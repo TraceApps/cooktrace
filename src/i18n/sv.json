@@ -1,0 +1,590 @@
+{
+  "nav": {
+    "recipes": "Recept",
+    "pantry": "Skafferi",
+    "diary": "Dagbok",
+    "shopping": "Shopping",
+    "settings": "Inställningar"
+  },
+  "routes": {
+    "recipes": { "title": "Recept"  },
+    "pantry": { "title": "Skafferi" },
+    "diary": {  "title": "Dagbok"   },
+    "shopping": { "title": "Shopping"  },
+    "settings": { "title": "Inställningar"   }
+  },
+  "common": {
+    "sign_out": "Logga ut",
+    "log_out": "Logga ut",
+    "signing_out": "Loggar ut…",
+    "experimental": "Experimentell",
+    "hide": "Dölj",
+    "save": "Spara",
+    "saving": "Sparar…",
+    "cancel": "Avbryt",
+    "delete": "Radera",
+    "back": "Tillbaka",
+    "edit": "Redigera",
+    "done": "Klart",
+    "close": "Stäng",
+    "loading": "Laddar…",
+    "signed_in": "Inloggad",
+    "signed_out": "Utloggad",
+    "linked": "Länkad",
+    "unlinked": "Okopplad",
+    "admin": "admin",
+    "errors": {
+      "cant_reach_server": "Kunde inte nå servern",
+      "failed": "Misslyckades",
+      "unlink_failed": "Kunde inte ta bort länken"
+    }
+  },
+  "settings": {
+    "appearance": {
+      "section": "Utseende",
+      "theme": "Tema",
+      "accent_color": "Accentfärg",
+      "navigation_style": "Navigeringsstil"
+    },
+    "regional": {
+      "section": "Regionala enheter",
+      "language": "Språk"
+    },
+    "diary": { "section": "Dagbok" },
+    "water": { "section": "Vatten" },
+    "foods": { "section": "Livsmedel" },
+    "categories": { "section": "Kategorier" },
+    "nutrients": { "section": "Näringsämnen" },
+    "goals": { "section": "Mål" },
+    "body_stats": { "section": "Kroppsstatistik" },
+    "statistics": { "section": "Statistik" },
+    "connected_services": { "section": "Matkällor" },
+    "ai": { "section": "AI-assistent" },
+    "notifications": { "section": "Aviseringar" },
+    "wellness": { "section": "Välbefinnande" },
+    "sharing": { "section": "Matdelning" },
+    "profile_hero": {
+      "label_fallback": "Min profil",
+      "subtitle_empty": "Tryck för att lägga till ditt namn och foto"
+    },
+    "authentication": { "section": "Autentisering" },
+    "users": {
+      "section": "Användare",
+      "users_heading": "Användare",
+      "add_user": "+ Lägg till användare",
+      "username": "Användarnamn",
+      "username_required": "Användarnamn *",
+      "full_name": "Fullständigt namn (valfritt)",
+      "password_required": "Lösenord *",
+      "confirm_required": "Bekräfta *",
+      "role": "Roll",
+      "role_admin": "admin",
+      "role_user": "användare",
+      "role_self_suffix": "(du)",
+      "create": "Skapa",
+      "creating": "Skapar…",
+      "delete_user_title": "Ta bort {name}?",
+      "delete_user_message": "All den här användarens data – mat, måltider, dagboksanteckningar, inställningar – kommer att tas bort. Detta kan inte ångras.",
+      "delete": "Radera",
+      "promote_title": "Befordra {name}?",
+      "promote_message": "De kommer att kunna hantera användare, delning, e-postkonfiguration och OIDC-leverantörer.",
+      "promote_confirm": "Befordra",
+      "demote_title": "Degradera {name}?",
+      "demote_message": "De kommer att förlora administratörsåtkomst. Du kan befordra dem tillbaka senare.",
+      "demote_confirm": "Degradera",
+      "reset_password": "Återställ lösenord",
+      "reset_password_prompt": "Ange nytt lösenord för {name}\n\n(Måste vara 8+ tecken med versaler, undre tecken, siffror och specialtecken.)",
+      "invite_user": "Bjud in användare",
+      "invite_user_explainer": "Skicka en registreringslänk så att användaren väljer sitt eget lösenord. Rekommenderas.",
+      "email_optional": "E-post (valfritt)",
+      "send_invite": "Skicka inbjudan",
+      "generate_link": "Generera inbjudningslänk",
+      "invite_sent": "Inbjudan skickad",
+      "invite_sent_to": "Inbjudan skickad till {email}",
+      "user_fallback": "användare",
+      "share_link_intro": "Dela den här länken:",
+      "copy": "Kopiera",
+      "copy_link": "Kopiera länk",
+      "add_user_show": "Lägg till användare manuellt",
+      "add_user_hide": "Dölj manuell tillägg",
+      "add_user_explainer": "Du ställer in användarnamn och lösenord själv och delar dem sedan med användaren. Användbart när SMTP inte är konfigurerat eller för offline-inställningar.",
+      "create_directly": "Skapa användare",
+      "session_duration": "Sessionens varaktighet",
+      "session_never": "Utgår aldrig",
+      "session_8h": "8 timmar",
+      "session_1d": "1 dag",
+      "session_7d": "7 dagar",
+      "session_30d": "30 dagar",
+      "session_90d": "90 dagar",
+      "session_1y": "1 år",
+      "save": "Spara",
+      "disable_um": "Inaktivera användarhantering",
+      "disable_um_subtitle": "Tar bort alla användarkonton och återgår till enanvändarläge",
+      "disable_um_title": "Inaktivera användarhantering?",
+      "disable_um_message": "Detta tar bort alla användarkonton och deras data kan inte återställas. Appen återgår till enanvändarläge.",
+      "disable_um_confirm": "Inaktivera och ta bort alla",
+      "enable_um": "Aktivera användarhantering",
+      "enable_um_subtitle": "Lägg till flera användarkonton med separata data och inställningar",
+      "create_admin_account": "Skapa administratörskonto",
+      "create_admin_explainer": "Det första kontot är alltid administratör. All befintlig mat-, måltids- och dagboksdata på den här servern kommer att tilldelas det.",
+      "enable_create": "Aktivera och skapa administratör",
+      "enabling": "Aktiverar…",
+      "toast_user_created": "Användare tillagd",
+      "toast_user_deleted": "Användaren borttagen",
+      "toast_password_reset": "Återställning av lösenord",
+      "toast_role_changed": "{name} är nu {role}",
+      "toast_um_enabled": "Användarhantering aktiverad",
+      "toast_um_disabled": "Användarhantering inaktiverad",
+      "toast_invite_sent": "Inbjudan skickad",
+      "toast_link_copied": "Kopierad!",
+      "err_username_required": "Användarnamn krävs",
+      "err_passwords_mismatch": "Lösenorden matchar inte",
+      "err_username_password_required": "Användarnamn och lösenord krävs",
+      "err_registration_failed": "Registreringen misslyckades",
+      "err_failed_to_add": "Misslyckades med att lägga till användare",
+      "err_could_not_change_role": "Kunde inte ändra roll",
+      "err_could_not_reset_password": "Kunde inte återställa lösenordet",
+      "err_could_not_reach_server": "Kunde inte nå servern"
+    },
+    "email": { "section": "E-post (SMTP)" },
+    "backup": { "section": "Säkerhetskopiering och återställning" },
+    "nutritionImport": { "section": "Importera från en annan app" },
+    "server": { "section": "Serveranslutning" },
+    "diagnostics": { "section": "Diagnostik" },
+    "about": { "section": "Om" }
+  },
+  "login": {
+    "subtitle": "Logga in på ditt konto",
+    "username": "Användarnamn",
+    "username_placeholder": "Ange användarnamn",
+    "password": "Lösenord",
+    "password_placeholder": "Ange lösenord",
+    "sign_in": "Logga in",
+    "signing_in": "Loggar in…",
+    "forgot_password": "Glömt lösenord?",
+    "locked_out": "Utelåst?",
+    "sso_sign_in_with": "Logga in med {provider}",
+    "sso_or": "eller",
+    "no_signin_methods": "Inga inloggningsmetoder tillgängliga. Fråga administratören.",
+    "errors": {
+      "failed": "Inloggningen misslyckades"
+    },
+    "recovery": {
+      "confirm": "Detta kommer att radera alla användarkonton. Dina mat- och dagboksdata kommer att sparas. Vill du fortsätta?",
+      "explainer": "Om du aldrig avsiktligt skapar användarkonton kan du inaktivera användarhantering. <strong>Detta kommer att radera alla användarkonton.</strong> Dina mat- och dagboksdata kommer att sparas.",
+      "token_prompt": "Ange <code>RECOVERY_TOKEN</code> från din servermiljö:",
+      "token_placeholder": "Återställningstoken",
+      "action": "Inaktivera användarhantering och återställ",
+      "disabling": "Inaktiverar…",
+      "failed": "Återställningen misslyckades",
+      "success": "Användarhantering inaktiverad — du är nu i enanvändarläge",
+      "done": "Användarhantering har inaktiverats.<br>Omdirigerar…"
+    }
+  },
+  "forgot_password": {
+    "title": "Återställ lösenord",
+    "intro": "Ange din e-postadress så skickar vi en länk för att återställa ditt lösenord.",
+    "email_label": "E-postadress",
+    "send_link": "Skicka återställningslänk",
+    "sending": "Skickar…",
+    "back_to_signin": "Tillbaka till inloggning",
+    "sent": "Om det finns ett konto för <strong>{email}</strong> har en återställningslänk skickats. Kontrollera din inkorg."
+  },
+  "reset_password": {
+    "title": "Nytt lösenord",
+    "verifying": "Verifierar länken…",
+    "invalid_link": "Den här återställningslänken är ogiltig eller har löpt ut.",
+    "request_new": "Begär en ny länk",
+    "success": "Lösenord uppdaterat. Omdirigerar…",
+    "set_for": "Ange ett nytt lösenord för <strong>{username}<strong>",
+    "new_password": "Nytt lösenord",
+    "confirm_password": "Bekräfta lösenord",
+    "password_placeholder": "8+ tecken, övre, nedre, nummer, symbol",
+    "submit": "Ange nytt lösenord",
+    "saving": "Sparar…",
+    "errors": {
+      "required": "Lösenord krävs",
+      "mismatch": "Lösenorden matchar inte",
+      "failed": "Återställningen misslyckades"
+    }
+  },
+  "profile": {
+    "title": "Profil",
+    "personal_info": "Personlig information",
+    "security": "Säkerhet",
+    "change_photo": "Ändra foto",
+    "full_name": "Fullständigt namn",
+    "full_name_placeholder": "Ditt fullständiga namn",
+    "email_placeholder": "Används för lösenordsåterställningar",
+    "nickname": "Smeknamn / Visningsnamn",
+    "nickname_placeholder": "Vad ska vi kalla dig?",
+    "birthday": "Födelsedag",
+    "gender": "Kön",
+    "gender_unset": "Föredrar att inte säga",
+    "change_password": "Ändra lösenord",
+    "set_password": "Ange lösenord",
+    "current_password": "Nuvarande lösenord",
+    "confirm_new_password": "Bekräfta nytt lösenord",
+    "saved": "Profilen sparad",
+    "password_changed": "Lösenordet har ändrats",
+    "linked_accounts": "Länkade konton",
+    "no_linked_accounts": "Inga identitetsleverantörer är länkade ännu.",
+    "link_with": "Länk med",
+    "unlink": "Ta bort länken",
+    "danger_zone": "Riskzon",
+    "delete_account": "Ta bort mitt konto",
+    "delete_account_explainer": "Ta bort ditt konto och all tillhörande data permanent – ​​mat, måltider, dagbok, välbefinnande, inställningar.",
+    "delete_account_title": "Radera ditt konto?",
+    "delete_account_message": "Dina mat-, måltids-, dagbok-, inställningar- och hälsodata kommer att tas bort permanent. Detta kan inte ångras.",
+    "delete_account_confirm": "Ta bort konto",
+    "deleting": "Tar bort…",
+    "account_deleted": "Konto raderat",
+    "errors": {
+      "save_failed": "Kunde inte spara profilen",
+      "upload_failed": "Uppladdningen misslyckades",
+      "password_change_failed": "Kunde inte ändra lösenordet",
+      "delete_account_failed": "Kunde inte ta bort kontot"
+    }
+  },
+  "wizard": {
+    "nav": {
+      "skip": "Skippa",
+      "get_started": "Kom igång",
+      "next": "Nästa",
+      "finish": "Slutför"
+    },
+    "welcome": {
+      "title": "Välkommen till CookTrace",
+      "desc": "Din personliga kostmätare. Vi hjälper dig att komma igång om ungefär en minut."
+    },
+    "name": {
+      "title": "Vad ska vi kalla dig?",
+      "desc": "Används i hälsningar, sidomenyn och din AI-assistent. Du kan ändra det senare i Inställningar.",
+      "placeholder": "Ditt namn (valfritt)"
+    },
+    "usermgmt": {
+      "create_account_title": "Skapa ditt konto",
+      "create_account_desc": "Konfigurera ditt administratörskonto för att säkra din CookTrace-instans. Du kan bjuda in andra användare senare från Inställningar.",
+      "multi_user_title": "Stöd för flera användare",
+      "multi_user_desc": "CookTrace kan köras i enanvändarläge (standard) eller fleranvändarläge med separata inloggningar och lösenordsåterställningar. Du kan alltid aktivera detta senare i Inställningar."
+    },
+    "units": {
+      "title": "Mätsystem",
+      "desc": "Hur mäter man saker?"
+    },
+    "gender": {
+      "title": "Vilket är ditt kön?",
+      "desc": "Används för att beräkna ditt kaloribehov."
+    },
+    "dob": {
+      "title": "När föddes du?",
+      "desc": "Din ålder påverkar din ämnesomsättning."
+    },
+    "height": {
+      "title": "Vad är din längd?",
+      "desc": "Används för att uppskatta ditt kaloribehov."
+    },
+    "weight": {
+      "title": "Vad är din vikt?"
+    },
+    "target": {
+      "title": "Vad är din målvikt?"
+    },
+    "activity": {
+      "title": "Hur aktiv är du?",
+      "desc": "Påverkar ditt dagliga kaloribehov."
+    },
+    "integrations": {
+      "title": "Integrationer",
+      "desc": "Anslut valfria tjänster. Hoppa över allt du inte behöver – du kan konfigurera dessa senare i Inställningar."
+    },
+    "notifications": {
+      "title": "Håll dig på rätt spår",
+      "desc": "Få användbara påminnelser och fira dina vinster. Du kan anpassa allt detta senare i Inställningar."
+    },
+    "summary": {
+      "title": "Dina dagliga mål",
+      "desc": "Beräknat från din statistik med hjälp av Mifflin-St Jeors formel."
+    },
+    "skip_modal": {
+      "title": "Hoppa över konfigurationen?",
+      "desc": "Du kan ställa in dina mål, enheter och integreringar när som helst från <strong>Inställningar</strong>. Fram till dess kommer kalorimål inte att beräknas automatiskt.",
+      "continue": "Fortsätt installationen",
+      "skip_now": "Hoppa över för tillfället"
+    }
+  },
+  "diary": {
+    "add_food": "Lägg till mat",
+    "notes_placeholder": "Hur kändes det idag? Sömn, energi, hunger, sug…",
+    "nav": {
+      "previous_day": "Föregående dag",
+      "next_day": "Nästa dag",
+      "jump_to_date": "Hoppa till datum"
+    },
+    "actions": {
+      "cancel_selection": "Avbryt val",
+      "delete_selected": "Ta bort markerade",
+      "log_water": "Logga vatten",
+      "log_water_long": "Vatten – registrera ditt vattenintag",
+      "nutrition_summary": "Näringssammanfattning",
+      "nutrition_summary_long": "Näringssammanfattning — fullständig sammanfattning av dagens näringsämnen",
+      "body_stats": "Kroppsstatistik",
+      "body_stats_long": "Kroppsstatistik — loggvikt, kroppsfett och mått"
+    },
+    "toast": {
+      "body_stats_saved": "Kroppsstatistik sparad",
+      "updated": "Uppdaterad",
+      "item_removed": "Objektet togs bort",
+      "activity_removed": "Aktivitet borttagen"
+    },
+    "errors": {
+      "note_save_failed": "Misslyckades med att spara anteckningen",
+      "name_required": "Vänligen ange ett namn",
+      "nothing_to_save": "Inget att spara",
+      "activity_save_failed": "Det gick inte att spara aktiviteten",
+      "activity_delete_failed": "Kunde inte ta bort aktiviteten"
+    },
+    "activity": {
+      "section": "Aktivitet",
+      "tap_to_add": "Tryck för att lägga till aktivitet",
+      "add": "Lägg till aktivitet",
+      "add_to_diary": "Lägg till i dagboken",
+      "save_changes": "Spara ändringar",
+      "title_add": "Lägg till aktivitet",
+      "title_edit": "Redigera aktivitet",
+      "field_name": "Aktivitet",
+      "field_name_placeholder": "t.ex. morgonvandring",
+      "field_kcal": "Förbrända kalorier",
+      "field_kcal_placeholder": "kcal",
+      "field_duration": "Varaktighet",
+      "field_duration_placeholder": "minuter",
+      "field_distance": "Avstånd",
+      "field_distance_placeholder": "t.ex. 10 km",
+      "field_optional": "(frivillig)",
+      "saving": "Lägger till…",
+      "estimated_short": "uppsk.",
+      "wellness_hint": "Synkroniserade träningspass från din enhet live i Wellness",
+      "not_counted": "räknas inte — använder bärbara enheter",
+      "policy_chip": "Policy: bärbar enhet vinner. Växla in Inställningar → Dagbok.",
+      "actions": {
+        "edit": "Redigera",
+        "delete": "Radera"
+      },
+      "errors": {
+        "name_required": "Namn krävs",
+        "kcal_required": "Kalorier som krävs"
+      }
+    }
+  },
+  "foods": {
+    "search_placeholder": "Sök efter mat eller skanna streckkoden...",
+    "scan_barcode": "Skanna streckkod",
+    "add_new": "Lägg till ny",
+    "n_selected": "{n} vald",
+    "add_n": "Lägg till",
+    "adding": "Lägger till…",
+    "add_selected_to_diary": "Lägg till markerade i dagboken",
+    "search_in": "Sök {source}",
+    "searching_in": "Söker efter {source}…",
+    "no_results_in": "Inga resultat i {source}",
+    "sources": {
+      "local": "Lokal",
+      "from_others": "Från andra"
+    },
+    "toast": {
+      "deleted": "Borttagen",
+      "cloned": "Klonad"
+    }
+  },
+  "trace": {
+    "panel_label": "AI-coachchatt",
+    "ask_placeholder": "Fråga mig vad som helst…",
+    "clear_conversation": "Rensa konversationen",
+    "attach_image": "Bifoga bild"
+  },
+  "smart_log": {
+    "placeholder": "Till frukost åt jag 2 ägg och rostat bröd"
+  },
+  "goals": {
+    "save_goal": "Spara mål",
+    "toast": {
+      "goal_saved": "Mål sparat",
+      "water_goal_saved": "Vattenmålet sparat",
+      "template_saved": "Mallen sparad",
+      "template_applied": "\"{name}\" tillämpades"
+    }
+  },
+  "food_editor": {
+    "name_placeholder": "Matens namn",
+    "brand_placeholder": "Varumärke (valfritt)",
+    "saved": "Sparad",
+    "added_to_diary": "Tillagd i dagboken",
+    "errors": {
+      "name_required": "Vänligen ange ett namn"
+    }
+  },
+  "meal_editor": {
+    "meal_name_placeholder": "Måltidsnamn",
+    "recipe_name_placeholder": "Receptnamn",
+    "errors": {
+      "no_ingredients": "Vänligen lägg till minst en ingrediens"
+    }
+  },
+  "pantry": {
+    "title": "Skafferi",
+    "add_item": "Lägg till objekt",
+    "search_placeholder": "Sök i skafferiet…",
+    "scan_barcode": "Skanna streckkod",
+    "filters": {
+      "all": "Alla",
+      "in_stock": "I lager",
+      "out": "Slut",
+      "all_categories": "Alla kategorier",
+      "uncategorized": "Okategoriserad",
+      "select_multiple": "Välj",
+      "cancel_select": "Avbryt"
+    },
+    "external": {
+      "searching_in": "Söker i {source}…",
+      "no_results_in": "Inga resultat i {source}",
+      "sources": {
+        "local": "Skafferi",
+        "off": "AV",
+        "usda": "USDA"
+      }
+    },
+    "actions": {
+      "edit": "Redigera",
+      "select_multiple": "Välj flera",
+      "delete": "Radera",
+      "mark_in_stock": "Markera som i lager",
+      "mark_out_stock": "Markera som slut i lager"
+    },
+    "bulk": {
+      "selected": "{n} vald",
+      "select_all": "Markera alla",
+      "clear": "Rensa",
+      "delete": "Radera",
+      "confirm_title": "Ta bort {n} skafferivaror?",
+      "confirm_message": "Recept som refererar till dem stannar kvar; det här tar bara bort dem från skafferiet."
+    }
+  },
+  "pantry_editor": {
+    "title_add": "Lägg till skafferiartikel",
+    "title_edit": "Redigera skafferiartikel",
+    "cards": {
+      "photo": "Bild",
+      "basic_info": "Grundläggande information",
+      "inventory": "Lager",
+      "category": "Kategori",
+      "notes": "Anteckningar",
+      "nutrition": "Näring",
+      "danger": "Riskzon"
+    },
+    "fields": {
+      "name": "Namn",
+      "name_placeholder": "Vanligt mjöl",
+      "brand": "Märke",
+      "brand_placeholder": "t.ex. kung Arthur",
+      "barcode": "Streckkod",
+      "serving_size": "Portionsstorlek",
+      "serving_unit": "Enhet",
+      "on_hand": "Till hands",
+      "in_stock": "I lager",
+      "in_stock_desc": "Kör \"X / Y i skafferiet\"-pillret på varje receptkort.",
+      "category_none": "Ingen",
+      "notes_placeholder": "Var du förvarar det, utgångsdatum, något annat…"
+    },
+    "actions": {
+      "share_to_off": "Dela till OFF",
+      "refresh_off": "Uppdatera från OFF",
+      "uploading": "Laddar upp…",
+      "loading": "Laddar…",
+      "submitted": "Inskickat!",
+      "updated": "Uppdaterad!",
+      "show_all_nutrients": "Visa alla näringsämnen",
+      "show_less": "Visa mindre",
+      "remove": "Ta bort från skafferiet"
+    },
+    "linked": {
+      "linked": "Länkat: ändrad portionsstorlek skalar varje näringsämne proportionellt",
+      "unlinked": "Okopplad: näringsvärdena förblir oförändrade när du ändrar portionsstorleken"
+    },
+    "errors": {
+      "name_required": "Namn krävs",
+      "save_failed": "Spara misslyckades",
+      "off_lookup_failed": "OFF-sökning misslyckades",
+      "off_not_found": "Hittades inte på Open Food Facts",
+      "share_no_barcode": "Lägg till en streckkod för att dela",
+      "refresh_no_barcode": "Lägg till eller skanna en streckkod först"
+    }
+  },
+  "diary_entry": {
+    "title_add": "Lägg till i dagboken",
+    "title_edit": "Redigera dagboksanteckning",
+    "save_changes": "Spara ändringar",
+    "submit": "Lägg till i dagboken",
+    "fields": {
+      "date": "Datum",
+      "notes": "Anteckningar",
+      "notes_hint": "(hur blev det?)",
+      "photos": "Foton",
+      "photos_hint": "(valfritt — lägg till så många du vill)"
+    },
+    "actions": {
+      "open_recipe": "Öppna recept",
+      "mark_cooked": "Markera som tillagad",
+      "delete": "Radera"
+    }
+  },
+  "settings_added": {
+    "food_sources": { "section": "Matkällor" },
+    "off": {
+      "section": "Open Food Facts",
+      "enable": "Aktivera Open Food Facts",
+      "enable_desc": "Slå upp streckkoder i den globala crowdsourcade matdatabasen. Inget konto behövs för sökningar; man behöver bara ladda upp redigeringar via Dela till OFF.",
+      "search_language": "Sökspråk",
+      "search_country": "Sök land",
+      "upload_country": "Uppladdningsland",
+      "username": "Kontoanvändarnamn",
+      "username_hint": "Valfritt — behövs endast för att ladda upp redigeringar.",
+      "password": "Kontolösenord",
+      "create_account": "Skapa ett OFF-konto →"
+    },
+    "usda": {
+      "section": "USDA FoodData Central",
+      "enable": "Aktivera USDA FoodData",
+      "enable_desc": "Sök i USDA:s näringsdatabas när du lägger till skafferiprodukter.",
+      "get_key": "Skaffa en gratis API-nyckel →",
+      "api_key": "API-nyckel"
+    },
+    "barcode_scanner": {
+      "section": "Streckkodsläsare",
+      "beep": "Pipsignal vid skanning",
+      "beep_desc": "Kort ljudbekräftelse när en streckkod känns igen.",
+      "flashlight": "Automatisk aktivering av ficklampa",
+      "flashlight_desc": "Slå på den bakre kamerans ficklampa automatiskt när skannern öppnas (endast webb – native använder operativsystemets kameragränssnittskontroller)."
+    },
+    "federation": { "section": "NutriTrace Federation" }
+  },
+  "accept_invite": {
+    "title": "Skapa konto",
+    "verifying": "Verifierar inbjudan…",
+    "invalid_link": "Den här inbjudningslänken är ogiltig eller har gått ut. Be administratören om en ny.",
+    "success": "Konto skapat! Omdirigerar…",
+    "intro": "Du har blivit inbjuden till CookTrace. Välj ett användarnamn och lösenord för att komma igång.",
+    "intro_with_email": "Du blev inbjuden som <strong>{email}</strong>. Välj ett användarnamn och lösenord för att komma igång.",
+    "username_label": "Användarnamn *",
+    "username_placeholder": "Välj ett användarnamn",
+    "full_name_label": "Fullständigt namn (valfritt)",
+    "full_name_placeholder": "Ditt namn",
+    "password_label": "Lösenord *",
+    "confirm_label": "Bekräfta lösenord *",
+    "submit": "Skapa konto",
+    "creating": "Skapar konto…",
+    "errors": {
+      "username_required": "Användarnamn krävs",
+      "failed": "Misslyckades med att skapa konto"
+    }
+  }
+}

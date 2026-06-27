@@ -4,9 +4,11 @@ import { register, init, getLocaleFromNavigator } from 'svelte-i18n';
 // register them here and add an entry to AVAILABLE_LOCALES so the language
 // picker in Settings → Appearance shows the new option.
 register('en', () => import('./en.json'));
+register('sv', () => import('./sv.json'));
 
 export const AVAILABLE_LOCALES = [
   { code: 'en', label: 'English' },
+  { code: 'sv', label: 'Svenska' },
 ];
 
 export function initI18n(initialLocale) {
