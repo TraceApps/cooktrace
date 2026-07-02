@@ -212,20 +212,26 @@ async function pullChanges() {
 }
 
 /**
- * Full sync round: push pending, then pull recent. Concurrent callers
- * share the in-flight promise so a manual "Sync now" tap mid-background
- * round doesn't double-fire.
+ * Full sync round: pull recent FIRST, then push pending. Pull-then-push
+ * means mobile pushes against the freshest baseline; otherwise a row
+ * the user edited locally before the server's last change would push
+ * the stale full-row payload and silently clobber the server (issue
+ * surfaced as variant relationships not appearing on mobile even
+ * though the PWA had set them — local row was still pre-attach, the
+ * push sent generic_parent_id=NULL, and the server's value was lost).
+ * Concurrent callers share the in-flight promise so a manual "Sync
+ * now" tap mid-background round doesn't double-fire.
  */
 export async function fullSync(silentOrOpts = false) {
   const silent = typeof silentOrOpts === 'object' ? !!silentOrOpts.silent : !!silentOrOpts;
   if (!_shouldRun()) return { ok: false, reason: 'not-server-mode' };
   if (_syncInFlight) return _syncInFlight;
-  syncState.update(s => ({ ...s, syncing: true, phase: 'push', error: null }));
+  syncState.update(s => ({ ...s, syncing: true, phase: 'pull', error: null }));
   _syncInFlight = (async () => {
     try {
-      const push = await pushChanges();
-      syncState.update(s => ({ ...s, phase: 'pull' }));
       const pull = await pullChanges();
+      syncState.update(s => ({ ...s, phase: 'push' }));
+      const push = await pushChanges();
       // After the data pull, walk the server's image URLs and download
       // any that aren't already in the local cache so recipe/pantry/
       // diary thumbnails render offline. Best-effort: a failure here

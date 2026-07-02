@@ -125,18 +125,18 @@ input[type="number"]::-webkit-inner-spin-button {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  /* Top padding leaves room for the floating hamburger button row above the
-     title. When hamburger is showing: safe-top + 10 (top inset) + 40 (button) +
-     8 (gap) = title row starts well below the hamburger. When hamburger is
-     hidden: just safe-top + 10. */
-  padding: calc(var(--page-top, var(--safe-top)) + 10px + var(--hamburger-row, 0px)) var(--page-px) 12px;
-  /* Align the H1's first letter to the hamburger centerline (viewport x=32)
-     so the title visually anchors to the menu button. When hamburger is
-     hidden, --hamburger-offset is 0 and we fall back to normal --page-px. */
-  padding-left: max(var(--page-px), var(--hamburger-offset, 0px));
+  /* Compact-height header across all three banner modes (Animated /
+     Gradient / Off). Illustrated SVG banners were retired alongside
+     the rebuild; all three modes share the same compact geometry,
+     differing only in background and motion. Mirrors LiftTrace's
+     banner retirement (aa9d5a0 + 5fe7280). */
+  padding-top: calc(var(--page-top, var(--safe-top)) + 10px);
+  padding-bottom: 10px;
+  padding-right: var(--page-px);
+  padding-left: max(var(--page-px), var(--hamburger-clearance, 0px));
 }
 .page-header h1 {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 800;
   margin: 0;
   line-height: 1.1;
@@ -146,40 +146,14 @@ input[type="number"]::-webkit-inner-spin-button {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  /* Fixed 40px height so the title sits at the same vertical position on every
-     page (matching .btn-icon height used in page-header actions). Sticky sub-bars
-     on Diary/Wellness rely on this exact value for their top offset calculation. */
   height: 40px;
   display: flex;
   align-items: center;
 }
 
-/* Banner variant — taller header with illustrated SVG backdrop */
-.page-header.has-banner {
-  clip-path: inset(0);       /* clip the SVG to the header bounds — avoids iOS Safari
-                                 bug where overflow:hidden on sticky stops child animations */
-  padding-bottom: 72px;      /* extend downward to give the illustration room */
-  align-items: flex-end;     /* push h1 (and any action buttons) to the bottom */
-}
-/* Ensure h1 gradient text is legible over the illustration */
-.page-header.has-banner h1 {
-  position: relative;        /* stack above the absolute SVG */
-  z-index: 1;
-  text-shadow: 0 2px 12px rgba(0,0,0,0.35);
-}
-
-/* Gradient variant — compact-height header (same geometry as the plain
-   .page-header:not(.has-banner) compact mode) but with the user's active
-   accent gradient as the background instead of glass. No tall-banner
-   padding, no SVG; just a themed compact bar. Top-left radial highlight
-   gives an otherwise-flat gradient a glossy, dimensional feel. Mirrors
-   NutriTrace 34ce663 + 9de0853, with the same NT-flavored glass
-   overlay so it reads as part of the same sticky-chrome family as the
-   compact header rather than a hard accent block bolted on. */
+/* Gradient variant — accent-tinted background, static. */
 .page-header.banner-gradient {
   background:
-    /* Subtle white film softens saturation and ties it to NT's overall
-       glass aesthetic without dulling the accent enough to matter. */
     linear-gradient(180deg,
       rgba(255, 255, 255, 0.10) 0%,
       rgba(255, 255, 255, 0.04) 100%),
@@ -190,57 +164,135 @@ input[type="number"]::-webkit-inner-spin-button {
       color-mix(in srgb, var(--accent)   65%, transparent) 0%,
       color-mix(in srgb, var(--accent-2) 55%, transparent) 100%),
     var(--glass-surface);
-  /* Real backdrop refraction when anything peeks behind the sticky top. */
   backdrop-filter: blur(8px) saturate(140%);
   -webkit-backdrop-filter: blur(8px) saturate(140%);
-  border-bottom: 1px solid var(--border);
 }
 .page-header.banner-gradient h1 {
-  /* Solid white reads better on the saturated gradient than the accent-
-     gradient text fill (which would clash with the accent backdrop). */
   background: none;
   -webkit-text-fill-color: #fff;
   color: #fff;
 }
-/* Header action buttons blend into the saturated gradient with their
-   default transparent-bg + tinted-icon look. Give them a subtle frosted-
-   glass pill + pure-white icon so they read as tappable surfaces, scoped
-   to gradient mode only. CookTrace has no portaled top-bar actions, so
-   the in-header selector covers everything. */
-.page-header.banner-gradient .btn-icon {
+
+/* Animated variant — same geometry + base look as Gradient. The
+   animation itself is picked separately under Settings → Appearance
+   → Banner Animation, applied via documentElement-level
+   `banner-animation-<style>` classes so the rules below stay
+   decoupled from the route markup. Four styles ship: shimmer
+   (default), drift, pulse, aurora. All honour prefers-reduced-motion. */
+.page-header.banner-animated {
+  background:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, 0.10) 0%,
+      rgba(255, 255, 255, 0.04) 100%),
+    radial-gradient(ellipse 80% 100% at 15% -10%,
+      rgba(255, 255, 255, 0.28) 0%,
+      rgba(255, 255, 255, 0)   60%),
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--accent)   65%, transparent) 0%,
+      color-mix(in srgb, var(--accent-2) 55%, transparent) 100%),
+    var(--glass-surface);
+  backdrop-filter: blur(8px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+  /* Intentionally NOT setting position here — base .page-header handles
+     standalone routes, sticky-top wrappers force the inner header static.
+     A nested sticky here breaks the wrapper's pin. */
+  overflow: hidden;
+}
+.page-header.banner-animated h1 {
+  background: none;
+  -webkit-text-fill-color: #fff;
+  color: #fff;
+}
+.page-header.banner-animated > * {
+  position: relative;
+  z-index: 1;
+}
+
+html.banner-animation-shimmer .page-header.banner-animated::before {
+  content: '';
+  position: absolute;
+  inset: -20% 0;
+  background: radial-gradient(ellipse 35% 100% at 50% 50%,
+    rgba(255, 255, 255, 0.32) 0%,
+    rgba(255, 255, 255, 0)   100%);
+  pointer-events: none;
+  z-index: 0;
+  animation: ct-banner-shimmer 9s linear infinite;
+}
+@keyframes ct-banner-shimmer {
+  from { transform: translateX(-70%); }
+  to   { transform: translateX(170%); }
+}
+
+html.banner-animation-drift .page-header.banner-animated {
+  animation: ct-banner-drift 14s ease-in-out infinite alternate;
+}
+@keyframes ct-banner-drift {
+  from { filter: hue-rotate(0deg)  saturate(1);    }
+  to   { filter: hue-rotate(24deg) saturate(1.15); }
+}
+
+html.banner-animation-pulse .page-header.banner-animated {
+  animation: ct-banner-pulse 6s ease-in-out infinite alternate;
+}
+@keyframes ct-banner-pulse {
+  from { filter: brightness(1)    saturate(1);    }
+  to   { filter: brightness(1.08) saturate(1.18); }
+}
+
+html.banner-animation-aurora .page-header.banner-animated::before,
+html.banner-animation-aurora .page-header.banner-animated::after {
+  content: '';
+  position: absolute;
+  inset: -50% 0;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(28px);
+}
+html.banner-animation-aurora .page-header.banner-animated::before {
+  background: radial-gradient(ellipse 40% 120% at 50% 50%,
+    color-mix(in srgb, var(--accent-2) 55%, transparent) 0%,
+    transparent 70%);
+  animation: ct-banner-aurora-a 12s ease-in-out infinite alternate;
+}
+html.banner-animation-aurora .page-header.banner-animated::after {
+  background: radial-gradient(ellipse 40% 120% at 50% 50%,
+    color-mix(in srgb, var(--accent) 55%, transparent) 0%,
+    transparent 70%);
+  animation: ct-banner-aurora-b 16s ease-in-out infinite alternate;
+}
+@keyframes ct-banner-aurora-a {
+  from { transform: translateX(-30%); }
+  to   { transform: translateX( 60%); }
+}
+@keyframes ct-banner-aurora-b {
+  from { transform: translateX( 50%); }
+  to   { transform: translateX(-40%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.banner-animation-shimmer .page-header.banner-animated::before,
+  html.banner-animation-aurora  .page-header.banner-animated::before,
+  html.banner-animation-aurora  .page-header.banner-animated::after  { animation: none; }
+  html.banner-animation-drift   .page-header.banner-animated,
+  html.banner-animation-pulse   .page-header.banner-animated         { animation: none; }
+}
+
+/* Frosted-pill action buttons against accent backgrounds (Gradient and
+   Animated). CookTrace has no portaled top-bar actions, so the
+   in-header selector covers everything. */
+.page-header.banner-gradient .btn-icon,
+.page-header.banner-animated .btn-icon {
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
 }
-.page-header.banner-gradient .btn-icon:hover { background: rgba(255, 255, 255, 0.22); }
-.page-header.banner-gradient .btn-icon .material-symbols-rounded { color: #fff; }
-
-/* Compact variant — applied automatically whenever the user has page
-   banners turned off. The hamburger normally pushes the H1 onto its
-   own line (via --hamburger-row in the padding-top calc). For pages
-   without an illustrated banner there's no good reason for that empty
-   row — bring the title up alongside the hamburger, shrink the type a
-   notch, and drop the border so the sticky blur alone separates the
-   header from the content. Saves ~40px of vertical real estate on
-   every page without changing markup. */
-.page-header:not(.has-banner) {
-  padding-top: calc(var(--page-top, var(--safe-top)) + 10px);
-  /* Symmetric 10px gap above and below the inner 40px row so the title
-     sits in the centre of the compact bar instead of hugging the bottom
-     border. Sticky sub-bars below the header (date strip, search bar)
-     still sit flush against the border because the padding lives
-     INSIDE the border, not below it. */
-  padding-bottom: 10px;
-  /* Title sits NEXT TO the hamburger button (not below it), so the
-     left padding has to clear the button itself. --hamburger-clearance
-     is the button's RIGHT edge + small gap (~64px when shown, 0 when
-     the sidebar is pinned and the button isn't rendered). When the
-     hamburger isn't visible the standard --page-px gutter takes over. */
-  padding-left: max(var(--page-px), var(--hamburger-clearance, 0px));
+.page-header.banner-gradient .btn-icon:hover,
+.page-header.banner-animated .btn-icon:hover {
+  background: rgba(255, 255, 255, 0.22);
 }
-.page-header:not(.has-banner) h1 {
-  font-size: 22px;
-  /* Keep the hamburger button's 40px tap target as the row baseline. */
-  height: 40px;
+.page-header.banner-gradient .btn-icon .material-symbols-rounded,
+.page-header.banner-animated .btn-icon .material-symbols-rounded {
+  color: #fff;
 }
 
 /* Page shell — used by all route pages.

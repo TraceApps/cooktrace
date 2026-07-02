@@ -239,9 +239,9 @@
                 <span class="field-label">Password *</span>
                 <div class="pw-wrap">
                   {#if umShowPass}
-                    <input class="input pw-input" type="text" bind:value={umPassword} autocomplete="new-password" placeholder="8+ chars, upper, lower, number, symbol" />
+                    <input class="input pw-input" type="text" bind:value={umPassword} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" placeholder="8+ chars, upper, lower, number, symbol" />
                   {:else}
-                    <input class="input pw-input" type="password" bind:value={umPassword} autocomplete="new-password" placeholder="8+ chars, upper, lower, number, symbol" />
+                    <input class="input pw-input" type="password" bind:value={umPassword} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" placeholder="8+ chars, upper, lower, number, symbol" />
                   {/if}
                   <button
                     type="button"
@@ -262,7 +262,7 @@
               </label>
               <label class="field">
                 <span class="field-label">Confirm *</span>
-                <input class="input" type="password" bind:value={umConfirm} autocomplete="new-password" />
+                <input class="input" type="password" bind:value={umConfirm} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
                 {#if umConfirm && umPassword !== umConfirm}
                   <span class="pw-mismatch">Passwords don't match</span>
                 {/if}

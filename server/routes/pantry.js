@@ -306,9 +306,19 @@ router.post('/', wrap((req, res) => {
   const name = (body.name || '').toString().trim();
   if (!name) return res.status(400).json({ error: 'Name is required' });
 
-  // Dedupe by case-insensitive name within the same user.
+  // Dedupe by case-insensitive name within the same user. Variants
+  // are excluded from the dedupe scope (Issue #4): when a user has
+  // "GreenWise Whole Milk" as a variant of a different generic and
+  // types "Whole Milk" into Create, they want a brand-new top-level
+  // row, not to silently match into the unrelated variant. Generic
+  // and flat rows (generic_parent_id IS NULL) still dedupe so users
+  // can't double-create a top-level item with the same name.
   const dup = db.prepare(
-    `SELECT * FROM pantry_items WHERE ${userClause(u)} AND LOWER(name) = LOWER(?) AND deleted_at IS NULL`
+    `SELECT * FROM pantry_items
+       WHERE ${userClause(u)}
+       AND LOWER(name) = LOWER(?)
+       AND deleted_at IS NULL
+       AND generic_parent_id IS NULL`
   ).get(...userArgs(u), name);
   if (dup) return res.status(200).json(_hydrate(dup));
 
@@ -321,12 +331,23 @@ router.post('/', wrap((req, res) => {
     const c = db.prepare(`SELECT slug FROM pantry_categories WHERE id = ?`).get(categoryId);
     categorySlug = c?.slug || null;
   }
+  // Variant fields (Issue #4). generic_parent_id sets this row as a
+  // child variant of the given pantry item. nutrition_source_variant_id
+  // is only meaningful when this row is itself a generic (i.e. has at
+  // least one child) and points at one of its children. Validation that
+  // both stay in range is done at update / promote time; create-time
+  // values are trusted (caller is the editor flow which already picked
+  // valid IDs).
+  const genericParentId = body.generic_parent_id != null && body.generic_parent_id !== ''
+    ? parseInt(body.generic_parent_id, 10) : null;
+  const nutritionSourceVariantId = body.nutrition_source_variant_id != null && body.nutrition_source_variant_id !== ''
+    ? parseInt(body.nutrition_source_variant_id, 10) : null;
   const result = db.prepare(
     `INSERT INTO pantry_items
        (user_id, name, brand, barcode, in_stock, quantity, unit, expires_on, nt_food_id,
         img_url, notes, category, category_id, serving_size, serving_unit, serving_label,
-        nutrition, g_per_cup)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        nutrition, g_per_cup, generic_parent_id, nutrition_source_variant_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     u, name,
     body.brand?.toString().trim() || null,
@@ -345,6 +366,8 @@ router.post('/', wrap((req, res) => {
     body.serving_label || null,
     _stringifyNutrition(body.nutrition),
     body.g_per_cup != null && body.g_per_cup !== '' ? Number(body.g_per_cup) : null,
+    Number.isFinite(genericParentId) ? genericParentId : null,
+    Number.isFinite(nutritionSourceVariantId) ? nutritionSourceVariantId : null,
   );
   const row = db.prepare(`SELECT * FROM pantry_items WHERE id = ?`).get(result.lastInsertRowid);
   res.status(201).json(_hydrate(row));
@@ -378,12 +401,56 @@ router.put('/:id', wrap((req, res) => {
     }
   }
 
+  // Variant fields (Issue #4). Both are validated below so we can't
+  // create cycles (item points at itself) or three-level hierarchies
+  // (a child cannot also be a generic). nutrition_source_variant_id
+  // is additionally constrained to a row that is a child of this item.
+  let nextGenericParentId = existing.generic_parent_id;
+  if (body.generic_parent_id !== undefined) {
+    if (body.generic_parent_id === null || body.generic_parent_id === '') {
+      nextGenericParentId = null;
+    } else {
+      const candidate = parseInt(body.generic_parent_id, 10);
+      if (!Number.isFinite(candidate))            return res.status(400).json({ error: 'generic_parent_id must be a number or null' });
+      if (candidate === id)                       return res.status(400).json({ error: "An item can't be its own generic parent" });
+      const parent = db.prepare(
+        `SELECT id, generic_parent_id FROM pantry_items WHERE id = ? AND deleted_at IS NULL`
+      ).get(candidate);
+      if (!parent)                                return res.status(400).json({ error: 'Generic parent not found' });
+      if (parent.generic_parent_id != null)       return res.status(400).json({ error: "Can't nest variants under another variant" });
+      const ownChildren = db.prepare(
+        `SELECT COUNT(*) AS n FROM pantry_items WHERE generic_parent_id = ? AND deleted_at IS NULL`
+      ).get(id);
+      if (ownChildren.n > 0)                      return res.status(400).json({ error: "Can't move a generic with its own variants under another generic" });
+      nextGenericParentId = candidate;
+    }
+  }
+
+  let nextNutritionSourceVariantId = existing.nutrition_source_variant_id;
+  if (body.nutrition_source_variant_id !== undefined) {
+    if (body.nutrition_source_variant_id === null || body.nutrition_source_variant_id === '') {
+      nextNutritionSourceVariantId = null;
+    } else {
+      const candidate = parseInt(body.nutrition_source_variant_id, 10);
+      if (!Number.isFinite(candidate))            return res.status(400).json({ error: 'nutrition_source_variant_id must be a number or null' });
+      const source = db.prepare(
+        `SELECT id, generic_parent_id FROM pantry_items WHERE id = ? AND deleted_at IS NULL`
+      ).get(candidate);
+      if (!source)                                return res.status(400).json({ error: 'Nutrition source variant not found' });
+      if (source.generic_parent_id !== id)        return res.status(400).json({ error: 'Nutrition source must be a child of this item' });
+      nextNutritionSourceVariantId = candidate;
+    }
+  }
+  // A row that is itself a variant can never own a nutrition source.
+  if (nextGenericParentId != null) nextNutritionSourceVariantId = null;
+
   db.prepare(
     `UPDATE pantry_items SET
        name = ?, brand = ?, barcode = ?, in_stock = ?, quantity = ?, unit = ?, expires_on = ?,
        nt_food_id = ?, img_url = ?, notes = ?,
        category = ?, category_id = ?, serving_size = ?, serving_unit = ?, serving_label = ?,
        nutrition = ?, g_per_cup = ?,
+       generic_parent_id = ?, nutrition_source_variant_id = ?,
        updated_at = datetime('now')
      WHERE id = ?`
   ).run(
@@ -404,6 +471,8 @@ router.put('/:id', wrap((req, res) => {
     body.serving_label !== undefined ? (body.serving_label || null) : existing.serving_label,
     body.nutrition !== undefined ? _stringifyNutrition(body.nutrition) : existing.nutrition,
     body.g_per_cup !== undefined ? (body.g_per_cup === '' || body.g_per_cup == null ? null : Number(body.g_per_cup)) : existing.g_per_cup,
+    nextGenericParentId,
+    nextNutritionSourceVariantId,
     id,
   );
   const row = db.prepare(`SELECT * FROM pantry_items WHERE id = ?`).get(id);
@@ -420,10 +489,41 @@ router.delete('/:id', wrap((req, res) => {
   if ((u == null && existing.user_id != null) || (u != null && existing.user_id !== u)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  db.prepare(
-    `UPDATE pantry_items SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
-  ).run(id);
-  res.json({ ok: true });
+  // Variant handling on parent delete. Soft-delete sets deleted_at;
+  // the FK `ON DELETE SET NULL` only fires on hard deletes, so without
+  // this block children would keep pointing at a now-hidden parent
+  // and become invisible in both the list (excluded by generic_parent_id
+  // filter) and the parent's expand (parent itself is gone).
+  //   ?cascade=1  → soft-delete every child too.
+  //   otherwise   → promote children to standalone flat items
+  //                 (generic_parent_id cleared, nutrition_source ref
+  //                 unwound on the parent which is going away anyway).
+  const cascade = req.query.cascade === '1' || req.query.cascade === 'true';
+  const variantIds = db.prepare(
+    `SELECT id FROM pantry_items WHERE generic_parent_id = ? AND deleted_at IS NULL`
+  ).all(id).map(r => r.id);
+  const tx = db.transaction(() => {
+    if (variantIds.length) {
+      if (cascade) {
+        db.prepare(
+          `UPDATE pantry_items
+              SET deleted_at = datetime('now'), updated_at = datetime('now')
+            WHERE id IN (${variantIds.map(() => '?').join(',')})`
+        ).run(...variantIds);
+      } else {
+        db.prepare(
+          `UPDATE pantry_items
+              SET generic_parent_id = NULL, updated_at = datetime('now')
+            WHERE id IN (${variantIds.map(() => '?').join(',')})`
+        ).run(...variantIds);
+      }
+    }
+    db.prepare(
+      `UPDATE pantry_items SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
+    ).run(id);
+  });
+  tx();
+  res.json({ ok: true, cascade, affected_variants: variantIds.length });
 }));
 
 // ── PATCH /:id/stock — quick toggle ─────────────────────────────────────
@@ -465,8 +565,12 @@ export function ensurePantryItems(userId, names) {
   const insert = db.prepare(
     `INSERT INTO pantry_items (user_id, name, in_stock) VALUES (?, ?, 0)`
   );
+  // Same variant-aware dedupe as POST /pantry: ensurePantryItems used by
+  // recipe-save linking should match top-level rows only. A variant
+  // that happens to share a name with a recipe ingredient shouldn't
+  // intercept the link.
   const findByName = db.prepare(
-    `SELECT * FROM pantry_items WHERE ${userExpr} AND LOWER(name) = ? AND deleted_at IS NULL`
+    `SELECT * FROM pantry_items WHERE ${userExpr} AND LOWER(name) = ? AND deleted_at IS NULL AND generic_parent_id IS NULL`
   );
   const findById = db.prepare(`SELECT * FROM pantry_items WHERE id = ?`);
 

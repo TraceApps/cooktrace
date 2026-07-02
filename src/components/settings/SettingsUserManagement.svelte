@@ -534,9 +534,9 @@
             <input class="input" type="text" bind:value={newUsername} placeholder={$_('settings.users.username_required')} autocomplete="off" />
             <div class="um-pw-wrap">
               {#if newShowPass}
-                <input class="input um-pw-input" type="text" bind:value={newPassword} placeholder={$_('settings.users.password_required')} autocomplete="new-password" />
+                <input class="input um-pw-input" type="text" bind:value={newPassword} placeholder={$_('settings.users.password_required')} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
               {:else}
-                <input class="input um-pw-input" type="password" bind:value={newPassword} placeholder={$_('settings.users.password_required')} autocomplete="new-password" />
+                <input class="input um-pw-input" type="password" bind:value={newPassword} placeholder={$_('settings.users.password_required')} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
               {/if}
               <button class="um-pw-eye" type="button" on:click={() => newShowPass = !newShowPass} aria-label={newShowPass ? 'Hide' : 'Show'}>
                 <span class="material-symbols-rounded">{newShowPass ? 'visibility_off' : 'visibility'}</span>
@@ -631,18 +631,18 @@
             <div class="um-form-row">
               <div style="display:flex;gap:4px;align-items:center;flex:1">
                 {#if enableShowPass}
-                  <input class="input" style="flex:1" type="text" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" />
+                  <input class="input" style="flex:1" type="text" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
                 {:else}
-                  <input class="input" style="flex:1" type="password" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" />
+                  <input class="input" style="flex:1" type="password" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
                 {/if}
                 <button class="btn-icon" on:click={() => enableShowPass = !enableShowPass} style="flex-shrink:0">
                   <span class="material-symbols-rounded" style="font-size:18px">{enableShowPass ? 'visibility_off' : 'visibility'}</span>
                 </button>
               </div>
               {#if enableShowPass}
-                <input class="input" type="text" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" />
+                <input class="input" type="text" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
               {:else}
-                <input class="input" type="password" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" />
+                <input class="input" type="password" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
               {/if}
             </div>
             {#if enableUmError}<p class="um-error">{enableUmError}</p>{/if}

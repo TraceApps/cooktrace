@@ -329,7 +329,10 @@ const _CtApiHttp = {
   createPantryItem(data)         { return this.post('/api/pantry', data); },
   updatePantryItem(id, data)     { return this.put(`/api/pantry/${id}`, data); },
   toggleStock(id, in_stock)      { return this.patch(`/api/pantry/${id}/stock`, { in_stock }); },
-  deletePantryItem(id)           { return this.del(`/api/pantry/${id}`); },
+  deletePantryItem(id, opts = {}) {
+    const q = opts.cascade ? '?cascade=1' : '';
+    return this.del(`/api/pantry/${id}${q}`);
+  },
 
   // Cook Diary (Phase 3) — past cooks + planned cooks
   async getCookDiary(opts = {}) {

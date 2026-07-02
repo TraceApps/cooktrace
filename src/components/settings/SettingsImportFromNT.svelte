@@ -14,6 +14,7 @@
   import { ntFederationEnabled, ntInstanceUrl } from '../../stores/settings.js';
   import { resolveAssetUrl, apiUrl, isNative, getServerUrl, getAuthToken } from '../../lib/platform.js';
   import { showSuccess, showError } from '../../stores/toast.js';
+  import { NtApi } from '../../lib/api.js';
 
   let query = '';
   let searching = false;
@@ -22,6 +23,36 @@
   let inStock = true;
   let importing = false;
   let summary = null;        // { count, created, skipped }
+
+  // Variant import mode (Issue #4 commit 4). Three options for what
+  // shape the imported NT foods take in the CookTrace pantry:
+  //   'flat'                 each food becomes a standalone pantry item
+  //                          (the original behaviour, default).
+  //   'variant-of-existing'  each food becomes a child variant of an
+  //                          existing generic pantry item the user picks.
+  //   'variant-of-new'       a fresh generic is created first, and all
+  //                          imported foods become its children.
+  let variantMode = 'flat';
+  let existingGenericId = null;
+  let newGenericName = '';
+  let pantryGenerics = [];
+
+  async function _loadPantryGenerics() {
+    try {
+      const all = await NtApi.getPantry();
+      // A row is eligible as a parent if it is currently a generic
+      // (something points at it) OR flat (could be promoted). Filter
+      // out variants since those can't host children.
+      const variantIds = new Set(all.filter(r => r.generic_parent_id != null).map(r => r.generic_parent_id));
+      pantryGenerics = all
+        .filter(r => r.generic_parent_id == null)
+        .map(r => ({ id: r.id, name: r.name, isGeneric: variantIds.has(r.id) }))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    } catch { pantryGenerics = []; }
+  }
+  // Refresh the generic pool whenever the picker actually has results
+  // (cheap; runs at most once per search).
+  $: if (results.length > 0) _loadPantryGenerics();
 
   function _authHeaders() {
     const h = { 'Content-Type': 'application/json' };
@@ -67,13 +98,30 @@
   async function commit() {
     if (selected.size === 0) return;
     const foods = results.filter(r => selected.has(r.id));
+    // Variant import mode validation. The server accepts the mode
+    // as-is and creates the new generic when asked; client-side gate
+    // is just so the request never goes out half-baked.
+    if (variantMode === 'variant-of-existing' && !existingGenericId) {
+      showError('Pick a pantry item to attach these as variants of.');
+      return;
+    }
+    if (variantMode === 'variant-of-new' && !newGenericName.trim()) {
+      showError('Name the new generic item first.');
+      return;
+    }
     importing = true;
     try {
       const res = await fetch(apiUrl('/api/nt/import-foods'), {
         method: 'POST',
         credentials: 'include',
         headers: _authHeaders(),
-        body: JSON.stringify({ foods, inStock }),
+        body: JSON.stringify({
+          foods,
+          inStock,
+          variantMode,
+          parentId: variantMode === 'variant-of-existing' ? existingGenericId : null,
+          newGenericName: variantMode === 'variant-of-new' ? newGenericName.trim() : null,
+        }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `Import failed (${res.status})`);
@@ -162,6 +210,43 @@
             </li>
           {/each}
         </ul>
+        <fieldset class="variant-mode">
+          <legend class="variant-mode-legend">Import as</legend>
+          <label class="variant-mode-row">
+            <input type="radio" bind:group={variantMode} value="flat" />
+            <span class="variant-mode-label">
+              <span class="variant-mode-title">New flat items</span>
+              <span class="variant-mode-desc">Each picked food becomes its own pantry item. Default behavior.</span>
+            </span>
+          </label>
+          <label class="variant-mode-row">
+            <input type="radio" bind:group={variantMode} value="variant-of-existing" />
+            <span class="variant-mode-label">
+              <span class="variant-mode-title">Variants of an existing pantry item</span>
+              <span class="variant-mode-desc">Attach all picked foods as branded variants of a generic you already have.</span>
+              {#if variantMode === 'variant-of-existing'}
+                <select class="select variant-mode-select" bind:value={existingGenericId}>
+                  <option value={null}>Pick a pantry item…</option>
+                  {#each pantryGenerics as g (g.id)}
+                    <option value={g.id}>{g.name}{g.isGeneric ? ' (generic)' : ''}</option>
+                  {/each}
+                </select>
+              {/if}
+            </span>
+          </label>
+          <label class="variant-mode-row">
+            <input type="radio" bind:group={variantMode} value="variant-of-new" />
+            <span class="variant-mode-label">
+              <span class="variant-mode-title">Variants of a new generic item</span>
+              <span class="variant-mode-desc">Create a new generic (e.g. "Milk"), then drop all picked foods in as its variants.</span>
+              {#if variantMode === 'variant-of-new'}
+                <input class="input variant-mode-input" type="text"
+                  placeholder="New generic name (e.g. Milk)"
+                  bind:value={newGenericName} />
+              {/if}
+            </span>
+          </label>
+        </fieldset>
         <label class="opt">
           <input type="checkbox" bind:checked={inStock} />
           <span>Mark Imported Items as In Stock</span>
@@ -280,6 +365,34 @@
     margin-bottom: 12px; font-size: 13px; color: var(--text-2); cursor: pointer;
   }
   .actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* Variant import-mode radios (Issue #4 commit 4) */
+  .variant-mode {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    margin-top: 12px;
+  }
+  .variant-mode-legend {
+    padding: 0 6px;
+    font-size: 12px; font-weight: 700;
+    color: var(--text-2);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .variant-mode-row {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 8px 0;
+    cursor: pointer;
+  }
+  .variant-mode-row + .variant-mode-row { border-top: 1px solid var(--border); }
+  .variant-mode-row input[type="radio"] { margin-top: 4px; }
+  .variant-mode-label { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  .variant-mode-title { color: var(--text-1); font-size: 13px; font-weight: 600; }
+  .variant-mode-desc { color: var(--text-3); font-size: 12px; line-height: 1.4; }
+  .variant-mode-select, .variant-mode-input {
+    margin-top: 6px;
+    max-width: 320px;
+  }
 
   .summary { padding: 14px 16px 16px; }
   .summary-head { display: flex; gap: 12px; margin-bottom: 12px; align-items: flex-start; }

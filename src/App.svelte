@@ -12,7 +12,7 @@
   import Toast     from './components/ui/Toast.svelte';
   import ConfirmDialogMount from './components/ui/ConfirmDialogMount.svelte';
   import { DB }    from './lib/db.js';
-  import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent, language, pageBanners } from './stores/settings.js';
+  import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent, language, pageBanners, bannerStyle, bannerAnimation } from './stores/settings.js';
   import { locale } from 'svelte-i18n';
   import { currentUser, userMgmtActive, setupRequired, loadAuthState, handleOidcCallback } from './stores/auth.js';
   import { needsNativeSetup, isNative, getNativeMode, getServerUrl, apiUrl } from './lib/platform.js';
@@ -115,10 +115,9 @@
     // banner-on layout is active (title sits BELOW the floating
     // hamburger). In banner-off / compact mode the title sits NEXT to
     // the button so no extra row is needed.
-    document.documentElement.style.setProperty(
-      '--hamburger-row',
-      (showHamburger && $pageBanners) ? '48px' : '0px'
-    );
+    // All three banner modes share the compact-header geometry
+    // (illustrated SVG banners were retired). --hamburger-row stays 0.
+    document.documentElement.style.setProperty('--hamburger-row', '0px');
     // 12px (left margin) + 40px (button width) + 12px (gap before title)
     document.documentElement.style.setProperty(
       '--hamburger-clearance',
@@ -150,6 +149,16 @@
 
   $: if (typeof document !== 'undefined') {
     document.documentElement.classList.toggle('no-animations', !!$disableAnimations);
+    // Apply exactly one `banner-animation-<style>` class on documentElement
+    // so the CSS animation rules in base.css can target a single decorative
+    // style without conflicting selectors. Only active when bannerStyle is
+    // 'animated'; gradient + off get no animation class regardless.
+    for (const cls of ['banner-animation-shimmer','banner-animation-drift','banner-animation-pulse','banner-animation-aurora']) {
+      document.documentElement.classList.remove(cls);
+    }
+    if ($bannerStyle === 'animated') {
+      document.documentElement.classList.add(`banner-animation-${$bannerAnimation || 'shimmer'}`);
+    }
   }
 
   onMount(async () => {

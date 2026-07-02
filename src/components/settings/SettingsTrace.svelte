@@ -21,12 +21,27 @@
   // NutriTrace pattern: paste / type freely, then click Save to commit.
   // The draft is initialised from the store and re-synced when the
   // store changes (e.g. settings sync from another device).
+  //
+  // Sync via a guarded reactive that only fires when the STORE value
+  // actually changes. The previous `$: draft = $store || draft` form
+  // reran on every keystroke (because `draft` is one of its
+  // dependencies) and silently overwrote the user's typing once a
+  // value had been saved before, surfacing as "field is read-only"
+  // for any user trying to update their key or base URL. (Issue #5.)
   let aiApiKeyDraft  = $aiApiKey  || '';
   let aiBaseUrlDraft = $aiBaseUrl || '';
   let aiKeySaved     = false;
   let aiBaseUrlSaved = false;
-  $: aiApiKeyDraft  = $aiApiKey  || aiApiKeyDraft;
-  $: aiBaseUrlDraft = $aiBaseUrl || aiBaseUrlDraft;
+  let _aiApiKeySynced  = $aiApiKey;
+  let _aiBaseUrlSynced = $aiBaseUrl;
+  $: if ($aiApiKey !== _aiApiKeySynced) {
+    _aiApiKeySynced = $aiApiKey;
+    aiApiKeyDraft = $aiApiKey || '';
+  }
+  $: if ($aiBaseUrl !== _aiBaseUrlSynced) {
+    _aiBaseUrlSynced = $aiBaseUrl;
+    aiBaseUrlDraft = $aiBaseUrl || '';
+  }
 
   // Save now also runs the connection test. If it succeeds the user
   // gets a toast + green check + the Trace FAB unlocks. If it fails

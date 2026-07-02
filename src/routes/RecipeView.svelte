@@ -1,6 +1,7 @@
 <script>
   import { push } from 'svelte-spa-router';
   import { fade } from 'svelte/transition';
+  import { formatDuration } from '../lib/duration.js';
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { confirmDialog } from '../stores/confirmDialog.js';
@@ -504,7 +505,8 @@
   }
 
   function totalMinutes(r) {
-    return (r?.prep_minutes || 0) + (r?.cook_minutes || 0);
+    if (r?.total_minutes != null) return r.total_minutes;
+    return (r?.prep_minutes || 0) + (r?.cook_minutes || 0) + (r?.rest_minutes || 0);
   }
 
   // Map a video URL (external or local) onto a render mode.
@@ -760,19 +762,25 @@
           {#if recipe.prep_minutes}
             <div class="meta-stat">
               <span class="material-symbols-rounded meta-icon">schedule</span>
-              <div class="meta-text"><span class="meta-label">Prep Time</span><span class="meta-value">{recipe.prep_minutes}m</span></div>
+              <div class="meta-text"><span class="meta-label">Prep Time</span><span class="meta-value">{formatDuration(recipe.prep_minutes)}</span></div>
             </div>
           {/if}
           {#if recipe.cook_minutes}
             <div class="meta-stat">
               <span class="material-symbols-rounded meta-icon">local_fire_department</span>
-              <div class="meta-text"><span class="meta-label">Cook Time</span><span class="meta-value">{recipe.cook_minutes}m</span></div>
+              <div class="meta-text"><span class="meta-label">Cook Time</span><span class="meta-value">{formatDuration(recipe.cook_minutes)}</span></div>
+            </div>
+          {/if}
+          {#if recipe.rest_minutes}
+            <div class="meta-stat">
+              <span class="material-symbols-rounded meta-icon">hourglass_top</span>
+              <div class="meta-text"><span class="meta-label">Rest Time</span><span class="meta-value">{formatDuration(recipe.rest_minutes)}</span></div>
             </div>
           {/if}
           {#if totalMinutes(recipe) > 0}
             <div class="meta-stat">
               <span class="material-symbols-rounded meta-icon">timer</span>
-              <div class="meta-text"><span class="meta-label">Total Time</span><span class="meta-value">{totalMinutes(recipe)}m</span></div>
+              <div class="meta-text"><span class="meta-label">Total Time</span><span class="meta-value">{formatDuration(totalMinutes(recipe))}</span></div>
             </div>
           {/if}
           {#if recipe.servings}

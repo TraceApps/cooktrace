@@ -24,7 +24,9 @@ Third app in the Trace family alongside [NutriTrace](https://github.com/traceapp
 ## Features
 
 ### Recipes
-- Full recipe model: name, hero image, description, star rating, favorite, yield, prep / cook / total time, servings, ingredient groups, step list, kitchen gear, source URL, video URL, rich-text notes
+- Full recipe model: name, hero image, description, star rating, favorite, yield, prep / cook / rest / total time, servings, ingredient groups, step list, kitchen gear, source URL, video URL, rich-text notes
+- **Rest Time** covers every hands-off period — bread rise, meat rest, dough chill, marinate, soak, ferment. Left blank stays hidden on the recipe view
+- **Total Time is auto-calculated from Prep + Cook + Rest by default**, with an optional manual override in the editor. Times render everywhere as `45m` under an hour or `1h 15m` above, not raw minutes. Importers pick up Rest and Total from Mealie / Paprika / schema.org / Tandoor when the source names them
 - **Per-step photos** — camera-icon button on each step opens a Camera / Upload / URL picker
 - **Step text formatting** — `**bold**`, `*italic*`, `__underline__` inline; time mentions like `15 minutes` become tappable timers
 - **Live recipe scaling** — ×0.5 / ×1 / ×2 / ×3 chips plus custom servings; quantities snap to common cooking fractions and render as mixed numbers (`1 ½` not `1 1/2`)
@@ -47,14 +49,16 @@ Third app in the Trace family alongside [NutriTrace](https://github.com/traceapp
 - **Rich-text Notes** — bold / italic / underline / strikethrough + text-color palette + bullet / numbered lists. HTML is sanitized; scripts and event handlers are stripped
 
 ### Pantry
-- **Slide-up details sheet** — tapping an item opens a bottom sheet (mobile) or centered card (desktop) with hero photo, brand, category, barcode, stock pill, serving size, on-hand quantity, and Nutrition Facts
-- **In-place edit** — tap Edit on the sheet, the fields swap to inputs. Photo, name, brand, category, barcode, in-stock, serving size + unit, on-hand qty, notes
+- **Slide-up details sheet** — tapping an item opens a bottom sheet (mobile) or centered card (desktop) with hero photo, brand, category, barcode, stock pill, serving size, on-hand quantity, expiration date, and Nutrition Facts
+- **In-place edit** — tap Edit on the sheet, the fields swap to inputs. Photo, name, brand, category, barcode, in-stock, serving size + unit, on-hand qty, expiration date, notes
+- **Variants** — every row can carry sub-variants for different brands of the same ingredient. Whole Milk is the generic a recipe links to; Greenwise, Publix, and the store-brand version each live under it as their own row with their own barcode, photo, stock, and expiry. Add Variant with inline suggestions (type a brand, matching pantry items surface as tap-to-attach chips). Search picks the right thing to show: parent card for the generic name, standalone variant card for a brand-specific query, parent-expanded when the query mentions both
+- **Expiration dates + digest** — every row gains an Expires On field with the app's in-sheet calendar picker. Amber pill for anything within two weeks, red for past. Expiring Soon filter chip surfaces the whole set in one tap. Settings → Notifications → Reminders → Expiration Digest opts into a once-a-day roll-up notification at the time you pick, covering everything expiring within your chosen window (1 / 3 / 5 / 7 / 14 days). Past-expiry items always ride along
 - **Inline nutrient editing** — one input row per nutrient in your visibleNutriments setting (default ~10 staples). `Edit all nutrients` opens a stacked sub-sheet with the full 31-nutrient picker
 - **Grid + List view modes** — toggle in the filter row; per-user preference syncs across devices
 - **Bulk multi-select** — checklist mode, Select All, bulk delete
 - **External lookup** — Open Food Facts search + barcode scanner via `@capacitor-mlkit/barcode-scanning` (native) or QuaggaJS (web). Optional USDA FoodData Central search when you enter a key in Settings
 - **Catalog grows organically** — opt-in via Settings → Cooking → Auto-add ingredients to Pantry (default off). Manual links from the Link picker always work either way
-- **Pantry-match pill** on every recipe card: `8 / 10 in pantry`, color-coded full / partial / none
+- **Pantry-match pill** on every recipe card: `8 / 10 in pantry`, color-coded full / partial / none. Variant-aware — a generic counts as in-stock if any of its variants are stocked
 
 ![CookTrace pantry — grid view with photos, stock pills, and category filter chips](docs/screenshots/02-pantry.png)
 
@@ -409,14 +413,14 @@ The dev server proxies `/api` to `:3001` so the same fetch paths work in dev and
 
 ## Translations
 
-CookTrace ships with English (`en`) translations. Pick your active language from **Settings → Regional & Units → Language** — the change is reactive (no reload needed).
+CookTrace comes with English (`en`) translations and a community-contributed Swedish (`sv`) translation. Pick your active language from **Settings → Regional & Units → Language**. The change is reactive (no reload needed).
 
-**Want to contribute a translation?** It's a single JSON file:
+**Want to contribute a translation?** Four small steps:
 
 1. Copy `src/i18n/en.json` to `src/i18n/<your-locale>.json` (e.g. `fr.json`, `de.json`, `pt-BR.json`).
 2. Translate the values, leave the keys untouched. HTML / Markdown inside values (e.g. `<strong>`, `<code>`, `<br>`) stays as-is.
-3. `npm run i18n:check` reports per-locale coverage.
-4. Open a PR.
+3. Register the locale in `src/i18n/index.js`: add a `register('<your-locale>', () => import('./<your-locale>.json'));` line, and add an `{ code: '<your-locale>', label: '<Language name in its own language>' }` entry to `AVAILABLE_LOCALES` so the picker in Settings surfaces it.
+4. Run `npm run i18n:check` to confirm 100% key coverage, then open a PR.
 
 ---
 

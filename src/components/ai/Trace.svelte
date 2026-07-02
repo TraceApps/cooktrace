@@ -345,20 +345,66 @@
                   (p.category?.name || '').toLowerCase() === cat ||
                   (p.category?.slug || '').toLowerCase() === cat)
               : rows;
-            return filtered.map(p => ({
-              id: p.id,
-              name: p.name,
-              brand: p.brand || null,
-              in_stock: !!p.in_stock,
-              quantity: p.quantity ?? null,
-              unit: p.unit ?? null,
-              expires_on: p.expires_on ?? null,
-              category: p.category?.name || null,
-              serving: p.serving_size ? `${p.serving_size} ${p.serving_unit || 'g'}` : null,
-              has_nutrition: !!(p.nutrition && Object.keys(p.nutrition).length > 0),
-              barcode: p.barcode || null,
-              notes: p.notes || null,
-            }));
+            // Variant-aware shape (Issue #4). Standalone variants drop
+            // from the top of the response; they ride along under their
+            // parent in `variants[]`. This stops the AI from double-
+            // counting (e.g. "Milk" and three branded variants all
+            // appearing as four separate rows).
+            const variantsByParent = new Map();
+            for (const r of filtered) {
+              if (r.generic_parent_id != null) {
+                if (!variantsByParent.has(r.generic_parent_id)) variantsByParent.set(r.generic_parent_id, []);
+                variantsByParent.get(r.generic_parent_id).push(r);
+              }
+            }
+            const topLevel = filtered.filter(r => r.generic_parent_id == null);
+            const shapeVariant = (v) => ({
+              id: v.id,
+              brand: v.brand || null,
+              name: v.name,
+              in_stock: !!v.in_stock,
+              quantity: v.quantity ?? null,
+              unit: v.unit ?? null,
+              barcode: v.barcode || null,
+              expires_on: v.expires_on ?? null,
+            });
+            const isInStock = (p) => {
+              const kids = variantsByParent.get(p.id) || [];
+              if (kids.length > 0) return kids.some(k => k.in_stock);
+              return !!p.in_stock;
+            };
+            return topLevel
+              // Filter by in_stock_only AFTER aggregation so a generic
+              // with at least one stocked variant correctly surfaces.
+              .filter(p => !args?.in_stock_only || isInStock(p))
+              .map(p => {
+                // For generics, the parent doesn't carry an expiry — the
+                // variants each own one. Roll them up so the AI sees the
+                // earliest date under the parent's expires_on, matching
+                // the pill on the pantry list card.
+                const kids = variantsByParent.get(p.id) || [];
+                const kidExps = kids.map(k => k.expires_on).filter(Boolean);
+                const earliestKidExp = kidExps.length
+                  ? kidExps.reduce((a, b) => (a < b ? a : b))
+                  : null;
+                return {
+                id: p.id,
+                name: p.name,
+                brand: p.brand || null,
+                in_stock: isInStock(p),
+                quantity: p.quantity ?? null,
+                unit: p.unit ?? null,
+                expires_on: p.expires_on ?? earliestKidExp,
+                category: p.category?.name || null,
+                serving: p.serving_size ? `${p.serving_size} ${p.serving_unit || 'g'}` : null,
+                has_nutrition: !!(p.nutrition && Object.keys(p.nutrition).length > 0),
+                barcode: p.barcode || null,
+                notes: p.notes || null,
+                ...((variantsByParent.get(p.id) || []).length > 0
+                  ? { variants: (variantsByParent.get(p.id) || []).map(shapeVariant) }
+                  : {}),
+                };
+              });
           } catch (e) { return { error: e.message || 'Failed' }; }
         }
         case 'find_recipes_from_pantry': {
@@ -578,7 +624,8 @@
       servings: r.servings,
       prep_minutes: r.prep_minutes,
       cook_minutes: r.cook_minutes,
-      total_minutes: (r.prep_minutes || 0) + (r.cook_minutes || 0),
+      rest_minutes: r.rest_minutes,
+      total_minutes: r.total_minutes != null ? r.total_minutes : (r.prep_minutes || 0) + (r.cook_minutes || 0) + (r.rest_minutes || 0),
       rating: r.rating,
       favorite: !!r.favorite,
       last_cooked_at: r.last_cooked_at,

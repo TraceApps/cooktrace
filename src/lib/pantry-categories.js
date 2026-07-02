@@ -29,10 +29,17 @@ const _byId = new Map(PANTRY_CATEGORIES.map(c => [c.id, c]));
 
 export function categoryLabel(id) {
   if (!id) return 'Uncategorized';
+  // Server hydrate now returns the joined category as an object
+  // ({ id, name, slug, icon, color }) instead of a slug string. Be
+  // defensive so callers passing either shape keep working. Without
+  // this, an object id misses the Map lookup and the caller renders
+  // `[object Object]` as the label.
+  if (typeof id === 'object') return id.name || id.label || 'Uncategorized';
   return _byId.get(id)?.label || id;
 }
 
 export function categoryIcon(id) {
   if (!id) return 'help';
+  if (typeof id === 'object') return id.icon || 'kitchen';
   return _byId.get(id)?.icon || 'kitchen';
 }

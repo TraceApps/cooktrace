@@ -17,6 +17,9 @@ import { scrapeRecipe, fetchRecipeHtml, extractFromHtml } from '../lib/recipe-sc
 import { aiExtractRecipe } from '../lib/recipe-ai-fallback.js';
 import { scrapeWithRecipeScrapers, isRecipeScrapersAvailable } from '../lib/recipe-scrapers-bridge.js';
 import { importRecipeFromText, importPaprikaArchive, scanRecipeZip, scanLoadedZip, loadRecipeZip, readImageFromLoadedZip, readZipImageBytes, mealieEventImagePaths } from '../lib/recipe-importers.js';
+import { extractText, detectFileType } from '../lib/text-extractors.js';
+import { parseRecipeText, HIGH_CONFIDENCE_THRESHOLD } from '../lib/heuristic-recipe-parser.js';
+import JSZip from 'jszip';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -157,8 +160,19 @@ function _toStorage(body) {
     img_url:      body.img_url ?? body.imgUrl ?? null,
     servings:     body.servings != null ? Math.max(1, parseInt(body.servings, 10) || 1) : null,
     yield_text:   body.yield_text ? String(body.yield_text).trim() || null : null,
-    prep_minutes: body.prep_minutes != null ? Math.max(0, parseInt(body.prep_minutes, 10) || 0) : null,
-    cook_minutes: body.cook_minutes != null ? Math.max(0, parseInt(body.cook_minutes, 10) || 0) : null,
+    prep_minutes:  body.prep_minutes  != null ? Math.max(0, parseInt(body.prep_minutes,  10) || 0) : null,
+    cook_minutes:  body.cook_minutes  != null ? Math.max(0, parseInt(body.cook_minutes,  10) || 0) : null,
+    // Rest / rise / marinate / chill — the generic hands-off slot.
+    // Rolls into auto-calc for total_minutes when the manual
+    // override is null.
+    rest_minutes:  body.rest_minutes  != null && body.rest_minutes  !== ''
+      ? Math.max(0, parseInt(body.rest_minutes,  10) || 0)
+      : null,
+    // Optional manual override. NULL means "auto = prep + cook +
+    // rest"; a value here wins downstream.
+    total_minutes: body.total_minutes != null && body.total_minutes !== ''
+      ? Math.max(0, parseInt(body.total_minutes, 10) || 0)
+      : null,
     rating,
     ingredients:  JSON.stringify(Array.isArray(body.ingredients) ? body.ingredients : []),
     steps:        JSON.stringify(Array.isArray(body.steps) ? body.steps : []),
@@ -184,13 +198,30 @@ router.get('/', wrap((req, res) => {
     `SELECT * FROM recipes WHERE ${_whereUser(u)} AND deleted_at IS NULL ORDER BY updated_at DESC`
   ).all(..._userArgs(u));
 
-  // Build a Set of in-stock pantry_item_ids once for the whole list, so
-  // the pantry-match summary on each card is O(ingredients) per recipe.
-  const stockSet = new Set(
-    db.prepare(
-      `SELECT id FROM pantry_items WHERE ${_whereUser(u)} AND in_stock = 1 AND deleted_at IS NULL`
-    ).all(..._userArgs(u)).map(r => r.id)
-  );
+  // Build a Set of "effectively in-stock" pantry_item_ids once for the
+  // whole list, so the pantry-match summary on each card is
+  // O(ingredients) per recipe.
+  //
+  // Variant-aware (Issue #4): a row counts as in-stock when its own
+  // in_stock = 1, OR when it is a generic with at least one in-stock
+  // child variant. Recipes whose ingredient links to either the parent
+  // or a specific child get a correct match either way.
+  const allStock = db.prepare(
+    `SELECT id, generic_parent_id, in_stock FROM pantry_items
+       WHERE ${_whereUser(u)} AND deleted_at IS NULL`
+  ).all(..._userArgs(u));
+  const stockSet = new Set();
+  const stockedByParent = new Set();
+  for (const r of allStock) {
+    if (r.in_stock) {
+      stockSet.add(r.id);
+      if (r.generic_parent_id != null) stockedByParent.add(r.generic_parent_id);
+    }
+  }
+  // Promote every generic whose any child is in stock.
+  for (const r of allStock) {
+    if (stockedByParent.has(r.id)) stockSet.add(r.id);
+  }
 
   // Bulk-prefetch categories for the user once, then index by id. Avoids
   // an N+1 SELECT inside _hydrate.
@@ -545,13 +576,13 @@ router.post('/', wrap((req, res) => {
   const result = db.prepare(
     `INSERT INTO recipes
        (user_id, name, description, img_url, servings, yield_text,
-        prep_minutes, cook_minutes, rating, favorite,
+        prep_minutes, cook_minutes, total_minutes, rest_minutes, rating, favorite,
         ingredients, steps, tags, tools, nutrition,
         source_url, notes, visibility, created_by_username, category_id, video_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     u, data.name, data.description, data.img_url, data.servings, data.yield_text,
-    data.prep_minutes, data.cook_minutes, data.rating, data.favorite,
+    data.prep_minutes, data.cook_minutes, data.total_minutes, data.rest_minutes, data.rating, data.favorite,
     data.ingredients, data.steps, data.tags, data.tools, data.nutrition,
     data.source_url, data.notes, data.visibility, creatorUsername, data.category_id, data.video_url,
   );
@@ -580,14 +611,14 @@ router.put('/:id', wrap((req, res) => {
   db.prepare(
     `UPDATE recipes SET
        name = ?, description = ?, img_url = ?, servings = ?, yield_text = ?,
-       prep_minutes = ?, cook_minutes = ?, rating = ?, favorite = ?,
+       prep_minutes = ?, cook_minutes = ?, total_minutes = ?, rest_minutes = ?, rating = ?, favorite = ?,
        ingredients = ?, steps = ?, tags = ?, tools = ?, nutrition = ?,
        source_url = ?, notes = ?, visibility = ?, category_id = ?, video_url = ?,
        updated_at = datetime('now')
      WHERE id = ?`
   ).run(
     data.name, data.description, data.img_url, data.servings, data.yield_text,
-    data.prep_minutes, data.cook_minutes, data.rating, data.favorite,
+    data.prep_minutes, data.cook_minutes, data.total_minutes, data.rest_minutes, data.rating, data.favorite,
     data.ingredients, data.steps, data.tags, data.tools, data.nutrition,
     data.source_url, data.notes, data.visibility, data.category_id, data.video_url,
     id,
@@ -946,6 +977,62 @@ function _recomputeCookAggregates(recipeId) {
 // Parses schema.org/Recipe JSON-LD from the page, normalises into our
 // shape, then runs through the regular create flow so pantry-linking +
 // sodium↔salt derivation apply automatically.
+// Scrape one URL through the tiered chain (Standard JSON-LD, Enhanced
+// recipe-scrapers, Smart AI fallback) without saving. Returns
+// { parsed, usedTier, errors }. Shared by /scrape (single-URL save flow)
+// and /batch-scrape (multi-URL preview-and-pick flow).
+async function _scrapeUrlOnly(url, opts = {}) {
+  const errors = [];
+  let html, finalUrl;
+  try { ({ html, finalUrl } = await fetchRecipeHtml(url)); }
+  catch (e) { return { parsed: null, usedTier: null, errors: [e.message] }; }
+
+  const engine   = opts.engine   || 'standard';
+  const fallback = opts.fallback || 'standard';
+  const aiCfg    = opts.aiCfg    || null;
+  let parsed = null;
+  let usedTier = null;
+
+  const tryStandard = () => {
+    try {
+      const r = extractFromHtml(html, finalUrl);
+      if (r) { parsed = r; usedTier = 'standard'; }
+    } catch (e) { errors.push(`standard: ${e.message}`); }
+  };
+  const tryEnhanced = async () => {
+    try {
+      if (!await isRecipeScrapersAvailable()) {
+        errors.push('enhanced: recipe-scrapers not available on this server');
+        return;
+      }
+      const r = await scrapeWithRecipeScrapers(html, finalUrl);
+      if (r?.name) { parsed = r; usedTier = 'enhanced'; }
+    } catch (e) { errors.push(`enhanced: ${e.message}`); }
+  };
+  const trySmart = async () => {
+    try {
+      if (!aiCfg) { errors.push('smart: AI not configured'); return; }
+      const r = await aiExtractRecipe(html, finalUrl, aiCfg);
+      if (r?.name) { parsed = r; usedTier = 'smart'; }
+    } catch (e) { errors.push(`smart: ${e.message}`); }
+  };
+
+  if (engine === 'enhanced') {
+    await tryEnhanced();
+    if (!parsed) {
+      if (fallback === 'smart') await trySmart();
+      if (!parsed) tryStandard();
+    }
+  } else if (engine === 'smart') {
+    await trySmart();
+    if (!parsed) tryStandard();
+  } else {
+    tryStandard();
+    if (!parsed && aiCfg) await trySmart();
+  }
+  return { parsed, usedTier, errors };
+}
+
 router.post('/scrape', wrap(async (req, res) => {
   const u = uid(req);
   const url = (req.body?.url || '').toString().trim();
@@ -1041,6 +1128,122 @@ router.post('/scrape', wrap(async (req, res) => {
     return res.status(200).json({ skipped: true, reason: 'duplicate', _import_tier: usedTier });
   }
   res.status(201).json({ ...row, _import_tier: usedTier });
+}));
+
+// ── POST /batch-scrape ─────────────────────────────────────────────────
+// Multi-URL preview-and-pick flow. Accepts `{ urls: [string, ...] }`,
+// scrapes each through the tiered chain (concurrency capped at 3 to
+// avoid hammering target sites), and writes per-URL parsed previews
+// into the same .import-cache/bulk-<uuid>/ pattern Phase 2 uses. The
+// existing /bulk-commit endpoint then saves the user-selected rows.
+//
+// Concurrency cap (3) is per-batch only; over a 50-URL paste this
+// completes in under a minute on most sites, while keeping any single
+// host happy.
+router.post('/batch-scrape', wrap(async (req, res) => {
+  const u = uid(req);
+  const raw = req.body?.urls;
+  let urls = [];
+  if (Array.isArray(raw)) {
+    urls = raw.map(s => String(s || '').trim()).filter(Boolean);
+  } else if (typeof raw === 'string') {
+    // Allow a single string of newline / space / comma separated URLs.
+    urls = raw.split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
+  }
+  // De-duplicate while preserving order.
+  const seen = new Set();
+  urls = urls.filter(u => (seen.has(u) ? false : (seen.add(u), true)));
+  if (urls.length === 0) return res.status(400).json({ error: 'No URLs provided' });
+  if (urls.length > 100) return res.status(400).json({ error: 'Up to 100 URLs per batch' });
+
+  _pruneImportCache();
+  const uuid = crypto.randomUUID();
+
+  const engine   = _userSetting(u, 'urlImportEngine')   || 'standard';
+  const fallback = _userSetting(u, 'urlImportFallback') || 'standard';
+  const aiCfg    = _aiConfigForUser(u);
+  const scrapeOpts = { engine, fallback, aiCfg };
+
+  // Small concurrent pool. Workers pull from a shared index so we don't
+  // need a queue library for a one-shot batch.
+  const CONCURRENCY = 3;
+  const manifest = new Array(urls.length);
+  let nextIdx = 0;
+
+  async function worker() {
+    while (true) {
+      const i = nextIdx++;
+      if (i >= urls.length) return;
+      const url = urls[i];
+      const fileId = String(i + 1);
+      try {
+        const result = await _scrapeUrlOnly(url, scrapeOpts);
+        if (!result.parsed) {
+          const row = {
+            id: fileId,
+            filename: url,
+            source: null,
+            url,
+            error: result.errors[0] || 'No recipe could be extracted',
+            empty: false,
+            confidence: 0,
+          };
+          manifest[i] = row;
+          _writeBulkPreview(uuid, fileId, row);
+          continue;
+        }
+        // URL-scraped recipes treat as high confidence (the parse came
+        // from a structured source). The Phase 2 picker uses this to
+        // pre-check rows by default.
+        const summary = {
+          id: fileId,
+          filename: result.parsed.name || url,
+          source: null,
+          url,
+          type: 'url',
+          tier: result.usedTier,
+          empty: false,
+          confidence: 1,
+          name: result.parsed.name,
+          servings: result.parsed.servings || null,
+          prep_minutes:  result.parsed.prep_minutes  || null,
+          cook_minutes:  result.parsed.cook_minutes  || null,
+          rest_minutes:  result.parsed.rest_minutes  || null,
+          total_minutes: result.parsed.total_minutes || null,
+          ingredientCount: (result.parsed.ingredients || []).length,
+          stepCount: (result.parsed.steps || []).length,
+        };
+        manifest[i] = summary;
+        _writeBulkPreview(uuid, fileId, { ...summary, recipe: result.parsed });
+      } catch (e) {
+        const row = {
+          id: fileId,
+          filename: url,
+          source: null,
+          url,
+          error: e.message || 'Scrape failed',
+          empty: false,
+          confidence: 0,
+        };
+        manifest[i] = row;
+        _writeBulkPreview(uuid, fileId, row);
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, urls.length) }, () => worker()));
+
+  return res.status(201).json({
+    cacheUuid: uuid,
+    highConfidenceThreshold: HIGH_CONFIDENCE_THRESHOLD,
+    items: manifest,
+    summary: {
+      total: manifest.length,
+      clean:      manifest.filter(m => !m.error).length,
+      partial:    0,
+      lowOrError: manifest.filter(m =>  m.error).length,
+    },
+  });
 }));
 
 // Read a single user_settings value as a plain string. Returns null
@@ -1156,13 +1359,13 @@ function _saveImportedRecipe(u, parsed, opts = {}) {
   const result = db.prepare(
     `INSERT INTO recipes
        (user_id, name, description, img_url, servings, yield_text,
-        prep_minutes, cook_minutes, rating, favorite,
+        prep_minutes, cook_minutes, total_minutes, rest_minutes, rating, favorite,
         ingredients, steps, tags, tools, nutrition,
         source_url, notes, visibility, created_by_username, category_id, video_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     u, data.name, data.description, data.img_url, data.servings, data.yield_text,
-    data.prep_minutes, data.cook_minutes, data.rating, data.favorite,
+    data.prep_minutes, data.cook_minutes, data.total_minutes, data.rest_minutes, data.rating, data.favorite,
     data.ingredients, data.steps, data.tags, data.tools, data.nutrition,
     data.source_url, data.notes, data.visibility, creatorUsername, data.category_id, data.video_url,
   );
@@ -1195,10 +1398,17 @@ function _saveImportedRecipe(u, parsed, opts = {}) {
 // expands to multiple recipes (one row per file in the archive).
 const _importUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 16 * 1024 * 1024 }, // 16 MB — Paprika archives can be large
+  limits: { fileSize: 16 * 1024 * 1024 }, // 16 MB. Paprika archives can be large.
 });
-// Larger multer for zip-based bulk imports — Mealie / Tandoor backup
-// zips with image assets routinely run 100–300 MB. Override via the
+// Multer instance for the file-import flow (Issue #2 Phase 1). Accepts PDF /
+// RTF / TXT / MD up to 16 MB. Higher than a typical paste, lower than the
+// bulk-zip importer.
+const _fileImportUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 16 * 1024 * 1024 },
+});
+// Larger multer for zip-based bulk imports. Mealie / Tandoor backup
+// zips with image assets routinely run 100-300 MB. Override via the
 // IMPORT_ZIP_MAX_MB env var if you regularly import bigger libraries.
 // Default 512 MB matches the full-backup ceiling so the two flows
 // behave the same. Memory storage is fine for one-shot imports; the
@@ -1207,6 +1417,16 @@ const _zipImportMaxMb = parseInt(process.env.IMPORT_ZIP_MAX_MB || '512', 10);
 const _zipImportUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: _zipImportMaxMb * 1024 * 1024 },
+});
+// Multer instance for the bulk-file-import flow (Issue #2 Phase 2). Accepts
+// multiple files (or a single ZIP) up to IMPORT_ZIP_MAX_MB total. Memory
+// storage so nothing the user uploaded touches disk before we extract.
+const _bulkFileImportUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: _zipImportMaxMb * 1024 * 1024,
+    files: 200,  // cap the per-request count to keep the scan responsive
+  },
 });
 
 // Where /uploads lives on disk. Mirrors image-localizer.js.
@@ -1228,7 +1448,11 @@ function _pruneImportCache() {
       try {
         const p = path.join(_IMPORT_CACHE_DIR, f);
         const st = fs.statSync(p);
-        if (now - st.mtimeMs > _IMPORT_CACHE_TTL_MS) fs.unlinkSync(p);
+        if (now - st.mtimeMs > _IMPORT_CACHE_TTL_MS) {
+          // Both single-file zip caches and bulk preview directories live here.
+          // rm with recursive handles both shapes safely.
+          fs.rmSync(p, { recursive: true, force: true });
+        }
       } catch {}
     }
   } catch {}
@@ -1254,6 +1478,60 @@ function _deleteImportCache(id) {
   const p = _importCachePath(id);
   if (!p) return;
   try { fs.unlinkSync(p); } catch {}
+}
+
+// ── Bulk-import cache helpers (Issue #2 Phase 2) ───────────────────────
+// Bulk imports cache one JSON preview per source file under
+// `.import-cache/<uuid>/`. Each preview is a few KB so the picker can
+// render the full manifest without re-uploading anything. The original
+// PDF/RTF/TXT/MD/ZIP buffers are dropped after extraction; nothing the
+// user uploaded is persisted past the request.
+function _bulkCacheDir(uuid) {
+  if (!/^[a-f0-9-]{8,64}$/i.test(uuid)) return null;
+  return path.join(_IMPORT_CACHE_DIR, `bulk-${uuid}`);
+}
+function _bulkPreviewPath(uuid, fileId) {
+  const dir = _bulkCacheDir(uuid);
+  if (!dir) return null;
+  if (!/^[a-z0-9_-]{1,32}$/i.test(fileId)) return null;
+  return path.join(dir, `${fileId}.json`);
+}
+function _writeBulkPreview(uuid, fileId, payload) {
+  const p = _bulkPreviewPath(uuid, fileId);
+  if (!p) throw new Error('Invalid cache id');
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(payload));
+}
+function _readBulkPreview(uuid, fileId) {
+  const p = _bulkPreviewPath(uuid, fileId);
+  if (!p) return null;
+  try { return JSON.parse(fs.readFileSync(p, 'utf-8')); }
+  catch { return null; }
+}
+function _readBulkManifest(uuid) {
+  const dir = _bulkCacheDir(uuid);
+  if (!dir) return [];
+  try {
+    return fs.readdirSync(dir)
+      .filter(f => f.endsWith('.json'))
+      .map(f => {
+        try {
+          const data = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'));
+          // Strip the raw extracted text from the manifest payload — the
+          // picker doesn't need it, and including 50 × 30 KB blobs makes
+          // the response heavy. Re-read full text via _readBulkPreview for
+          // the AI-fallback path.
+          const { text, ...summary } = data;
+          return summary;
+        } catch { return null; }
+      })
+      .filter(Boolean);
+  } catch { return []; }
+}
+function _deleteBulkCache(uuid) {
+  const dir = _bulkCacheDir(uuid);
+  if (!dir) return;
+  try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
 }
 
 // Save raw image bytes from a zip entry to /uploads and return the
@@ -1580,6 +1858,328 @@ router.post('/import', _importUpload.single('file'), wrap(async (req, res) => {
   }
 }));
 
+// ── POST /extract-and-parse — Issue #2 Phase 1 ─────────────────────────
+// Multi-format text extraction + heuristic recipe parser. Accepts a PDF,
+// RTF, TXT, or MD upload, returns the extracted text plus a best-effort
+// structured recipe with a confidence score. Does NOT save anything.
+//
+// Confidence guides the client:
+//   high  (>= HIGH_CONFIDENCE_THRESHOLD): save the heuristic result.
+//   low   (< threshold) + AI configured:  offer "Try with AI" fallback.
+//   low   + no AI:                        offer best-effort save with a badge.
+//
+// Image-only PDFs (no text layer) come back with empty: true and a hint
+// pointing the user at Photo Import per page; auto-rendering those pages
+// as images is deferred to a later phase.
+router.post('/extract-and-parse', _fileImportUpload.single('file'), wrap(async (req, res) => {
+  const f = req.file;
+  if (!f) return res.status(400).json({ error: 'No file uploaded' });
+  const type = detectFileType(f.mimetype, f.originalname);
+  if (!type) {
+    return res.status(400).json({
+      error: 'Unsupported file type. Use PDF, RTF, TXT, or MD.',
+      filename: f.originalname,
+    });
+  }
+  let extracted;
+  try {
+    extracted = await extractText(f.buffer, f.mimetype, f.originalname);
+  } catch (e) {
+    return res.status(400).json({ error: e.message || 'Could not read file', type });
+  }
+  if (extracted.empty) {
+    return res.status(200).json({
+      type: extracted.type,
+      text: '',
+      empty: true,
+      pages: extracted.pages || null,
+      hint: extracted.type === 'pdf'
+        ? 'This PDF has no text layer (looks like a scanned image). Try saving each page as an image and using Photo Import.'
+        : 'File is empty.',
+      recipe: null,
+      confidence: 0,
+    });
+  }
+
+  // Use the original filename (sans extension) as a fallback recipe name
+  // when the text doesn't yield a clear title.
+  const fallbackName = String(f.originalname || '').replace(/\.[^.]+$/, '').trim() || null;
+  const parsed = parseRecipeText(extracted.text, { fallbackName });
+
+  // `save=true` is the one-shot path: extract, parse, persist, return the row.
+  // Used by the dialog when the user confirms a high-confidence preview, or
+  // explicitly chooses "save anyway" on a low-confidence one. Without `save`,
+  // the call is a read-only preview that the client can route to AI fallback.
+  const wantsSave = req.body?.save === true || req.body?.save === 'true' || req.body?.save === '1';
+  if (wantsSave) {
+    const u = uid(req);
+    const addToPantry      = (req.body?.addToPantry ?? false) === true || req.body?.addToPantry === 'true';
+    const applyTags        = req.body?.applyTags === true || req.body?.applyTags === 'true';
+    const importCategories = req.body?.importCategories !== false && req.body?.importCategories !== 'false';
+    try {
+      const row = _saveImportedRecipe(u, parsed.recipe, {
+        addToPantry, applyTags, importCategories,
+        creatorUsername: req.user?.username || null,
+      });
+      return res.status(201).json({
+        type: extracted.type,
+        pages: extracted.pages || null,
+        confidence: parsed.confidence,
+        highConfidenceThreshold: HIGH_CONFIDENCE_THRESHOLD,
+        recipe: row,
+      });
+    } catch (e) {
+      return res.status(e.status || 500).json({ error: e.message || 'Save failed' });
+    }
+  }
+
+  return res.status(200).json({
+    type: extracted.type,
+    text: extracted.text,
+    empty: false,
+    pages: extracted.pages || null,
+    recipe: parsed.recipe,
+    confidence: parsed.confidence,
+    highConfidenceThreshold: HIGH_CONFIDENCE_THRESHOLD,
+    debug: parsed.debug,
+  });
+}));
+
+// ── POST /bulk-scan — Issue #2 Phase 2 ─────────────────────────────────
+// Multi-file bulk import. Accepts up to 200 files in one request, or a
+// single ZIP that gets expanded server-side. Each supported entry
+// (PDF / RTF / TXT / MD) runs through the same extract + heuristic
+// pipeline as Phase 1, with the parsed preview cached under
+// .import-cache/bulk-<uuid>/<fileId>.json. Returns the cache UUID plus
+// a manifest (name, confidence, source filename, ingredient/step counts)
+// so the client can render a picker without re-uploading anything.
+//
+// Original file bytes are never written to disk. Memory storage drops
+// them as soon as the request resolves; only the small JSON preview
+// (a few KB each) lives in the cache directory.
+router.post('/bulk-scan', _bulkFileImportUpload.array('files', 200), wrap(async (req, res) => {
+  _pruneImportCache();
+  const uploads = Array.isArray(req.files) ? req.files : [];
+  if (uploads.length === 0) return res.status(400).json({ error: 'No files uploaded' });
+
+  // Expand any ZIPs into their supported entries.
+  const items = [];
+  for (const f of uploads) {
+    const ext = (f.originalname || '').toLowerCase().split('.').pop();
+    const isZip = ext === 'zip' || f.mimetype === 'application/zip' || f.mimetype === 'application/x-zip-compressed';
+    if (isZip) {
+      let zip;
+      try { zip = await JSZip.loadAsync(f.buffer); }
+      catch (e) {
+        items.push({ kind: 'error', filename: f.originalname, error: 'ZIP read failed: ' + (e.message || 'unknown') });
+        continue;
+      }
+      for (const entryName of Object.keys(zip.files)) {
+        const entry = zip.files[entryName];
+        if (entry.dir) continue;
+        // Skip macOS metadata + hidden / system files.
+        if (/^__MACOSX\/|(^|\/)\._|(^|\/)\.DS_Store$/.test(entryName)) continue;
+        const entryExt = entryName.toLowerCase().split('.').pop();
+        if (!['pdf', 'rtf', 'txt', 'md', 'markdown'].includes(entryExt)) continue;
+        let bytes;
+        try { bytes = await entry.async('nodebuffer'); }
+        catch (e) {
+          items.push({ kind: 'error', filename: entryName, source: f.originalname, error: 'Could not read zip entry' });
+          continue;
+        }
+        items.push({ kind: 'file', filename: entryName, source: f.originalname, buffer: bytes, mimetype: _mimeFromExt(entryExt) });
+      }
+    } else {
+      const type = detectFileType(f.mimetype, f.originalname);
+      if (!type) {
+        items.push({ kind: 'error', filename: f.originalname, error: 'Unsupported file type' });
+        continue;
+      }
+      items.push({ kind: 'file', filename: f.originalname, source: null, buffer: f.buffer, mimetype: f.mimetype });
+    }
+  }
+
+  if (items.filter(i => i.kind === 'file').length === 0) {
+    return res.status(400).json({ error: 'No PDF / RTF / TXT / MD files found in the upload' });
+  }
+
+  // Allocate the cache UUID up front, then process each entry. Errors
+  // become explicit error rows in the manifest so the picker shows them
+  // alongside successful parses.
+  const uuid = crypto.randomUUID();
+  const manifest = [];
+  let nextId = 0;
+  for (const it of items) {
+    const fileId = String(++nextId);
+    if (it.kind === 'error') {
+      manifest.push({
+        id: fileId,
+        filename: it.filename,
+        source: it.source || null,
+        error: it.error,
+        empty: false,
+        confidence: 0,
+      });
+      _writeBulkPreview(uuid, fileId, { ...manifest[manifest.length - 1] });
+      continue;
+    }
+    let extracted;
+    try { extracted = await extractText(it.buffer, it.mimetype, it.filename); }
+    catch (e) {
+      const row = {
+        id: fileId,
+        filename: it.filename,
+        source: it.source,
+        error: e.message || 'Extraction failed',
+        empty: false,
+        confidence: 0,
+      };
+      manifest.push(row);
+      _writeBulkPreview(uuid, fileId, row);
+      continue;
+    }
+    if (extracted.empty) {
+      const row = {
+        id: fileId,
+        filename: it.filename,
+        source: it.source,
+        type: extracted.type,
+        pages: extracted.pages || null,
+        empty: true,
+        confidence: 0,
+        hint: extracted.type === 'pdf'
+          ? 'This PDF has no text layer (looks like a scanned image). Try Photo Import per page.'
+          : 'File is empty.',
+      };
+      manifest.push(row);
+      _writeBulkPreview(uuid, fileId, row);
+      continue;
+    }
+    const fallbackName = String(it.filename || '').replace(/^.*\//, '').replace(/\.[^.]+$/, '').trim() || null;
+    const parsed = parseRecipeText(extracted.text, { fallbackName });
+    const summary = {
+      id: fileId,
+      filename: it.filename,
+      source: it.source,
+      type: extracted.type,
+      pages: extracted.pages || null,
+      empty: false,
+      confidence: parsed.confidence,
+      name: parsed.recipe.name,
+      servings: parsed.recipe.servings || null,
+      prep_minutes:  parsed.recipe.prep_minutes  || null,
+      cook_minutes:  parsed.recipe.cook_minutes  || null,
+      rest_minutes:  parsed.recipe.rest_minutes  || null,
+      total_minutes: parsed.recipe.total_minutes || null,
+      ingredientCount: parsed.recipe.ingredients.length,
+      stepCount: parsed.recipe.steps.length,
+    };
+    manifest.push(summary);
+    // Write the full payload (including extracted text + parsed recipe)
+    // so commit and the AI-fallback path can re-read it without another
+    // upload. Manifest reader strips `text` from the picker response.
+    _writeBulkPreview(uuid, fileId, { ...summary, recipe: parsed.recipe, text: extracted.text });
+  }
+
+  return res.status(201).json({
+    cacheUuid: uuid,
+    highConfidenceThreshold: HIGH_CONFIDENCE_THRESHOLD,
+    items: manifest,
+    summary: {
+      total: manifest.length,
+      clean: manifest.filter(m => !m.error && !m.empty && m.confidence >= HIGH_CONFIDENCE_THRESHOLD).length,
+      partial: manifest.filter(m => !m.error && !m.empty && m.confidence < HIGH_CONFIDENCE_THRESHOLD && m.confidence >= 0.4).length,
+      lowOrError: manifest.filter(m => m.error || m.empty || m.confidence < 0.4).length,
+    },
+  });
+}));
+
+// Map a recognized extension to a sensible mime type for downstream extractors.
+function _mimeFromExt(ext) {
+  if (ext === 'pdf')  return 'application/pdf';
+  if (ext === 'rtf')  return 'application/rtf';
+  if (ext === 'md' || ext === 'markdown') return 'text/markdown';
+  return 'text/plain';
+}
+
+// ── POST /bulk-commit ──────────────────────────────────────────────────
+// Reads the cached previews for the selected file ids and saves each
+// via _saveImportedRecipe. Deletes the cache directory when done so
+// nothing the user uploaded is retained beyond the import window.
+router.post('/bulk-commit', wrap(async (req, res) => {
+  const u = uid(req);
+  const cacheUuid = String(req.body?.cacheUuid || '');
+  if (!cacheUuid) return res.status(400).json({ error: 'cacheUuid is required' });
+  const dir = _bulkCacheDir(cacheUuid);
+  if (!dir || !fs.existsSync(dir)) return res.status(404).json({ error: 'Cache expired or not found' });
+
+  const selectedIds = Array.isArray(req.body?.selectedIds) ? req.body.selectedIds.map(String) : null;
+  if (!selectedIds || selectedIds.length === 0) {
+    return res.status(400).json({ error: 'selectedIds is required (non-empty array)' });
+  }
+  const addToPantry      = req.body?.addToPantry === true || req.body?.addToPantry === 'true';
+  const applyTags        = req.body?.applyTags === true || req.body?.applyTags === 'true';
+  const importCategories = req.body?.importCategories !== false && req.body?.importCategories !== 'false';
+  const creatorUsername  = req.user?.username || null;
+
+  const created = [];
+  const failed = [];
+  for (const id of selectedIds) {
+    const preview = _readBulkPreview(cacheUuid, id);
+    if (!preview || preview.error || preview.empty || !preview.recipe) {
+      failed.push({ id, reason: preview?.error || preview?.hint || 'Nothing to save for this entry' });
+      continue;
+    }
+    try {
+      const row = _saveImportedRecipe(u, preview.recipe, {
+        addToPantry, applyTags, importCategories, creatorUsername,
+      });
+      created.push({ id, recipe: row });
+    } catch (e) {
+      failed.push({ id, reason: e.message || 'Save failed' });
+    }
+  }
+
+  // Cleanup: drop the entire bulk cache directory whether all entries
+  // saved cleanly or not. Anything not saved this round needs to be
+  // re-uploaded, which matches Mealie's bulk-zip importer behavior.
+  _deleteBulkCache(cacheUuid);
+
+  return res.status(201).json({
+    count: created.length,
+    recipes: created,
+    failed,
+  });
+}));
+
+// ── POST /bulk-cancel ──────────────────────────────────────────────────
+// Explicit cancel from the picker. Drops the cache directory immediately
+// so abandoned uploads don't wait for the TTL sweep.
+router.post('/bulk-cancel', wrap(async (req, res) => {
+  const cacheUuid = String(req.body?.cacheUuid || '');
+  if (!cacheUuid) return res.status(400).json({ error: 'cacheUuid is required' });
+  _deleteBulkCache(cacheUuid);
+  return res.status(204).end();
+}));
+
+// ── GET /bulk-text/:cacheUuid/:fileId ──────────────────────────────────
+// Returns the extracted text for one cached entry. The client uses this
+// to feed Trace AI when the user clicks "Try with AI" on a low-confidence
+// row in the picker, without re-uploading the original file.
+router.get('/bulk-text/:cacheUuid/:fileId', wrap(async (req, res) => {
+  const { cacheUuid, fileId } = req.params;
+  const preview = _readBulkPreview(cacheUuid, fileId);
+  if (!preview) return res.status(404).json({ error: 'Not found' });
+  if (preview.error || preview.empty || !preview.text) {
+    return res.status(400).json({ error: preview.error || preview.hint || 'No text available' });
+  }
+  return res.status(200).json({
+    text: preview.text,
+    filename: preview.filename,
+    type: preview.type,
+  });
+}));
+
 // ── GET /:id/card.png — server-rendered share card (Phase 6) ───────────
 // Returns an SVG (browsers + Slack/Discord/iMessage all render SVG fine).
 // Pinterest-style portrait card with hero image (if present), recipe name,
@@ -1594,7 +2194,9 @@ router.get('/:id/card.png', wrap(async (req, res) => {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  const total = (recipe.prep_minutes || 0) + (recipe.cook_minutes || 0);
+  const total = recipe.total_minutes != null
+    ? recipe.total_minutes
+    : (recipe.prep_minutes || 0) + (recipe.cook_minutes || 0) + (recipe.rest_minutes || 0);
   const subtitle = [
     total ? `${total} min` : null,
     recipe.servings ? `Serves ${recipe.servings}` : null,

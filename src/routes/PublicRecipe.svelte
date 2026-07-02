@@ -10,6 +10,7 @@
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
   import { resolveAssetUrl } from '../lib/platform.js';
+  import { formatDuration } from '../lib/duration.js';
   import { formatDate, domainFromUrl } from '../lib/format.js';
   import { dateFormat } from '../stores/settings.js';
   import { scaleQty, displayQty } from '../lib/qty.js';
@@ -51,7 +52,8 @@
   $: if (token) load();
 
   function totalMinutes(r) {
-    return (r?.prep_minutes || 0) + (r?.cook_minutes || 0);
+    if (r?.total_minutes != null) return r.total_minutes;
+    return (r?.prep_minutes || 0) + (r?.cook_minutes || 0) + (r?.rest_minutes || 0);
   }
 </script>
 
@@ -109,19 +111,25 @@
           {#if recipe.prep_minutes}
             <div class="meta-stat">
               <span class="material-symbols-rounded">schedule</span>
-              <span><strong>{recipe.prep_minutes}m</strong> Prep</span>
+              <span><strong>{formatDuration(recipe.prep_minutes)}</strong> Prep</span>
             </div>
           {/if}
           {#if recipe.cook_minutes}
             <div class="meta-stat">
               <span class="material-symbols-rounded">local_fire_department</span>
-              <span><strong>{recipe.cook_minutes}m</strong> Cook</span>
+              <span><strong>{formatDuration(recipe.cook_minutes)}</strong> Cook</span>
+            </div>
+          {/if}
+          {#if recipe.rest_minutes}
+            <div class="meta-stat">
+              <span class="material-symbols-rounded">hourglass_top</span>
+              <span><strong>{formatDuration(recipe.rest_minutes)}</strong> Rest</span>
             </div>
           {/if}
           {#if totalMinutes(recipe) > 0}
             <div class="meta-stat">
               <span class="material-symbols-rounded">timer</span>
-              <span><strong>{totalMinutes(recipe)}m</strong> Total</span>
+              <span><strong>{formatDuration(totalMinutes(recipe))}</strong> Total</span>
             </div>
           {/if}
           {#if recipe.servings}

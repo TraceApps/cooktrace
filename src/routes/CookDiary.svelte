@@ -8,7 +8,6 @@
   import { confirmDialog } from '../stores/confirmDialog.js';
   import { localDateStr } from '../lib/db.js';
   import { relativeTime, shortDate } from '../lib/relative-time.js';
-  import DiaryBanner from '../components/banners/DiaryBanner.svelte';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import DateInput from '../components/ui/DateInput.svelte';
   import CookHeatmap from '../components/diary/CookHeatmap.svelte';
@@ -376,8 +375,7 @@
 </script>
 
 <div class="page-shell">
-  <header class="page-header" class:has-banner={$pageBanners} class:banner-gradient={$bannerStyle === 'gradient'}>
-    {#if $bannerStyle === 'animated'}<DiaryBanner />{/if}
+  <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
     <h1>Diary</h1>
     <button class="btn-icon header-action" on:click={openPlan} aria-label="Plan a Cook" title="Plan a Cook">
       <span class="material-symbols-rounded">event_available</span>

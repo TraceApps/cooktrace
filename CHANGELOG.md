@@ -1,4 +1,141 @@
-# CookTrace changelog
+# Changelog
+
+All notable changes to CookTrace are documented here.
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+---
+
+## [Unreleased]
+
+---
+
+## [1.0.0-rc.2] - 2026-07-02
+
+### Added
+
+- **Pantry Variants.** A pantry row can now carry brand-specific
+  rows underneath it. Recipes link to the parent (Whole Milk); each
+  variant (Greenwise, Publix) has its own barcode, photo, stock,
+  and expiration date. Add Variant with inline suggestions: type
+  a brand and existing pantry items surface as tap-to-attach chips.
+  Delete of a parent with variants asks whether to keep the variants
+  as standalone items (default, safer) or remove them together.
+- **Recipe Nutrition Source on the Parent.** A generic pantry item
+  can either use its own nutrition numbers (default) or pull from
+  one of its variants, so recipe math reflects the label of the
+  product you actually cook with.
+- **Pantry Expiration Dates.** Every pantry row gains an Expires On
+  field with an in-sheet calendar picker. Amber pill on cards for
+  anything expiring within two weeks, red for past. Expiring Soon
+  filter chip surfaces the whole set in one tap. Variant expiries
+  surface as chips inside the parent sheet's Variants list.
+- **Expiration Digest Notification.** Once-a-day roll-up covering
+  everything expiring within a chosen window (1 / 3 / 5 / 7 / 14
+  days), delivered at a chosen time. Push goes out through Apprise,
+  Gotify, or ntfy plus the local device channel. Past-expiry items
+  always included regardless of window. Settings → Notifications →
+  Reminders → Expiration Digest.
+- **Rest Time Field on Recipes.** Any hands-off period, bread rise,
+  meat rest, dough chill, marinate, soak, ferment. Left blank stays
+  hidden on the recipe view; set adds a Rest meta pill next to Prep
+  and Cook. Rolls into the auto-calculated Total Time below.
+- **Total Time Manual Override.** Optional field in the recipe
+  editor. Leave blank and the app auto-calculates from prep + cook
+  + rest; set a value and it wins. Placeholder shows the auto-calc
+  live so you see the fallback before overriding.
+- **Clear Link on the Category Picker.** A small Clear link appears
+  in the pantry item's Category label when a category is set,
+  wiping the selection in one tap.
+- **New Preserves Recipe Category.** Jams, pickles, curds,
+  chutneys, ferments, canning recipes, none of which fit cleanly
+  under Sauce, Bread, or Dessert. Added to the default seeded
+  chapter list with a berry / pomegranate color that reads clearly
+  distinct from Bread. Existing accounts keep their category list
+  untouched; only fresh installs get the new default automatically
+  (add it in Settings → Recipe Categories if you want it on an
+  existing account).
+- **Animated Variant Expand and Collapse.** Chevron rotates
+  smoothly on the parent card, variant cards drop in from above
+  with a spring easing on expand, slide back up on collapse.
+  Honors OS-level reduce-motion preferences.
+
+### Changed
+
+- **Recipe Category Colors Tightened.** Snack, Sauce, and the new
+  Preserves each moved off crowded hue bands so the chip row scans
+  cleanly at a glance. Snack shifted from yellow to teal (was too
+  close to Breakfast's amber), Sauce shifted from violet to indigo
+  (was too close to Appetizer's purple), and Preserves sits at
+  berry / pomegranate rather than rust (was too close to Bread).
+  Existing accounts keep their current colors; only fresh installs
+  get the new palette.
+- **Recipe Times Show Hours and Minutes.** Every recipe-time display
+  now reads in hours and minutes instead of raw minutes. A 75-minute
+  recipe shows as `1h 15m` on list cards, detail view, cookbook
+  cards, public share pages, the shareable card, and the
+  file-import preview. The editor input still takes raw minutes.
+- **Smart Pantry Search Under Variants.** Query the parent name and
+  you get the parent card alone. Query only a variant's brand and
+  you get that variant alone with a "Variant of Whole Milk"
+  subtitle, no duplicate parent. Query both and the parent expands
+  with the matching variant nested underneath.
+- **Expires On Uses the In-Sheet Calendar Picker.** Matches every
+  other date entry in the app instead of the browser's default
+  `mm/dd/yyyy` widget.
+- **Tandoor Imports: `waiting_time` Maps to Rest.** Tandoor's
+  waiting_time is a hands-off signal by convention, so it lands in
+  Rest Time instead of Cook Time. Working_time still maps to Prep.
+  Cook stays null on Tandoor imports; the auto-calculated Total
+  covers everything correctly.
+- **Native Pantry Updates Only Write Fields the Payload Carries.**
+  A stock toggle no longer rewrites brand, category, or FK columns
+  as a side effect. Prevents unrelated data from getting nulled
+  on partial edits.
+
+### Fixed
+
+- **Pantry Stock Toggle No Longer Crashes on Native.** The
+  top-right quick-toggle on any pantry card threw "NOT NULL
+  constraint failed: pantry_items.name" because the partial update
+  was writing every column with undefined placeholders. Only
+  present fields get written now.
+- **Variant Relationships Survive Mobile Edits.** Setting Greenwise
+  as a variant of Whole Milk on the PWA now stays set on the phone
+  through unrelated stock toggles, quantity bumps, and brand edits.
+  Was silently reverting because the sync order was push-then-pull,
+  so a stale local row propagated back to the server before the
+  server's fresher state pulled down. Order is pull-then-push now,
+  and the server preserves FK columns via COALESCE when the client
+  sends NULL.
+- **`[object Object]` Category Pill on Mobile.** The category pill
+  on the pantry sheet was rendering the raw category object rather
+  than its name on Android. Native queries now join the category
+  the same way the PWA server does.
+- **Category Casing Mismatch Between PWA and Mobile.** "Dairy &
+  eggs" on Android vs "Dairy & Eggs" on the PWA. The pill now
+  reads the live category row instead of falling into a hardcoded
+  slug-to-label map with older casing.
+- **Dropdown Menus Close on Outside Scroll.** Combobox dropdowns
+  portaled to the body layer were blocking wheel and touchmove
+  events from reaching the sheet underneath, so scrolling the page
+  while a dropdown was open did nothing. Outside scroll now closes
+  the dropdown and lets the scroll through.
+- **Confirm Dialogs Stack Correctly Over the Sheet.** "Remove from
+  pantry?" and similar confirms were rendering behind the item's
+  own edit surface, making the buttons invisible.
+- **Native DB Init Survives Upgrades.** A pantry index creation
+  ran against an old schema on first launch after an APK upgrade
+  and blocked the whole database from initializing. Moved the
+  index into the migration that adds the column so it runs after
+  the ALTER.
+- **Recipe Editor Dropdowns Are Scrollable Again.** Opening the
+  Category, Tags, or Kitchen Gear picker in the recipe editor was
+  capping the list at eight items, so anything past the eighth
+  entry could only be reached by typing to filter. The cap is
+  removed so the whole catalog is browseable via the popover's
+  own scroll.
+
+---
 
 ## v1.0.0-rc.1 (2026-06-07)
 

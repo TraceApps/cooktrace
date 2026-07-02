@@ -71,7 +71,7 @@ const TABLES = {
   },
   recipes: {
     cols: [
-      'name', 'description', 'img_url', 'servings', 'prep_minutes', 'cook_minutes',
+      'name', 'description', 'img_url', 'servings', 'prep_minutes', 'cook_minutes', 'total_minutes', 'rest_minutes',
       'ingredients', 'steps', 'tags', 'tools', 'source_url', 'video_url', 'notes',
       'visibility', 'rating', 'yield_text', 'last_cooked_at', 'cook_count',
       'nutrition', 'favorite', 'category_id', 'share_token',
@@ -84,8 +84,17 @@ const TABLES = {
       'name', 'brand', 'barcode', 'in_stock', 'quantity', 'unit', 'expires_on',
       'nt_food_id', 'img_url', 'notes', 'category', 'category_id',
       'serving_size', 'serving_unit', 'serving_label', 'nutrition', 'g_per_cup',
+      // Variant feature (Issue #4). Both are FKs back into pantry_items;
+      // declared here so the differential sync push includes them and
+      // pull translates the server ids to local ids via the same
+      // pantry_items lookup the shopping_list uses for pantry_id.
+      'generic_parent_id', 'nutrition_source_variant_id',
     ],
-    parents: { category_id: 'pantry_categories' },
+    parents: {
+      category_id: 'pantry_categories',
+      generic_parent_id: 'pantry_items',
+      nutrition_source_variant_id: 'pantry_items',
+    },
     softDelete: true,
   },
   cook_diary: {
@@ -234,9 +243,21 @@ router.get('/pull', wrap((req, res) => {
   for (const [name, spec] of Object.entries(TABLES)) {
     const cols = ['id', ...spec.cols, 'updated_at'];
     if (spec.softDelete) cols.push('deleted_at');
+    // Sort self-referencing tables so parents come before children in
+    // the pull payload. The client's dbApplyPull scans server_id →
+    // local_id fresh for each row, so a parent that arrives before its
+    // child is available for FK translation on the child. Without
+    // this ordering, a variant row that lands before its generic
+    // parent in the payload would translate the parent FK to null and
+    // the relationship silently disappears on the first sync after
+    // it was attached (SQLite orders NULLs first in ASC by default,
+    // so top-level parents naturally lead).
+    const selfRef = Object.entries(spec.parents || {})
+      .find(([, parentTable]) => parentTable === name);
+    const orderBy = selfRef ? ` ORDER BY ${selfRef[0]} ASC, id ASC` : '';
     out[name] = db.prepare(
       `SELECT ${cols.join(', ')} FROM ${name}
-        WHERE ${userClause(u)} AND updated_at > ?`
+        WHERE ${userClause(u)} AND updated_at > ?${orderBy}`
     ).all(...userArgs(u), since);
   }
 
@@ -294,7 +315,18 @@ function _buildInsertSql(table, spec) {
 }
 
 function _buildUpdateSql(table, spec) {
-  const setCols = spec.cols.map(c => `${c} = ?`);
+  // FK columns keep the server's value when the client pushes NULL.
+  // The client always sends its full row (SELECT * on pending rows),
+  // so a mobile push whose local row hasn't yet picked up a PWA-side
+  // attach would clobber the server's newly-set FK with NULL. COALESCE
+  // preserves the server's value unless the client explicitly sends a
+  // non-null. Detaches still go through the explicit PUT route
+  // (server/routes/pantry.js), which uses body.X !== undefined
+  // semantics and correctly writes NULL when asked.
+  const fkCols = new Set(Object.keys(spec.parents || {}));
+  const setCols = spec.cols.map(c => (
+    fkCols.has(c) ? `${c} = COALESCE(?, ${c})` : `${c} = ?`
+  ));
   setCols.push('updated_at = ?');
   if (spec.softDelete) setCols.push('deleted_at = ?');
   return `UPDATE ${table} SET ${setCols.join(', ')} WHERE id = ?`;

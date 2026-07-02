@@ -18,7 +18,7 @@
  */
 import db from '../db.js';
 import { logger } from '../logger.js';
-import { notifyCookDay, notifyShoppingNudge } from './push-notify.js';
+import { notifyCookDay, notifyShoppingNudge, notifyExpiryDigest } from './push-notify.js';
 import { sendWeeklySummaryEmail } from '../email.js';
 
 const TICK_MS = 15 * 60 * 1000; // 15 minutes
@@ -50,6 +50,8 @@ async function runTick() {
     catch (e) { logger.debug?.(`[scheduler] cookDay user=${u.id} ${e.message}`); }
     try { await _checkShoppingNudge(u.id, today); }
     catch (e) { logger.debug?.(`[scheduler] shopping user=${u.id} ${e.message}`); }
+    try { await _checkExpiryDigest(u.id, today); }
+    catch (e) { logger.debug?.(`[scheduler] expiry user=${u.id} ${e.message}`); }
     try { await _checkWeeklySummary(u.id, today); }
     catch (e) { logger.debug?.(`[scheduler] weekly user=${u.id} ${e.message}`); }
   }
@@ -181,6 +183,50 @@ function _appOrigin() {
   // Best-effort: use APP_ORIGIN env var if set; otherwise null and the
   // email helper substitutes a sensible default in its CTA buttons.
   return process.env.APP_ORIGIN || process.env.PUBLIC_URL || null;
+}
+
+// Pantry expiration digest. Fires once per day at the user's picked
+// notifExpiryTime (default 09:00, server-local). Skips silently when
+// the user has nothing expiring within the window they picked. Past-
+// expiry items always ride along regardless of window (they've already
+// gone, shouldn't fall off the radar). The tick runs every 15 min, so
+// we accept any time in the 15-min window starting at the picked hour
+// so a picked '09:00' fires on the first tick between 9:00 and 9:15.
+async function _checkExpiryDigest(userId, today) {
+  const enabled = _userSetting(userId, 'notifExpiryEnabled');
+  if (!enabled) return;
+  const rawTime = _userSetting(userId, 'notifExpiryTime');
+  const [rawHH, rawMM] = typeof rawTime === 'string' && /^\d{1,2}:\d{2}$/.test(rawTime)
+    ? rawTime.split(':').map(n => parseInt(n, 10))
+    : [9, 0];
+  const targetHH = Math.max(0, Math.min(23, rawHH));
+  const targetMM = Math.max(0, Math.min(59, rawMM));
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const targetMinutes = targetHH * 60 + targetMM;
+  // Accept any tick within the 15-min window starting at target so the
+  // once-every-15-min scheduler doesn't miss the user's picked time.
+  if (nowMinutes < targetMinutes || nowMinutes >= targetMinutes + 15) return;
+  if (_alreadyFired(userId, 'expiry_digest', null, today)) return;
+  const daysBeforeRaw = _userSetting(userId, 'notifExpiryDaysBefore');
+  const daysBefore = Number.isFinite(+daysBeforeRaw) && +daysBeforeRaw > 0 ? +daysBeforeRaw : 3;
+  const cutoff = new Date(); cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() + daysBefore);
+  const cutoffDate = cutoff.toISOString().slice(0, 10);
+  const rows = db.prepare(
+    `SELECT id, name, brand, expires_on
+       FROM pantry_items
+      WHERE user_id = ? AND deleted_at IS NULL
+        AND expires_on IS NOT NULL AND expires_on <= ?
+      ORDER BY expires_on ASC`
+  ).all(userId, cutoffDate);
+  if (!rows.length) return;
+  try {
+    await notifyExpiryDigest(userId, rows);
+    _markFired(userId, 'expiry_digest', null, today);
+  } catch (e) {
+    logger.debug?.(`[scheduler] expiry push failed user=${userId} ${e.message}`);
+  }
 }
 
 async function _checkShoppingNudge(userId, today) {

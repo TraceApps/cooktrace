@@ -220,7 +220,12 @@ function restoreFromZip(zip) {
   const data = JSON.parse(zip.readAsText('database.json'));
 
   db.transaction(() => {
-    // Wipe in dependency order — children before parents.
+    // Defer FK checks until COMMIT so self-referential FKs on
+    // pantry_items (generic_parent_id, nutrition_source_variant_id)
+    // don't trip when a child row inserts before its parent within the
+    // same transaction. Standard SQLite pattern for tree restores.
+    db.pragma('defer_foreign_keys = ON');
+    // Wipe in dependency order, children before parents.
     db.prepare('DELETE FROM cook_diary').run();
     db.prepare('DELETE FROM shopping_list').run();
     db.prepare('DELETE FROM recipes').run();
@@ -287,17 +292,22 @@ function restoreFromZip(zip) {
       brand: null, barcode: null,
       in_stock: 1, quantity: null, unit: null, expires_on: null,
       nt_food_id: null, img_url: null, notes: null,
-      category: null, serving_size: null, serving_unit: null, serving_label: null, nutrition: null,
+      category: null, category_id: null,
+      serving_size: null, serving_unit: null, serving_label: null,
+      nutrition: null, g_per_cup: null,
+      generic_parent_id: null, nutrition_source_variant_id: null,
       created_at: null, updated_at: null, deleted_at: null,
     };
     const insPantry = db.prepare(`
       INSERT OR IGNORE INTO pantry_items (id, user_id, name, brand, barcode, in_stock, quantity, unit,
         expires_on, nt_food_id, img_url, notes,
-        category, serving_size, serving_unit, serving_label, nutrition,
+        category, category_id, serving_size, serving_unit, serving_label, nutrition, g_per_cup,
+        generic_parent_id, nutrition_source_variant_id,
         created_at, updated_at, deleted_at)
       VALUES (@id, @user_id, @name, @brand, @barcode, @in_stock, @quantity, @unit,
         @expires_on, @nt_food_id, @img_url, @notes,
-        @category, @serving_size, @serving_unit, @serving_label, @nutrition,
+        @category, @category_id, @serving_size, @serving_unit, @serving_label, @nutrition, @g_per_cup,
+        @generic_parent_id, @nutrition_source_variant_id,
         @created_at, @updated_at, @deleted_at)
     `);
     for (const p of data.pantry_items || []) insPantry.run(_withDefaults(p, pantryDefaults));

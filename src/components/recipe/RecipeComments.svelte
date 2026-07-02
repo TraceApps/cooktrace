@@ -321,7 +321,7 @@
           <span class="hint">Supports bold / italic / lists</span>
           <button class="btn btn-primary" on:click={submit}
             disabled={posting || !draft.trim()}>
-            {posting ? 'Posting…' : 'Post comment'}
+            {posting ? 'Posting…' : 'Post Comment'}
           </button>
         </div>
       </div>

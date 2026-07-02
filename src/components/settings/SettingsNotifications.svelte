@@ -14,11 +14,13 @@
   //   - Shopping list nudge (unchecked items lingering)
   import { showSuccess, showError } from '../../stores/toast.js';
   import { isNative, getServerUrl, getAuthToken, apiUrl } from '../../lib/platform.js';
+  import TimePicker from '../ui/TimePicker.svelte';
   import {
     notifLocalEnabled, notifPushService,
     appriseUrl, appriseTag,
     gotifyUrl, gotifyToken,
     ntfyUrl, ntfyTopic, ntfyToken,
+    notifExpiryEnabled, notifExpiryDaysBefore, notifExpiryTime,
   } from '../../stores/settings.js';
   import { DB } from '../../lib/db.js';
   import { scheduleSave } from '../../stores/settings.js';
@@ -228,6 +230,41 @@
       <input type="checkbox" class="toggle-cb" checked={notifRecipeComments}
         on:change={e => { notifRecipeComments = e.target.checked; toggleReminder('notifRecipeComments', e.target.checked); }} />
     </div>
+    <div class="setting-divider"></div>
+    <div class="setting-row">
+      <div>
+        <span class="setting-label">Expiration Digest</span>
+        <span class="setting-desc">One roll-up per day covering everything in your pantry expiring within the window below. Delivered through the same channels above (device + configured push service). No message when nothing's expiring.</span>
+      </div>
+      <input type="checkbox" class="toggle-cb" checked={$notifExpiryEnabled}
+        on:change={e => notifExpiryEnabled.set(e.target.checked)} />
+    </div>
+    {#if $notifExpiryEnabled}
+      <div class="setting-row">
+        <div>
+          <span class="setting-label">Warn Me This Many Days Ahead</span>
+          <span class="setting-desc">The digest lists every item whose expiration date falls within the next N days. Past-expiry items always surface.</span>
+        </div>
+        <div class="select-wrap">
+          <select class="select sel-sm" value={$notifExpiryDaysBefore}
+            on:change={e => notifExpiryDaysBefore.set(parseInt(e.target.value, 10))}>
+            <option value={1}>1 day</option>
+            <option value={3}>3 days</option>
+            <option value={5}>5 days</option>
+            <option value={7}>1 week</option>
+            <option value={14}>2 weeks</option>
+          </select>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <span class="setting-label">Delivery Time</span>
+          <span class="setting-desc">The digest fires once per day at this time (server-local). Default 9:00 am so it lands before your first grocery run.</span>
+        </div>
+        <TimePicker value={$notifExpiryTime} on:change={e => notifExpiryTime.set(e.detail)} />
+      </div>
+    {/if}
+    <div class="setting-divider"></div>
     <div class="setting-row">
       <div>
         <span class="setting-label">Weekly Summary Email</span>

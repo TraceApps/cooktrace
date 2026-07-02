@@ -45,6 +45,8 @@ const SCHEMA = `
     servings             INTEGER DEFAULT 2,
     prep_minutes         INTEGER,
     cook_minutes         INTEGER,
+    total_minutes        INTEGER,
+    rest_minutes         INTEGER,
     ingredients          TEXT NOT NULL DEFAULT '[]',
     steps                TEXT NOT NULL DEFAULT '[]',
     tags                 TEXT NOT NULL DEFAULT '[]',
@@ -75,38 +77,47 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_recipes_category ON recipes(category_id);
 
   CREATE TABLE IF NOT EXISTS pantry_items (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    server_id       INTEGER,
-    user_id         INTEGER DEFAULT 1,
-    name            TEXT NOT NULL,
-    brand           TEXT,
-    barcode         TEXT,
-    in_stock        INTEGER NOT NULL DEFAULT 1,
-    quantity        REAL,
-    unit            TEXT,
-    expires_on      TEXT,
-    nt_food_id      INTEGER,
-    img_url         TEXT,
-    notes           TEXT,
-    category        TEXT,
-    category_id     INTEGER,
-    serving_size    REAL,
-    serving_unit    TEXT,
-    serving_label   TEXT,
-    nutrition       TEXT,
-    g_per_cup       REAL,
-    created_at      TEXT DEFAULT (datetime('now')),
-    updated_at      TEXT DEFAULT (datetime('now')),
-    deleted_at      TEXT DEFAULT NULL,
-    sync_status     TEXT DEFAULT 'synced'
+    id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id                   INTEGER,
+    user_id                     INTEGER DEFAULT 1,
+    name                        TEXT NOT NULL,
+    brand                       TEXT,
+    barcode                     TEXT,
+    in_stock                    INTEGER NOT NULL DEFAULT 1,
+    quantity                    REAL,
+    unit                        TEXT,
+    expires_on                  TEXT,
+    nt_food_id                  INTEGER,
+    img_url                     TEXT,
+    notes                       TEXT,
+    category                    TEXT,
+    category_id                 INTEGER,
+    serving_size                REAL,
+    serving_unit                TEXT,
+    serving_label               TEXT,
+    nutrition                   TEXT,
+    g_per_cup                   REAL,
+    generic_parent_id           INTEGER,
+    nutrition_source_variant_id INTEGER,
+    created_at                  TEXT DEFAULT (datetime('now')),
+    updated_at                  TEXT DEFAULT (datetime('now')),
+    deleted_at                  TEXT DEFAULT NULL,
+    sync_status                 TEXT DEFAULT 'synced'
   );
-  CREATE INDEX IF NOT EXISTS idx_pantry_user     ON pantry_items(user_id);
-  CREATE INDEX IF NOT EXISTS idx_pantry_updated  ON pantry_items(updated_at);
-  CREATE INDEX IF NOT EXISTS idx_pantry_deleted  ON pantry_items(deleted_at);
-  CREATE INDEX IF NOT EXISTS idx_pantry_server   ON pantry_items(server_id);
-  CREATE INDEX IF NOT EXISTS idx_pantry_sync     ON pantry_items(sync_status);
-  CREATE INDEX IF NOT EXISTS idx_pantry_barcode  ON pantry_items(barcode);
-  CREATE INDEX IF NOT EXISTS idx_pantry_category ON pantry_items(category_id);
+  CREATE INDEX IF NOT EXISTS idx_pantry_user           ON pantry_items(user_id);
+  CREATE INDEX IF NOT EXISTS idx_pantry_updated        ON pantry_items(updated_at);
+  CREATE INDEX IF NOT EXISTS idx_pantry_deleted        ON pantry_items(deleted_at);
+  CREATE INDEX IF NOT EXISTS idx_pantry_server         ON pantry_items(server_id);
+  CREATE INDEX IF NOT EXISTS idx_pantry_sync           ON pantry_items(sync_status);
+  CREATE INDEX IF NOT EXISTS idx_pantry_barcode        ON pantry_items(barcode);
+  CREATE INDEX IF NOT EXISTS idx_pantry_category       ON pantry_items(category_id);
+  -- idx_pantry_generic_parent is created by _migratePantryVariantColumns
+  -- after the column has been added (or confirmed to exist). Putting it
+  -- here was racing with the migration on existing local DBs whose
+  -- pantry_items table predates the generic_parent_id column: the
+  -- CREATE TABLE IF NOT EXISTS no-op'd, this index then errored with
+  -- "no such column", and the whole multi-statement execute rolled
+  -- back before the migration even got a chance to run.
 
   CREATE TABLE IF NOT EXISTS cook_diary (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -341,7 +352,51 @@ export async function dbInit() {
   if (!isNative) return;
   await getDb();
   await _migrateAiChatUpdatedAt();
+  await _migratePantryVariantColumns();
+  await _migrateRecipeTotalMinutes();
   await _backfillShoppingNames();
+}
+
+// Optional manual override for total time (recipes.total_minutes).
+// Same idempotent ALTER pattern the variant columns use. Existing
+// recipes stay auto (column NULL); a value here wins over prep+cook.
+async function _migrateRecipeTotalMinutes() {
+  try {
+    const db = await getDb();
+    const info = await db.query(`PRAGMA table_info(recipes)`);
+    const cols = new Set((info?.values || []).map(c => c.name));
+    if (!cols.has('total_minutes')) {
+      await db.run(`ALTER TABLE recipes ADD COLUMN total_minutes INTEGER`);
+    }
+    if (!cols.has('rest_minutes')) {
+      await db.run(`ALTER TABLE recipes ADD COLUMN rest_minutes INTEGER`);
+    }
+  } catch { /* best-effort */ }
+}
+
+// Mirror of the server migration: pantry_items gains generic_parent_id
+// and nutrition_source_variant_id (Issue #4 / variants). Older local
+// DBs are missing them — ALTER ADD here so dbApplyPull doesn't choke
+// when the next server pull surfaces the new columns. Idempotent via
+// PRAGMA table_info.
+async function _migratePantryVariantColumns() {
+  try {
+    const db = await getDb();
+    const info = await db.query(`PRAGMA table_info(pantry_items)`);
+    const cols = new Set((info?.values || []).map(c => c.name));
+    if (!cols.has('generic_parent_id')) {
+      await db.run(`ALTER TABLE pantry_items ADD COLUMN generic_parent_id INTEGER`);
+    }
+    if (!cols.has('nutrition_source_variant_id')) {
+      await db.run(`ALTER TABLE pantry_items ADD COLUMN nutrition_source_variant_id INTEGER`);
+    }
+    // Always create the index (idempotent). The column is guaranteed to
+    // exist by this point — either CREATE TABLE in SCHEMA made it (fresh
+    // install) or the ALTER above just added it. Putting the index in
+    // SCHEMA itself races with the migration on upgrades, so it lives
+    // here instead.
+    await db.run(`CREATE INDEX IF NOT EXISTS idx_pantry_generic_parent ON pantry_items(generic_parent_id)`);
+  } catch { /* best-effort */ }
 }
 
 // Mirror of the server migration: ai_chat_history used to only have
@@ -608,6 +663,12 @@ export async function dbApplyPull(payload) {
     pantry_id: ['pantry_items'],
     cookbook_id: ['cookbooks'],
     parent_id: ['recipe_comments'],
+    // Variant feature (Issue #4). Both FKs point back at pantry_items;
+    // translate server ids to local ids on pull so a parent or
+    // nutrition-source variant referenced before its own row arrives
+    // resolves correctly across the same pull payload.
+    generic_parent_id: ['pantry_items'],
+    nutrition_source_variant_id: ['pantry_items'],
   };
 
   // Build a per-table { server_id → local_id } map by scanning the
@@ -639,19 +700,34 @@ export async function dbApplyPull(payload) {
         [row.id]
       ))?.values?.[0];
 
-      // Don't overwrite local pending edits. If the user wrote to this
-      // row locally between the last sync and now, the pull would
-      // clobber the fresh value with the server's pre-edit copy. Skip
-      // and let the next push send the local edit up. See the same
-      // guard in NT (dbUpsertFromServer) and LT (sync.js appliers).
-      if (existing && existing.sync_status === 'pending') continue;
-
       // Translate FK columns from server ids to local ids.
       const translated = { ...row };
       for (const [fk, candidates] of Object.entries(parents)) {
         if (fk in translated && translated[fk] != null) {
           translated[fk] = await translateFK(translated[fk], candidates);
         }
+      }
+
+      // Local pending edits shouldn't be overwritten by the server's
+      // pre-edit snapshot for user-editable columns. But STRUCTURAL FK
+      // columns (category_id, variant links) are managed by explicit
+      // attach/detach flows, not free-text editing, so we still apply
+      // those from the pull even when the row is pending. Without this
+      // carveout, a user editing the stock on Greenwise while Whole
+      // Milk sits in the pull payload would leave Greenwise stuck at
+      // its stale generic_parent_id until the next push cleared the
+      // pending flag AND another server-side change bumped updated_at.
+      if (existing && existing.sync_status === 'pending') {
+        const fkKeys = Object.keys(parents).filter(k => k in translated);
+        if (fkKeys.length) {
+          const setClause = fkKeys.map(k => `${k} = ?`).join(', ');
+          const setValues = fkKeys.map(k => translated[k]);
+          await db.run(
+            `UPDATE ${table} SET ${setClause} WHERE id = ?`,
+            [...setValues, existing.id]
+          );
+        }
+        continue;
       }
 
       // Build column list dynamically from the row's keys (minus `id`).

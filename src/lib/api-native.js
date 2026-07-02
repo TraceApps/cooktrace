@@ -109,12 +109,32 @@ function _recipeFromRow(row) {
   return out;
 }
 
-function _pantryFromRow(row) {
+async function _pantryCategoryMap() {
+  const rows = await _query(
+    `SELECT id, name, slug, icon, color FROM pantry_categories
+      WHERE user_id = ? AND deleted_at IS NULL`,
+    [LOCAL_USER_ID]
+  );
+  const m = new Map();
+  for (const r of rows) m.set(r.id, r);
+  return m;
+}
+
+function _pantryFromRow(row, catMap = null) {
   if (!row) return null;
   const out = { ...row };
   out.nutrition = _parseJson(out.nutrition, null);
   out.imgUrl = resolveAssetUrl(out.img_url) || '';
   out.in_stock = !!out.in_stock;
+  // Mirror the server's _hydrate: when the row carries a category_id,
+  // attach the joined category object so downstream callers (the
+  // sheet's pill, the list view) see the same shape as on PWA. Without
+  // this, `item.category` would be the slug string and the pill would
+  // fall back to the hardcoded PANTRY_CATEGORIES list — which differs
+  // in casing from the live pantry_categories rows.
+  if (out.category_id != null && catMap) {
+    out.category = catMap.get(out.category_id) || null;
+  }
   return out;
 }
 
@@ -176,18 +196,20 @@ export const CtApiNative = {
 
     const id = await _runInsert(
       `INSERT INTO recipes
-         (user_id, name, description, img_url, servings, prep_minutes, cook_minutes,
+         (user_id, name, description, img_url, servings, prep_minutes, cook_minutes, total_minutes, rest_minutes,
           ingredients, steps, tags, tools, source_url, video_url, notes, visibility,
           rating, yield_text, nutrition, favorite, category_id, sync_status)
-       VALUES (?,?,?,?,?,?,?, ?,?,?,?,?,?,?,?, ?,?,?,?,?, 'pending')`,
+       VALUES (?,?,?,?,?,?,?,?,?, ?,?,?,?,?,?,?,?, ?,?,?,?,?, 'pending')`,
       [
         LOCAL_USER_ID,
         d.name || 'Untitled',
         d.description || null,
         img,
         d.servings ?? 2,
-        d.prep_minutes ?? null,
-        d.cook_minutes ?? null,
+        d.prep_minutes  ?? null,
+        d.cook_minutes  ?? null,
+        d.total_minutes ?? null,
+        d.rest_minutes  ?? null,
         ingredients, steps, tags, tools,
         d.source_url || null,
         d.video_url || null,
@@ -211,7 +233,7 @@ export const CtApiNative = {
     await _run(
       `UPDATE recipes SET
          name = ?, description = ?, img_url = ?, servings = ?,
-         prep_minutes = ?, cook_minutes = ?,
+         prep_minutes = ?, cook_minutes = ?, total_minutes = ?, rest_minutes = ?,
          ingredients = ?, steps = ?, tags = ?, tools = ?,
          source_url = ?, video_url = ?, notes = ?, visibility = ?,
          rating = ?, yield_text = ?, nutrition = ?, favorite = ?,
@@ -222,8 +244,10 @@ export const CtApiNative = {
         d.description ?? null,
         img,
         d.servings ?? 2,
-        d.prep_minutes ?? null,
-        d.cook_minutes ?? null,
+        d.prep_minutes  ?? null,
+        d.cook_minutes  ?? null,
+        d.total_minutes ?? null,
+        d.rest_minutes  ?? null,
         _stringify(d.ingredients ?? []),
         _stringify(d.steps ?? []),
         _stringify(d.tags ?? []),
@@ -604,12 +628,14 @@ export const CtApiNative = {
       }
     }
 
-    return rows.map(r => ({ ..._pantryFromRow(r), recipe_count: usage.get(r.id) || 0 }));
+    const catMap = await _pantryCategoryMap();
+    return rows.map(r => ({ ..._pantryFromRow(r, catMap), recipe_count: usage.get(r.id) || 0 }));
   },
 
   async getPantryItem(id) {
     const rows = await _query(`SELECT * FROM pantry_items WHERE id = ? AND deleted_at IS NULL`, [id]);
-    return _pantryFromRow(rows[0]);
+    const catMap = await _pantryCategoryMap();
+    return _pantryFromRow(rows[0], catMap);
   },
 
   async getPantryItemByBarcode(code) {
@@ -618,7 +644,8 @@ export const CtApiNative = {
       `SELECT * FROM pantry_items WHERE user_id = ? AND barcode = ? AND deleted_at IS NULL LIMIT 1`,
       [LOCAL_USER_ID, code]
     );
-    return _pantryFromRow(rows[0]) || null;
+    const catMap = await _pantryCategoryMap();
+    return _pantryFromRow(rows[0], catMap) || null;
   },
 
   async getPantryItemRecipes(id) {
@@ -645,8 +672,9 @@ export const CtApiNative = {
       `INSERT INTO pantry_items
          (user_id, name, brand, barcode, in_stock, quantity, unit, expires_on,
           img_url, notes, category, category_id, serving_size, serving_unit, serving_label,
-          nutrition, g_per_cup, nt_food_id, sync_status)
-       VALUES (?,?,?,?,?,?,?,?, ?,?,?,?,?,?,?, ?,?,?, 'pending')`,
+          nutrition, g_per_cup, nt_food_id,
+          generic_parent_id, nutrition_source_variant_id, sync_status)
+       VALUES (?,?,?,?,?,?,?,?, ?,?,?,?,?,?,?, ?,?,?, ?,?, 'pending')`,
       [
         LOCAL_USER_ID,
         d.name,
@@ -666,28 +694,53 @@ export const CtApiNative = {
         _stringify(d.nutrition ?? null),
         d.g_per_cup ?? null,
         d.nt_food_id ?? null,
+        d.generic_parent_id ?? null,
+        d.nutrition_source_variant_id ?? null,
       ]
     );
     return this.getPantryItem(id);
   },
 
   async updatePantryItem(id, d) {
-    const fields = [
-      'name = ?', 'brand = ?', 'barcode = ?', 'in_stock = ?', 'quantity = ?',
-      'unit = ?', 'expires_on = ?', 'img_url = ?', 'notes = ?', 'category = ?',
-      'category_id = ?', 'serving_size = ?', 'serving_unit = ?', 'serving_label = ?',
-      'nutrition = ?', 'g_per_cup = ?', 'nt_food_id = ?',
-      `updated_at = datetime('now')`,
-      `sync_status = 'pending'`,
-    ];
-    const params = [
-      d.name, d.brand || null, d.barcode || null, _bool(d.in_stock ?? true),
-      d.quantity ?? null, d.unit || null, d.expires_on || null,
-      d.img_url ?? d.imgUrl ?? null, d.notes || null, d.category || null,
-      d.category_id ?? null, d.serving_size ?? null, d.serving_unit || null,
-      d.serving_label || null, _stringify(d.nutrition ?? null), d.g_per_cup ?? null,
-      d.nt_food_id ?? null, id,
-    ];
+    // Build the UPDATE from the keys ACTUALLY present in `d`. The prior
+    // implementation wrote every column every time, using undefined
+    // payload keys as NULL — which broke two things:
+    //   1. Partial patches like quickToggle({quantity, in_stock})
+    //      violated the NOT NULL constraint on `name` (d.name was
+    //      undefined, coerced to NULL).
+    //   2. Any partial update silently wiped generic_parent_id +
+    //      nutrition_source_variant_id, which is why the variant
+    //      relationship kept disappearing on mobile after any
+    //      unrelated edit — the next sync push then propagated the
+    //      NULLs up to the server.
+    // The `img_url` payload key is accepted under either name for
+    // backwards compat with call sites that used imgUrl.
+    const fields = [];
+    const params = [];
+    const push = (col, val) => { fields.push(`${col} = ?`); params.push(val); };
+    if ('name' in d)                        push('name', d.name);
+    if ('brand' in d)                       push('brand', d.brand || null);
+    if ('barcode' in d)                     push('barcode', d.barcode || null);
+    if ('in_stock' in d)                    push('in_stock', _bool(d.in_stock));
+    if ('quantity' in d)                    push('quantity', d.quantity ?? null);
+    if ('unit' in d)                        push('unit', d.unit || null);
+    if ('expires_on' in d)                  push('expires_on', d.expires_on || null);
+    if ('img_url' in d || 'imgUrl' in d)    push('img_url', d.img_url ?? d.imgUrl ?? null);
+    if ('notes' in d)                       push('notes', d.notes || null);
+    if ('category' in d)                    push('category', d.category || null);
+    if ('category_id' in d)                 push('category_id', d.category_id ?? null);
+    if ('serving_size' in d)                push('serving_size', d.serving_size ?? null);
+    if ('serving_unit' in d)                push('serving_unit', d.serving_unit || null);
+    if ('serving_label' in d)               push('serving_label', d.serving_label || null);
+    if ('nutrition' in d)                   push('nutrition', _stringify(d.nutrition ?? null));
+    if ('g_per_cup' in d)                   push('g_per_cup', d.g_per_cup ?? null);
+    if ('nt_food_id' in d)                  push('nt_food_id', d.nt_food_id ?? null);
+    if ('generic_parent_id' in d)           push('generic_parent_id', d.generic_parent_id ?? null);
+    if ('nutrition_source_variant_id' in d) push('nutrition_source_variant_id', d.nutrition_source_variant_id ?? null);
+    if (fields.length === 0) return this.getPantryItem(id);
+    fields.push(`updated_at = datetime('now')`);
+    fields.push(`sync_status = 'pending'`);
+    params.push(id);
     await _run(`UPDATE pantry_items SET ${fields.join(', ')} WHERE id = ?`, params);
     return this.getPantryItem(id);
   },
@@ -700,7 +753,33 @@ export const CtApiNative = {
     return { ok: true, in_stock: !!in_stock };
   },
 
-  async deletePantryItem(id) {
+  async deletePantryItem(id, opts = {}) {
+    // Variant handling mirrors the server route. When deleting a generic
+    // that has variants, either cascade (soft-delete every child) or
+    // promote them to standalone flat items (clear generic_parent_id).
+    // Without this the children would orphan: the parent is hidden by
+    // deleted_at filter but the children still have generic_parent_id
+    // set, so they're excluded from the top-level list.
+    const cascade = !!opts.cascade;
+    const variantRows = await _query(
+      `SELECT id FROM pantry_items WHERE generic_parent_id = ? AND deleted_at IS NULL`,
+      [id]
+    );
+    if (variantRows.length) {
+      const ids = variantRows.map(r => r.id);
+      const placeholders = ids.map(() => '?').join(',');
+      if (cascade) {
+        await _run(
+          `UPDATE pantry_items SET deleted_at = datetime('now'), sync_status = 'pending' WHERE id IN (${placeholders})`,
+          ids
+        );
+      } else {
+        await _run(
+          `UPDATE pantry_items SET generic_parent_id = NULL, sync_status = 'pending' WHERE id IN (${placeholders})`,
+          ids
+        );
+      }
+    }
     await _run(
       `UPDATE pantry_items SET deleted_at = datetime('now'), sync_status = 'pending' WHERE id = ?`,
       [id]
@@ -1446,8 +1525,10 @@ function _importedToRecipePayload(r) {
     img_url: r.imgUrl ?? r.img_url ?? null,
     servings: r.servings ?? 2,
     yield_text: r.yield_text ?? null,
-    prep_minutes: r.prep_minutes ?? null,
-    cook_minutes: r.cook_minutes ?? null,
+    prep_minutes:  r.prep_minutes  ?? null,
+    cook_minutes:  r.cook_minutes  ?? null,
+    total_minutes: r.total_minutes ?? null,
+    rest_minutes:  r.rest_minutes  ?? null,
     ingredients: r.ingredients ?? [],
     steps: r.steps ?? [],
     tags: r.tags ?? [],

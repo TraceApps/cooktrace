@@ -229,6 +229,19 @@ if (!columnExists('recipes', 'favorite')) {
   db.exec(`ALTER TABLE recipes ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_recipes_favorite ON recipes(favorite)`);
 }
+// Optional manual override for Total Time. NULL means "auto = prep +
+// cook"; a value here wins. Lets a user account for time the two
+// component fields don't cover — resting, marinating, waiting for
+// oven preheat, etc.
+if (!columnExists('recipes', 'total_minutes')) {
+  db.exec(`ALTER TABLE recipes ADD COLUMN total_minutes INTEGER`);
+}
+// Rest / rise / wait / marinate / chill time — the generic hands-off
+// slot. Rolls into the auto-calc for total_minutes when that
+// override is NULL.
+if (!columnExists('recipes', 'rest_minutes')) {
+  db.exec(`ALTER TABLE recipes ADD COLUMN rest_minutes INTEGER`);
+}
 
 // ai_chat_history was originally append-only with just created_at, but
 // /api/sync/pull SELECTs updated_at on every table in TABLES (including
@@ -318,6 +331,29 @@ if (!columnExists('pantry_items', 'g_per_cup')) {
   db.exec(`ALTER TABLE pantry_items ADD COLUMN g_per_cup REAL`);
 }
 
+// ── Pantry variants (Issue #4) ─────────────────────────────────────────
+// Lets one pantry item be a "generic" with multiple brand-specific
+// children (e.g. parent "Milk" with variants "Milk (Brand A)" and
+// "Milk (Brand B)"). Hierarchy is intentionally one-level: a row is
+// either flat (both columns NULL), a generic (rows pointing at it via
+// generic_parent_id), or a variant (its own generic_parent_id is set).
+//
+// generic_parent_id   FK to pantry_items(id). NULL for flat items and
+//                     for generics themselves. Set on every variant.
+// nutrition_source_variant_id
+//                     FK to pantry_items(id). When set, the parent row
+//                     pulls its effective nutrition from this variant
+//                     for recipe calculations. NULL = use the parent's
+//                     own nutrition field (current behaviour). Only
+//                     valid on rows that are themselves generics.
+if (!columnExists('pantry_items', 'generic_parent_id')) {
+  db.exec(`ALTER TABLE pantry_items ADD COLUMN generic_parent_id INTEGER REFERENCES pantry_items(id) ON DELETE SET NULL`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_pantry_generic_parent ON pantry_items(generic_parent_id)`);
+}
+if (!columnExists('pantry_items', 'nutrition_source_variant_id')) {
+  db.exec(`ALTER TABLE pantry_items ADD COLUMN nutrition_source_variant_id INTEGER REFERENCES pantry_items(id) ON DELETE SET NULL`);
+}
+
 // ── Recipe categories ──────────────────────────────────────────────────────
 // One category per recipe (Paprika/Crouton model — simple and matches how
 // people think about meal types). The catalog is shared per-user; admin
@@ -368,8 +404,9 @@ if (!columnExists('recipes', 'video_url')) {
     ['Bread',      'bread',      '#d97706'],
     ['Dessert',    'dessert',    '#ec4899'],
     ['Drink',      'drink',      '#3b82f6'],
-    ['Snack',      'snack',      '#eab308'],
-    ['Sauce',      'sauce',      '#8b5cf6'],
+    ['Snack',      'snack',      '#14b8a6'],
+    ['Sauce',      'sauce',      '#6366f1'],
+    ['Preserves',  'preserves',  '#9f1239'],
   ];
   const userIds = db.prepare(`SELECT id FROM users`).all().map(r => r.id);
   // Single-user mode (no users table rows): seed under user_id NULL too.

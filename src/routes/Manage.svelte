@@ -12,7 +12,6 @@
    */
   import { push } from 'svelte-spa-router';
   import { pageBanners, bannerStyle } from '../stores/settings.js';
-  import ManageBanner from '../components/banners/ManageBanner.svelte';
   import { NtApi } from '../lib/api.js';
   import ManageRecipeCategories from '../components/manage/ManageRecipeCategories.svelte';
   import ManagePantryCategories from '../components/manage/ManagePantryCategories.svelte';
@@ -92,8 +91,7 @@
 </script>
 
 <div class="page-shell manage-page">
-  <header class="page-header" class:has-banner={$pageBanners} class:banner-gradient={$bannerStyle === 'gradient'}>
-    {#if $bannerStyle === 'animated'}<ManageBanner />{/if}
+  <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
     <h1>Manage</h1>
   </header>
 

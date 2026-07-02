@@ -141,6 +141,27 @@ export function notifyShoppingNudge(userId, count) {
     `You have ${count} unchecked item${count === 1 ? '' : 's'} on your shopping list.`, 4);
 }
 
+/**
+ * Pantry expiration digest. `items` is a pre-sorted array of pantry
+ * rows carrying { name, brand, expires_on } where past-expiry entries
+ * come first. Kept as one roll-up per day so a stocked pantry doesn't
+ * fire eight separate notifications.
+ */
+export function notifyExpiryDigest(userId, items) {
+  if (!Array.isArray(items) || items.length === 0) return;
+  if (_firedToday(userId, 'expiry_digest')) return;
+  const lines = items.slice(0, 6).map(it => {
+    const label = it.brand ? `${it.name} (${it.brand})` : it.name;
+    return `• ${label} — ${it.expires_on}`;
+  });
+  if (items.length > 6) lines.push(`…and ${items.length - 6} more`);
+  const body = lines.join('\n');
+  const title = items.length === 1
+    ? '🕒 1 pantry item expiring'
+    : `🕒 ${items.length} pantry items expiring`;
+  return pushNotify(userId, 'notifExpiryEnabled', title, body, 4);
+}
+
 // Comment reply: someone other than the recipe owner posted a
 // comment. NOT deduped per day — comments are real-time signals
 // users actually want to hear about. Fire-and-forget at the call site.

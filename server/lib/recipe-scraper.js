@@ -204,6 +204,12 @@ function _normalise(r, sourceUrl) {
   // If we have only a total but no breakdown, surface it as cook time so
   // the meta row has something to show.
   const cook = cookMinutes ?? (prepMinutes == null && totalMinutes != null ? totalMinutes : null);
+  // Keep totalTime distinctly when the source gives both a total AND at
+  // least one of prep/cook (i.e. the site is telling us there's a
+  // resting/marinating gap that prep+cook alone would understate).
+  const totalCol = totalMinutes != null && (prepMinutes != null || cookMinutes != null)
+    ? totalMinutes
+    : null;
 
   // Ingredients — flat list under one unnamed group. Parse each schema.org
   // string into qty / unit / name / note so the pantry doesn't end up with
@@ -256,8 +262,10 @@ function _normalise(r, sourceUrl) {
     imgUrl,
     servings,
     yield_text: yieldText || null,
-    prep_minutes: prepMinutes ?? null,
-    cook_minutes: cook ?? null,
+    prep_minutes:  prepMinutes ?? null,
+    cook_minutes:  cook ?? null,
+    rest_minutes:  _parseDuration(r.restTime),
+    total_minutes: totalCol,
     ingredients: items.length ? [{ name: '', items }] : [],
     steps,
     tags,

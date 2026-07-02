@@ -1,12 +1,12 @@
 <script>
   import { onMount } from 'svelte';
-  import { fade } from 'svelte/transition';
+  import { fade, fly } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
   import { pageBanners, bannerStyle, pantryView } from '../stores/settings.js';
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { confirmDialog } from '../stores/confirmDialog.js';
   import { push } from 'svelte-spa-router';
-  import PantryBanner from '../components/banners/PantryBanner.svelte';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import BulkActionBar from '../components/ui/BulkActionBar.svelte';
   import BarcodeScanner from '../components/ui/BarcodeScanner.svelte';
@@ -18,18 +18,86 @@
   // fallback during the initial async load and as the icon-name dictionary
   // for older items whose `category` is a slug like "spice" / "dairy".
   import { PANTRY_CATEGORIES, categoryLabel, categoryIcon } from '../lib/pantry-categories.js';
+  import {
+    displayVariantName,
+    buildVariantsByParent,
+    topLevelItems,
+    aggregateStock,
+    matchesSearch,
+    queryHitVariant,
+    matchingVariants,
+    classifySearchHit,
+  } from '../lib/pantry-variants.js';
   import * as OFF from '../lib/off.js';
   import * as USDA from '../lib/usda.js';
   import { offEnabled, usdaEnabled, usdaApiKey } from '../stores/settings.js';
 
   let items = [];
+  // Tracks which generic items the user has expanded to show their
+  // variants. Auto-populated for generics whose children matched the
+  // current search query so search hits stay visible.
+  let expandedGenerics = new Set();
+  // Two-phase collapse: when the user closes an expanded generic, add
+  // its id to collapsingGenerics for one animation tick before removing
+  // it from expandedGenerics. That gives the variant cards time to
+  // play their reverse CSS keyframe. Svelte's out: transition doesn't
+  // fire in this tree (something in the parents suppresses it), so we
+  // drive the exit manually.
+  let collapsingGenerics = new Set();
+  const _VARIANT_EXIT_MS = 220;
+
+  // Expiry helper (Issue #9). Single threshold (14 days) for the
+  // warning state. Items past expiry get a stronger red treatment.
+  const EXPIRY_WARN_DAYS = 14;
+  function _expiryStatus(dateStr) {
+    if (!dateStr) return 'none';
+    const d = new Date(dateStr + 'T00:00:00');
+    if (Number.isNaN(d.getTime())) return 'none';
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const diff = (d - now) / (1000 * 60 * 60 * 24);
+    if (diff < 0) return 'past';
+    if (diff <= EXPIRY_WARN_DAYS) return 'warn';
+    return 'ok';
+  }
+  function _expiryShortLabel(dateStr) {
+    const status = _expiryStatus(dateStr);
+    if (status === 'past') return 'Expired';
+    if (status === 'warn') {
+      const d = new Date(dateStr + 'T00:00:00');
+      const now = new Date(); now.setHours(0, 0, 0, 0);
+      const days = Math.round((d - now) / (1000 * 60 * 60 * 24));
+      if (days === 0) return 'Expires today';
+      if (days === 1) return 'Expires tomorrow';
+      return `Expires in ${days}d`;
+    }
+    return '';
+  }
+
+  // Effective expiry for the list-card pill. A generic doesn't have
+  // its own expiry; it aggregates from children, surfacing the worst
+  // status (past > warn). Flat items and variants use their own.
+  // Returns the date string we want the pill to render against, or
+  // null when nothing should be shown.
+  function _effectiveExpiry(item, isGen) {
+    if (!isGen) return item?.expires_on || null;
+    const kids = variantsByParent.get(item.id) || [];
+    let pastDate = null;
+    let warnDate = null;
+    for (const k of kids) {
+      if (!k.expires_on) continue;
+      const s = _expiryStatus(k.expires_on);
+      if (s === 'past' && (!pastDate || k.expires_on < pastDate)) pastDate = k.expires_on;
+      else if (s === 'warn' && (!warnDate || k.expires_on < warnDate)) warnDate = k.expires_on;
+    }
+    return pastDate || warnDate || null;
+  }
   let loading = true;
   let loadError = null;
   let query = '';
   // Measured page-header height — exposed as --header-h on page-shell
   // so the sticky toolbar pins below the header instead of underneath it.
   let headerH = 0;
-  let stockFilter = 'all'; // 'all' | 'in' | 'out'
+  let stockFilter = 'all'; // 'all' | 'in' | 'out' | 'expiring'
   let categoryFilter = 'all'; // 'all' | <category slug> | 'uncategorized'
   // Sort key — applies after the category/stock filters. Defaults to
   // 'name' to preserve the existing alphabetical-by-name behaviour.
@@ -140,18 +208,63 @@
     return null;
   }
 
+  // Variant-aware derivations (Issue #4). Hide variant rows from the
+  // top-level list (they surface under their parents instead), and
+  // build a parent-id-keyed lookup for the per-row variant fanout +
+  // aggregate-stock pill.
+  $: variantsByParent = buildVariantsByParent(items);
+  $: topItems = topLevelItems(items);
+
   $: filtered = (() => {
-    const base = items
-      .filter(i => stockFilter === 'all' || (stockFilter === 'in' ? i.in_stock : !i.in_stock))
+    // Non-search filters (stock + category) run on top-level items only;
+    // variants inherit their parent's category and their own stock rolls
+    // up to the parent's aggregate for the stock pill.
+    const preSearch = topItems
+      .filter(i => {
+        if (stockFilter === 'all') return true;
+        if (stockFilter === 'expiring') {
+          const myStatus = _expiryStatus(i.expires_on);
+          if (myStatus === 'warn' || myStatus === 'past') return true;
+          const kids = variantsByParent.get(i.id) || [];
+          return kids.some(k => {
+            const s = _expiryStatus(k.expires_on);
+            return s === 'warn' || s === 'past';
+          });
+        }
+        const agg = aggregateStock(i, variantsByParent);
+        const inStock = agg.isGeneric ? agg.stocked > 0 : !!i.in_stock;
+        return stockFilter === 'in' ? inStock : !inStock;
+      })
       .filter(i => {
         if (categoryFilter === 'all') return true;
         if (categoryFilter === 'uncategorized') return !_itemSlug(i);
         return _itemSlug(i) === categoryFilter;
-      })
-      .filter(i => {
-        if (!query.trim()) return true;
-        return i.name.toLowerCase().includes(query.trim().toLowerCase());
       });
+    // Search classification (Issue #4 UX):
+    //   * classifySearchHit === 'parent'   → include parent, no auto-expand
+    //   * classifySearchHit === 'expanded' → include parent, expand it below
+    //   * classifySearchHit === 'variants' → user typed brand-only tokens;
+    //     surface each matching variant as its own top-level card with a
+    //     "variant of Whole Milk" subtitle, and drop the parent from the
+    //     result set (it wouldn't add anything the variant doesn't already
+    //     communicate via its subtitle).
+    const q = query.trim();
+    const base = q
+      ? (() => {
+          const acc = [];
+          for (const it of preSearch) {
+            const cls = classifySearchHit(it, variantsByParent, q);
+            if (cls === 'parent' || cls === 'expanded') {
+              acc.push(it);
+            } else if (cls === 'variants') {
+              for (const v of matchingVariants(it, variantsByParent, q)) {
+                acc.push({ ...v, _standaloneVariantParent: it });
+              }
+            }
+          }
+          return acc;
+        })()
+      : preSearch;
     // Apply sort. Stable secondary sort by name keeps tied entries
     // alphabetised so the order doesn't jitter on equal keys.
     const byName = (a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' });
@@ -168,11 +281,46 @@
     return base.slice().sort(byName);
   })();
 
+  // Auto-expand generics whose search classification is 'expanded' — the
+  // user's query touched BOTH the parent and a specific variant, so the
+  // matching variant should be visible under its parent right away.
+  // 'variants' hits render standalone; 'parent' hits stay collapsed.
+  $: {
+    const q = query.trim();
+    if (q) {
+      const next = new Set(expandedGenerics);
+      for (const it of topItems) {
+        if (classifySearchHit(it, variantsByParent, q) === 'expanded') next.add(it.id);
+      }
+      if (next.size !== expandedGenerics.size) expandedGenerics = next;
+    }
+  }
+
+  function toggleExpand(id) {
+    if (expandedGenerics.has(id)) {
+      // Start collapse — flag as collapsing, let the reverse animation
+      // play, then unmount.
+      collapsingGenerics = new Set(collapsingGenerics).add(id);
+      setTimeout(() => {
+        const nextExp = new Set(expandedGenerics); nextExp.delete(id);
+        const nextCol = new Set(collapsingGenerics); nextCol.delete(id);
+        expandedGenerics = nextExp;
+        collapsingGenerics = nextCol;
+      }, _VARIANT_EXIT_MS);
+    } else {
+      const next = new Set(expandedGenerics);
+      next.add(id);
+      expandedGenerics = next;
+    }
+  }
+
   // Counts per category, keyed by slug. Drives the chip badges.
+  // Counts top-level items only (flat + generics); variants don't
+  // show in the list so they shouldn't inflate category badges.
   $: categoryCounts = (() => {
     const c = { uncategorized: 0 };
     for (const cat of pantryCategories) c[cat.slug] = 0;
-    for (const it of items) {
+    for (const it of topItems) {
       const slug = _itemSlug(it);
       if (!slug) c.uncategorized++;
       else if (c[slug] != null) c[slug]++;
@@ -180,7 +328,25 @@
     return c;
   })();
 
-  $: stockedCount = items.filter(i => i.in_stock).length;
+  // Top-level stocked count: a generic is "stocked" when at least one
+  // variant is. Flat items use their own in_stock flag.
+  $: stockedCount = topItems.filter(i => {
+    const agg = aggregateStock(i, variantsByParent);
+    return agg.isGeneric ? agg.stocked > 0 : !!i.in_stock;
+  }).length;
+
+  // Expiring-soon count (Issue #9). Counts top-level items whose own
+  // expiry is warn/past OR whose any variant is. Used by the filter
+  // chip badge.
+  $: expiringSoonCount = topItems.filter(i => {
+    const myStatus = _expiryStatus(i.expires_on);
+    if (myStatus === 'warn' || myStatus === 'past') return true;
+    const kids = variantsByParent.get(i.id) || [];
+    return kids.some(k => {
+      const s = _expiryStatus(k.expires_on);
+      return s === 'warn' || s === 'past';
+    });
+  }).length;
 
   // Grouping: when "All categories" is selected AND no search query,
   // bucket the filtered items by category so each renders under its
@@ -240,6 +406,21 @@
   }
   onMount(load);
 
+  // Variant feature announcement (Issue #4 commit 4). One-shot banner
+  // at the top of the Pantry page introducing the new feature. Dismiss
+  // via the X; the key in localStorage keeps it dismissed across loads.
+  // Versioned (v1) so a future announcement can re-show without
+  // colliding with this one.
+  const VARIANT_ANNOUNCE_KEY = 'ct:pantry:variant-announce-v1';
+  let showVariantBanner = false;
+  if (typeof localStorage !== 'undefined') {
+    try { showVariantBanner = !localStorage.getItem(VARIANT_ANNOUNCE_KEY); } catch {}
+  }
+  function _dismissVariantBanner() {
+    showVariantBanner = false;
+    try { localStorage.setItem(VARIANT_ANNOUNCE_KEY, '1'); } catch {}
+  }
+
   // Every create / edit / scan flow opens the same slide-up sheet now.
   // No more nav to a separate full-page editor: the sheet is the only
   // pantry editor in v1.0. itemId=null means create mode; startInEdit
@@ -276,6 +457,14 @@
     // New row landed; refresh the list so it shows up + any side-effect
     // server fields (timestamps, derived flags) are reflected. Cheaper
     // to refetch than reconstruct locally.
+    try { items = await NtApi.getPantry(); } catch {}
+  }
+  async function onSheetRefresh() {
+    // Variant-relationship change (attach / detach / set-parent / add
+    // new variant). The sheet emits 'changed' for the row it owns, but
+    // those operations also mutate OTHER rows (the child being attached,
+    // a flat item being promoted to a generic). A targeted local patch
+    // can't fix the sibling row, so refetch the whole list.
     try { items = await NtApi.getPantry(); } catch {}
   }
   function startEdit(it) {
@@ -409,8 +598,7 @@
 </script>
 
 <div class="page-shell" style="--header-h: {headerH}px">
-  <header class="page-header" class:has-banner={$pageBanners} class:banner-gradient={$bannerStyle === 'gradient'} bind:offsetHeight={headerH}>
-    {#if $bannerStyle === 'animated'}<PantryBanner />{/if}
+  <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'} bind:offsetHeight={headerH}>
     <h1>Pantry</h1>
     <button class="btn-icon header-action" on:click={startCreate} aria-label="Add item" title="Add item">
       <span class="material-symbols-rounded">add</span>
@@ -418,6 +606,20 @@
   </header>
 
   <div class="page-content">
+    {#if showVariantBanner && items.length > 0}
+      <div class="variant-banner" in:fade={{ duration: 160 }}>
+        <span class="material-symbols-rounded variant-banner-icon">category</span>
+        <div class="variant-banner-body">
+          <div class="variant-banner-title">Pantry now supports product variants</div>
+          <p class="variant-banner-desc">
+            Group different brands of the same ingredient under one pantry entry. Open any item, scroll to Variants, and add a brand or store. Recipes that link to the generic match any of the variants. Your existing pantry works exactly as before until you opt in per item.
+          </p>
+        </div>
+        <button class="variant-banner-close" on:click={_dismissVariantBanner} aria-label="Dismiss">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </div>
+    {/if}
     {#if items.length > 0}
       <div class="toolbar sticky-controls">
         <div class="search-row">
@@ -443,12 +645,13 @@
             <span class="filter-divider" aria-hidden="true"></span>
           {/if}
           <div class="filter-chips">
-            {#each [['all','All'], ['in','In Stock'], ['out','Out']] as [v, label]}
+            {#each [['all','All'], ['in','In Stock'], ['out','Out'], ['expiring','Expiring Soon']] as [v, label]}
               <button class="seg" class:active={stockFilter === v} on:click={() => stockFilter = v}>
                 {label}
                 {#if v === 'in'}<span class="seg-count">{stockedCount}</span>{/if}
-                {#if v === 'out'}<span class="seg-count">{items.length - stockedCount}</span>{/if}
-                {#if v === 'all'}<span class="seg-count">{items.length}</span>{/if}
+                {#if v === 'out'}<span class="seg-count">{topItems.length - stockedCount}</span>{/if}
+                {#if v === 'all'}<span class="seg-count">{topItems.length}</span>{/if}
+                {#if v === 'expiring'}<span class="seg-count">{expiringSoonCount}</span>{/if}
               </button>
             {/each}
           </div>
@@ -567,10 +770,17 @@
         <div class="card-grid" class:list={$pantryView === 'list'}>
           {#each section.items as it (it.id)}
             {@const isSelected = selectMode && selectedIds.has(it.id)}
+            {@const stockAgg = aggregateStock(it, variantsByParent)}
+            {@const isGen = stockAgg.isGeneric}
+            {@const effExp = _effectiveExpiry(it, isGen)}
+            {@const inStockDisplay = isGen ? stockAgg.stocked > 0 : !!it.in_stock}
+            {@const expanded = expandedGenerics.has(it.id)}
+            {@const variants = isGen ? (variantsByParent.get(it.id) || []) : []}
             <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
             <article class="pcard"
-              class:in-stock={it.in_stock}
+              class:in-stock={inStockDisplay}
               class:selected={isSelected}
+              class:generic={isGen}
               on:click={() => onRowClick(it)}
               use:longpress
               on:longpress={() => onRowLongPress(it)}
@@ -584,20 +794,20 @@
                 {:else}
                   <span class="material-symbols-rounded photo-stub">{_catIconBySlug(_itemSlug(it))}</span>
                 {/if}
-                {#if !selectMode}
-                  <button class="photo-stock"
-                    class:on={it.in_stock}
-                    on:click|stopPropagation={() => quickToggle(it)}
-                    aria-label={it.in_stock ? 'Mark as out of stock' : 'Mark as in stock'}
-                    title={it.in_stock ? 'In stock' : 'Out of stock'}>
-                    <span class="material-symbols-rounded">{it.in_stock ? 'check' : 'add'}</span>
-                  </button>
-                {:else}
+                {#if selectMode}
                   <button class="photo-stock"
                     class:on={isSelected}
                     on:click|stopPropagation={() => toggleSelected(it.id)}
                     aria-label={isSelected ? 'Deselect' : 'Select'}>
                     <span class="material-symbols-rounded">{isSelected ? 'check' : 'add'}</span>
+                  </button>
+                {:else if !isGen}
+                  <button class="photo-stock"
+                    class:on={inStockDisplay}
+                    on:click|stopPropagation={() => quickToggle(it)}
+                    aria-label={inStockDisplay ? 'Mark as out of stock' : 'Mark as in stock'}
+                    title={inStockDisplay ? 'In stock' : 'Out of stock'}>
+                    <span class="material-symbols-rounded">{inStockDisplay ? 'check' : 'add'}</span>
                   </button>
                 {/if}
               </div>
@@ -607,18 +817,39 @@
                 {#if it.brand}
                   <div class="pcard-brand">{it.brand}</div>
                 {/if}
+                {#if it._standaloneVariantParent}
+                  <div class="pcard-variant-of">Variant of {it._standaloneVariantParent.name}</div>
+                {/if}
                 <div class="pcard-meta">
-                  {#if it.quantity != null || it.unit}
+                  {#if isGen}
+                    <span class="pcard-pill variants-pill" title={`${stockAgg.stocked} of ${stockAgg.total} variants in stock`}>
+                      <span class="material-symbols-rounded">category</span>
+                      {stockAgg.stocked} / {stockAgg.total}
+                    </span>
+                  {:else if it.quantity != null || it.unit}
                     <span class="pcard-qty">
                       {it.quantity ?? ''}{it.quantity != null && it.unit ? ' ' : ''}{it.unit ?? ''}
                     </span>
                   {/if}
-                  <!-- Recipe-usage pill — only when actually used. -->
+                  <!-- Recipe-usage pill, only when actually used. -->
                   {#if it.recipe_count > 0}
                     <span class="pcard-pill usage-pill" title={`Used in ${it.recipe_count} recipe${it.recipe_count === 1 ? '' : 's'}`}>
                       <span class="material-symbols-rounded">restaurant</span>
                       {it.recipe_count}
                     </span>
+                  {/if}
+                  <!-- Expiry pill (Issue #9). For generics, the effExp
+                       above is the earliest expiring child. For flat
+                       items + variants, it's the row's own date. Only
+                       renders on warn / past. -->
+                  {#if effExp}
+                    {@const expStatus = _expiryStatus(effExp)}
+                    {#if expStatus === 'warn' || expStatus === 'past'}
+                      <span class="pcard-pill expiry-pill" class:past={expStatus === 'past'} title={`Expires ${effExp}`}>
+                        <span class="material-symbols-rounded">{expStatus === 'past' ? 'event_busy' : 'schedule'}</span>
+                        {_expiryShortLabel(effExp)}
+                      </span>
+                    {/if}
                   {/if}
                   <!-- Category pill only when ungrouped (search/specific filter) -->
                   {#if !section.label && _itemSlug(it)}
@@ -630,7 +861,60 @@
                   {/if}
                 </div>
               </div>
+
+              {#if isGen}
+                <button class="pcard-expand"
+                  class:open={expanded}
+                  on:click|stopPropagation={() => toggleExpand(it.id)}
+                  aria-label={expanded ? 'Collapse variants' : 'Expand variants'}
+                  title={expanded ? 'Collapse variants' : 'Expand variants'}>
+                  <span class="material-symbols-rounded chevron-icon" class:up={expanded}>expand_more</span>
+                </button>
+              {/if}
             </article>
+
+            {#if isGen && expanded}
+              {#each variants as v, vIdx (v.id)}
+                <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+                <article class="pcard variant-card"
+                  class:in-stock={v.in_stock}
+                  class:collapsing={collapsingGenerics.has(it.id)}
+                  style={`--variant-stagger: ${vIdx * 60}ms;`}
+                  on:click={() => onRowClick(v)}
+                  use:longpress
+                  on:longpress={() => onRowLongPress(v)}
+                  on:contextmenu|preventDefault={() => onRowLongPress(v)}
+                  role="button" tabindex="0"
+                  on:keydown={(e) => { if (e.key === 'Enter') onRowClick(v); }}>
+                  <div class="pcard-photo">
+                    {#if v.img_url}
+                      <img src={v.img_url} alt="" loading="lazy" />
+                    {:else}
+                      <span class="material-symbols-rounded photo-stub">label</span>
+                    {/if}
+                    {#if !selectMode}
+                      <button class="photo-stock"
+                        class:on={v.in_stock}
+                        on:click|stopPropagation={() => quickToggle(v)}
+                        aria-label={v.in_stock ? 'Mark as out of stock' : 'Mark as in stock'}
+                        title={v.in_stock ? 'In stock' : 'Out of stock'}>
+                        <span class="material-symbols-rounded">{v.in_stock ? 'check' : 'add'}</span>
+                      </button>
+                    {/if}
+                  </div>
+                  <div class="pcard-body">
+                    <div class="pcard-name">{displayVariantName(v, it, { nested: true })}</div>
+                    <div class="pcard-meta">
+                      {#if v.quantity != null || v.unit}
+                        <span class="pcard-qty">
+                          {v.quantity ?? ''}{v.quantity != null && v.unit ? ' ' : ''}{v.unit ?? ''}
+                        </span>
+                      {/if}
+                    </div>
+                  </div>
+                </article>
+              {/each}
+            {/if}
           {/each}
         </div>
       {/each}
@@ -700,6 +984,7 @@
   on:changed={onSheetChanged}
   on:deleted={onSheetDeleted}
   on:created={onSheetCreated}
+  on:refresh={onSheetRefresh}
 />
 
 
@@ -1080,6 +1365,16 @@
     font-size: 12px; color: var(--text-3);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  /* Subtitle shown when a search matched only variant-specific tokens
+     (a brand the user typed) so a variant surfaced as its own top-
+     level card. Keeps the parent-of relationship visible without
+     needing to also render the parent card. */
+  .pcard-variant-of {
+    font-size: 11px; color: var(--text-3);
+    font-style: italic;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    margin-top: 1px;
+  }
   .pcard-meta {
     display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
     margin-top: 4px;
@@ -1105,6 +1400,106 @@
     border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
   }
   .pcard-pill.usage-pill .material-symbols-rounded { color: var(--accent); }
+
+  /* Generic + variant rendering (Issue #4) */
+  .pcard.generic { position: relative; }
+  .pcard-expand {
+    position: absolute; top: 8px; right: 8px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text-2);
+    width: 28px; height: 28px;
+    border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: transform var(--dur-fast), border-color var(--dur-fast);
+  }
+  .pcard-expand:hover { border-color: var(--accent); color: var(--text-1); }
+  .pcard-expand.open { background: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); }
+  .pcard-expand .material-symbols-rounded { font-size: 18px; }
+  /* Single icon, rotates on expand for a smooth open/close instead of
+     swapping between two glyphs (which jumped). */
+  .chevron-icon {
+    transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .chevron-icon.up { transform: rotate(180deg); }
+  .pcard-pill.variants-pill {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent);
+  }
+  .pcard.variant-card {
+    margin-left: 16px;
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--accent) 4%, var(--surface-1));
+    /* CSS-only entrance — plays on every mount. Reliable across
+       WebViews where Svelte's fly transition may or may not fire due
+       to grid layout containment / reduced-motion / etc. --variant-
+       stagger is a per-card delay set inline based on the each-block
+       index so cards cascade in one after another. */
+    animation: variant-in 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation-delay: var(--variant-stagger, 0ms);
+  }
+  /* Manual exit: toggleExpand sets .collapsing on every variant card
+     for _VARIANT_EXIT_MS ms before actually removing them, so this
+     reverse keyframe has time to play. */
+  .pcard.variant-card.collapsing {
+    animation: variant-out 220ms cubic-bezier(0.55, 0, 0.75, 0.1) forwards;
+    animation-delay: 0ms;
+  }
+  @keyframes variant-in {
+    from { transform: translateY(-24px); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
+  }
+  @keyframes variant-out {
+    from { transform: translateY(0);     opacity: 1; }
+    to   { transform: translateY(-20px); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pcard.variant-card,
+    .pcard.variant-card.collapsing { animation: none; }
+  }
+  .card-grid.list .pcard.variant-card { margin-left: 24px; }
+
+  /* Variant feature announcement banner (Issue #4 commit 4) */
+  .variant-banner {
+    display: flex; align-items: flex-start; gap: 12px;
+    margin: 12px 0;
+    padding: 12px 14px;
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface-1));
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+    border-radius: var(--radius-md);
+  }
+  .variant-banner-icon { color: var(--accent); font-size: 24px; }
+  .variant-banner-body { flex: 1; min-width: 0; }
+  .variant-banner-title {
+    font-weight: 700; color: var(--text-1); font-size: 14px;
+    margin-bottom: 2px;
+  }
+  .variant-banner-desc {
+    margin: 0;
+    color: var(--text-2);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .variant-banner-close {
+    background: transparent; border: none;
+    color: var(--text-3); cursor: pointer;
+    padding: 0; line-height: 1;
+  }
+  .variant-banner-close:hover { color: var(--text-1); }
+  .variant-banner-close .material-symbols-rounded { font-size: 20px; }
+
+  /* Expiry pill on pantry cards (Issue #9) */
+  .pcard-pill.expiry-pill {
+    background: color-mix(in srgb, var(--warning, #f59e0b) 18%, transparent);
+    color: var(--warning, #f59e0b);
+  }
+  .pcard-pill.expiry-pill .material-symbols-rounded { color: var(--warning, #f59e0b); }
+  .pcard-pill.expiry-pill.past {
+    background: color-mix(in srgb, var(--error, #f87171) 14%, transparent);
+    color: var(--error, #f87171);
+  }
+  .pcard-pill.expiry-pill.past .material-symbols-rounded { color: var(--error, #f87171); }
 
   /* ── Phone layout: flip the card to a compact horizontal row ───────
      On a phone the 4:3 photo + stacked body makes each card 180px+

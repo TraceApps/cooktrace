@@ -136,11 +136,49 @@ router.post('/import-foods', wrap(async (req, res) => {
   if (!foods || foods.length === 0) return res.status(400).json({ error: 'foods array required' });
   const inStock = req.body?.inStock !== false ? 1 : 0;
 
+  // Variant import mode (Issue #4 commit 4). Three options:
+  //   'flat'                 standalone rows (default).
+  //   'variant-of-existing'  all imports become children of the named
+  //                          existing pantry item (`parentId`).
+  //   'variant-of-new'       a new generic is created from `newGenericName`
+  //                          first, then all imports become its children.
+  const variantMode = req.body?.variantMode || 'flat';
+  let parentId = null;
+  if (variantMode === 'variant-of-existing') {
+    const requested = parseInt(req.body?.parentId, 10);
+    if (!Number.isFinite(requested)) return res.status(400).json({ error: 'parentId required when variantMode is variant-of-existing' });
+    const parent = db.prepare(
+      `SELECT id, generic_parent_id, deleted_at FROM pantry_items WHERE id = ? AND ${u == null ? 'user_id IS NULL' : 'user_id = ?'}`
+    ).get(...(u == null ? [requested] : [requested, u]));
+    if (!parent || parent.deleted_at) return res.status(400).json({ error: 'Parent pantry item not found' });
+    if (parent.generic_parent_id != null) return res.status(400).json({ error: 'Picked parent is itself a variant; pick a flat or generic item' });
+    parentId = parent.id;
+  } else if (variantMode === 'variant-of-new') {
+    const newName = (req.body?.newGenericName || '').toString().trim();
+    if (!newName) return res.status(400).json({ error: 'newGenericName required when variantMode is variant-of-new' });
+    // Pick a sensible default photo + category from the first food
+    // that has them so the new generic isn't a bare row. The generic
+    // is created out-of-stock; child stock drives the aggregate pill.
+    const first = foods[0] || {};
+    const seed = db.prepare(
+      `INSERT INTO pantry_items
+         (user_id, name, brand, in_stock, img_url, serving_size, serving_unit, nutrition)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      u, newName, null, 0,
+      first.image_url || first.img_url || first.imgUrl || null,
+      first.serving_size != null ? Number(first.serving_size) : null,
+      first.serving_unit || null,
+      first.nutrition ? JSON.stringify(first.nutrition) : null,
+    );
+    parentId = Number(seed.lastInsertRowid);
+  }
+
   const insert = db.prepare(
     `INSERT INTO pantry_items
        (user_id, name, brand, barcode, in_stock, nt_food_id,
-        img_url, serving_size, serving_unit, nutrition)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        img_url, serving_size, serving_unit, nutrition, generic_parent_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const created = [];
   const skipped = [];
@@ -150,16 +188,23 @@ router.post('/import-foods', wrap(async (req, res) => {
   // deleted matches → resurrected (deleted_at cleared) and refreshed
   // from the NT food so the user gets the latest brand / nutrition /
   // image instead of a duplicate row alongside the tombstone.
+  //
+  // Variant import: the dedup check is scoped per-parent so the same
+  // food can be a flat row AND a variant of a generic at the same time
+  // without colliding. The resurrect path preserves whatever parent
+  // the existing row had.
   const findExisting = db.prepare(
     `SELECT id, deleted_at FROM pantry_items
      WHERE ${u == null ? 'user_id IS NULL' : 'user_id = ?'}
-     AND lower(name) = lower(?) LIMIT 1`
+     AND lower(name) = lower(?)
+     AND ${parentId == null ? 'generic_parent_id IS NULL' : 'generic_parent_id = ?'} LIMIT 1`
   );
   const resurrect = db.prepare(
     `UPDATE pantry_items
      SET deleted_at = NULL, updated_at = datetime('now'),
          brand = ?, barcode = ?, in_stock = ?, nt_food_id = ?,
-         img_url = ?, serving_size = ?, serving_unit = ?, nutrition = ?
+         img_url = ?, serving_size = ?, serving_unit = ?, nutrition = ?,
+         generic_parent_id = ?
      WHERE id = ?`
   );
 
@@ -167,7 +212,10 @@ router.post('/import-foods', wrap(async (req, res) => {
     for (const f of foods) {
       const name = (f.name || '').toString().trim();
       if (!name) { skipped.push({ name: f.name, reason: 'no name' }); continue; }
-      const existing = u == null ? findExisting.get(name) : findExisting.get(u, name);
+      const lookupArgs = u == null
+        ? (parentId == null ? [name] : [name, parentId])
+        : (parentId == null ? [u, name] : [u, name, parentId]);
+      const existing = findExisting.get(...lookupArgs);
       if (existing && !existing.deleted_at) {
         skipped.push({ name, reason: 'already in pantry' });
         continue;
@@ -182,6 +230,7 @@ router.post('/import-foods', wrap(async (req, res) => {
           f.serving_size != null ? Number(f.serving_size) : null,
           f.serving_unit || null,
           f.nutrition ? JSON.stringify(f.nutrition) : null,
+          parentId,
           existing.id,
         );
         created.push({ id: existing.id, name, restored: true });
@@ -197,6 +246,7 @@ router.post('/import-foods', wrap(async (req, res) => {
         f.serving_size != null ? Number(f.serving_size) : null,
         f.serving_unit || null,
         f.nutrition ? JSON.stringify(f.nutrition) : null,
+        parentId,
       );
       created.push({ id: result.lastInsertRowid, name });
     }

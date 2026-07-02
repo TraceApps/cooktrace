@@ -2,13 +2,15 @@
   import { onMount, tick } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { fade } from 'svelte/transition';
+  import { formatDuration } from '../lib/duration.js';
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { pageBanners, bannerStyle, aiEnabled, aiKeyVerified, recipesSort } from '../stores/settings.js';
-  import RecipesBanner from '../components/banners/RecipesBanner.svelte';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import BulkActionBar from '../components/ui/BulkActionBar.svelte';
-  import PhotoImportDialog from '../components/recipe/PhotoImportDialog.svelte';
+  import ImportFromFileDialog from '../components/recipe/ImportFromFileDialog.svelte';
+  import CookbookImportDialog from '../components/recipe/CookbookImportDialog.svelte';
+  import ImportUrlDialog from '../components/recipe/ImportUrlDialog.svelte';
   import { relativeTime } from '../lib/relative-time.js';
   import { longpress } from '../lib/long-press.js';
   import { confirmDialog } from '../stores/confirmDialog.js';
@@ -23,15 +25,15 @@
   // The "Paste or upload" option opens a dialog that accepts BOTH a file
   // upload (.json, .html, Mealie/Tandoor/Paprika exports) AND a paste
   // textarea — parser auto-detects JSON vs HTML/schema.org/Recipe.
-  // Photo import lives above the JSON/HTML option because it's the
-  // friendliest path for most users; gated on AI being enabled AND
-  // verified (so the entry doesn't dangle when Trace can't actually run).
+  // "Import from File" handles images (Trace AI vision) plus PDF / RTF /
+  // TXT / MD (server-side text extraction + heuristic parse + optional
+  // AI fallback for low-confidence inputs). Always visible; AI-dependent
+  // paths inside the dialog gate themselves on the runtime AI config.
   $: createActions = [
     { label: 'Create Manually',          icon: 'edit_note',          value: 'manual' },
     { label: 'Import from URL',          icon: 'link',               value: 'url' },
-    ...(($aiEnabled && ($aiKeyVerified || aiEnvLocked))
-      ? [{ label: 'Import from Photo', icon: 'photo_camera', value: 'photo' }]
-      : []),
+    { label: 'Import from File', icon: 'upload_file', value: 'file' },
+    { label: 'Import Cookbook',  icon: 'menu_book',   value: 'cookbook' },
     { label: 'Import from JSON/HTML',    icon: 'content_paste',      value: 'paste' },
   ];
 
@@ -46,7 +48,8 @@
     } catch {}
   });
 
-  let photoImportOpen = false;
+  let fileImportOpen = false;
+  let cookbookImportOpen = false;
   function onCreateAction(e) {
     const v = e.detail?.value;
     if (v === 'manual') {
@@ -55,27 +58,18 @@
       urlImportOpen = true;
     } else if (v === 'paste') {
       pasteImportOpen = true;
-    } else if (v === 'photo') {
-      photoImportOpen = true;
+    } else if (v === 'file') {
+      fileImportOpen = true;
+    } else if (v === 'cookbook') {
+      cookbookImportOpen = true;
     }
   }
 
   // ── URL import ─────────────────────────────────────────────────────────
+  // The unified ImportUrlDialog owns the textarea, options, and either-or
+  // routing (1 URL = direct save, N URLs = picker grid). We only hold the
+  // open flag here.
   let urlImportOpen = false;
-  let urlImportInput = '';
-  let urlImportBusy = false;
-  // Default: add new ingredients to pantry on import (clean names go in
-  // since the scraper now splits qty/unit/name). Tags default off — they
-  // tend to be noisy on imported content.
-  // Default OFF: imported recipes save with their ingredients as plain
-  // text. The user opts in to Pantry linking explicitly via the toggle
-  // when they actually want their stocked-brand metadata to apply.
-  let urlImportAddToPantry = false;
-  let urlImportApplyTags = false;
-  // Categories from the source page. Defaults ON to match the
-  // genre standard (Mealie / Paprika / NYT Cooking all carry the
-  // category over verbatim, auto-creating it if missing).
-  let urlImportCategories = true;
 
   // ── Paste / Upload import ──────────────────────────────────────────────
   let pasteImportOpen = false;
@@ -130,31 +124,7 @@
       pasteBusy = false;
     }
   }
-  async function doUrlImport() {
-    const url = urlImportInput.trim();
-    if (!url) return;
-    urlImportBusy = true;
-    try {
-      const created = await NtApi.scrapeRecipe(url, {
-        addToPantry: urlImportAddToPantry,
-        applyTags: urlImportApplyTags,
-        importCategories: urlImportCategories,
-      });
-      const stepCount = (created.steps || []).reduce((n, s) => n + (s?.text ? 1 : 0), 0);
-      if (stepCount === 0) {
-        showError("Imported — but the source page didn't include cooking steps. Open the recipe to add them manually.");
-      } else {
-        showSuccess('Recipe imported');
-      }
-      urlImportOpen = false;
-      urlImportInput = '';
-      push(`/recipes/${created.id}`);
-    } catch (e) {
-      showError(e.message || 'Could not import recipe');
-    } finally {
-      urlImportBusy = false;
-    }
-  }
+  // URL import logic now lives inside ImportUrlDialog.
 
   // ── Long-press card actions ────────────────────────────────────────────
   // Share Link / public-link entries need a server to mint and host
@@ -703,13 +673,13 @@
   onMount(load);
 
   function totalMinutes(r) {
-    return (r.prep_minutes || 0) + (r.cook_minutes || 0);
+    if (r?.total_minutes != null) return r.total_minutes;
+    return (r?.prep_minutes || 0) + (r?.cook_minutes || 0) + (r?.rest_minutes || 0);
   }
 </script>
 
 <div class="page-shell" style="--header-h: {headerH}px">
-  <header class="page-header" class:has-banner={$pageBanners} class:banner-gradient={$bannerStyle === 'gradient'} bind:offsetHeight={headerH}>
-    {#if $bannerStyle === 'animated'}<RecipesBanner />{/if}
+  <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'} bind:offsetHeight={headerH}>
     <h1>Recipes</h1>
     <button class="btn-icon header-action" on:click={() => createSheetOpen = true} aria-label="New Recipe" title="New Recipe">
       <span class="material-symbols-rounded">add</span>
@@ -730,7 +700,8 @@
     on:select={onCardAction}
   />
 
-  <PhotoImportDialog bind:open={photoImportOpen} envLocked={aiEnvLocked} />
+  <ImportFromFileDialog bind:open={fileImportOpen} envLocked={aiEnvLocked} />
+  <CookbookImportDialog bind:open={cookbookImportOpen} envLocked={aiEnvLocked} />
 
   {#if shareDialogOpen && shareDialogRecipe}
     <div class="cb-dialog-backdrop" on:click={() => shareDialogOpen = false}>
@@ -913,56 +884,8 @@
     </div>
   {/if}
 
-  <!-- URL import dialog -->
-  {#if urlImportOpen}
-    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="modal-backdrop" on:click|self={() => urlImportOpen = false}>
-      <div class="modal" on:click|stopPropagation>
-        <header class="modal-header">
-          <h2>Import from URL</h2>
-          <button class="btn-icon" on:click={() => urlImportOpen = false} aria-label="Close"><span class="material-symbols-rounded">close</span></button>
-        </header>
-        <div class="modal-body">
-          <p class="modal-hint">Paste a recipe URL — most food blogs use schema.org/Recipe microdata which we'll parse automatically.</p>
-          <input
-            class="input"
-            type="url"
-            placeholder="https://example.com/the-best-banana-bread"
-            bind:value={urlImportInput}
-            on:keydown={(e) => e.key === 'Enter' && doUrlImport()}
-            autofocus
-          />
-          <label class="opt-row">
-            <input type="checkbox" bind:checked={urlImportAddToPantry} />
-            <span>
-              <span class="opt-label">Link ingredients to your Pantry</span>
-              <span class="opt-desc">Matches imported names to your existing Pantry items (case-insensitive) and creates new rows for any that don't exist yet. Off = leave the Pantry alone; ingredients save as plain text only.</span>
-            </span>
-          </label>
-          <label class="opt-row">
-            <input type="checkbox" bind:checked={urlImportApplyTags} />
-            <span>
-              <span class="opt-label">Apply tags from the source page</span>
-              <span class="opt-desc">Off by default. Tags from food blogs tend to be noisy; you can always add them later.</span>
-            </span>
-          </label>
-          <label class="opt-row">
-            <input type="checkbox" bind:checked={urlImportCategories} />
-            <span>
-              <span class="opt-label">Import the source's category</span>
-              <span class="opt-desc">Carries the recipe's category from the source page. Matches an existing one in your catalog if the name lines up (case-insensitive); otherwise creates a new category. Off = save the recipe uncategorized.</span>
-            </span>
-          </label>
-        </div>
-        <footer class="modal-footer">
-          <button class="btn btn-secondary" on:click={() => urlImportOpen = false}>Cancel</button>
-          <button class="btn btn-primary" on:click={doUrlImport} disabled={urlImportBusy || !urlImportInput.trim()}>
-            {urlImportBusy ? 'Fetching…' : 'Import'}
-          </button>
-        </footer>
-      </div>
-    </div>
-  {/if}
+  <!-- URL import dialog (unified: 1 URL = direct save, N URLs = picker) -->
+  <ImportUrlDialog bind:open={urlImportOpen} />
 
   <!-- Paste / upload import dialog (Phase 7). Auto-detects format —
        schema.org JSON-LD, schema.org HTML, Mealie / Tandoor / CookTrace
@@ -1205,7 +1128,7 @@
                   {#if totalMinutes(r) > 0}
                     <span class="meta-pill">
                       <span class="material-symbols-rounded">schedule</span>
-                      {totalMinutes(r)}m
+                      {formatDuration(totalMinutes(r))}
                     </span>
                   {/if}
                   {#if r.servings}
@@ -1312,7 +1235,7 @@
                 {#if totalMinutes(r) > 0}
                   <span class="meta-pill">
                     <span class="material-symbols-rounded">schedule</span>
-                    {totalMinutes(r)}m
+                    {formatDuration(totalMinutes(r))}
                   </span>
                 {/if}
                 {#if r.servings}

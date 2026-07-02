@@ -11,6 +11,7 @@
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
+  import { formatDuration } from '../lib/duration.js';
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { confirmDialog } from '../stores/confirmDialog.js';
@@ -169,7 +170,8 @@
   }
 
   function totalMinutes(r) {
-    return (r.prep_minutes || 0) + (r.cook_minutes || 0);
+    if (r?.total_minutes != null) return r.total_minutes;
+    return (r?.prep_minutes || 0) + (r?.cook_minutes || 0) + (r?.rest_minutes || 0);
   }
 </script>
 
@@ -268,7 +270,7 @@
                   {#if r.description}<p class="card-desc">{r.description}</p>{/if}
                   <div class="card-meta">
                     {#if totalMinutes(r) > 0}
-                      <span class="meta-pill"><span class="material-symbols-rounded">schedule</span>{totalMinutes(r)}m</span>
+                      <span class="meta-pill"><span class="material-symbols-rounded">schedule</span>{formatDuration(totalMinutes(r))}</span>
                     {/if}
                     {#if r.servings}
                       <span class="meta-pill"><span class="material-symbols-rounded">restaurant</span>{r.servings}</span>

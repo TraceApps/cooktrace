@@ -3,7 +3,6 @@
   import { slide } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
-  import SettingsBanner from '../components/banners/SettingsBanner.svelte';
   import SettingsAuth   from '../components/settings/SettingsAuth.svelte';
   import SettingsBackup from '../components/settings/SettingsBackup.svelte';
   import SettingsServerConnection from '../components/settings/SettingsServerConnection.svelte';
@@ -30,7 +29,7 @@
   import { applyAppearance, applyAccentColor, scheduleSave } from '../stores/settings.js';
   import {
     appearance, accentColor, navStyle, sidebarPersistent, disableAnimations,
-    pageBanners, bannerStyle, measurementSystem, defaultServings, energyUnit,
+    pageBanners, bannerStyle, bannerAnimation, measurementSystem, defaultServings, energyUnit,
     dateFormat, timeFormat, language, startPage,
     offEnabled, offSearchLanguage, offSearchCountry, offUploadCountry,
     offUsername, offPassword, barcodeBeep, barcodeFlashlight,
@@ -218,7 +217,7 @@
     federation:    ['federation','nutritrace','nt','linked','share','token','instance','foods','pull foods','import foods','sync foods'],
     foodsources:   ['food sources','open food facts','off','usda','fooddata central','api key','barcode','scanner','beep','flashlight','search','language','country','contribute'],
     ai:            ['ai','trace','assistant','provider','model','api key','chat','claude','openai','gemini','base url','artificial intelligence','smart log','smartlog','quick log','voice','dictate','hold to record','mic'],
-    notifications: ['notifications','reminders','cook day','thaw','alerts','push','apprise','gotify','ntfy'],
+    notifications: ['notifications','reminders','cook day','thaw','alerts','push','apprise','gotify','ntfy','expiration','expiry','expires','expiring','pantry expiry','digest','weekly summary','shopping nudge'],
     email:         ['email','smtp','mail','password reset','invite','from address','tls','outgoing'],
     backup:        ['backup','export','import','restore','json','full backup','reset','danger zone'],
     import:        ['import','mealie','tandoor','paprika','recipe import','migration','migrate','transfer','bulk','zip','from another app'],
@@ -361,8 +360,7 @@
 </script>
 
 <div class="page-shell">
-  <header class="page-header" class:has-banner={$pageBanners} class:banner-gradient={$bannerStyle === 'gradient'}>
-    {#if $bannerStyle === 'animated'}<SettingsBanner />{/if}
+  <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
     <h1>Settings</h1>
   </header>
 
@@ -488,7 +486,7 @@
           <div class="setting-row">
             <div>
               <span class="setting-label">Page Banners</span>
-              <div class="setting-desc">Decorative header at the top of every page. Animated shows the illustrated SVG, Gradient uses the active accent gradient (compact), Off hides the banner entirely.</div>
+              <div class="setting-desc">Header style at the top of every page. Animated is a compact accent-gradient bar with a chosen motion style; Gradient is the same bar, static; Off is a plain glass header.</div>
             </div>
             <div class="select-wrap" style="width:130px">
               <select class="select sel-sm" value={$bannerStyle} on:change={e => bannerStyle.set(e.currentTarget.value)}>
@@ -498,6 +496,22 @@
               </select>
             </div>
           </div>
+          {#if $bannerStyle === 'animated'}
+            <div class="setting-row">
+              <div>
+                <span class="setting-label">Animation Style</span>
+                <div class="setting-desc">Shimmer is a soft white sweep, Drift is a slow hue rotation, Pulse is a gentle breathing, Aurora is a soft accent-tinted cloud-of-light. All honour Reduce Motion.</div>
+              </div>
+              <div class="select-wrap" style="width:130px">
+                <select class="select sel-sm" value={$bannerAnimation} on:change={e => bannerAnimation.set(e.currentTarget.value)}>
+                  <option value="shimmer">Shimmer</option>
+                  <option value="drift">Drift</option>
+                  <option value="pulse">Pulse</option>
+                  <option value="aurora">Aurora</option>
+                </select>
+              </div>
+            </div>
+          {/if}
         </div>
       </div>
     {/if}
@@ -1165,10 +1179,11 @@
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border-bottom: 1px solid var(--border);
   }
-  /* With banner: pad-bot is 72 instead of 12 → 122 + hamburger-row */
-  :global(.page-header.has-banner) + .settings-search-bar {
-    top: calc(var(--page-top, var(--safe-top)) + 122px + var(--hamburger-row, 0px));
-  }
+  /* Stale rule for the retired .has-banner layout — kept here as an
+     empty placeholder so the comment block above doesn't reference a
+     deleted selector. All three banner modes now use the compact
+     header height, so the search bar's `top` calc above already
+     covers every case. */
   .settings-search-icon { font-size: 20px; color: var(--text-3); flex-shrink: 0; }
   .settings-search-input {
     flex: 1;

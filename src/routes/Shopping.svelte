@@ -6,7 +6,6 @@
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { confirmDialog } from '../stores/confirmDialog.js';
-  import ShoppingBanner from '../components/banners/ShoppingBanner.svelte';
   import UnitPicker from '../components/ui/UnitPicker.svelte';
   import Combobox from '../components/ui/Combobox.svelte';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
@@ -327,8 +326,7 @@
 </script>
 
 <div class="page-shell">
-  <header class="page-header" class:has-banner={$pageBanners} class:banner-gradient={$bannerStyle === 'gradient'}>
-    {#if $bannerStyle === 'animated'}<ShoppingBanner />{/if}
+  <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
     <h1>Shopping</h1>
     <button class="btn-icon header-action header-action-3" on:click={openShareSheet} aria-label="Share List" title="Share List">
       <span class="material-symbols-rounded">share</span>

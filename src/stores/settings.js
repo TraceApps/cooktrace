@@ -13,7 +13,7 @@ const _dlog = import.meta.env.DEV
 //
 export const USER_PREFS = new Set([
   // Locale + display
-  'language','accentColor','pageBanners','bannerStyle','startPage',
+  'language','accentColor','pageBanners','bannerStyle','bannerAnimation','startPage',
   'dateFormat','timeFormat','timezone',
   // Cooking prefs (used by CookTrace features as they ship)
   'measurementSystem',         // 'metric' | 'imperial' — physical units only
@@ -48,6 +48,11 @@ export const USER_PREFS = new Set([
   // Notifications
   'notifLocalEnabled','notifPushService',
   'appriseUrl','appriseTag','gotifyUrl','gotifyToken','ntfyUrl','ntfyTopic','ntfyToken',
+  // Pantry expiration digest. Enable ships a once-a-day roll-up of
+  // items expiring within the user-picked window; keeps the delivery
+  // channel(s) consistent with every other reminder (local + configured
+  // push service).
+  'notifExpiryEnabled','notifExpiryDaysBefore','notifExpiryTime',
   // Open Food Facts. Search prefs + contribution credentials.
   'offEnabled','offSearchLanguage','offSearchCountry',
   'offUsername','offPassword','offUploadCountry',
@@ -307,7 +312,13 @@ function _migrateBannerStyle() {
   return 'animated';
 }
 export const bannerStyle = createSettingStore('bannerStyle', _migrateBannerStyle());
-export const pageBanners = derived(bannerStyle, $s => $s === 'animated');
+// pageBanners is now a legacy derived alias. Illustrated SVG banners were
+// retired (mirrors LiftTrace's banner rebuild). Kept around as
+// `bannerStyle !== 'off'` for any downstream code still importing it.
+export const pageBanners = derived(bannerStyle, $s => $s !== 'off');
+// bannerAnimation picks which CSS animation applies when bannerStyle is
+// 'animated'. Four styles: 'shimmer' (default), 'drift', 'pulse', 'aurora'.
+export const bannerAnimation = createSettingStore('bannerAnimation', 'shimmer');
 export const startPage   = createSettingStore('startPage',   '/');
 export const dateFormat  = createSettingStore('dateFormat',  'US');
 export const timeFormat  = createSettingStore('timeFormat',  '12h');
@@ -408,6 +419,14 @@ export const currentKitchenId = createSettingStore('currentKitchenId', null);
 // Notifications
 export const notifLocalEnabled = createSettingStore('notifLocalEnabled', true);
 export const notifPushService  = createSettingStore('notifPushService',  'none');
+// Pantry expiration digest. daysBefore covers the window "expiring
+// within N days" that gets rolled into one push per day. Off by
+// default so a fresh install never spams. notifExpiryTime is a
+// server-local HH:MM string (server has no reliable per-user timezone
+// yet) picked by TimePicker in Settings.
+export const notifExpiryEnabled     = createSettingStore('notifExpiryEnabled',     false);
+export const notifExpiryDaysBefore  = createSettingStore('notifExpiryDaysBefore',  3);
+export const notifExpiryTime        = createSettingStore('notifExpiryTime',        '09:00');
 export const appriseUrl  = createSettingStore('appriseUrl',  '');
 export const appriseTag  = createSettingStore('appriseTag',  '');
 export const gotifyUrl   = createSettingStore('gotifyUrl',   '');

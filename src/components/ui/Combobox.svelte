@@ -23,7 +23,14 @@
    *   placeholder  : input placeholder text
    *   creatable    : show the "+ Create" row when no exact match
    *   createLabel  : override the create-row text. Defaults to "Create".
-   *   maxResults   : cap dropdown items (default 8)
+   *   maxResults   : cap dropdown items (default Infinity — show all).
+   *                  The popover itself scrolls via max-height +
+   *                  overflow-y, so it handles any list size. Pass an
+   *                  explicit number only when you want to hint at a
+   *                  smaller suggestion list. Was 8 originally, which
+   *                  clipped tag / kitchen-gear / category browsing
+   *                  and forced users to type-filter to reach items
+   *                  they should have been able to scroll to.
    *
    * Events:
    *   on:select  → e.detail = the chosen option object
@@ -39,7 +46,7 @@
   export let placeholder = 'Type to search…';
   export let creatable = true;
   export let createLabel = 'Create';
-  export let maxResults = 8;
+  export let maxResults = Infinity;
   export let disabled = false;
 
   const dispatch = createEventDispatcher();
@@ -103,6 +110,19 @@
       if (wrapperEl && wrapperEl.contains(e.target)) return;
       closePopover();
     }
+  }
+
+  // The popover is portaled to <body>, so when it lives inside a Sheet
+  // (or any inner scroll container) the host's wheel / touchmove never
+  // reach that container while a finger or cursor is over the popover
+  // area; the host stops scrolling. Close on any outside wheel /
+  // touchmove instead — matches the conventional "drop a menu by
+  // scrolling" behaviour on mobile + desktop. Inside-the-popover scroll
+  // is left alone so the internal list still scrolls.
+  function _onOutsideScroll(e) {
+    if (!open) return;
+    if (popoverEl && popoverEl.contains(e.target)) return;
+    closePopover();
   }
 
   function selectOption(opt) {
@@ -193,6 +213,7 @@
 </script>
 
 <svelte:window on:mousedown={_onWindow} on:resize={_onWindow} on:scroll={_onWindow} />
+<svelte:document on:wheel|capture={_onOutsideScroll} on:touchmove|capture={_onOutsideScroll} />
 
 <div class="cb" bind:this={wrapperEl} class:disabled>
   {#if mode === 'chips'}

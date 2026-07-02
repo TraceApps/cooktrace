@@ -30,6 +30,8 @@
   import { createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
   import Sheet from '../ui/Sheet.svelte';
+  import Dialog from '../ui/Dialog.svelte';
+  import DateInput from '../ui/DateInput.svelte';
   import ImagePicker from '../ui/ImagePicker.svelte';
   import UnitPicker from '../ui/UnitPicker.svelte';
   import BarcodeScanner from '../ui/BarcodeScanner.svelte';
@@ -42,6 +44,7 @@
   import { categoryLabel, categoryIcon } from '../../lib/pantry-categories.js';
   import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS, isDerived, deriveSodiumSalt } from '../../lib/nutriments.js';
   import { lookupBarcode, contributeToOFF } from '../../lib/off.js';
+  import { displayVariantName as _sharedDisplayVariantName } from '../../lib/pantry-variants.js';
   import { visibleNutriments, offEnabled, offUsername, offPassword, offUploadCountry } from '../../stores/settings.js';
 
   export let open = false;
@@ -70,6 +73,30 @@
   let categoryNewOpen = false;
   let categoryNewName = '';
   let categoryNewIcon = 'kitchen';
+
+  // Variant state (Issue #4). variantContext is loaded after the main
+  // item loads; carries the parent's name (when this item is a variant),
+  // the children list (when this item is a generic), and the candidate
+  // pool for the "Make this a variant of..." picker.
+  let variantContext = { parentName: null, children: [], candidates: [] };
+  let variantPickerOpen = false;
+  let variantPickerMode = null;   // 'set-parent' | 'add-existing-child'
+  let variantPickerQuery = '';
+  // Brand-first variant creation: most variants differ by brand or store
+  // (GreenWise vs Publix), so the inline form asks for that. A small
+  // "Use a different name" expander reveals the name field for the
+  // rare type-variation case ("Whole Milk" generic with a "2% Milk"
+  // variant). The variant inherits the parent's name when no name override.
+  let newVariantBrand = '';
+  let newVariantName = '';
+  let newVariantNameOverride = false;
+  let addingVariantRow = false;
+  // Variant-aware delete dialog state. When the user hits delete on a
+  // generic that has variants, we open this dialog instead of the
+  // standard yes/no confirm so they can choose whether the variants
+  // get promoted to standalone items or removed too.
+  let deleteWithVariantsOpen = false;
+  let deleteCascade = false;
 
   // OFF state
   let downloading = false;
@@ -109,6 +136,7 @@
     } catch (e) { loadError = e.message || 'Could not load item'; }
     finally { loading = false; }
     _loadPantryCategories();
+    _loadVariantContext();
   }
 
   function _enterCreateMode() {
@@ -137,6 +165,7 @@
       serving_size: item.serving_size ?? '',
       serving_unit: item.serving_unit ?? 'g',
       nutrition: item.nutrition && typeof item.nutrition === 'object' ? { ...item.nutrition } : {},
+      expires_on: item.expires_on ?? '',
     };
     _lastServingSize = Number(draft.serving_size) || null;
     editing = true;
@@ -174,6 +203,280 @@
     try { pantryCategories = await NtApi.getPantryCategories(); }
     catch { pantryCategories = []; }
   }
+
+  // Variant-related lookups. Fetches the full pantry list once, derives:
+  //   - parentName: the name of this item's generic parent, if any
+  //   - children:   rows whose generic_parent_id === item.id (this item is a generic)
+  //   - candidates: rows that could become this item's parent OR receive
+  //                 this item as an existing-child variant (any flat item
+  //                 or generic, excluding self and own descendants).
+  async function _loadVariantContext() {
+    if (!item?.id) { variantContext = { parentName: null, children: [], candidates: [] }; return; }
+    let all = [];
+    try { all = await NtApi.getPantry(); }
+    catch { variantContext = { parentName: null, children: [], candidates: [] }; return; }
+
+    const byId = new Map(all.map(r => [r.id, r]));
+    const parentName = item.generic_parent_id != null
+      ? (byId.get(item.generic_parent_id)?.name || null)
+      : null;
+    const children = all
+      .filter(r => r.generic_parent_id === item.id && r.id !== item.id)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    // Set of pantry_items ids that have children (i.e. are themselves
+    // generics). Used to gate Add Variant suggestions: attaching a
+    // generic as a variant would orphan its own children, and the
+    // server's PUT route rejects it with "Can't move a generic with
+    // its own variants under another generic". Surfacing that as a
+    // toast feels worse than just not offering the option.
+    const isGenericId = new Set(
+      all.filter(r => r.generic_parent_id != null).map(r => r.generic_parent_id)
+    );
+    const candidates = all
+      .filter(r =>
+        r.id !== item.id
+        && r.generic_parent_id == null   // not already a variant
+        && r.id !== item.generic_parent_id  // not already this item's parent
+      )
+      .map(r => ({ ...r, _isGeneric: isGenericId.has(r.id) }));
+    variantContext = { parentName, children, candidates };
+  }
+
+  $: isVariant  = !!item && item.generic_parent_id != null;
+  $: isGeneric  = !!item && !isVariant && variantContext.children.length > 0;
+  $: isFlat     = !!item && !isVariant && !isGeneric;
+
+  async function _setGenericParent(parentId) {
+    if (!item?.id) return;
+    try {
+      const updated = await NtApi.updatePantryItem(item.id, { generic_parent_id: parentId });
+      item = updated;
+      variantPickerOpen = false;
+      variantPickerQuery = '';
+      await _loadVariantContext();
+      showSuccess(parentId ? 'Added as a variant' : 'Detached from parent');
+      dispatch('changed', { item: updated });
+      // Variant relationship moved; the parent (if any) and any sibling
+      // rows in the host list won't be patched by the targeted `changed`
+      // event. Ask the host to refetch so the pantry list reflects the
+      // new hierarchy.
+      dispatch('refresh');
+    } catch (e) {
+      showError(e?.message || 'Could not update variant link');
+    }
+  }
+
+  async function _detachVariant() {
+    const parent = variantContext.parentName || 'parent';
+    const ok = await confirmDialog({
+      title: 'Detach from ' + parent + '?',
+      body: 'This variant becomes a standalone pantry item. Recipes that link to ' + parent + ' will no longer see this item as one of its variants.',
+      confirm: 'Detach',
+    });
+    if (!ok) return;
+    await _setGenericParent(null);
+  }
+
+  async function _addNewVariant() {
+    const brand = (newVariantBrand || '').trim();
+    const overrideName = newVariantNameOverride ? (newVariantName || '').trim() : '';
+    if (!brand && !overrideName) {
+      showError('Add a brand or override name to tell this variant apart.');
+      return;
+    }
+    if (!item?.id) return;
+    try {
+      // Inherit the parent's name unless the user explicitly typed a
+      // different one. Brand goes in the brand column either way so
+      // search and display compose consistently across surfaces.
+      //
+      // Expiry carry-over: when promoting a flat item to a generic by
+      // adding its first variant, the parent's existing expires_on
+      // represents a real product that's now the variant. Hand the date
+      // forward so the user's prior data flows to the right physical
+      // thing instead of getting orphaned on the now-invisible parent
+      // field. Subsequent variants start blank.
+      const promoting = isFlat && variantContext.children.length === 0;
+      const seed = {
+        name: overrideName || item.name,
+        brand: brand || null,
+        in_stock: 1,
+        category_id: item.category_id ?? null,
+        generic_parent_id: item.id,
+        expires_on: promoting ? (item.expires_on || null) : null,
+      };
+      const created = await NtApi.createPantryItem(seed);
+      newVariantBrand = '';
+      newVariantName = '';
+      newVariantNameOverride = false;
+      addingVariantRow = false;
+      await _loadVariantContext();
+      showSuccess('Added variant ' + _displayVariantName(created, item, { nested: false }));
+      dispatch('changed', { item });
+      // A new row landed and (when promoting a flat item) the parent may
+      // have been auto-converted to a generic. Local patch can't infer
+      // either, so ask the host to refetch.
+      dispatch('refresh');
+    } catch (e) {
+      showError(e?.message || 'Could not add variant');
+    }
+  }
+
+  // Alias so existing template references stay readable. Helper lives
+  // in src/lib/pantry-variants.js so the pantry list, AI tool output,
+  // and federation responses all compose names the same way.
+  const _displayVariantName = _sharedDisplayVariantName;
+
+  // Expiry display helpers (Issue #9). Threshold is hardcoded at 14
+  // days for the warning chip; past-expiry items always show the
+  // stronger red treatment. Settings-tunable threshold can land later
+  // if there's demand.
+  const _EXPIRY_WARN_DAYS = 14;
+  function _expiryStatus(dateStr) {
+    if (!dateStr) return 'none';
+    const d = new Date(dateStr + 'T00:00:00');
+    if (Number.isNaN(d.getTime())) return 'none';
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const diff = (d - now) / (1000 * 60 * 60 * 24);
+    if (diff < 0) return 'past';
+    if (diff <= _EXPIRY_WARN_DAYS) return 'warn';
+    return 'ok';
+  }
+  function _formatExpiry(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr + 'T00:00:00');
+      if (Number.isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch { return dateStr; }
+  }
+
+  // Earliest expiring variant on a generic. Returns the worst-case
+  // status (past > warn > ok) plus the corresponding child row so the
+  // editor can render "Earliest variant: <name> on <date>". null when
+  // no variant has an expiry date set.
+  function _earliestVariantExpiry() {
+    const kids = variantContext?.children || [];
+    let pastWorst = null;
+    let warnWorst = null;
+    for (const k of kids) {
+      if (!k.expires_on) continue;
+      const s = _expiryStatus(k.expires_on);
+      if (s === 'past') {
+        if (!pastWorst || k.expires_on < pastWorst.kid.expires_on) pastWorst = { kid: k, status: 'past' };
+      } else if (s === 'warn') {
+        if (!warnWorst || k.expires_on < warnWorst.kid.expires_on) warnWorst = { kid: k, status: 'warn' };
+      }
+    }
+    if (pastWorst) return pastWorst;
+    if (warnWorst) return warnWorst;
+    // No warn/past, but still useful to surface the soonest future date
+    // so a user planning meals sees what's next up.
+    let nextDated = null;
+    for (const k of kids) {
+      if (!k.expires_on) continue;
+      if (!nextDated || k.expires_on < nextDated.kid.expires_on) nextDated = { kid: k, status: 'ok' };
+    }
+    return nextDated;
+  }
+
+  async function _addExistingAsVariant(childId) {
+    if (!item?.id || !childId) return;
+    try {
+      const updatedChild = await NtApi.updatePantryItem(childId, { generic_parent_id: item.id });
+      variantPickerOpen = false;
+      variantPickerQuery = '';
+      addingVariantRow = false;
+      newVariantBrand = '';
+      newVariantName = '';
+      newVariantNameOverride = false;
+      await _loadVariantContext();
+      showSuccess('Linked as a variant');
+      dispatch('changed', { item });
+      // Patch the CHILD's row in the host list synchronously so the
+      // parent's chevron appears immediately instead of after the
+      // refetch round-trip. Without this dispatch, the in-memory items
+      // array keeps the child with generic_parent_id == null until the
+      // safety-net refresh below completes.
+      if (updatedChild?.id) dispatch('changed', { item: updatedChild });
+      dispatch('refresh');
+    } catch (e) {
+      showError(e?.message || 'Could not link variant');
+    }
+  }
+
+  // Parent nutrition source (Issue #4). The parent's effective
+  // nutrition for recipe calculations comes from either its own
+  // manual values (null) or one of its child variants. Changing the
+  // source is a one-click action; the editor's nutrition fields stay
+  // editable when Manual is selected, become a read-only preview when
+  // pulling from a variant.
+  async function _setNutritionSource(variantId) {
+    if (!item?.id) return;
+    try {
+      const updated = await NtApi.updatePantryItem(item.id, {
+        nutrition_source_variant_id: variantId,
+      });
+      item = updated;
+      showSuccess(variantId ? 'Pulling nutrition from variant' : 'Nutrition set to manual');
+      dispatch('changed', { item: updated });
+    } catch (e) {
+      showError(e?.message || 'Could not update nutrition source');
+    }
+  }
+
+  function _openPicker(mode) {
+    variantPickerMode = mode;
+    variantPickerQuery = '';
+    variantPickerOpen = true;
+  }
+
+  $: variantPickerResults = (() => {
+    const q = (variantPickerQuery || '').trim().toLowerCase();
+    const pool = variantPickerMode === 'set-parent'
+      ? variantContext.candidates  // anywhere flat-or-generic
+      : variantContext.candidates.filter(r => r.id !== item?.id);
+    if (!q) return pool.slice(0, 50);
+    return pool.filter(r => (r.name || '').toLowerCase().includes(q)).slice(0, 50);
+  })();
+
+  // Suggestion list under the inline Add Variant input (Issue #4 UX
+  // polish). As the user types a brand into the form, we surface
+  // existing flat-or-generic pantry rows whose name or brand matches.
+  // Tapping a suggestion attaches that existing item as a variant of
+  // the current row, in one step. If nothing matches, the user can
+  // still hit Add to create a brand-new variant from the typed text.
+  // Candidates are reused from variantContext (already excludes self,
+  // existing children, and rows that are already variants of someone
+  // else, so the suggestion list can't show a row that wouldn't
+  // accept the attachment).
+  $: addVariantSuggestions = (() => {
+    if (!addingVariantRow) return [];
+    const q = (newVariantBrand || '').trim().toLowerCase();
+    if (!q) return [];
+    // Filter out generics from the Add Variant suggestion list so we
+    // don't offer a target the server will reject.
+    const pool = (variantContext.candidates || []).filter(r => !r._isGeneric);
+    const scored = pool
+      .map(r => {
+        const name = (r.name || '').toLowerCase();
+        const brand = (r.brand || '').toLowerCase();
+        const hay = name + ' ' + brand;
+        if (!hay.includes(q)) return null;
+        // Prefer rows whose brand or name STARTS with the query, then
+        // fall back to "contains" matches. Same idea as a contact-list
+        // autocomplete; keeps the most obvious hit at the top.
+        const startsWith = name.startsWith(q) || brand.startsWith(q);
+        return { row: r, startsWith };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        if (a.startsWith !== b.startsWith) return a.startsWith ? -1 : 1;
+        return (a.row.name || '').localeCompare(b.row.name || '');
+      })
+      .map(s => s.row);
+    return scored.slice(0, 6);
+  })();
   $: {
     const src = editing ? draft : item;
     if (src?.category_id != null) {
@@ -186,6 +489,22 @@
       categoryName = '';
     }
   }
+  // Icon that pairs with categoryName. Looks up the live pantry-category
+  // row by id (or slug fallback) so the icon matches whatever the user
+  // saved on the server — not the hardcoded PANTRY_CATEGORIES list,
+  // which would render the wrong icon for custom categories.
+  $: _categoryIconResolved = (() => {
+    const src = item;
+    if (src?.category_id != null) {
+      return pantryCategories.find(x => x.id === src.category_id)?.icon
+        || categoryIcon(src.category);
+    }
+    if (src?.category) {
+      return pantryCategories.find(x => x.slug === src.category)?.icon
+        || categoryIcon(src.category);
+    }
+    return categoryIcon(null);
+  })();
   function onPantryCategorySelect(e) {
     const opt = e.detail;
     const match = pantryCategories.find(c => c.name.toLowerCase() === (opt?.name || '').toLowerCase());
@@ -367,6 +686,7 @@
         serving_size: draft.serving_size === '' || draft.serving_size == null ? null : Number(draft.serving_size),
         serving_unit: draft.serving_unit || null,
         nutrition: draft.nutrition && Object.keys(draft.nutrition).length ? draft.nutrition : null,
+        expires_on: draft.expires_on || null,
       };
       if (itemId == null) {
         const row = await NtApi.createPantryItem(payload);
@@ -394,19 +714,45 @@
 
   async function deleteItem() {
     if (!item || itemId == null) return;
+    // Generic with variants: open the variant-aware delete dialog so
+    // the user explicitly picks what happens to the children. Default
+    // the radio to "promote to standalone" so an Enter / one-tap
+    // confirm doesn't silently nuke pantry data.
+    if (isGeneric && variantContext.children.length > 0) {
+      deleteCascade = false;
+      deleteWithVariantsOpen = true;
+      return;
+    }
     const ok = await confirmDialog({
       title: 'Remove from pantry?',
       message: `"${item.name}" will be removed. Recipes referencing it stay; this just drops it from your library.`,
       confirmText: 'Remove', dangerous: true,
     });
     if (!ok) return;
+    await _performDelete(false);
+  }
+
+  async function _performDelete(cascade) {
+    if (!item || itemId == null) return;
     try {
-      await NtApi.deletePantryItem(itemId);
-      showSuccess('Removed');
+      await NtApi.deletePantryItem(itemId, { cascade });
+      showSuccess(cascade ? 'Removed item + variants' : 'Removed');
       const id = itemId;
       open = false;
       dispatch('deleted', { id });
+      // Variants either got soft-deleted (cascade) or had their
+      // generic_parent_id cleared (promote). Either way the host's
+      // in-memory items array can't infer the change from a single
+      // 'deleted' event for the parent — refetch to keep the list
+      // consistent with the new state.
+      if (isGeneric && variantContext.children.length > 0) dispatch('refresh');
     } catch (e) { showError(e.message || 'Delete failed'); }
+  }
+
+  async function _confirmVariantDelete() {
+    const cascade = deleteCascade;
+    deleteWithVariantsOpen = false;
+    await _performDelete(cascade);
   }
 
   // Inline quick qty +/- removed in v1.0 — quantity is changed in the
@@ -504,7 +850,15 @@
                 <input class="input" type="text" bind:value={draft.brand} placeholder="Morton" />
               </label>
               <label class="field">
-                <span class="field-label">Category</span>
+                <span class="field-label">
+                  Category
+                  {#if categoryName}
+                    <button type="button" class="field-clear"
+                      on:click|preventDefault={() => { draft.category_id = null; draft.category = ''; draft = { ...draft }; }}>
+                      Clear
+                    </button>
+                  {/if}
+                </span>
                 <Combobox
                   bind:this={comboCategoryRef}
                   mode="single"
@@ -572,10 +926,10 @@
             {:else}
               {#if item.brand}<div class="brand">{item.brand}</div>{/if}
               <div class="meta-pills">
-                {#if item.category}
+                {#if categoryName}
                   <span class="pill">
-                    <span class="material-symbols-rounded">{categoryIcon(item.category)}</span>
-                    {categoryLabel(item.category)}
+                    <span class="material-symbols-rounded">{_categoryIconResolved}</span>
+                    {categoryName}
                   </span>
                 {/if}
                 {#if item.barcode}
@@ -698,15 +1052,237 @@
       </div>
 
       {#if editing}
+        {#if !isGeneric}
+          <label class="field full">
+            <span class="field-label">Expires On <span class="field-hint-inline">(optional, helps catch items going bad)</span></span>
+            <DateInput bind:value={draft.expires_on} />
+          </label>
+        {:else}
+          <div class="field full expires-hint-row">
+            <span class="material-symbols-rounded">event</span>
+            <span>Expiry is tracked per variant. Open any variant to set its date.</span>
+          </div>
+        {/if}
         <label class="field full">
           <span class="field-label">Notes</span>
           <textarea class="input" rows="3" bind:value={draft.notes}
             placeholder="Where you bought it, what works well, etc."></textarea>
         </label>
-      {:else if item.notes}
-        <div class="notes">
-          <div class="notes-label">Notes</div>
-          <p class="notes-body">{item.notes}</p>
+      {:else}
+        {#if isGeneric}
+          {@const earliest = _earliestVariantExpiry()}
+          {#if earliest}
+            <div class="expires-row" class:warn={earliest.status === 'warn'} class:past={earliest.status === 'past'}>
+              <span class="material-symbols-rounded">{earliest.status === 'past' ? 'event_busy' : 'event'}</span>
+              <span class="expires-label">
+                Earliest variant: {_displayVariantName(earliest.kid, item, { nested: false })} on {_formatExpiry(earliest.kid.expires_on)}{earliest.status === 'past' ? ' (already expired)' : ''}
+              </span>
+            </div>
+          {/if}
+        {:else if item.expires_on}
+          {@const expiryStatus = _expiryStatus(item.expires_on)}
+          <div class="expires-row" class:warn={expiryStatus === 'warn'} class:past={expiryStatus === 'past'}>
+            <span class="material-symbols-rounded">{expiryStatus === 'past' ? 'event_busy' : 'event'}</span>
+            <span class="expires-label">Expires {_formatExpiry(item.expires_on)}{expiryStatus === 'past' ? ' (already expired)' : ''}</span>
+          </div>
+        {/if}
+        {#if item.notes}
+          <div class="notes">
+            <div class="notes-label">Notes</div>
+            <p class="notes-body">{item.notes}</p>
+          </div>
+        {/if}
+      {/if}
+
+      <!-- Variants section (Issue #4). Visible only on a saved item
+           (not during Create) so the new item's id exists for links. -->
+      {#if item?.id != null && !loading}
+        <div class="variants">
+          <div class="variants-head">
+            <span class="material-symbols-rounded">category</span>
+            <span class="variants-title">Variants</span>
+          </div>
+
+          {#if isVariant}
+            <p class="variants-note">
+              This item is a variant of <strong>{variantContext.parentName || 'a generic pantry item'}</strong>. Recipes that link to the generic see this item as one of its variants.
+            </p>
+            <div class="variants-actions">
+              <button class="btn btn-secondary" on:click={_detachVariant}>
+                <span class="material-symbols-rounded">link_off</span>
+                Detach from {variantContext.parentName || 'Parent'}
+              </button>
+            </div>
+
+          {:else if isGeneric}
+            <p class="variants-note">
+              This is a generic item with {variantContext.children.length} variant{variantContext.children.length === 1 ? '' : 's'}. Each variant is its own pantry row (own barcode, photo, stock) but recipes can link to the generic to match any of them.
+            </p>
+            <ul class="variant-list">
+              {#each variantContext.children as v (v.id)}
+                {@const vExpStatus = _expiryStatus(v.expires_on)}
+                <li class="variant-row">
+                  <span class="material-symbols-rounded variant-row-icon">label</span>
+                  <span class="variant-row-name">{_displayVariantName(v, item, { nested: true })}</span>
+                  {#if !v.in_stock}
+                    <span class="variant-row-chip variant-row-chip-out" title="Out of stock">Out</span>
+                  {/if}
+                  {#if v.expires_on}
+                    <span class="variant-row-chip"
+                      class:variant-row-chip-warn={vExpStatus === 'warn'}
+                      class:variant-row-chip-past={vExpStatus === 'past'}
+                      title={`Expires ${_formatExpiry(v.expires_on)}`}>
+                      <span class="material-symbols-rounded variant-row-chip-icon">{vExpStatus === 'past' ? 'event_busy' : 'schedule'}</span>
+                      {_formatExpiry(v.expires_on)}
+                    </span>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+
+            {#if !addingVariantRow}
+              <div class="nutrition-source">
+                <div class="nutrition-source-head">Recipe nutrition source</div>
+                <p class="nutrition-source-hint">
+                  Which numbers should recipes use when an ingredient links to this generic? Variants still keep their own nutrition for their own detail view; this just picks which one feeds the recipe math.
+                </p>
+                <label class="nutrition-source-row">
+                  <input type="radio" name="nutrition-source"
+                    checked={item.nutrition_source_variant_id == null}
+                    on:change={() => _setNutritionSource(null)} />
+                  <span class="nutrition-source-label">
+                    <span class="nutrition-source-title">Manual (this item's own nutrition)</span>
+                  </span>
+                </label>
+                {#each variantContext.children as v (v.id)}
+                  <label class="nutrition-source-row">
+                    <input type="radio" name="nutrition-source"
+                      checked={item.nutrition_source_variant_id === v.id}
+                      on:change={() => _setNutritionSource(v.id)} />
+                    <span class="nutrition-source-label">
+                      <span class="nutrition-source-title">Pull from {_displayVariantName(v, item, { nested: false })}</span>
+                    </span>
+                  </label>
+                {/each}
+              </div>
+            {/if}
+            {#if addingVariantRow}
+              <div class="variant-add-card">
+                <div class="variant-add-head">Add a Variant</div>
+                <p class="variant-add-hint">
+                  Type a brand or store. If you already have a matching pantry item, you'll be able to attach it directly. Otherwise a brand-new variant gets created.
+                </p>
+                <div class="variant-add">
+                  <input class="input" type="text" placeholder="Brand or store (e.g. Greenwise)"
+                    bind:value={newVariantBrand}
+                    on:keydown={e => { if (e.key === 'Enter') _addNewVariant(); }} />
+                  {#if addVariantSuggestions.length}
+                    <ul class="variant-suggest">
+                      {#each addVariantSuggestions as s (s.id)}
+                        <li>
+                          <button class="variant-suggest-row" on:click={() => _addExistingAsVariant(s.id)}>
+                            <span class="material-symbols-rounded">link</span>
+                            <span class="variant-suggest-name">{s.name}{s.brand ? ' (' + s.brand + ')' : ''}</span>
+                            <span class="variant-suggest-meta">Attach as variant</span>
+                          </button>
+                        </li>
+                      {/each}
+                    </ul>
+                  {:else if newVariantBrand.trim()}
+                    <p class="variant-add-empty">No matching pantry items, this will create a new variant.</p>
+                  {/if}
+                  {#if newVariantNameOverride}
+                    <input class="input variant-add-name" type="text"
+                      placeholder="Override name (e.g. 2% Milk)"
+                      bind:value={newVariantName}
+                      on:keydown={e => { if (e.key === 'Enter') _addNewVariant(); }} />
+                  {/if}
+                  <div class="variant-add-actions">
+                    {#if !newVariantNameOverride}
+                      <button class="btn-link variant-name-toggle" on:click={() => { newVariantNameOverride = true; }}>
+                        Use a different name
+                      </button>
+                    {/if}
+                    <span class="variant-add-spacer"></span>
+                    <button class="btn btn-secondary" on:click={() => { addingVariantRow = false; newVariantBrand = ''; newVariantName = ''; newVariantNameOverride = false; }}>Cancel</button>
+                    <button class="btn btn-primary" on:click={_addNewVariant} disabled={!newVariantBrand.trim()}>{newVariantBrand.trim() ? `Create "${newVariantBrand.trim()}"` : 'Create Variant'}</button>
+                  </div>
+                </div>
+              </div>
+            {:else}
+              <div class="variants-actions">
+                <button class="btn btn-primary" on:click={() => { addingVariantRow = true; newVariantBrand = ''; newVariantName = ''; newVariantNameOverride = false; }}>
+                  <span class="material-symbols-rounded">add</span>
+                  Add Variant
+                </button>
+              </div>
+            {/if}
+
+          {:else}
+            <p class="variants-note">
+              Flat pantry item. Add a variant under this entry (different brands of milk all share the recipe match), or move this item under an existing generic.
+            </p>
+            {#if addingVariantRow}
+              <div class="variant-add-card">
+                <div class="variant-add-head">Add a Variant</div>
+                <p class="variant-add-hint">
+                  Type a brand or store. If you already have a matching pantry item, you'll be able to attach it directly. Otherwise a brand-new variant gets created.
+                </p>
+                <div class="variant-add">
+                  <input class="input" type="text" placeholder="Brand or store (e.g. Greenwise)"
+                    bind:value={newVariantBrand}
+                    on:keydown={e => { if (e.key === 'Enter') _addNewVariant(); }} />
+                  {#if addVariantSuggestions.length}
+                    <ul class="variant-suggest">
+                      {#each addVariantSuggestions as s (s.id)}
+                        <li>
+                          <button class="variant-suggest-row" on:click={() => _addExistingAsVariant(s.id)}>
+                            <span class="material-symbols-rounded">link</span>
+                            <span class="variant-suggest-name">{s.name}{s.brand ? ' (' + s.brand + ')' : ''}</span>
+                            <span class="variant-suggest-meta">Attach as variant</span>
+                          </button>
+                        </li>
+                      {/each}
+                    </ul>
+                  {:else if newVariantBrand.trim()}
+                    <p class="variant-add-empty">No matching pantry items, this will create a new variant.</p>
+                  {/if}
+                  {#if newVariantNameOverride}
+                    <input class="input variant-add-name" type="text"
+                      placeholder="Override name (e.g. 2% Milk)"
+                      bind:value={newVariantName}
+                      on:keydown={e => { if (e.key === 'Enter') _addNewVariant(); }} />
+                  {/if}
+                  <div class="variant-add-actions">
+                    {#if !newVariantNameOverride}
+                      <button class="btn-link variant-name-toggle" on:click={() => { newVariantNameOverride = true; }}>
+                        Use a different name
+                      </button>
+                    {/if}
+                    <span class="variant-add-spacer"></span>
+                    <button class="btn btn-secondary" on:click={() => { addingVariantRow = false; newVariantBrand = ''; newVariantName = ''; newVariantNameOverride = false; }}>Cancel</button>
+                    <button class="btn btn-primary" on:click={_addNewVariant} disabled={!newVariantBrand.trim()}>{newVariantBrand.trim() ? `Create "${newVariantBrand.trim()}"` : 'Create Variant'}</button>
+                  </div>
+                </div>
+              </div>
+              {#if item.expires_on}
+                <p class="variants-note variants-hint">
+                  Promoting this to a generic will move the existing expiry date ({_formatExpiry(item.expires_on)}) to the new variant, where it belongs to the actual product.
+                </p>
+              {/if}
+            {:else}
+              <div class="variants-actions">
+                <button class="btn btn-primary" on:click={() => { addingVariantRow = true; newVariantBrand = ''; newVariantName = ''; newVariantNameOverride = false; }}>
+                  <span class="material-symbols-rounded">add</span>
+                  Add Variant
+                </button>
+                <button class="btn btn-secondary" on:click={() => _openPicker('set-parent')}>
+                  <span class="material-symbols-rounded">subdirectory_arrow_right</span>
+                  Make a Variant of...
+                </button>
+              </div>
+            {/if}
+          {/if}
         </div>
       {/if}
 
@@ -761,8 +1337,75 @@
   </div>
 </Sheet>
 
+<!-- Variant picker (Issue #4). Stacked over the main sheet. Reused for
+     both "Make this a variant of..." (set-parent) and the generic's
+     "Link an Existing Item" (add-existing-child) flow. -->
+<Sheet bind:open={variantPickerOpen} title={variantPickerMode === 'set-parent' ? 'Make a Variant of...' : 'Link an Existing Item'} height="auto">
+  <div class="variant-picker-body">
+    <p class="field-hint">
+      {variantPickerMode === 'set-parent'
+        ? 'Pick the generic pantry item this should become a variant of. Only items that are not already a variant of something else are listed.'
+        : 'Pick a pantry item to attach as a variant of this generic. The picked item keeps its own data (barcode, photo, stock).'}
+    </p>
+    <input class="input" type="search" placeholder="Search pantry..."
+      bind:value={variantPickerQuery} autofocus />
+    <ul class="variant-picker-list">
+      {#each variantPickerResults as r (r.id)}
+        <li>
+          <button class="variant-picker-row" on:click={() => variantPickerMode === 'set-parent' ? _setGenericParent(r.id) : _addExistingAsVariant(r.id)}>
+            <span class="variant-picker-name">{r.name}</span>
+            {#if r.brand}<span class="variant-picker-meta">{r.brand}</span>{/if}
+          </button>
+        </li>
+      {:else}
+        <li class="variant-picker-empty">No matching pantry items.</li>
+      {/each}
+    </ul>
+    <div class="variant-picker-actions">
+      <button class="btn btn-secondary" on:click={() => variantPickerOpen = false}>Cancel</button>
+    </div>
+  </div>
+</Sheet>
+
 <!-- Inline barcode scanner. -->
 <BarcodeScanner bind:open={editorScannerOpen} on:scan={onScan} on:close={() => editorScannerOpen = false} />
+
+<!-- Variant-aware delete confirmation. Only opens when the user hits
+     delete on a generic that has children. Lets them pick whether the
+     variants survive as standalone items or get removed together. -->
+{#if item && isGeneric}
+  <Dialog
+    bind:open={deleteWithVariantsOpen}
+    title={`Remove "${item.name}"?`}
+    confirmText="Remove"
+    cancelText="Cancel"
+    dangerous={true}
+    on:confirm={_confirmVariantDelete}
+    on:cancel={() => deleteWithVariantsOpen = false}
+  >
+    <p class="variant-delete-msg">
+      This item has {variantContext.children.length} variant{variantContext.children.length === 1 ? '' : 's'}. What should happen to {variantContext.children.length === 1 ? 'it' : 'them'}?
+    </p>
+    <label class="variant-delete-row">
+      <input type="radio" name="variant-delete-mode"
+        checked={!deleteCascade}
+        on:change={() => deleteCascade = false} />
+      <span class="variant-delete-label">
+        <span class="variant-delete-title">Keep as standalone items</span>
+        <span class="variant-delete-hint">The variants stay in your pantry as their own rows. Recommended.</span>
+      </span>
+    </label>
+    <label class="variant-delete-row">
+      <input type="radio" name="variant-delete-mode"
+        checked={deleteCascade}
+        on:change={() => deleteCascade = true} />
+      <span class="variant-delete-label">
+        <span class="variant-delete-title">Remove the variants too</span>
+        <span class="variant-delete-hint">All {variantContext.children.length} variant{variantContext.children.length === 1 ? '' : 's'} get removed alongside this item.</span>
+      </span>
+    </label>
+  </Dialog>
+{/if}
 
 <style>
   .state { padding: 40px 0; display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--text-3); }
@@ -887,7 +1530,17 @@
   .field-label {
     font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
     text-transform: uppercase; color: var(--text-3);
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
   }
+  /* Inline Clear link inside the field label — appears when a value is
+     set so the user can wipe a Combobox / Category selection that no
+     longer applies. */
+  .field-clear {
+    background: transparent; border: none; cursor: pointer;
+    color: var(--accent); font-size: 11px; font-weight: 600;
+    text-transform: none; letter-spacing: 0; padding: 0;
+  }
+  .field-clear:hover { text-decoration: underline; }
   .field-hint { font-size: 11px; color: var(--text-3); line-height: 1.4; margin: 4px 0 0; }
   .input {
     background: var(--surface-2);
@@ -1027,4 +1680,228 @@
       align-items: start;
     }
   }
+
+  /* Variants (Issue #4) */
+  .variants {
+    margin-top: 16px;
+    padding: 12px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+  .variants-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 6px;
+  }
+  .variants-head .material-symbols-rounded { color: var(--accent); font-size: 20px; }
+  .variants-title { font-weight: 700; color: var(--text-1); font-size: 14px; }
+  .variants-note { margin: 0 0 10px; color: var(--text-3); font-size: 12px; line-height: 1.5; }
+  .variants-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .variants-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+  .variants-actions .btn .material-symbols-rounded { font-size: 16px; }
+
+  .variant-list { list-style: none; padding: 0; margin: 0 0 10px; }
+  .variant-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+  .variant-row-icon { font-size: 16px; color: var(--text-3); }
+  .variant-row-name { flex: 1; color: var(--text-1); font-weight: 500; }
+  .variant-row-meta { color: var(--text-3); font-size: 12px; }
+  .variant-row-chip {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; font-weight: 600;
+    padding: 2px 8px; border-radius: 999px;
+    background: var(--surface-2); color: var(--text-3);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .variant-row-chip-icon { font-size: 13px; }
+  .variant-row-chip-warn {
+    background: color-mix(in srgb, var(--warn, orange) 14%, transparent);
+    color: var(--warn, orange);
+    border-color: color-mix(in srgb, var(--warn, orange) 40%, transparent);
+  }
+  .variant-row-chip-past {
+    background: color-mix(in srgb, var(--danger, red) 14%, transparent);
+    color: var(--danger, red);
+    border-color: color-mix(in srgb, var(--danger, red) 40%, transparent);
+  }
+  .variant-row-chip-out {
+    background: color-mix(in srgb, var(--text-3) 12%, transparent);
+    color: var(--text-3);
+  }
+
+  .variant-add { display: flex; flex-direction: column; gap: 6px; }
+  .variant-add .input { width: 100%; }
+  .variant-add-actions { display: flex; gap: 6px; align-items: center; }
+  .variant-add-spacer { flex: 1; }
+  /* Distinct card around the inline Add Variant form so it doesn't
+     visually bleed into the surrounding Recipe nutrition source picker
+     (which sits in the same section but is unrelated). */
+  .variant-add-card {
+    margin-top: 10px;
+    padding: 12px;
+    background: color-mix(in srgb, var(--accent) 6%, var(--surface-1));
+    border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+    border-radius: var(--radius-md);
+  }
+  .variant-add-head {
+    color: var(--text-1);
+    font-weight: 700;
+    font-size: 12px;
+    margin-bottom: 4px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .variant-add-hint {
+    color: var(--text-3);
+    font-size: 12px;
+    line-height: 1.4;
+    margin: 0 0 10px;
+  }
+  .variant-add-empty {
+    color: var(--text-3);
+    font-size: 12px;
+    line-height: 1.4;
+    margin: 2px 0 0;
+    font-style: italic;
+  }
+
+  /* Variant-aware delete dialog inner content. */
+  .variant-delete-msg {
+    color: var(--text-2);
+    font-size: 13px;
+    line-height: 1.45;
+    margin: 0 0 12px;
+  }
+  .variant-delete-row {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 6px 0;
+    cursor: pointer;
+  }
+  .variant-delete-row input[type="radio"] { margin-top: 3px; }
+  .variant-delete-label { display: flex; flex-direction: column; gap: 2px; }
+  .variant-delete-title { color: var(--text-1); font-size: 13px; font-weight: 600; }
+  .variant-delete-hint  { color: var(--text-3); font-size: 12px; line-height: 1.4; }
+  .variant-name-toggle {
+    background: transparent; border: none;
+    color: var(--accent);
+    font-size: 12px; font-weight: 600;
+    cursor: pointer; padding: 0;
+  }
+  .variant-name-toggle:hover { text-decoration: underline; }
+
+  /* Inline suggestion list under the Add Variant input (Issue #4 UX) */
+  .variant-suggest { list-style: none; padding: 0; margin: 0; }
+  .variant-suggest li + li { margin-top: 4px; }
+  .variant-suggest-row {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-1);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color var(--dur-fast), background var(--dur-fast);
+  }
+  .variant-suggest-row:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-1)); }
+  .variant-suggest-row .material-symbols-rounded { font-size: 16px; color: var(--text-3); flex-shrink: 0; }
+  .variant-suggest-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+  .variant-suggest-meta { color: var(--text-3); font-size: 12px; }
+
+  .nutrition-source {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .nutrition-source-head {
+    color: var(--text-1);
+    font-weight: 700;
+    font-size: 12px;
+    margin-bottom: 4px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .nutrition-source-hint {
+    color: var(--text-3);
+    font-size: 12px;
+    line-height: 1.4;
+    margin: 0 0 8px;
+  }
+  .nutrition-source-row {
+    display: flex; gap: 8px; align-items: flex-start;
+    padding: 4px 0;
+    cursor: pointer;
+  }
+  .nutrition-source-row input[type="radio"] { margin-top: 3px; }
+  .nutrition-source-label { display: flex; flex-direction: column; gap: 1px; }
+  .nutrition-source-title { color: var(--text-1); font-size: 13px; font-weight: 500; }
+
+  /* Expiry display in view mode (Issue #9) */
+  .expires-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-2);
+    font-size: 13px;
+  }
+  .expires-row .material-symbols-rounded { font-size: 18px; color: var(--text-3); }
+  .expires-row.warn {
+    background: color-mix(in srgb, var(--warning, #f59e0b) 12%, var(--surface-1));
+    border-color: color-mix(in srgb, var(--warning, #f59e0b) 35%, var(--border));
+    color: var(--warning, #f59e0b);
+  }
+  .expires-row.warn .material-symbols-rounded { color: var(--warning, #f59e0b); }
+  .expires-row.past {
+    background: color-mix(in srgb, var(--error, #f87171) 12%, var(--surface-1));
+    border-color: color-mix(in srgb, var(--error, #f87171) 35%, var(--border));
+    color: var(--error, #f87171);
+  }
+  .expires-row.past .material-symbols-rounded { color: var(--error, #f87171); }
+  .field-hint-inline { color: var(--text-3); font-weight: 400; font-size: 11px; margin-left: 6px; }
+
+  .expires-hint-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    background: var(--surface-2);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-3);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .expires-hint-row .material-symbols-rounded { font-size: 16px; }
+
+  .variants-hint { color: var(--text-3); font-size: 12px; margin-top: 8px; }
+
+  .variant-picker-body { padding: 4px 0 0; display: flex; flex-direction: column; gap: 10px; }
+  .variant-picker-list {
+    list-style: none; padding: 0; margin: 0;
+    max-height: 320px; overflow-y: auto;
+  }
+  .variant-picker-row {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 10px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 4px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .variant-picker-row:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-1)); }
+  .variant-picker-name { flex: 1; color: var(--text-1); font-weight: 500; font-size: 13px; }
+  .variant-picker-meta { color: var(--text-3); font-size: 12px; }
+  .variant-picker-empty { padding: 12px; text-align: center; color: var(--text-3); font-size: 13px; }
+  .variant-picker-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 6px; border-top: 1px solid var(--border); }
 </style>

@@ -143,7 +143,14 @@ function _normalise(r, sourceUrl) {
   const prepMinutes = _parseDuration(r.prepTime);
   const cookMinutes = _parseDuration(r.cookTime);
   const totalMinutes = _parseDuration(r.totalTime);
+  // If the source only exposes a total, keep the old behaviour of
+  // stashing it in cook so the user still sees SOME time. When both
+  // prep AND cook are present, still capture totalTime distinctly so
+  // any resting/marinating gap the source encodes is preserved.
   const cook = cookMinutes ?? (prepMinutes == null && totalMinutes != null ? totalMinutes : null);
+  const totalCol = totalMinutes != null && (prepMinutes != null || cookMinutes != null)
+    ? totalMinutes
+    : null;
 
   const items = (r.recipeIngredient || [])
     .map(s => _parseIngredientLine(_str(s)))
@@ -182,8 +189,10 @@ function _normalise(r, sourceUrl) {
     img_url: imgUrl,
     servings,
     yield_text: yieldText || null,
-    prep_minutes: prepMinutes ?? null,
-    cook_minutes: cook ?? null,
+    prep_minutes:  prepMinutes ?? null,
+    cook_minutes:  cook ?? null,
+    rest_minutes:  _parseDuration(r.restTime),
+    total_minutes: totalCol,
     ingredients: items.length ? [{ name: '', items }] : [],
     steps,
     tags,

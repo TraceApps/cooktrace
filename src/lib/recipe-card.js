@@ -16,6 +16,7 @@
  */
 
 import { brandFooter } from './brand-mark.js';
+import { formatDuration } from './duration.js';
 
 const W = 600;
 const HERO_H = 380;
@@ -275,9 +276,9 @@ function _paginate(blocks, firstPageBudget, restPageBudget) {
  */
 export async function buildRecipeCardPages(recipe) {
   const r = recipe || {};
-  const total = (r.prep_minutes || 0) + (r.cook_minutes || 0);
+  const total = r.total_minutes != null ? r.total_minutes : (r.prep_minutes || 0) + (r.cook_minutes || 0) + (r.rest_minutes || 0);
   const subtitle = [
-    total ? `${total} min` : null,
+    total ? formatDuration(total) : null,
     r.servings ? `Serves ${r.servings}` : null,
     r.yield_text || null,
   ].filter(Boolean).join(' · ');
@@ -399,9 +400,9 @@ export function buildRecipeShareText(recipe) {
   const r = recipe || {};
   const lines = [];
   lines.push(`🍳 ${r.name || 'Recipe'}`);
-  const total = (r.prep_minutes || 0) + (r.cook_minutes || 0);
+  const total = r.total_minutes != null ? r.total_minutes : (r.prep_minutes || 0) + (r.cook_minutes || 0) + (r.rest_minutes || 0);
   const meta = [
-    total ? `${total} min` : null,
+    total ? formatDuration(total) : null,
     r.servings ? `Serves ${r.servings}` : null,
     r.yield_text || null,
   ].filter(Boolean).join(' · ');

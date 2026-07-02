@@ -560,6 +560,27 @@ export function convertQty(qty, fromUnit, toUnit, gPerCup) {
 }
 
 /**
+ * Resolve which pantry row supplies nutrition for a recipe ingredient.
+ * Variant feature (Issue #4): when a recipe ingredient links to a
+ * generic pantry item AND that generic has nutrition_source_variant_id
+ * set, pull the source variant's row instead. Otherwise just return
+ * the originally-linked row (which may itself be a flat item, a
+ * generic with its own manual nutrition, or a specific variant the
+ * recipe linked directly).
+ */
+function _resolveNutritionSource(pantryById, pantryItemId) {
+  if (!pantryById || pantryItemId == null) return null;
+  const own = pantryById.get(pantryItemId);
+  if (!own) return null;
+  const sourceId = own.nutrition_source_variant_id;
+  if (sourceId == null) return own;
+  const sourceRow = pantryById.get(sourceId);
+  // Defensive: source must still exist and still be a child of this row.
+  if (!sourceRow || sourceRow.generic_parent_id !== own.id) return own;
+  return sourceRow;
+}
+
+/**
  * Compute the nutrition totals for a recipe given its grouped
  * ingredients + a Map<pantry_item_id, pantry_row> for lookup.
  *
@@ -583,7 +604,7 @@ export function computeRecipeNutrition(ingredients, pantryById) {
     for (const it of (g.items || [])) {
       total++;
       if (!it || !it.name) continue;
-      const pantry = pantryById.get(it.pantry_item_id);
+      const pantry = _resolveNutritionSource(pantryById, it.pantry_item_id);
       if (!pantry || !pantry.nutrition || !pantry.serving_size || !pantry.serving_unit) {
         skipped.push({ name: it.name, reason: 'no nutrition data' });
         continue;
@@ -660,7 +681,7 @@ export function computeRecipeMass(recipe, pantryById) {
         // "to taste" — neither contributes nor blocks.
         continue;
       }
-      const pantry = pantryById.get(it.pantry_item_id);
+      const pantry = _resolveNutritionSource(pantryById, it.pantry_item_id);
       const fam = unitFamily(it.unit);
 
       if (fam === 'weight') {

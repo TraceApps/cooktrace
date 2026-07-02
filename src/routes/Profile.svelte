@@ -410,7 +410,7 @@
         {/if}
         <div class="form-group">
           <label class="form-label">{$_('reset_password.new_password')}</label>
-          <input class="input" type="password" bind:value={new_password} placeholder={$_('reset_password.password_placeholder')} />
+          <input class="input" type="password" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" bind:value={new_password} placeholder={$_('reset_password.password_placeholder')} />
           {#if new_password}
             <div class="pw-strength" class:s-0={pwScore.score === 0} class:s-1={pwScore.score === 1} class:s-2={pwScore.score === 2} class:s-3={pwScore.score === 3} class:s-4={pwScore.score === 4}>
               <div class="pw-bar"><div class="pw-fill" style:width={`${(pwScore.score / 4) * 100}%`}></div></div>
@@ -420,7 +420,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">{$_('profile.confirm_new_password')}</label>
-          <input class="input" type="password" bind:value={new_password2} />
+          <input class="input" type="password" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" bind:value={new_password2} />
           {#if new_password2 && new_password !== new_password2}
             <p class="pw-mismatch">{$_('reset_password.errors.mismatch')}</p>
           {/if}

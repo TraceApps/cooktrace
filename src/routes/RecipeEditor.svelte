@@ -52,6 +52,16 @@
   let servings = $defaultServings || 2;
   let prepMinutes = '';
   let cookMinutes = '';
+  // Rest / rise / marinate / chill / soak — the hands-off slot.
+  // Empty means "no rest time"; when set it rolls into the auto-calc
+  // for Total below.
+  let restMinutes = '';
+  // Empty = 'auto' (derive from prep + cook + rest); a value here overrides.
+  let totalMinutes = '';
+  // Placeholder in the Total input shows what the auto-calc would be
+  // right now, so the user sees the fallback value before deciding
+  // whether to override.
+  $: totalAutoCalc = (parseInt(prepMinutes, 10) || 0) + (parseInt(cookMinutes, 10) || 0) + (parseInt(restMinutes, 10) || 0);
   // Grouped ingredients: [{ name?: 'Sauce', items: [{qty,unit,name,note}] }, ...]
   // Default: one unnamed group (renders as a flat list until the user
   // adds a second group).
@@ -309,8 +319,10 @@
       rating      = r.rating ?? null;
       yieldText   = r.yield_text || '';
       servings    = r.servings || 2;
-      prepMinutes = r.prep_minutes ?? '';
-      cookMinutes = r.cook_minutes ?? '';
+      prepMinutes  = r.prep_minutes  ?? '';
+      cookMinutes  = r.cook_minutes  ?? '';
+      restMinutes  = r.rest_minutes  ?? '';
+      totalMinutes = r.total_minutes ?? '';
       // Server returns ingredients in grouped shape: [{name, items: [...]}].
       // Each item is mapped to controlled-input strings.
       ingredientGroups = (r.ingredients?.length ? r.ingredients : [_blankGroup()])
@@ -748,8 +760,10 @@
         rating: rating ?? null,
         yield_text: yieldText.trim() || null,
         servings: parseInt(servings, 10) || null,
-        prep_minutes: prepMinutes === '' ? null : parseInt(prepMinutes, 10),
-        cook_minutes: cookMinutes === '' ? null : parseInt(cookMinutes, 10),
+        prep_minutes:  prepMinutes  === '' ? null : parseInt(prepMinutes,  10),
+        cook_minutes:  cookMinutes  === '' ? null : parseInt(cookMinutes,  10),
+        rest_minutes:  restMinutes  === '' ? null : parseInt(restMinutes,  10),
+        total_minutes: totalMinutes === '' ? null : parseInt(totalMinutes, 10),
         ingredients: cleanedIngredients,
         steps: cleanedSteps,
         tags: cleanedTags,
@@ -853,6 +867,16 @@
             <label class="field flex">
               <span class="field-label">Cook (min)</span>
               <input class="input num" type="number" min="0" bind:value={cookMinutes} />
+            </label>
+            <label class="field flex">
+              <span class="field-label" title="Any hands-off time: dough rise, meat rest, marinate, chill, soak, ferment. Rolls into the auto-calculated Total below.">Rest (min)</span>
+              <input class="input num" type="number" min="0" bind:value={restMinutes} />
+            </label>
+            <label class="field flex">
+              <span class="field-label" title="Auto-calculated from prep + cook + rest unless you set a value here. Use it to include time the three component fields don't cover.">Total (min)</span>
+              <input class="input num" type="number" min="0"
+                placeholder={totalAutoCalc > 0 ? `auto: ${totalAutoCalc}` : 'auto'}
+                bind:value={totalMinutes} />
             </label>
             <label class="field flex">
               <span class="field-label">Servings</span>
