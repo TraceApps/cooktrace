@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { fade, slide } from 'svelte/transition';
+  import { _ } from 'svelte-i18n';
   import { pageBanners, bannerStyle } from '../stores/settings.js';
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
@@ -376,7 +377,7 @@
 
 <div class="page-shell">
   <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
-    <h1>Diary</h1>
+    <h1>{$_('routes.diary.title')}</h1>
     <button class="btn-icon header-action" on:click={openPlan} aria-label="Plan a Cook" title="Plan a Cook">
       <span class="material-symbols-rounded">event_available</span>
     </button>
@@ -471,16 +472,16 @@
     {:else if entries.length === 0}
       <div class="state empty" in:fade={{ duration: 120 }}>
         <span class="material-symbols-rounded empty-icon">event_note</span>
-        <h2>Nothing Logged Yet</h2>
-        <p>Mark recipes as cooked from the recipe page, or plan one for a future date.</p>
-        <button class="btn btn-primary" on:click={openPlan}>Plan a Cook</button>
+        <h2>{$_('routes.diary.empty_title')}</h2>
+        <p>{$_('routes.diary.empty_desc')}</p>
+        <button class="btn btn-primary" on:click={openPlan}>{$_('routes.diary.plan_cook')}</button>
       </div>
     {:else if filterRecipeId && displayEntries.length === 0}
       <div class="state empty" in:fade={{ duration: 120 }}>
         <span class="material-symbols-rounded empty-icon">filter_alt_off</span>
-        <h2>No Matches</h2>
-        <p>No diary entries found for {filterRecipeName || 'this recipe'} in the current range.</p>
-        <button class="btn btn-secondary" on:click={clearFilter}>Clear Filter</button>
+        <h2>{$_('routes.diary.no_matches_title')}</h2>
+        <p>{$_('routes.diary.no_matches_desc', { values: { name: filterRecipeName || $_('routes.diary.this_recipe') } })}</p>
+        <button class="btn btn-secondary" on:click={clearFilter}>{$_('routes.diary.clear_filter')}</button>
       </div>
     {:else if view === 'list'}
       {#each groupedByDate as [date, items]}

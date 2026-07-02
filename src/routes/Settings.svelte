@@ -362,7 +362,7 @@
 
 <div class="page-shell">
   <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
-    <h1>Settings</h1>
+    <h1>{$_('routes.settings.title')}</h1>
   </header>
 
   <div class="settings-search-bar">
@@ -412,7 +412,7 @@
     <!-- ── Appearance ──────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'appearance')} on:click={() => toggleSection('appearance')}>
       <span class="material-symbols-rounded si">contrast</span>
-      <span>Appearance</span>
+      <span>{$_('settings.appearance.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.appearance}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'appearance') && sectionVisible(settingsQuery, 'appearance')}
@@ -520,7 +520,7 @@
     <!-- ── Regional & Units ─────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'regional')} on:click={() => toggleSection('regional')}>
       <span class="material-symbols-rounded si">language</span>
-      <span>Regional &amp; Units</span>
+      <span>{$_('settings.regional.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.regional}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'regional') && sectionVisible(settingsQuery, 'regional')}
@@ -594,7 +594,7 @@
     <!-- ── Cooking ─────────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'cooking')} on:click={() => toggleSection('cooking')}>
       <span class="material-symbols-rounded si">soup_kitchen</span>
-      <span>Cooking</span>
+      <span>{$_('settings.cooking.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.cooking}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'cooking') && sectionVisible(settingsQuery, 'cooking')}
@@ -677,7 +677,7 @@
     <!-- ── Nutrition ───────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'nutrition')} on:click={() => toggleSection('nutrition')}>
       <span class="material-symbols-rounded si">nutrition</span>
-      <span>Nutrition</span>
+      <span>{$_('settings.nutrition.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.nutrition}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'nutrition') && sectionVisible(settingsQuery, 'nutrition')}
@@ -691,7 +691,7 @@
     <!-- ── AI Assistant ────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'ai')} on:click={() => toggleSection('ai')}>
       <span class="material-symbols-rounded si">smart_toy</span>
-      <span>AI Assistant</span>
+      <span>{$_('settings.ai.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.ai}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'ai') && sectionVisible(settingsQuery, 'ai')}
@@ -703,7 +703,7 @@
     <!-- ── NutriTrace federation ───────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'federation')} on:click={() => toggleSection('federation')}>
       <span class="material-symbols-rounded si">hub</span>
-      <span>NutriTrace Federation</span>
+      <span>{$_('settings.federation.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.federation}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'federation') && sectionVisible(settingsQuery, 'federation')}
@@ -716,7 +716,7 @@
     <!-- ── Food sources (Open Food Facts + barcode scanner) ───────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'foodsources')} on:click={() => toggleSection('foodsources')}>
       <span class="material-symbols-rounded si">qr_code_scanner</span>
-      <span>Food Sources</span>
+      <span>{$_('settings.connected_services.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.foodsources}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'foodsources') && sectionVisible(settingsQuery, 'foodsources')}
@@ -840,7 +840,7 @@
     {#if isNative}
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'serverconn')} on:click={() => toggleSection('serverconn')}>
       <span class="material-symbols-rounded si">cloud_sync</span>
-      <span>Server Connection</span>
+      <span>{$_('settings.server_connection.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.serverconn}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'serverconn') && sectionVisible(settingsQuery, 'serverconn')}
@@ -853,7 +853,7 @@
     <!-- ── Notifications ───────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'notifications')} on:click={() => toggleSection('notifications')}>
       <span class="material-symbols-rounded si">notifications</span>
-      <span>Notifications</span>
+      <span>{$_('settings.notifications.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.notifications}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'notifications') && sectionVisible(settingsQuery, 'notifications')}
@@ -867,7 +867,7 @@
     {#if !$userMgmtActive || $currentUser?.role === 'admin'}
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'email')} on:click={() => toggleSection('email')}>
       <span class="material-symbols-rounded si">mail</span>
-      <span>Email (SMTP)</span>
+      <span>{$_('settings.email.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.email}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'email') && sectionVisible(settingsQuery, 'email')}
@@ -880,7 +880,7 @@
     <!-- ── Backup & Restore ────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'backup')} on:click={() => toggleSection('backup')}>
       <span class="material-symbols-rounded si">backup</span>
-      <span>Backup &amp; Data</span>
+      <span>{$_('settings.backup.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.backup}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'backup') && sectionVisible(settingsQuery, 'backup')}
@@ -892,7 +892,7 @@
     <!-- ── Import from Another App (Mealie / Tandoor / Paprika bulk) ──── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'import')} on:click={() => toggleSection('import')}>
       <span class="material-symbols-rounded si">download</span>
-      <span>Import from Another App</span>
+      <span>{$_('settings.import.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.import}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'import') && sectionVisible(settingsQuery, 'import')}
@@ -904,7 +904,7 @@
     <!-- ── Kitchens (multi-user soft groups for sharing) ──────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'kitchens')} on:click={() => toggleSection('kitchens')}>
       <span class="material-symbols-rounded si">cooking</span>
-      <span>Kitchens</span>
+      <span>{$_('settings.kitchens.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.kitchens}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'kitchens') && sectionVisible(settingsQuery, 'kitchens')}
@@ -916,7 +916,7 @@
     <!-- ── Diagnostics ─────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'diagnostics')} on:click={() => toggleSection('diagnostics')}>
       <span class="material-symbols-rounded si">troubleshoot</span>
-      <span>Diagnostics</span>
+      <span>{$_('settings.diagnostics.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.diagnostics}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'diagnostics') && sectionVisible(settingsQuery, 'diagnostics')}
@@ -952,7 +952,7 @@
     <!-- ── Users ─────────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'users')} on:click={() => toggleSection('users')}>
       <span class="material-symbols-rounded si">group</span>
-      <span>Users</span>
+      <span>{$_('settings.users.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.users}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'users') && sectionVisible(settingsQuery, 'users')}
@@ -963,7 +963,7 @@
     {#if $userMgmtActive && $currentUser?.role === 'admin'}
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'auth')} on:click={() => toggleSection('auth')}>
       <span class="material-symbols-rounded si">vpn_key</span>
-      <span>Authentication</span>
+      <span>{$_('settings.authentication.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.auth}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'auth') && sectionVisible(settingsQuery, 'auth')}
@@ -975,7 +975,7 @@
     <!-- ── About ──────────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'about')} on:click={() => toggleSection('about')}>
       <span class="material-symbols-rounded si">info</span>
-      <span>About</span>
+      <span>{$_('settings.about.section')}</span>
       <span class="material-symbols-rounded chevron" class:rotated={openSections.about}>expand_more</span>
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'about') && sectionVisible(settingsQuery, 'about')}

@@ -76,10 +76,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Use Camera Shortcut in File Import.** Snap a photo of a
   handwritten recipe card or a printed page directly from the
   import dialog, alongside the file picker.
-- **Swedish Translation.** Full UI in Swedish, contributed by
-  @olsson82 via PR #3. Switch in Settings → Regional & Units →
-  Language. English strings fall through when a translation lags a
-  release.
+- **Swedish Translation.** Contributed by @olsson82 via PR #3, plus
+  a coverage expansion pass in-house. Switch in Settings → Regional
+  & Units → Language. Coverage now spans the app's primary surfaces:
+  bottom nav, page titles + search placeholders + empty states on
+  Recipes / Pantry / Diary / Shopping, all Settings section
+  headers, the Recipe view (meta labels, section titles, Cook Mode),
+  the Recipe editor (field labels), the Pantry item sheet (name /
+  brand / barcode / on-hand / variants / expires-on), Trace's
+  welcome screen and quick-chip prompts, plus the auth flows
+  (Login, Register, Reset Password, Accept Invite, Profile) and
+  User Management. Longer-form help copy, individual Settings
+  sub-components, and some import / manage surfaces are still
+  English and will translate progressively as more strings get
+  wrapped for i18n in future releases.
 - **Language Picker.** Regional & Units gains a Language dropdown
   populated from the registered locale list, so Swedish (and any
   future translation) is actually reachable from the UI. The

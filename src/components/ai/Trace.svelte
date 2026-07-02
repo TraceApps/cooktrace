@@ -16,6 +16,7 @@
   import { tick, onMount } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
+  import { _ } from 'svelte-i18n';
   import TraceFace from './TraceFace.svelte';
   import TraceFaceChef from './TraceFaceChef.svelte';
   import {
@@ -1046,7 +1047,7 @@ When you write to the user's data, summarise what you did briefly and concretely
           </div>
           <div>
             <div class="panel-name">{assistantName}</div>
-            <div class="panel-sub">Your AI Cooking &amp; Recipe Assistant</div>
+            <div class="panel-sub">{$_('trace.panel_sub')}</div>
           </div>
         </div>
         <div class="panel-header-actions">
@@ -1071,22 +1072,22 @@ When you write to the user's data, summarise what you did briefly and concretely
             <div class="ai-welcome-avatar">
               <svelte:component this={Mascot} size={56} />
             </div>
-            <p class="ai-welcome-name">Hi, I'm {assistantName}!</p>
+            <p class="ai-welcome-name">{$_('trace.welcome_name', { values: { name: assistantName } })}</p>
             <p class="ai-welcome-desc">
-              Ask me anything — recipes, pantry, meal plans, shopping. I have access to your kitchen data and can find recipes, scale them, log what you made, and tell you what you can cook from what's on hand.
+              {$_('trace.welcome_desc')}
             </p>
             <div class="ai-quick-chips">
-              <button class="ai-chip" on:click={() => quickAsk("What can I make with what's in my pantry?")}>
-                Cook From My Pantry
+              <button class="ai-chip" on:click={() => quickAsk($_('trace.chip_pantry_ask'))}>
+                {$_('trace.chip_pantry')}
               </button>
-              <button class="ai-chip" on:click={() => quickAsk("Suggest a recipe for tonight.")}>
-                Recipe Suggestion
+              <button class="ai-chip" on:click={() => quickAsk($_('trace.chip_suggestion_ask'))}>
+                {$_('trace.chip_suggestion')}
               </button>
-              <button class="ai-chip" on:click={() => quickAsk("What recipes have I cooked recently?")}>
-                Recently Cooked
+              <button class="ai-chip" on:click={() => quickAsk($_('trace.chip_recent_ask'))}>
+                {$_('trace.chip_recent')}
               </button>
-              <button class="ai-chip" on:click={() => quickAsk("Build a shopping list for this week.")}>
-                Shopping List
+              <button class="ai-chip" on:click={() => quickAsk($_('trace.chip_shopping_ask'))}>
+                {$_('trace.chip_shopping')}
               </button>
             </div>
           </div>
@@ -1142,7 +1143,7 @@ When you write to the user's data, summarise what you did briefly and concretely
           class="input"
           rows="1"
           bind:value={input}
-          placeholder={recording ? 'Listening…' : `Ask ${assistantName}…`}
+          placeholder={recording ? $_('trace.listening') : $_('trace.ask_placeholder', { values: { name: assistantName } })}
           on:keydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
           disabled={busy}
         ></textarea>

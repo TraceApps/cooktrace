@@ -29,6 +29,7 @@
    */
   import { createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
+  import { _ } from 'svelte-i18n';
   import Sheet from '../ui/Sheet.svelte';
   import Dialog from '../ui/Dialog.svelte';
   import DateInput from '../ui/DateInput.svelte';
@@ -842,20 +843,20 @@
           <div class="identity-info">
             {#if editing}
               <label class="field">
-                <span class="field-label">Name</span>
+                <span class="field-label">{$_('pantry_sheet.name')}</span>
                 <input class="input" type="text" bind:value={draft.name} placeholder="Iodized Salt" />
               </label>
               <label class="field">
-                <span class="field-label">Brand</span>
+                <span class="field-label">{$_('pantry_sheet.brand')}</span>
                 <input class="input" type="text" bind:value={draft.brand} placeholder="Morton" />
               </label>
               <label class="field">
                 <span class="field-label">
-                  Category
+                  {$_('editor.category')}
                   {#if categoryName}
                     <button type="button" class="field-clear"
                       on:click|preventDefault={() => { draft.category_id = null; draft.category = ''; draft = { ...draft }; }}>
-                      Clear
+                      {$_('common.clear')}
                     </button>
                   {/if}
                 </span>
@@ -875,7 +876,7 @@
                 />
               </label>
               <label class="field">
-                <span class="field-label">Barcode</span>
+                <span class="field-label">{$_('pantry_sheet.barcode')}</span>
                 <div class="barcode-wrap">
                   <input class="input barcode-input" type="text" inputmode="numeric"
                     bind:value={draft.barcode} placeholder="optional" />
@@ -964,7 +965,7 @@
                rather than a single combined strip. -->
           <div class="stats">
             <div class="stat">
-              <div class="stat-label">On Hand</div>
+              <div class="stat-label">{$_('pantry_sheet.on_hand')}</div>
               {#if editing}
                 <input class="input num" type="number" min="0" step="0.01"
                   bind:value={draft.quantity} placeholder="0" />
@@ -1054,7 +1055,7 @@
       {#if editing}
         {#if !isGeneric}
           <label class="field full">
-            <span class="field-label">Expires On <span class="field-hint-inline">(optional, helps catch items going bad)</span></span>
+            <span class="field-label">{$_('pantry_sheet.expires_on')} <span class="field-hint-inline">{$_('pantry_sheet.expires_on_hint')}</span></span>
             <DateInput bind:value={draft.expires_on} />
           </label>
         {:else}
@@ -1064,7 +1065,7 @@
           </div>
         {/if}
         <label class="field full">
-          <span class="field-label">Notes</span>
+          <span class="field-label">{$_('recipe.notes')}</span>
           <textarea class="input" rows="3" bind:value={draft.notes}
             placeholder="Where you bought it, what works well, etc."></textarea>
         </label>
@@ -1088,7 +1089,7 @@
         {/if}
         {#if item.notes}
           <div class="notes">
-            <div class="notes-label">Notes</div>
+            <div class="notes-label">{$_('recipe.notes')}</div>
             <p class="notes-body">{item.notes}</p>
           </div>
         {/if}
@@ -1100,7 +1101,7 @@
         <div class="variants">
           <div class="variants-head">
             <span class="material-symbols-rounded">category</span>
-            <span class="variants-title">Variants</span>
+            <span class="variants-title">{$_('pantry_sheet.variants')}</span>
           </div>
 
           {#if isVariant}

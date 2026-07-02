@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { fade, slide } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
+  import { _ } from 'svelte-i18n';
   import { pageBanners, bannerStyle } from '../stores/settings.js';
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
@@ -327,7 +328,7 @@
 
 <div class="page-shell">
   <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
-    <h1>Shopping</h1>
+    <h1>{$_('routes.shopping.title')}</h1>
     <button class="btn-icon header-action header-action-3" on:click={openShareSheet} aria-label="Share List" title="Share List">
       <span class="material-symbols-rounded">share</span>
     </button>
@@ -351,7 +352,7 @@
           bind:value={addName}
           bind:typed={addNameTyped}
           options={pantryOptions}
-          placeholder="Add item…"
+          placeholder={$_('routes.shopping.add_placeholder')}
           creatable={true}
           createLabel="Add"
           on:create={() => quickAdd()}
@@ -397,11 +398,11 @@
     {:else if items.length === 0}
       <div class="state empty" in:fade={{ duration: 120 }}>
         <span class="material-symbols-rounded empty-icon">shopping_cart</span>
-        <h2>List Is Empty</h2>
-        <p>Add items above, or pull missing ingredients from a recipe.</p>
+        <h2>{$_('routes.shopping.empty_title')}</h2>
+        <p>{$_('routes.shopping.empty_desc')}</p>
         <button class="btn btn-primary" on:click={openPicker}>
           <span class="material-symbols-rounded">menu_book</span>
-          Add from Recipe
+          {$_('routes.shopping.add_from_recipe')}
         </button>
       </div>
     {:else}

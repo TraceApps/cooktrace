@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
+  import { _ } from 'svelte-i18n';
   import { pageBanners, bannerStyle, pantryView } from '../stores/settings.js';
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
@@ -599,7 +600,7 @@
 
 <div class="page-shell" style="--header-h: {headerH}px">
   <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'} bind:offsetHeight={headerH}>
-    <h1>Pantry</h1>
+    <h1>{$_('routes.pantry.title')}</h1>
     <button class="btn-icon header-action" on:click={startCreate} aria-label="Add item" title="Add item">
       <span class="material-symbols-rounded">add</span>
     </button>
@@ -624,7 +625,7 @@
       <div class="toolbar sticky-controls">
         <div class="search-row">
           <span class="material-symbols-rounded search-icon">search</span>
-          <input class="search" type="search" placeholder="Search pantry…" bind:value={query} />
+          <input class="search" type="search" placeholder={$_('routes.pantry.search_placeholder')} bind:value={query} />
           <button class="search-scan" on:click={() => scannerOpen = true} aria-label="Scan barcode" title="Scan barcode">
             <span class="material-symbols-rounded">barcode_scanner</span>
           </button>
@@ -744,18 +745,15 @@
     {:else if items.length === 0}
       <div class="state empty">
         <span class="material-symbols-rounded empty-icon">kitchen</span>
-        <h2>Pantry Is Empty</h2>
-        <p>Add ingredients here, or save a recipe — every ingredient you use auto-populates the pantry.</p>
-        <button class="btn btn-primary" on:click={startCreate}>Add an Item</button>
+        <h2>{$_('routes.pantry.empty_title')}</h2>
+        <p>{$_('routes.pantry.empty_desc')}</p>
+        <button class="btn btn-primary" on:click={startCreate}>{$_('routes.pantry.add_item')}</button>
       </div>
     {:else if filtered.length === 0}
-      <!-- Suppress the no-local-match state when an external source
-           (OFF / USDA) is the active search target — the external
-           results card below covers that case on its own. -->
       {#if searchSource === 'local'}
         <div class="state empty">
           <span class="material-symbols-rounded empty-icon">search_off</span>
-          <p>No matches for "{query}".</p>
+          <p>{$_('routes.pantry.no_match', { values: { q: query } })}</p>
         </div>
       {/if}
     {:else}

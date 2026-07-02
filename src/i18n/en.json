@@ -4,13 +4,44 @@
     "pantry":   "Pantry",
     "diary":    "Diary",
     "shopping": "Shopping",
+    "manage":   "Manage",
     "settings": "Settings"
   },
   "routes": {
-    "recipes":  { "title": "Recipes"  },
-    "pantry":   { "title": "Pantry"   },
-    "diary":    { "title": "Diary"    },
-    "shopping": { "title": "Shopping" },
+    "recipes":  {
+      "title": "Recipes",
+      "search_placeholder": "Search recipes…",
+      "new_recipe": "New Recipe",
+      "empty_title": "No Recipes Yet",
+      "empty_desc": "Add your first recipe to get started.",
+      "create_cta": "Create a Recipe",
+      "no_match": "No recipes match \"{q}\"."
+    },
+    "pantry":   {
+      "title": "Pantry",
+      "search_placeholder": "Search pantry…",
+      "empty_title": "Pantry Is Empty",
+      "empty_desc": "Add ingredients here, or save a recipe. Every ingredient you use auto-populates the pantry.",
+      "add_item": "Add an Item",
+      "no_match": "No matches for \"{q}\"."
+    },
+    "diary":    {
+      "title": "Diary",
+      "empty_title": "Nothing Logged Yet",
+      "empty_desc": "Mark recipes as cooked from the recipe page, or plan one for a future date.",
+      "plan_cook": "Plan a Cook",
+      "no_matches_title": "No Matches",
+      "no_matches_desc": "No diary entries found for {name} in the current range.",
+      "this_recipe": "this recipe",
+      "clear_filter": "Clear Filter"
+    },
+    "shopping": {
+      "title": "Shopping",
+      "empty_title": "List Is Empty",
+      "empty_desc": "Add items above, or pull missing ingredients from a recipe.",
+      "add_from_recipe": "Add from Recipe",
+      "add_placeholder": "Add item…"
+    },
     "settings": { "title": "Settings" }
   },
   "common": {
@@ -27,6 +58,7 @@
     "edit":         "Edit",
     "done":         "Done",
     "close":        "Close",
+    "clear":        "Clear",
     "loading":      "Loading…",
     "signed_in":    "Signed In",
     "signed_out":   "Signed Out",
@@ -39,6 +71,63 @@
       "unlink_failed":     "Could not unlink"
     }
   },
+  "pantry_sheet": {
+    "name":      "Name",
+    "brand":     "Brand",
+    "barcode":   "Barcode",
+    "on_hand":   "On Hand",
+    "variants":  "Variants",
+    "expires_on":"Expires On",
+    "expires_on_hint":"(optional, helps catch items going bad)"
+  },
+  "trace": {
+    "panel_sub":           "Your AI Cooking & Recipe Assistant",
+    "welcome_name":        "Hi, I'm {name}!",
+    "welcome_desc":        "Ask me anything about recipes, pantry, meal plans, or shopping. I have access to your kitchen data and can find recipes, scale them, log what you made, and tell you what you can cook from what's on hand.",
+    "chip_pantry":         "Cook From My Pantry",
+    "chip_pantry_ask":     "What can I make with what's in my pantry?",
+    "chip_suggestion":     "Recipe Suggestion",
+    "chip_suggestion_ask": "Suggest a recipe for tonight.",
+    "chip_recent":         "Recently Cooked",
+    "chip_recent_ask":     "What recipes have I cooked recently?",
+    "chip_shopping":       "Shopping List",
+    "chip_shopping_ask":   "Build a shopping list for this week.",
+    "ask_placeholder":     "Ask {name}…",
+    "listening":           "Listening…"
+  },
+  "editor": {
+    "name_required":      "Name *",
+    "description":        "Description",
+    "rating":             "Rating",
+    "prep_min":           "Prep (min)",
+    "cook_min":           "Cook (min)",
+    "rest_min":           "Rest (min)",
+    "total_min":          "Total (min)",
+    "yield":              "Yield",
+    "category":           "Category",
+    "source_url":         "Source URL",
+    "video_url":          "Video URL",
+    "add_ingredient":     "Add Ingredient",
+    "add_step":           "Add Step",
+    "add_group":          "Add Group"
+  },
+  "recipe": {
+    "prep_time":          "Prep Time",
+    "cook_time":          "Cook Time",
+    "rest_time":          "Rest Time",
+    "total_time":         "Total Time",
+    "servings":           "Servings",
+    "serving_singular":   "Serving",
+    "ingredients":        "Ingredients",
+    "instructions":       "Instructions",
+    "kitchen_gear":       "Kitchen Gear",
+    "video_instructions": "Video Instructions",
+    "notes":              "Notes",
+    "nutrition":          "Nutrition",
+    "cook_history":       "Cook History",
+    "cook_mode":          "Cook Mode",
+    "tags":               "Tags"
+  },
   "settings": {
     "appearance": {
       "section":          "Appearance",
@@ -50,6 +139,17 @@
       "section":  "Regional & Units",
       "language": "Language"
     },
+    "cooking":            { "section": "Cooking" },
+    "nutrition":          { "section": "Nutrition" },
+    "federation":         { "section": "NutriTrace Federation" },
+    "server_connection":  { "section": "Server Connection" },
+    "email":              { "section": "Email (SMTP)" },
+    "backup":             { "section": "Backup & Data" },
+    "import":             { "section": "Import from Another App" },
+    "kitchens":           { "section": "Kitchens" },
+    "diagnostics":        { "section": "Diagnostics" },
+    "about":              { "section": "About" },
+    "support_dev":        { "section": "Support Development" },
     "diary":              { "section": "Diary" },
     "water":              { "section": "Water" },
     "foods":              { "section": "Foods" },

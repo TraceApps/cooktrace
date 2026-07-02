@@ -2,16 +2,16 @@
   import { location, push } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
 
-  const TABS = [
-    { path: '/recipes',  icon: 'menu_book',     label: 'Recipes'  },
-    { path: '/pantry',   icon: 'kitchen',       label: 'Pantry'   },
-    { path: '/diary',    icon: 'event_note',    label: 'Diary'    },
-    { path: '/shopping', icon: 'shopping_cart', label: 'Shopping' },
-    { path: '/manage',   icon: 'tune',          label: 'Manage'   },
-    { path: '/settings', icon: 'settings',      label: 'Settings' },
+  // Labels resolve at render time via $_() so tab text follows the
+  // active locale without needing to re-mount when Language changes.
+  $: tabs = [
+    { path: '/recipes',  icon: 'menu_book',     label: $_('nav.recipes')  },
+    { path: '/pantry',   icon: 'kitchen',       label: $_('nav.pantry')   },
+    { path: '/diary',    icon: 'event_note',    label: $_('nav.diary')    },
+    { path: '/shopping', icon: 'shopping_cart', label: $_('nav.shopping') },
+    { path: '/manage',   icon: 'tune',          label: $_('nav.manage')   },
+    { path: '/settings', icon: 'settings',      label: $_('nav.settings') },
   ];
-
-  $: tabs = TABS;
   $: activeIdx = (() => {
     const base = $location.split('?')[0];
     // Treat '/' as Recipes

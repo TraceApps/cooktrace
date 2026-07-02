@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { fade } from 'svelte/transition';
+  import { _ } from 'svelte-i18n';
   import { formatDuration } from '../lib/duration.js';
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
@@ -680,8 +681,8 @@
 
 <div class="page-shell" style="--header-h: {headerH}px">
   <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'} bind:offsetHeight={headerH}>
-    <h1>Recipes</h1>
-    <button class="btn-icon header-action" on:click={() => createSheetOpen = true} aria-label="New Recipe" title="New Recipe">
+    <h1>{$_('routes.recipes.title')}</h1>
+    <button class="btn-icon header-action" on:click={() => createSheetOpen = true} aria-label={$_('routes.recipes.new_recipe')} title={$_('routes.recipes.new_recipe')}>
       <span class="material-symbols-rounded">add</span>
     </button>
   </header>
@@ -1008,7 +1009,7 @@
         <input
           class="search"
           type="search"
-          placeholder="Search recipes…"
+          placeholder={$_('routes.recipes.search_placeholder')}
           bind:value={query}
         />
       </div>
@@ -1178,14 +1179,14 @@
     {:else if recipes.length === 0}
       <div class="state empty" in:fade={{ duration: 120 }}>
         <span class="material-symbols-rounded empty-icon">menu_book</span>
-        <h2>No Recipes Yet</h2>
-        <p>Add your first recipe to get started.</p>
-        <button class="btn btn-primary" on:click={() => createSheetOpen = true}>Create a Recipe</button>
+        <h2>{$_('routes.recipes.empty_title')}</h2>
+        <p>{$_('routes.recipes.empty_desc')}</p>
+        <button class="btn btn-primary" on:click={() => createSheetOpen = true}>{$_('routes.recipes.create_cta')}</button>
       </div>
     {:else if filtered.length === 0}
       <div class="state empty" in:fade={{ duration: 120 }}>
         <span class="material-symbols-rounded empty-icon">search_off</span>
-        <p>No recipes match "{query}".</p>
+        <p>{$_('routes.recipes.no_match', { values: { q: query } })}</p>
       </div>
     {:else}
       <div class="grid">

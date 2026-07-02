@@ -3,6 +3,7 @@
   import { slide } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
   import { fade } from 'svelte/transition';
+  import { _ } from 'svelte-i18n';
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { resolveAssetUrl } from '../lib/platform.js';
@@ -838,12 +839,12 @@
 
           <!-- Name + description -->
           <label class="field">
-            <span class="field-label">Name *</span>
+            <span class="field-label">{$_('editor.name_required')}</span>
             <input class="input" type="text" bind:value={name} placeholder="Banana bread" />
           </label>
 
           <label class="field">
-            <span class="field-label">Description</span>
+            <span class="field-label">{$_('editor.description')}</span>
             <textarea
               class="input"
               rows="4"
@@ -854,18 +855,18 @@
 
           <!-- Rating -->
           <div class="field rating-field">
-            <span class="field-label">Rating</span>
+            <span class="field-label">{$_('editor.rating')}</span>
             <StarRating bind:value={rating} size={26} />
           </div>
 
           <!-- Time + servings + yield -->
           <div class="field-row">
             <label class="field flex">
-              <span class="field-label">Prep (min)</span>
+              <span class="field-label">{$_('editor.prep_min')}</span>
               <input class="input num" type="number" min="0" bind:value={prepMinutes} />
             </label>
             <label class="field flex">
-              <span class="field-label">Cook (min)</span>
+              <span class="field-label">{$_('editor.cook_min')}</span>
               <input class="input num" type="number" min="0" bind:value={cookMinutes} />
             </label>
             <label class="field flex">
@@ -879,7 +880,7 @@
                 bind:value={totalMinutes} />
             </label>
             <label class="field flex">
-              <span class="field-label">Servings</span>
+              <span class="field-label">{$_('recipe.servings')}</span>
               <input class="input num" type="number" min="1" bind:value={servings} />
             </label>
           </div>
@@ -1062,7 +1063,7 @@
 
           <!-- Category + Tags + Kitchen Gear -->
           <div class="field">
-            <span class="field-label">Category</span>
+            <span class="field-label">{$_('editor.category')}</span>
             <Combobox
               bind:this={comboCategoryRef}
               mode="single"
@@ -1079,7 +1080,7 @@
           </div>
 
           <div class="field">
-            <span class="field-label">Tags</span>
+            <span class="field-label">{$_('recipe.tags')}</span>
             <Combobox
               mode="chips"
               bind:value={tags}
@@ -1092,7 +1093,7 @@
           </div>
 
           <div class="field">
-            <span class="field-label">Kitchen Gear</span>
+            <span class="field-label">{$_('recipe.kitchen_gear')}</span>
             <Combobox
               mode="chips"
               bind:value={tools}
@@ -1147,7 +1148,7 @@
           </section>
 
           <label class="field">
-            <span class="field-label">Source URL</span>
+            <span class="field-label">{$_('editor.source_url')}</span>
             <input class="input" type="url" bind:value={sourceUrl} placeholder="https://example.com/the-best-banana-bread" />
           </label>
 
@@ -1206,7 +1207,7 @@
           </div>
 
           <div class="field">
-            <span class="field-label">Notes</span>
+            <span class="field-label">{$_('recipe.notes')}</span>
             <RichTextEditor bind:value={notes} placeholder="Tweaks, observations, who liked it…" rows={4} />
           </div>
 

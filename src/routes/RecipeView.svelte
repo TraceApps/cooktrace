@@ -1,6 +1,7 @@
 <script>
   import { push } from 'svelte-spa-router';
   import { fade } from 'svelte/transition';
+  import { _ } from 'svelte-i18n';
   import { formatDuration } from '../lib/duration.js';
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
@@ -624,7 +625,7 @@
     {#if cookMode}
       <span class="cook-mode-tag" aria-hidden="true">
         <span class="material-symbols-rounded cook-mode-icon">soup_kitchen</span>
-        <span class="cook-mode-label">Cook Mode</span>
+        <span class="cook-mode-label">{$_('recipe.cook_mode')}</span>
       </span>
       <button class="btn-icon close-btn" on:click={endCookMode} aria-label="Exit Cook Mode" title="Exit Cook Mode">
         <span class="material-symbols-rounded">close</span>
@@ -762,25 +763,25 @@
           {#if recipe.prep_minutes}
             <div class="meta-stat">
               <span class="material-symbols-rounded meta-icon">schedule</span>
-              <div class="meta-text"><span class="meta-label">Prep Time</span><span class="meta-value">{formatDuration(recipe.prep_minutes)}</span></div>
+              <div class="meta-text"><span class="meta-label">{$_('recipe.prep_time')}</span><span class="meta-value">{formatDuration(recipe.prep_minutes)}</span></div>
             </div>
           {/if}
           {#if recipe.cook_minutes}
             <div class="meta-stat">
               <span class="material-symbols-rounded meta-icon">local_fire_department</span>
-              <div class="meta-text"><span class="meta-label">Cook Time</span><span class="meta-value">{formatDuration(recipe.cook_minutes)}</span></div>
+              <div class="meta-text"><span class="meta-label">{$_('recipe.cook_time')}</span><span class="meta-value">{formatDuration(recipe.cook_minutes)}</span></div>
             </div>
           {/if}
           {#if recipe.rest_minutes}
             <div class="meta-stat">
               <span class="material-symbols-rounded meta-icon">hourglass_top</span>
-              <div class="meta-text"><span class="meta-label">Rest Time</span><span class="meta-value">{formatDuration(recipe.rest_minutes)}</span></div>
+              <div class="meta-text"><span class="meta-label">{$_('recipe.rest_time')}</span><span class="meta-value">{formatDuration(recipe.rest_minutes)}</span></div>
             </div>
           {/if}
           {#if totalMinutes(recipe) > 0}
             <div class="meta-stat">
               <span class="material-symbols-rounded meta-icon">timer</span>
-              <div class="meta-text"><span class="meta-label">Total Time</span><span class="meta-value">{formatDuration(totalMinutes(recipe))}</span></div>
+              <div class="meta-text"><span class="meta-label">{$_('recipe.total_time')}</span><span class="meta-value">{formatDuration(totalMinutes(recipe))}</span></div>
             </div>
           {/if}
           {#if recipe.servings}
@@ -823,7 +824,7 @@
         <section class="section ingredients-section">
           <h2 class="section-title">
             <span class="material-symbols-rounded section-icon">restaurant_menu</span>
-            <span class="section-title-text">Ingredients</span>
+            <span class="section-title-text">{$_('recipe.ingredients')}</span>
             {#if recipe.servings}
               <span class="section-hint">
                 {scaledServings} {scaledServings === 1 ? 'Serving' : 'Servings'}
@@ -850,7 +851,7 @@
                 {/each}
               </div>
               <label class="scale-custom">
-                <span class="scale-custom-label">Servings</span>
+                <span class="scale-custom-label">{$_('recipe.servings')}</span>
                 <input
                   type="number"
                   min="0.25"
@@ -955,7 +956,7 @@
         <section class="section">
           <h2 class="section-title">
             <span class="material-symbols-rounded section-icon">format_list_numbered</span>
-            <span class="section-title-text">Instructions</span>
+            <span class="section-title-text">{$_('recipe.instructions')}</span>
           </h2>
           {#if recipe.steps?.length}
             <ol class="steps">
@@ -1033,7 +1034,7 @@
           <section class="section video-section">
             <h2 class="section-title">
               <span class="material-symbols-rounded section-icon">play_circle</span>
-              <span class="section-title-text">Video Instructions</span>
+              <span class="section-title-text">{$_('recipe.video_instructions')}</span>
             </h2>
             {#if v.kind === 'iframe'}
               <div class="video-frame">
@@ -1133,7 +1134,7 @@
           <section class="section cook-history-section">
             <h2 class="section-title">
               <span class="material-symbols-rounded section-icon">history</span>
-              <span class="section-title-text">Cook History</span>
+              <span class="section-title-text">{$_('recipe.cook_history')}</span>
             </h2>
             <ul class="cook-list">
               {#each cooks as c (c.id)}
