@@ -3,6 +3,7 @@
   import { slide } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
+  import { AVAILABLE_LOCALES } from '../i18n/index.js';
   import SettingsAuth   from '../components/settings/SettingsAuth.svelte';
   import SettingsBackup from '../components/settings/SettingsBackup.svelte';
   import SettingsServerConnection from '../components/settings/SettingsServerConnection.svelte';
@@ -525,6 +526,20 @@
     {#if sectionOpen(openSections, settingsQuery, 'regional') && sectionVisible(settingsQuery, 'regional')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Language</span>
+              <div class="setting-desc">UI language. A translation may lag one or two releases behind English; missing strings fall back to English.</div>
+            </div>
+            <div class="select-wrap" style="width:160px">
+              <select class="select sel-sm" value={$language} on:change={e => language.set(e.target.value)}>
+                {#each AVAILABLE_LOCALES as loc}
+                  <option value={loc.code}>{loc.label}</option>
+                {/each}
+              </select>
+            </div>
+          </div>
+          <div class="setting-divider"></div>
           <div class="setting-row">
             <span class="setting-label">Date Format</span>
             <div class="select-wrap" style="width:160px">

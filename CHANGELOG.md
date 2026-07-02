@@ -77,7 +77,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   handwritten recipe card or a printed page directly from the
   import dialog, alongside the file picker.
 - **Swedish Translation.** Full UI in Swedish, contributed by
-  @olsson82 via PR #3. Switch in Settings → Appearance → Language.
+  @olsson82 via PR #3. Switch in Settings → Regional & Units →
+  Language. English strings fall through when a translation lags a
+  release.
+- **Language Picker.** Regional & Units gains a Language dropdown
+  populated from the registered locale list, so Swedish (and any
+  future translation) is actually reachable from the UI. The
+  translation existed in PR #3, but the picker to select it was
+  never wired.
 
 ### Changed
 
