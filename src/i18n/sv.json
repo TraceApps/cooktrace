@@ -4,45 +4,14 @@
     "pantry": "Skafferi",
     "diary": "Dagbok",
     "shopping": "Shopping",
-    "manage": "Hantera",
     "settings": "Inställningar"
   },
   "routes": {
-    "recipes": {
-      "title": "Recept",
-      "search_placeholder": "Sök recept…",
-      "new_recipe": "Nytt recept",
-      "empty_title": "Inga recept än",
-      "empty_desc": "Lägg till ditt första recept för att komma igång.",
-      "create_cta": "Skapa ett recept",
-      "no_match": "Inga recept matchar \"{q}\"."
-    },
-    "pantry": {
-      "title": "Skafferi",
-      "search_placeholder": "Sök i skafferiet…",
-      "empty_title": "Skafferiet är tomt",
-      "empty_desc": "Lägg till ingredienser här, eller spara ett recept. Varje ingrediens du använder fyller skafferiet automatiskt.",
-      "add_item": "Lägg till en vara",
-      "no_match": "Inga träffar för \"{q}\"."
-    },
-    "diary": {
-      "title": "Dagbok",
-      "empty_title": "Inget loggat än",
-      "empty_desc": "Markera recept som lagade från receptsidan, eller planera ett för ett framtida datum.",
-      "plan_cook": "Planera en lagning",
-      "no_matches_title": "Inga träffar",
-      "no_matches_desc": "Inga dagboksposter hittades för {name} i det aktuella intervallet.",
-      "this_recipe": "det här receptet",
-      "clear_filter": "Rensa filter"
-    },
-    "shopping": {
-      "title": "Shopping",
-      "empty_title": "Listan är tom",
-      "empty_desc": "Lägg till varor ovan, eller hämta saknade ingredienser från ett recept.",
-      "add_from_recipe": "Lägg till från recept",
-      "add_placeholder": "Lägg till vara…"
-    },
-    "settings": { "title": "Inställningar" }
+    "recipes": { "title": "Recept"  },
+    "pantry": { "title": "Skafferi" },
+    "diary": {  "title": "Dagbok"   },
+    "shopping": { "title": "Shopping"  },
+    "settings": { "title": "Inställningar"   }
   },
   "common": {
     "sign_out": "Logga ut",
@@ -58,7 +27,6 @@
     "edit": "Redigera",
     "done": "Klart",
     "close": "Stäng",
-    "clear": "Rensa",
     "loading": "Laddar…",
     "signed_in": "Inloggad",
     "signed_out": "Utloggad",
@@ -71,63 +39,6 @@
       "unlink_failed": "Kunde inte ta bort länken"
     }
   },
-  "pantry_sheet": {
-    "name":       "Namn",
-    "brand":      "Märke",
-    "barcode":    "Streckkod",
-    "on_hand":    "I lager",
-    "variants":   "Varianter",
-    "expires_on": "Utgår",
-    "expires_on_hint": "(valfritt, hjälper dig att fånga varor som är på väg att bli dåliga)"
-  },
-  "trace": {
-    "panel_sub":           "Din AI-assistent för matlagning och recept",
-    "welcome_name":        "Hej, jag heter {name}!",
-    "welcome_desc":        "Fråga mig om recept, skafferi, måltidsplaner eller shopping. Jag har tillgång till dina köksdata och kan hitta recept, skala dem, logga vad du lagat och berätta vad du kan laga av det du har hemma.",
-    "chip_pantry":         "Laga från mitt skafferi",
-    "chip_pantry_ask":     "Vad kan jag laga av det jag har i skafferiet?",
-    "chip_suggestion":     "Receptförslag",
-    "chip_suggestion_ask": "Föreslå ett recept för ikväll.",
-    "chip_recent":         "Nyligen lagat",
-    "chip_recent_ask":     "Vilka recept har jag lagat nyligen?",
-    "chip_shopping":       "Inköpslista",
-    "chip_shopping_ask":   "Bygg en inköpslista för veckan.",
-    "ask_placeholder":     "Fråga {name}…",
-    "listening":           "Lyssnar…"
-  },
-  "editor": {
-    "name_required":      "Namn *",
-    "description":        "Beskrivning",
-    "rating":             "Betyg",
-    "prep_min":           "Förberedelse (min)",
-    "cook_min":           "Tillagning (min)",
-    "rest_min":           "Vila (min)",
-    "total_min":          "Totalt (min)",
-    "yield":              "Utbyte",
-    "category":           "Kategori",
-    "source_url":         "Käll-URL",
-    "video_url":          "Video-URL",
-    "add_ingredient":     "Lägg till ingrediens",
-    "add_step":           "Lägg till steg",
-    "add_group":          "Lägg till grupp"
-  },
-  "recipe": {
-    "prep_time":          "Förberedelse",
-    "cook_time":          "Tillagningstid",
-    "rest_time":          "Vilotid",
-    "total_time":         "Total tid",
-    "servings":           "Portioner",
-    "serving_singular":   "Portion",
-    "ingredients":        "Ingredienser",
-    "instructions":       "Instruktioner",
-    "kitchen_gear":       "Köksutrustning",
-    "video_instructions": "Videoinstruktioner",
-    "notes":              "Anteckningar",
-    "nutrition":          "Näringsvärde",
-    "cook_history":       "Tillagningshistorik",
-    "cook_mode":          "Tillagningsläge",
-    "tags":               "Taggar"
-  },
   "settings": {
     "appearance": {
       "section": "Utseende",
@@ -139,17 +50,6 @@
       "section": "Regionala enheter",
       "language": "Språk"
     },
-    "cooking":           { "section": "Matlagning" },
-    "nutrition":         { "section": "Näring" },
-    "federation":        { "section": "NutriTrace-federation" },
-    "server_connection": { "section": "Serveranslutning" },
-    "email":             { "section": "E-post (SMTP)" },
-    "backup":            { "section": "Säkerhetskopia & data" },
-    "import":            { "section": "Importera från annan app" },
-    "kitchens":          { "section": "Kök" },
-    "diagnostics":       { "section": "Diagnostik" },
-    "about":             { "section": "Om" },
-    "support_dev":       { "section": "Stöd utvecklingen" },
     "diary": { "section": "Dagbok" },
     "water": { "section": "Vatten" },
     "foods": { "section": "Livsmedel" },

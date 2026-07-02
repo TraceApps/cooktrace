@@ -76,20 +76,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Use Camera Shortcut in File Import.** Snap a photo of a
   handwritten recipe card or a printed page directly from the
   import dialog, alongside the file picker.
-- **Swedish Translation.** Contributed by @olsson82 via PR #3, plus
-  a coverage expansion pass in-house. Switch in Settings → Regional
-  & Units → Language. Coverage now spans the app's primary surfaces:
-  bottom nav, page titles + search placeholders + empty states on
-  Recipes / Pantry / Diary / Shopping, all Settings section
-  headers, the Recipe view (meta labels, section titles, Cook Mode),
-  the Recipe editor (field labels), the Pantry item sheet (name /
-  brand / barcode / on-hand / variants / expires-on), Trace's
-  welcome screen and quick-chip prompts, plus the auth flows
-  (Login, Register, Reset Password, Accept Invite, Profile) and
-  User Management. Longer-form help copy, individual Settings
-  sub-components, and some import / manage surfaces are still
-  English and will translate progressively as more strings get
-  wrapped for i18n in future releases.
+- **Swedish Translation.** Contributed by @olsson82 via PR #3.
+  Switch in Settings → Regional & Units → Language. Coverage is
+  what @olsson82 translated at PR time: primarily the auth flows
+  (Login, Register, Reset Password, Accept Invite, Profile),
+  User Management, sidebar labels, and a couple of common UI
+  components. The rest of the app went through an i18n
+  instrumentation pass this release so a much larger set of
+  strings (bottom nav, main-route titles, empty states, Settings
+  section headers, Recipe view labels, Recipe editor fields,
+  Pantry item sheet, Trace welcome) is now extractable and
+  registered under English keys. Those newly-extracted keys
+  fall through to English for Swedish users until a Swedish
+  speaker translates them in a follow-up PR — we didn't want
+  to put in-house wording into @olsson82's file. A pull request
+  filling in the remaining sv.json entries is warmly welcome.
 - **Language Picker.** Regional & Units gains a Language dropdown
   populated from the registered locale list, so Swedish (and any
   future translation) is actually reachable from the UI. The
