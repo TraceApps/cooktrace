@@ -58,9 +58,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   smoothly on the parent card, variant cards drop in from above
   with a spring easing on expand, slide back up on collapse.
   Honors OS-level reduce-motion preferences.
+- **Import Cookbook.** A single multi-recipe PDF (a whole cookbook,
+  a printed booklet, a folder of scanned recipe pages) can now
+  import as multiple recipes in one pass. The AI parser splits the
+  file into individual recipes, previews each, you pick which to
+  save. (Issue #2 phase 3)
+- **Bulk File Import.** Pick a folder or a ZIP archive of recipe
+  files and import everything in one go. Per-file preview and
+  dedup before commit. (Issue #2 phase 2)
+- **Hybrid File Import.** PDF, RTF, TXT, and Markdown files import
+  through a heuristic parser first (fast, no AI cost); the AI
+  parser catches anything the heuristic can't structure. Both
+  paths land in the same preview + edit flow.
+- **Batch URL Import.** Paste a list of recipe URLs and import them
+  all in one pass. Scanned PDFs and image-only pages route through
+  an AI vision fallback so they parse instead of failing silently.
+- **Use Camera Shortcut in File Import.** Snap a photo of a
+  handwritten recipe card or a printed page directly from the
+  import dialog, alongside the file picker.
+- **Swedish Translation.** Full UI in Swedish, contributed by
+  @olsson82 via PR #3. Switch in Settings → Appearance → Language.
 
 ### Changed
 
+- **Animated Page Banners.** The illustrated SVG headers on
+  Recipes, Pantry, Diary, Shopping, and Settings are retired in
+  favor of four animated background styles picked in Settings →
+  Appearance: Shimmer (subtle sweep, default), Drift (slow
+  horizontal float), Pulse (color breathe), and Aurora (Northern
+  Lights sweep). All four honor the OS's reduce-motion preference.
+- **Import Menu Collapsed.** URL and File imports used to be two
+  separate top-level entries; they now sit under a single Import
+  entry that expands to show both sub-options. Same functionality,
+  cleaner surface.
+- **Password Rule Hints for Autofill.** Password inputs on the
+  wizard, register, reset, and profile screens now declare their
+  requirements via the `passwordrules` attribute, so iOS and
+  Chrome autofill generate a password that actually passes CookTrace's
+  8-plus-mixed-plus-symbol check instead of one that gets rejected.
 - **Recipe Category Colors Tightened.** Snack, Sauce, and the new
   Preserves each moved off crowded hue bands so the chip row scans
   cleanly at a glance. Snack shifted from yellow to teal (was too
@@ -128,6 +163,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   and blocked the whole database from initializing. Moved the
   index into the migration that adds the column so it runs after
   the ALTER.
+- **Trace AI Provider Fields Are Read-Only After Save.** Once an
+  AI provider config is saved in Settings → Trace, the API key
+  and Base URL fields lock so you can't accidentally overwrite
+  them by tapping through the form. Editing requires an explicit
+  Change toggle. (Issue #5)
+- **Animated Banner Sticky Pinning.** The animated header was
+  picking up an explicit `position: sticky` that broke pinning on
+  Recipes, Pantry, Diary, Shopping, and Settings. The redundant
+  declaration is dropped and the sticky wrapper handles the
+  pinning cleanly.
 - **Recipe Editor Dropdowns Are Scrollable Again.** Opening the
   Category, Tags, or Kitchen Gear picker in the recipe editor was
   capping the list at eight items, so anything past the eighth
