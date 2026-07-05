@@ -153,6 +153,7 @@ const SCHEMA = `
     checked      INTEGER NOT NULL DEFAULT 0,
     pantry_id    INTEGER,
     recipe_id    INTEGER,
+    sort_order   INTEGER,
     created_at   TEXT DEFAULT (datetime('now')),
     updated_at   TEXT DEFAULT (datetime('now')),
     deleted_at   TEXT DEFAULT NULL,
@@ -180,18 +181,19 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_recipe_cat_sync   ON recipe_categories(sync_status);
 
   CREATE TABLE IF NOT EXISTS pantry_categories (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    server_id   INTEGER,
-    user_id     INTEGER DEFAULT 1,
-    name        TEXT NOT NULL,
-    slug        TEXT NOT NULL,
-    icon        TEXT,
-    color       TEXT,
-    sort_order  INTEGER NOT NULL DEFAULT 0,
-    created_at  TEXT DEFAULT (datetime('now')),
-    updated_at  TEXT DEFAULT (datetime('now')),
-    deleted_at  TEXT DEFAULT NULL,
-    sync_status TEXT DEFAULT 'synced',
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id      INTEGER,
+    user_id        INTEGER DEFAULT 1,
+    name           TEXT NOT NULL,
+    slug           TEXT NOT NULL,
+    icon           TEXT,
+    color          TEXT,
+    sort_order     INTEGER NOT NULL DEFAULT 0,
+    default_aisle  TEXT,
+    created_at     TEXT DEFAULT (datetime('now')),
+    updated_at     TEXT DEFAULT (datetime('now')),
+    deleted_at     TEXT DEFAULT NULL,
+    sync_status    TEXT DEFAULT 'synced',
     UNIQUE(user_id, slug)
   );
   CREATE INDEX IF NOT EXISTS idx_pantry_cat_server ON pantry_categories(server_id);
@@ -354,7 +356,27 @@ export async function dbInit() {
   await _migrateAiChatUpdatedAt();
   await _migratePantryVariantColumns();
   await _migrateRecipeTotalMinutes();
+  await _migrateShoppingAisle();
   await _backfillShoppingNames();
+}
+
+// Shopping-list drag-to-reorder + pantry-category per-category
+// default aisle (#6, #8). Older local DBs are missing the columns;
+// ALTER them in place. Idempotent via PRAGMA table_info.
+async function _migrateShoppingAisle() {
+  try {
+    const db = await getDb();
+    const shopInfo = await db.query(`PRAGMA table_info(shopping_list)`);
+    const shopCols = new Set((shopInfo?.values || []).map(c => c.name));
+    if (!shopCols.has('sort_order')) {
+      await db.run(`ALTER TABLE shopping_list ADD COLUMN sort_order INTEGER`);
+    }
+    const catInfo = await db.query(`PRAGMA table_info(pantry_categories)`);
+    const catCols = new Set((catInfo?.values || []).map(c => c.name));
+    if (!catCols.has('default_aisle')) {
+      await db.run(`ALTER TABLE pantry_categories ADD COLUMN default_aisle TEXT`);
+    }
+  } catch { /* best-effort */ }
 }
 
 // Optional manual override for total time (recipes.total_minutes).

@@ -57,6 +57,22 @@ function _titleCaseName(raw) {
   }).join('');
 }
 
+// Aisle auto-lookup: linked pantry item → its category's default_aisle,
+// falling back to the category name, then null. Used by every insert path
+// (single-item POST, /from-recipe, /from-plan) so the shopping list groups
+// itself without the user having to tag each row.
+function _aisleForPantry(pantryId) {
+  if (!pantryId) return null;
+  const cat = db.prepare(
+    `SELECT c.default_aisle, c.name
+       FROM pantry_items p
+       LEFT JOIN pantry_categories c ON c.id = p.category_id
+      WHERE p.id = ?`
+  ).get(pantryId);
+  if (!cat) return null;
+  return (cat.default_aisle && cat.default_aisle.trim()) || cat.name || null;
+}
+
 // ── GET / — list shopping items ────────────────────────────────────────
 router.get('/', wrap((req, res) => {
   const u = uid(req);
@@ -67,7 +83,11 @@ router.get('/', wrap((req, res) => {
      LEFT JOIN pantry_items p ON p.id = s.pantry_id
      LEFT JOIN recipes      r ON r.id = s.recipe_id AND r.deleted_at IS NULL
      WHERE ${userClause(u).replace(/user_id/g, 's.user_id')} AND s.deleted_at IS NULL
-     ORDER BY s.checked ASC, COALESCE(s.aisle, 'zzz') ASC, s.name COLLATE NOCASE ASC`
+     ORDER BY s.checked ASC,
+              COALESCE(s.aisle, 'zzz') ASC,
+              CASE WHEN s.sort_order IS NULL THEN 1 ELSE 0 END,
+              s.sort_order ASC,
+              s.name COLLATE NOCASE ASC`
   ).all(...userArgs(u));
   res.json(rows.map(_hydrate));
 }));
@@ -79,16 +99,23 @@ router.post('/', wrap((req, res) => {
   const name = (body.name || '').toString().trim();
   if (!name) return res.status(400).json({ error: 'Name is required' });
 
+  // Auto-populate aisle when the caller didn't provide one but linked
+  // a pantry item. Explicit body.aisle always wins so callers can force
+  // a specific value; see _aisleForPantry for the fallback chain.
+  let aisle = body.aisle && String(body.aisle).trim() ? String(body.aisle).trim() : null;
+  if (aisle == null && body.pantry_id) aisle = _aisleForPantry(body.pantry_id);
+
   const result = db.prepare(
-    `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, checked, pantry_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, checked, pantry_id, recipe_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     u, _titleCaseName(name),
     body.quantity == null || body.quantity === '' ? null : Number(body.quantity),
     body.unit || null,
-    body.aisle || null,
+    aisle,
     body.checked ? 1 : 0,
     body.pantry_id || null,
+    body.recipe_id || null,
   );
   const row = db.prepare(`SELECT * FROM shopping_list WHERE id = ?`).get(result.lastInsertRowid);
   res.status(201).json(_hydrate(row));
@@ -107,16 +134,17 @@ router.put('/:id', wrap((req, res) => {
   const body = req.body || {};
   db.prepare(
     `UPDATE shopping_list SET
-       name = ?, quantity = ?, unit = ?, aisle = ?, checked = ?, pantry_id = ?,
+       name = ?, quantity = ?, unit = ?, aisle = ?, checked = ?, pantry_id = ?, sort_order = ?,
        updated_at = datetime('now')
      WHERE id = ?`
   ).run(
     body.name != null ? String(body.name).trim() || existing.name : existing.name,
     body.quantity !== undefined ? (body.quantity === '' || body.quantity == null ? null : Number(body.quantity)) : existing.quantity,
     body.unit !== undefined ? (body.unit || null) : existing.unit,
-    body.aisle !== undefined ? (body.aisle || null) : existing.aisle,
+    body.aisle !== undefined ? (body.aisle && String(body.aisle).trim() ? String(body.aisle).trim() : null) : existing.aisle,
     body.checked !== undefined ? (body.checked ? 1 : 0) : existing.checked,
     body.pantry_id !== undefined ? (body.pantry_id || null) : existing.pantry_id,
+    body.sort_order !== undefined ? (body.sort_order == null ? null : Number(body.sort_order)) : existing.sort_order,
     id,
   );
   const row = db.prepare(`SELECT * FROM shopping_list WHERE id = ?`).get(id);
@@ -149,6 +177,42 @@ router.delete('/by-recipe/:id', wrap((req, res) => {
       WHERE ${userClause(u)} AND deleted_at IS NULL AND recipe_id = ?`
   ).run(...userArgs(u), recipeId);
   res.json({ removed: result.changes });
+}));
+
+// ── POST /reorder — bulk drag-drop apply ──────────────────────────────
+// Client posts { items: [{id, aisle?, sort_order}, ...] } after a drag
+// gesture. One transaction so a partial failure doesn't leave the list
+// half-reordered. sort_order is the required primary field; aisle is
+// optional so callers can also cross-group drag (drop into a different
+// aisle) without a second round-trip.
+router.post('/reorder', wrap((req, res) => {
+  const u = uid(req);
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+  if (!items.length) return res.json({ updated: 0 });
+  const txn = db.transaction(() => {
+    let n = 0;
+    for (const it of items) {
+      const id = parseInt(it.id, 10);
+      if (!Number.isFinite(id)) continue;
+      const existing = db.prepare(
+        `SELECT * FROM shopping_list WHERE id = ? AND ${userClause(u)} AND deleted_at IS NULL`
+      ).get(id, ...userArgs(u));
+      if (!existing) continue;
+      const nextSort = it.sort_order == null ? null : Number(it.sort_order);
+      const nextAisle = it.aisle !== undefined
+        ? (it.aisle && String(it.aisle).trim() ? String(it.aisle).trim() : null)
+        : existing.aisle;
+      db.prepare(
+        `UPDATE shopping_list
+            SET sort_order = ?, aisle = ?, updated_at = datetime('now')
+          WHERE id = ?`
+      ).run(nextSort, nextAisle, id);
+      n++;
+    }
+    return n;
+  });
+  const updated = txn();
+  res.json({ updated });
 }));
 
 // ── DELETE /:id — soft delete ──────────────────────────────────────────
@@ -270,13 +334,14 @@ router.post('/from-plan', wrap((req, res) => {
   }
 
   const insert = db.prepare(
-    `INSERT INTO shopping_list (user_id, name, quantity, unit, pantry_id, recipe_id, checked)
-     VALUES (?, ?, ?, ?, ?, ?, 0)`
+    `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, pantry_id, recipe_id, checked)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0)`
   );
   let added = 0;
   const tx = db.transaction(() => {
     for (const row of merged.values()) {
-      insert.run(u, _titleCaseName(row.name), row.qty, row.unit, row.pantry_id, row.recipe_id);
+      const aisle = _aisleForPantry(row.pantry_id);
+      insert.run(u, _titleCaseName(row.name), row.qty, row.unit, aisle, row.pantry_id, row.recipe_id);
       added++;
     }
   });
@@ -310,14 +375,15 @@ router.post('/from-recipe/:id', wrap((req, res) => {
   // Stamp recipe_id on every row so the client can render a small
   // recipe chip next to it and offer "remove all from this recipe".
   const insert = db.prepare(
-    `INSERT INTO shopping_list (user_id, name, quantity, unit, pantry_id, recipe_id, checked)
-     VALUES (?, ?, ?, ?, ?, ?, 0)`
+    `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, pantry_id, recipe_id, checked)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0)`
   );
   const tx = db.transaction(() => {
     for (const it of flat) {
       if (!it.name) continue;
       if (onlyMissing && it.pantry_item_id && stockSet.has(it.pantry_item_id)) continue;
-      insert.run(u, _titleCaseName(it.name), it.qty || null, it.unit || null, it.pantry_item_id || null, recipeId);
+      const aisle = _aisleForPantry(it.pantry_item_id);
+      insert.run(u, _titleCaseName(it.name), it.qty || null, it.unit || null, aisle, it.pantry_item_id || null, recipeId);
       added++;
     }
   });

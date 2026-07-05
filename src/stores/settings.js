@@ -37,6 +37,11 @@ export const USER_PREFS = new Set([
   'urlImportEngine','urlImportFallback',
   // Pantry view mode — 'grid' (default photo cards) | 'list' (compact rows)
   'pantryView',
+  // Shopping list grouping — 'aisle' (default) | 'recipe' | 'flat'
+  'shoppingGroupBy',
+  // What happens to items after check — 'bottom' (default, sink to end
+  // of group) | 'hide' (soft-remove until Show Checked toggled)
+  'shoppingCheckedBehavior',
   // When true (default false), saving a recipe whose ingredients aren't
   // already linked to a pantry row will auto-create a pantry row by
   // ingredient name. Off by default — typing "flour" shouldn't silently
@@ -341,6 +346,8 @@ export const recipesSort = createSettingStore('recipesSort', 'fav-alpha');
 // row-per-item layout for users with very large catalogs who want to
 // scan more density per screen.
 export const pantryView = createSettingStore('pantryView', 'grid');
+export const shoppingGroupBy         = createSettingStore('shoppingGroupBy',         'aisle');
+export const shoppingCheckedBehavior = createSettingStore('shoppingCheckedBehavior', 'bottom');
 
 // Auto-create pantry rows when saving a recipe whose ingredients
 // aren't already linked. Off by default — typing "flour" in a recipe

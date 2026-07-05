@@ -17,15 +17,33 @@ export function longpress(node, opts = {}) {
   let startX = 0, startY = 0;
   let cancelled = false;
 
+  let activePointer = null;
+
   function fire(x, y) {
     cancelled = true;
     node.dispatchEvent(new CustomEvent('longpress', { detail: { x, y, target: node } }));
+    // Cancel the in-flight pointer stream so any drag-tracking lib
+    // (svelte-dnd-action, scroll containers, etc.) releases the
+    // touch. Without this, the finger stays "held" from Android's
+    // POV after the menu opens and continued finger drift feeds
+    // pointer-moves into a still-listening reorder gesture.
+    if (activePointer) {
+      try {
+        node.dispatchEvent(new PointerEvent('pointercancel', {
+          pointerId:   activePointer.pointerId,
+          pointerType: activePointer.pointerType,
+          bubbles:     true,
+          cancelable:  true,
+        }));
+      } catch { /* PointerEvent unsupported */ }
+    }
   }
   function clear() { if (timer) { clearTimeout(timer); timer = null; } }
 
   function onPointerDown(e) {
     cancelled = false;
     startX = e.clientX; startY = e.clientY;
+    activePointer = { pointerId: e.pointerId, pointerType: e.pointerType };
     timer = setTimeout(() => fire(e.clientX, e.clientY), duration);
   }
   function onPointerMove(e) {

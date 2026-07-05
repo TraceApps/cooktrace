@@ -9,6 +9,112 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.3] - 2026-07-05
+
+### Added
+
+- **Shopping List Aisle Grouping.** The list can now group by aisle
+  in addition to by recipe or flat. Every pantry category picks up
+  an optional Default Aisle label (Produce, Dairy, Bakery, whatever
+  your store calls it); anything added to the shopping list from a
+  linked pantry row inherits that aisle automatically. A chip row
+  at the top of the list toggles between By Aisle, By Recipe, and
+  Flat. The choice sticks per user across devices.
+- **Change Aisle Per Item.** Long-press a shopping row and pick a
+  known aisle from a chip list or type a fresh label. Custom aisles
+  work as their own groups without any pantry-category setup, write
+  "Freezer" once and it becomes a group.
+- **Drag to Reorder Shopping Items.** Grab a row's handle to
+  reorder within a group. Cross-group drops in By Aisle mode
+  reassign the moved item's aisle to match where you dropped it,
+  so shuffling the list is the same gesture as reclassifying an
+  item.
+- **Hide Checked Items Toggle.** New Shopping List section under
+  Settings → Cooking. Choose Sink to Bottom (default; items stay
+  visible so you can uncheck by mistake) or Hide (items disappear
+  from view with a one-tap "Show N Checked" toggle in the status
+  bar).
+- **AI Scan Label for Pantry Nutrition.** Take a photo of a
+  nutrition label from the pantry item editor and Trace extracts
+  name, brand, serving size, and every nutrient it can read.
+  Complementary to the existing barcode scanner: barcode looks up
+  Open Food Facts for name-brand products, label scan handles
+  store-brand jars, homemade batches, and imports OFF doesn't
+  cover. Requires an AI provider configured in Settings.
+- **Per-Row Edit on Shopping Rows.** Long-press any row for Edit,
+  Change Aisle, or Delete. Edit opens a modal for name, quantity,
+  and unit so refining items after add is a two-tap loop.
+
+### Changed
+
+- **Simplified Shopping Quick-Add.** The primary add row is now
+  name plus optional qty plus a labeled Add pill, matching Google
+  Keep, Bring!, AnyList, and OurGroceries. Unit moved to the
+  per-row Edit modal so a "milk, eggs, bread" sweep is
+  name-tap-Add-repeat, not three fields per item. The Add pill
+  carries a real text label so it's visible in portrait at every
+  phone size.
+- **Consolidated Bulk-Add into a + Menu.** The header shrinks to
+  two buttons: Share and a single + button. Tapping + opens an
+  action sheet with Add from Recipe and Add from Planned Cooks,
+  each with a proper label instead of a bare icon.
+- **"Add from Meal Plan" Renamed to "Add from Planned Cooks".**
+  Matches the Diary's language everywhere else (Plan a Cook,
+  Planned tag).
+- **Recipe Editor Ingredient Rows on Mobile.** The three per-row
+  action buttons (link to pantry, section divider, delete) collapse
+  behind a single kebab menu on small screens so the ingredient
+  name field has room to read. Adding a note is one tap in the
+  kebab; the note appears on a second inline row. Small indicator
+  icons on the row signal what's stashed behind the menu. Desktop
+  layout is unchanged.
+- **Multi-Select on Pantry and Recipes.** Enter selection mode from
+  the long-press menu on any item. The header title flips to "N
+  Selected" and the top-right buttons become trash + cancel on
+  Pantry, or trash + add-to-cookbook + cancel on Recipes. Matches
+  NutriTrace's pattern. Replaces the old floating action pill.
+- **Recipe Editor Landscape on Phone.** Ingredients and Steps stay
+  stacked when a phone rotates to landscape. The two-column view
+  only kicks in on tablet-landscape widths and up, so the fields
+  no longer get crushed on the pivot.
+
+### Fixed
+
+- Cook Mode reliably keeps the screen awake on Android. The Web
+  Wake Lock path silently stopped working on some Android WebView
+  versions; the Android app now uses the native `KeepAwake`
+  plugin. PWA continues to use the Web Wake Lock API.
+- Cook photos taken during a diary log render immediately on the
+  Diary Photos tab. Older photos still render via a backstop
+  conversion.
+- Bulk-add from a recipe or planned cook populates each row's
+  aisle from the linked pantry item's category, so items land
+  pre-grouped instead of piling into Uncategorized.
+- Long-pressing a Shopping row no longer lets you drag it while
+  the action menu is open. The finger-hold that opened the menu
+  was still feeding pointer moves into the reorder tracker.
+- Cancel out of Pantry multi-select no longer leaves an invisible
+  layer blocking taps until reload.
+- The Shopping quick-add box no longer freezes the app on mobile
+  when the pantry has hundreds of items. The suggestion list is
+  now capped so Android WebView doesn't try to render every pantry
+  row at once.
+
+### Security
+
+- **Dependency Security Updates.** Bumped `multer` 1.4.5-lts.1 →
+  2.2.0 (patches three high-severity DoS CVEs on the LTS line),
+  `nodemailer` 8.0.7 → 9.0.3 (patches five CVEs including a TLS
+  OAuth certificate-validation bypass and CRLF header injection),
+  and `vite` 7.3.3 → 7.3.6 (dev-only, patches a `server.fs.deny`
+  bypass on Windows). Package overrides pull `esbuild` forward to
+  ^0.25.0 to clear a dev-server CORS advisory nested under
+  svelte-i18n. Clears every actionable Dependabot alert. No
+  user-facing changes; self-hosters running Docker just need to
+  pull the new image.
+
+---
+
 ## [1.0.0-rc.2] - 2026-07-02
 
 ### Added

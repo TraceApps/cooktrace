@@ -18,9 +18,11 @@
   let editingId = null;
   let editName = '';
   let editIcon = '';
+  let editDefaultAisle = '';
 
   let newName = '';
   let newIcon = 'kitchen';
+  let newDefaultAisle = '';
   let creating = false;
 
   async function load() {
@@ -31,14 +33,23 @@
   }
   onMount(load);
 
-  function startEdit(c) { editingId = c.id; editName = c.name; editIcon = c.icon || ''; }
-  function cancelEdit()  { editingId = null; editName = ''; editIcon = ''; }
+  function startEdit(c) {
+    editingId = c.id;
+    editName = c.name;
+    editIcon = c.icon || '';
+    editDefaultAisle = c.default_aisle || '';
+  }
+  function cancelEdit()  { editingId = null; editName = ''; editIcon = ''; editDefaultAisle = ''; }
 
   async function saveEdit(c) {
     const name = editName.trim();
     if (!name) return;
     try {
-      const updated = await NtApi.updatePantryCategory(c.id, { name, icon: editIcon || null });
+      const updated = await NtApi.updatePantryCategory(c.id, {
+        name,
+        icon: editIcon || null,
+        default_aisle: editDefaultAisle.trim() || null,
+      });
       categories = categories.map(x => x.id === c.id ? updated : x);
       cancelEdit();
       showSuccess('Saved');
@@ -103,10 +114,15 @@
     if (!name) return;
     creating = true;
     try {
-      const c = await NtApi.createPantryCategory({ name, icon: newIcon || null });
+      const c = await NtApi.createPantryCategory({
+        name,
+        icon: newIcon || null,
+        default_aisle: newDefaultAisle.trim() || null,
+      });
       categories = [...categories, c];
       newName = '';
       newIcon = 'kitchen';
+      newDefaultAisle = '';
       showSuccess('Category added');
     } catch (e) { showError(e.message || 'Could not add'); }
     finally { creating = false; }
@@ -116,7 +132,7 @@
 <div class="mgr">
   <header class="mgr-head">
     <h2>Pantry Categories</h2>
-    <p class="mgr-desc">Used to group your pantry items into sections (Spices, Produce, etc.) and to filter the Pantry list.</p>
+    <p class="mgr-desc">Used to group your pantry items into sections (Spices, Produce, etc.) and to filter the Pantry list. The optional Default Aisle labels items added to the shopping list from this category — leave blank to use the category name.</p>
   </header>
 
   {#if loading}
@@ -144,6 +160,7 @@
             <div class="edit-form">
               <input class="input name-input" bind:value={editName} placeholder="Name" />
               <IconPicker bind:value={editIcon} placeholder="Icon" />
+              <input class="input aisle-input" bind:value={editDefaultAisle} placeholder="Default Aisle (optional)" maxlength="40" />
               <div class="row-actions">
                 <button class="btn btn-secondary tiny" on:click={cancelEdit}>Cancel</button>
                 <button class="btn btn-primary tiny" on:click={() => saveEdit(c)} disabled={!editName.trim()}>Save</button>
@@ -152,6 +169,11 @@
           {:else}
             <span class="material-symbols-rounded row-icon">{c.icon || 'kitchen'}</span>
             <span class="row-name">{c.name}</span>
+            {#if c.default_aisle}
+              <span class="aisle-pill" title="Default shopping list aisle">
+                <span class="material-symbols-rounded">category</span>{c.default_aisle}
+              </span>
+            {/if}
             {#if Number.isFinite(c.pantry_count)}
               <span class="usage-pill" class:zero={c.pantry_count === 0}
                 title={c.pantry_count === 0 ? 'No pantry items use this category' : `${c.pantry_count} pantry item${c.pantry_count === 1 ? '' : 's'}`}>
@@ -177,6 +199,7 @@
     <input class="input name-input" placeholder="New category name…" bind:value={newName}
       on:keydown={(e) => { if (e.key === 'Enter') create(); }} />
     <IconPicker bind:value={newIcon} placeholder="Icon" />
+    <input class="input aisle-input" bind:value={newDefaultAisle} placeholder="Default Aisle (optional)" maxlength="40" />
     <button class="btn btn-primary" on:click={create} disabled={creating || !newName.trim()}>
       {creating ? 'Adding…' : 'Add'}
     </button>
@@ -252,6 +275,16 @@
     flex: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   }
   .name-input { flex: 1; min-width: 160px; }
+  .aisle-input { flex: 1; min-width: 140px; max-width: 220px; font-size: 13px; }
+  .aisle-pill {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--radius-full, 99px);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent);
+  }
+  .aisle-pill .material-symbols-rounded { font-size: 12px; }
 
   .add-row {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;

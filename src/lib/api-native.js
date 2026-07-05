@@ -152,6 +152,22 @@ function _shoppingFromRow(row) {
   return out;
 }
 
+// Aisle auto-lookup mirror of server/routes/shopping.js's helper: linked
+// pantry item → its category default_aisle → the category name → null.
+async function _aisleForPantry(pantryId) {
+  if (!pantryId) return null;
+  const rows = await _query(
+    `SELECT c.default_aisle, c.name
+       FROM pantry_items p
+       LEFT JOIN pantry_categories c ON c.id = p.category_id
+      WHERE p.id = ?`,
+    [pantryId]
+  );
+  const cat = rows[0];
+  if (!cat) return null;
+  return (cat.default_aisle && String(cat.default_aisle).trim()) || cat.name || null;
+}
+
 function _cookbookFromRow(row) {
   if (!row) return null;
   const out = { ...row };
@@ -907,7 +923,11 @@ export const CtApiNative = {
     LEFT JOIN pantry_items p ON p.id = s.pantry_id
     LEFT JOIN recipes      r ON r.id = s.recipe_id AND r.deleted_at IS NULL
         WHERE s.user_id = ? AND s.deleted_at IS NULL
-        ORDER BY s.checked ASC, COALESCE(s.aisle, 'zzz') ASC, s.name COLLATE NOCASE ASC`,
+        ORDER BY s.checked ASC,
+                 COALESCE(s.aisle, 'zzz') ASC,
+                 CASE WHEN s.sort_order IS NULL THEN 1 ELSE 0 END,
+                 s.sort_order ASC,
+                 s.name COLLATE NOCASE ASC`,
       [LOCAL_USER_ID]
     );
     return rows.map(_shoppingFromRow);
@@ -915,13 +935,15 @@ export const CtApiNative = {
 
   async addShoppingItem(data) {
     const d = data || {};
+    let aisle = d.aisle && String(d.aisle).trim() ? String(d.aisle).trim() : null;
+    if (aisle == null && d.pantry_id) aisle = await _aisleForPantry(d.pantry_id);
     const id = await _runInsert(
       `INSERT INTO shopping_list
          (user_id, name, quantity, unit, aisle, checked, pantry_id, recipe_id, sync_status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
       [
         LOCAL_USER_ID, _titleCaseName(d.name), d.quantity ?? null, d.unit || null,
-        d.aisle || null, _bool(d.checked), d.pantry_id ?? null, d.recipe_id ?? null,
+        aisle, _bool(d.checked), d.pantry_id ?? null, d.recipe_id ?? null,
       ]
     );
     const rows = await _query(`SELECT * FROM shopping_list WHERE id = ?`, [id]);
@@ -929,17 +951,56 @@ export const CtApiNative = {
   },
 
   async updateShoppingItem(id, d) {
-    const fields = [
-      'name = ?', 'quantity = ?', 'unit = ?', 'aisle = ?',
-      'checked = ?', 'pantry_id = ?',
-      `updated_at = datetime('now')`, `sync_status = 'pending'`,
-    ];
-    const params = [
-      d.name, d.quantity ?? null, d.unit || null, d.aisle || null,
-      _bool(d.checked), d.pantry_id ?? null, id,
-    ];
-    await _run(`UPDATE shopping_list SET ${fields.join(', ')} WHERE id = ?`, params);
+    const existing = (await _query(`SELECT * FROM shopping_list WHERE id = ?`, [id]))[0];
+    if (!existing) return { ok: false };
+    const nextAisle = d.aisle !== undefined
+      ? (d.aisle && String(d.aisle).trim() ? String(d.aisle).trim() : null)
+      : existing.aisle;
+    const nextSort = d.sort_order !== undefined
+      ? (d.sort_order == null ? null : Number(d.sort_order))
+      : existing.sort_order;
+    await _run(
+      `UPDATE shopping_list SET
+         name = ?, quantity = ?, unit = ?, aisle = ?,
+         checked = ?, pantry_id = ?, sort_order = ?,
+         updated_at = datetime('now'), sync_status = 'pending'
+       WHERE id = ?`,
+      [
+        d.name ?? existing.name,
+        d.quantity !== undefined ? (d.quantity ?? null) : existing.quantity,
+        d.unit !== undefined ? (d.unit || null) : existing.unit,
+        nextAisle,
+        d.checked !== undefined ? _bool(d.checked) : existing.checked,
+        d.pantry_id !== undefined ? (d.pantry_id ?? null) : existing.pantry_id,
+        nextSort,
+        id,
+      ]
+    );
     return { ok: true };
+  },
+
+  async reorderShopping(items) {
+    if (!Array.isArray(items) || !items.length) return { updated: 0 };
+    let n = 0;
+    for (const it of items) {
+      const id = parseInt(it?.id, 10);
+      if (!Number.isFinite(id)) continue;
+      const existing = (await _query(`SELECT * FROM shopping_list WHERE id = ?`, [id]))[0];
+      if (!existing) continue;
+      const nextSort = it.sort_order == null ? null : Number(it.sort_order);
+      const nextAisle = it.aisle !== undefined
+        ? (it.aisle && String(it.aisle).trim() ? String(it.aisle).trim() : null)
+        : existing.aisle;
+      await _run(
+        `UPDATE shopping_list
+            SET sort_order = ?, aisle = ?,
+                updated_at = datetime('now'), sync_status = 'pending'
+          WHERE id = ?`,
+        [nextSort, nextAisle, id]
+      );
+      n++;
+    }
+    return { updated: n };
   },
 
   async toggleShoppingChecked(id, checked) {
@@ -997,10 +1058,11 @@ export const CtApiNative = {
     for (const it of flat) {
       if (!it?.name) continue;
       if (onlyMissing && it.pantry_item_id && stockIds.has(it.pantry_item_id)) continue;
+      const aisle = await _aisleForPantry(it.pantry_item_id);
       await _runInsert(
-        `INSERT INTO shopping_list (user_id, name, quantity, unit, pantry_id, recipe_id, checked, sync_status)
-         VALUES (?, ?, ?, ?, ?, ?, 0, 'pending')`,
-        [LOCAL_USER_ID, _titleCaseName(it.name), it.qty || null, it.unit || null, it.pantry_item_id || null, recipeId]
+        `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, pantry_id, recipe_id, checked, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'pending')`,
+        [LOCAL_USER_ID, _titleCaseName(it.name), it.qty || null, it.unit || null, aisle, it.pantry_item_id || null, recipeId]
       );
       added++;
     }
@@ -1058,10 +1120,11 @@ export const CtApiNative = {
 
     let added = 0;
     for (const row of merged.values()) {
+      const aisle = await _aisleForPantry(row.pantry_id);
       await _runInsert(
-        `INSERT INTO shopping_list (user_id, name, quantity, unit, pantry_id, recipe_id, checked, sync_status)
-         VALUES (?, ?, ?, ?, ?, ?, 0, 'pending')`,
-        [LOCAL_USER_ID, _titleCaseName(row.name), row.qty, row.unit, row.pantry_id, row.recipe_id]
+        `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, pantry_id, recipe_id, checked, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'pending')`,
+        [LOCAL_USER_ID, _titleCaseName(row.name), row.qty, row.unit, aisle, row.pantry_id, row.recipe_id]
       );
       added++;
     }
@@ -1136,18 +1199,30 @@ export const CtApiNative = {
     while ((await _query(`SELECT 1 FROM pantry_categories WHERE user_id = ? AND slug = ?`, [LOCAL_USER_ID, slug])).length) {
       slug = `${_slug(d.name)}-${n++}`;
     }
+    const defaultAisle = d.default_aisle && String(d.default_aisle).trim()
+      ? String(d.default_aisle).trim().slice(0, 40) : null;
     const id = await _runInsert(
-      `INSERT INTO pantry_categories (user_id, name, slug, icon, color, sort_order, sync_status)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
-      [LOCAL_USER_ID, d.name, slug, d.icon || null, d.color || null, max + 1]
+      `INSERT INTO pantry_categories (user_id, name, slug, icon, color, sort_order, default_aisle, sync_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+      [LOCAL_USER_ID, d.name, slug, d.icon || null, d.color || null, max + 1, defaultAisle]
     );
     return (await _query(`SELECT * FROM pantry_categories WHERE id = ?`, [id]))[0];
   },
   async updatePantryCategory(id, d) {
-    await _run(
-      `UPDATE pantry_categories SET name = ?, icon = ?, color = ?, updated_at = datetime('now'), sync_status = 'pending' WHERE id = ?`,
-      [d.name, d.icon || null, d.color || null, id]
-    );
+    const defaultAisle = d.default_aisle !== undefined
+      ? (d.default_aisle && String(d.default_aisle).trim() ? String(d.default_aisle).trim().slice(0, 40) : null)
+      : undefined;
+    if (defaultAisle === undefined) {
+      await _run(
+        `UPDATE pantry_categories SET name = ?, icon = ?, color = ?, updated_at = datetime('now'), sync_status = 'pending' WHERE id = ?`,
+        [d.name, d.icon || null, d.color || null, id]
+      );
+    } else {
+      await _run(
+        `UPDATE pantry_categories SET name = ?, icon = ?, color = ?, default_aisle = ?, updated_at = datetime('now'), sync_status = 'pending' WHERE id = ?`,
+        [d.name, d.icon || null, d.color || null, defaultAisle, id]
+      );
+    }
     return (await _query(`SELECT * FROM pantry_categories WHERE id = ?`, [id]))[0];
   },
   async deletePantryCategory(id) {
@@ -1438,7 +1513,18 @@ export const CtApiNative = {
       path: `uploads/${fileName}`,
       directory: Directory.Data,
     });
-    return uri; // file:// URI consumed by <img src> via resolveAssetUrl passthrough
+    // Store the WebView-safe URL rather than the raw file:// URI. Android
+    // WebView blocks file:// even after resolveAssetUrl's convertFileSrc
+    // pass under some scheme configurations (previously-uploaded photos
+    // stayed rendered because their URIs came from image-cache's
+    // already-converted mapping; freshly uploaded ones hit an unconverted
+    // path and 404'd). Converting at upload time means the stored value is
+    // https://localhost/_capacitor_file_/... and every render site works
+    // without depending on the runtime pass.
+    const { Capacitor: CapCore } = await import('@capacitor/core');
+    return (CapCore && typeof CapCore.convertFileSrc === 'function')
+      ? CapCore.convertFileSrc(uri)
+      : uri;
   },
 };
 

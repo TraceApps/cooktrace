@@ -14,6 +14,7 @@
   import RichTextEditor from '../components/ui/RichTextEditor.svelte';
   import MarkdownToolbar from '../components/ui/MarkdownToolbar.svelte';
   import Combobox from '../components/ui/Combobox.svelte';
+  import ActionSheet from '../components/ui/ActionSheet.svelte';
   import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS } from '../lib/nutriments.js';
   import { visibleNutriments } from '../stores/settings.js';
   import { computeRecipeNutrition } from '../lib/recipe-nutrition.js';
@@ -686,6 +687,64 @@
   }
   function addStep() { steps = [...steps, { title: '', text: '' }]; }
 
+  // ── Ingredient row kebab menu (mobile) ─────────────────────────────
+  // Under 600px the three per-row action buttons (link-to-pantry,
+  // start-section, delete) crush the name field. Collapse them behind
+  // a single kebab on mobile; the actions surface via an ActionSheet.
+  // Note editing lives here too — the second-line note input reveals
+  // when the ingredient has a note OR the user just tapped Add Note.
+  // Desktop keeps the visible-buttons layout via a CSS media query.
+  let ingActionOpen = false;
+  let ingActionGi = -1, ingActionIi = -1;
+  // Keys are "gi:ii" strings. Auto-populated on mount so any ingredient
+  // arriving with an existing note lands with its note row already open.
+  let notesExpanded = new Set();
+  function _ingKey(gi, ii) { return `${gi}:${ii}`; }
+  function _isNoteOpen(gi, ii, ing) {
+    return !!(ing.note && ing.note.trim()) || notesExpanded.has(_ingKey(gi, ii));
+  }
+  function openIngredientMenu(gi, ii) {
+    ingActionGi = gi; ingActionIi = ii;
+    ingActionOpen = true;
+  }
+  $: ingActionTarget = (ingActionGi >= 0 && ingActionIi >= 0)
+    ? (ingredientGroups[ingActionGi]?.items?.[ingActionIi] ?? null)
+    : null;
+  $: ingActions = ingActionTarget ? [
+    {
+      label: (ingActionTarget.note && ingActionTarget.note.trim()) ? 'Edit Note' : 'Add Note',
+      icon: 'edit_note',
+      value: 'note',
+    },
+    {
+      label: ingActionTarget.pantry_item_id ? 'Unlink Pantry' : 'Link to Pantry',
+      icon: 'kitchen',
+      value: 'pantry',
+    },
+    { label: 'Start Section Here', icon: 'subdirectory_arrow_right', value: 'section' },
+    { label: 'Delete',              icon: 'delete',                   value: 'delete', danger: true },
+  ] : [];
+  function onIngredientAction(e) {
+    const v = e.detail?.value;
+    const gi = ingActionGi, ii = ingActionIi;
+    ingActionGi = -1; ingActionIi = -1;
+    if (gi < 0 || ii < 0) return;
+    const ing = ingredientGroups[gi]?.items?.[ii];
+    if (!ing) return;
+    if (v === 'note') {
+      const next = new Set(notesExpanded);
+      next.add(_ingKey(gi, ii));
+      notesExpanded = next;
+    } else if (v === 'pantry') {
+      if (ing.pantry_item_id) unlinkRowAt(gi, ii);
+      else openPantrySwap(gi, ii);
+    } else if (v === 'section') {
+      toggleSectionAt(gi, ii);
+    } else if (v === 'delete') {
+      removeIngredient(gi, ii);
+    }
+  }
+
   // Step-photo modal — replaces the bulky inline ImagePicker per row
   // with a compact "Add Photo" icon button that pops open the same
   // three-source picker (Camera / Upload / URL) in a dialog on demand.
@@ -942,10 +1001,29 @@
                       on:blur={() => ing.qty = _normaliseQtyForUnit(ing.qty, ing.unit)} />
                     <UnitPicker bind:value={ing.unit} placeholder="unit"
                       on:change={() => ing.qty = _normaliseQtyForUnit(ing.qty, ing.unit)} />
-                    <input class="input ing-name" type="text" bind:value={ing.name} placeholder="flour"
-                      list="pantry-names" autocomplete="off" />
+                    <div class="ing-name-wrap">
+                      <input class="input ing-name" type="text" bind:value={ing.name} placeholder="flour"
+                        list="pantry-names" autocomplete="off" />
+                      <!-- Mobile state indicators: signal linked-pantry
+                           and has-note state on the primary row so the
+                           user sees what's stashed behind the kebab
+                           without opening it. Non-interactive; the
+                           kebab is the tap target. -->
+                      <span class="ing-indicators">
+                        {#if ing.pantry_item_id}
+                          <span class="ing-ind linked" title={pantryNamesById.get(ing.pantry_item_id) ? `Linked to ${pantryNamesById.get(ing.pantry_item_id)}` : 'Linked to Pantry'}>
+                            <span class="material-symbols-rounded">kitchen</span>
+                          </span>
+                        {/if}
+                        {#if ing.note && ing.note.trim()}
+                          <span class="ing-ind note" title="Has a note">
+                            <span class="material-symbols-rounded">edit_note</span>
+                          </span>
+                        {/if}
+                      </span>
+                    </div>
                     <input class="input ing-note" type="text" bind:value={ing.note} placeholder="sifted" />
-                    <button class="btn-icon small pantry-swap-btn"
+                    <button class="btn-icon small pantry-swap-btn desktop-only-btn"
                       class:linked={!!ing.pantry_item_id}
                       on:click={() => ing.pantry_item_id ? unlinkRowAt(gi, ii) : openPantrySwap(gi, ii)}
                       aria-label={ing.pantry_item_id
@@ -958,14 +1036,33 @@
                         : 'Link to a Pantry item'}>
                       <span class="material-symbols-rounded">kitchen</span>
                     </button>
-                    <button class="btn-icon small" on:click={() => toggleSectionAt(gi, ii)}
+                    <button class="btn-icon small desktop-only-btn" on:click={() => toggleSectionAt(gi, ii)}
                       aria-label="Start a section here" title="Start a new section at this row">
                       <span class="material-symbols-rounded">subdirectory_arrow_right</span>
                     </button>
-                    <button class="btn-icon small" on:click={() => removeIngredient(gi, ii)} aria-label="Remove" title="Remove">
+                    <button class="btn-icon small desktop-only-btn" on:click={() => removeIngredient(gi, ii)} aria-label="Remove" title="Remove">
                       <span class="material-symbols-rounded">delete</span>
                     </button>
+                    <!-- Kebab lives on mobile only. Rolls up the three
+                         actions above + note editing into one tap. -->
+                    <button class="btn-icon small ing-kebab" on:click={() => openIngredientMenu(gi, ii)}
+                      aria-label="Ingredient actions" title="Actions">
+                      <span class="material-symbols-rounded">more_vert</span>
+                    </button>
                   </div>
+                  <!-- Mobile-only expanded note row. Renders whenever
+                       the ingredient already has a note OR the user
+                       just tapped Add Note from the kebab menu. Never
+                       shown on desktop — the note has its own column
+                       in the primary grid there. -->
+                  {#if _isNoteOpen(gi, ii, ing)}
+                    <div class="ing-note-row">
+                      <input class="input ing-note-mobile" type="text"
+                        bind:value={ing.note}
+                        placeholder="Note (e.g. sifted, room-temp)"
+                        autofocus={notesExpanded.has(_ingKey(gi, ii)) && !(ing.note && ing.note.trim())} />
+                    </div>
+                  {/if}
                 {/each}
 
               </div>
@@ -1306,6 +1403,16 @@
   </div>
 {/if}
 
+<!-- Ingredient kebab-menu action sheet (mobile). Rolls up the three
+     per-row action buttons + "Add Note" so the primary row can give
+     the name field the space it needs to be readable. -->
+<ActionSheet
+  bind:open={ingActionOpen}
+  title={ingActionTarget?.name || 'Ingredient'}
+  actions={ingActions}
+  on:select={onIngredientAction}
+/>
+
 <style>
   /* editor-page + editor-header inherit from base.css */
   .editor-save { height: 36px; padding: 0 16px; font-size: 13px; }
@@ -1392,12 +1499,18 @@
     flex-direction: column;
     gap: 16px;
   }
-  @media (min-width: 960px) {
+  /* Phone landscape (Pixel 6 Pro ≈ 892px, foldables 900-1100px) used
+     to trip the old 960px breakpoint and jam both columns into cramped
+     space. Held until 1200px so any phone stays single-column stacked;
+     tablets in landscape and real desktops still get the two-column
+     Ingredients-left / Steps-right view. Below 1200px each panel gets
+     the whole viewport width, so the ingredient row's own 8-column
+     desktop grid (~276px chrome + name + note) has plenty of room to
+     breathe even between the 900px kebab-off and the 1200px 2-col
+     thresholds. */
+  @media (min-width: 1200px) {
     .editor-grid {
       display: grid;
-      /* Ingredients gets the wider column because each row carries
-         8 sub-controls (drag, qty, unit, name, note, link, section,
-         delete) — narrower would truncate the name + note inputs. */
       grid-template-columns: minmax(420px, 1.1fr) minmax(0, 1fr);
       gap: 28px;
       align-items: flex-start;
@@ -1405,9 +1518,9 @@
     .editor-col-ing,
     .editor-col-steps { margin-top: 0; }
   }
-  @media (min-width: 1280px) {
-    /* On wider monitors we have room to give Ingredients a real
-       breathing column without starving Steps. */
+  @media (min-width: 1400px) {
+    /* On wider monitors give Ingredients a real breathing column
+       without starving Steps. */
     .editor-grid {
       grid-template-columns: minmax(520px, 1.15fr) minmax(0, 1fr);
     }
@@ -1514,6 +1627,8 @@
   .ing-row {
     position: relative;
     display: grid;
+    /* Desktop: drag | qty | unit | name-wrap | note | pantry | section | delete
+       The kebab is display:none on desktop so it takes no track. */
     grid-template-columns: 22px 60px 92px 1fr 1fr 34px 34px 34px;
     gap: 6px;
     margin-bottom: 6px;
@@ -1522,6 +1637,38 @@
     border-radius: var(--radius-sm);
   }
   .ing-row .input { padding: 7px 9px; font-size: 13px; }
+  /* Name-wrap holds the input + the mobile indicator icons (linked,
+     has-note). On desktop the indicators hide because the note column
+     and the pantry-link button already convey that state visibly. */
+  .ing-name-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+  .ing-name-wrap .ing-name { width: 100%; padding-right: 8px; }
+  .ing-indicators {
+    display: none; /* desktop */
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    gap: 2px;
+    align-items: center;
+    pointer-events: none;
+  }
+  .ing-ind { display: inline-flex; align-items: center; justify-content: center; }
+  .ing-ind .material-symbols-rounded { font-size: 15px; color: var(--accent); }
+  .ing-ind.note .material-symbols-rounded { color: var(--text-3); }
+  .ing-kebab { display: none; /* desktop */ }
+  .ing-note-row {
+    /* Second-line note input. Aligns under the name column so it reads
+       as attached to the ingredient rather than a standalone field. */
+    display: none;
+    grid-column: 1 / -1;
+    padding: 0 6px 6px 34px; /* left-indent past the drag handle */
+  }
+  .ing-note-row .ing-note-mobile { width: 100%; }
   .ing-row.dragging { opacity: 0.4; }
   .ing-row.drag-over::before {
     content: '';
@@ -1548,9 +1695,21 @@
   .ing-handle:active { cursor: grabbing; }
   .ing-handle .material-symbols-rounded { font-size: 18px; }
 
-  @media (max-width: 600px) {
-    .ing-row { grid-template-columns: 22px 50px 78px 1fr 34px 34px 34px; }
+  @media (max-width: 900px) {
+    /* Mobile + phone-landscape + tablet-portrait: drag | qty | unit |
+       name-wrap (with indicators) | kebab. Below ~900px the desktop
+       eight-column grid crushes the name field even in landscape
+       (~750-850px on typical phones). Actions surface via ActionSheet
+       on kebab tap; any active note appears on a second inline row. */
+    .ing-row {
+      grid-template-columns: 22px 50px 78px 1fr 34px;
+    }
     .ing-row .ing-note { display: none; }
+    .ing-row .desktop-only-btn { display: none; }
+    .ing-row .ing-kebab { display: inline-flex; }
+    .ing-indicators { display: inline-flex; }
+    .ing-name-wrap .ing-name { padding-right: 46px; }
+    .ing-note-row { display: block; }
   }
 
   /* Video picker — three-row layout mirroring ImagePicker:

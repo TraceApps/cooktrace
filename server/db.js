@@ -483,6 +483,20 @@ if (!columnExists('shopping_list', 'recipe_id')) {
   db.exec(`ALTER TABLE shopping_list ADD COLUMN recipe_id INTEGER REFERENCES recipes(id) ON DELETE SET NULL`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_shopping_recipe_id ON shopping_list(recipe_id)`);
 }
+// Optional per-item sort order for drag-to-reorder within a group.
+// NULL means "use the default sort (alphabetical name within group)";
+// a value here wins. Set by the client on drag; cleared when the user
+// resets a group to auto-sort.
+if (!columnExists('shopping_list', 'sort_order')) {
+  db.exec(`ALTER TABLE shopping_list ADD COLUMN sort_order INTEGER`);
+}
+// Optional per-category default aisle. When set, new shopping items
+// linked to this category inherit this string as their aisle; the
+// user still overrides per item after auto-assignment. Free text
+// (numbers, section names, walking-route hints).
+if (!columnExists('pantry_categories', 'default_aisle')) {
+  db.exec(`ALTER TABLE pantry_categories ADD COLUMN default_aisle TEXT`);
+}
 
 // Seed defaults per user (idempotent — only runs for users who don't yet
 // have any pantry_categories rows). Mirrors the legacy hardcoded list in

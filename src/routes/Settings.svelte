@@ -36,6 +36,7 @@
     offUsername, offPassword, barcodeBeep, barcodeFlashlight,
     usdaEnabled, usdaApiKey,
     urlImportEngine, urlImportFallback, autoCreatePantryFromRecipes,
+    shoppingGroupBy, shoppingCheckedBehavior,
     aiEnabled, aiKeyVerified,
   } from '../stores/settings.js';
   $: enhancedAvailable = !isNative || !!getServerUrl(); // recipe-scrapers needs the server
@@ -213,7 +214,7 @@
     profile:       ['profile','my profile','account','name','avatar','log out','logout','sign out','password','change password'],
     appearance:    ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','reduce motion','banner','page banner'],
     regional:      ['regional','language','translation','locale','date','time','12h','24h','units','energy','kcal','kj','calories','kilojoules','imperial','metric','measurement system'],
-    cooking:       ['cooking','servings','default servings','yield','recipe','recipes','url import','url import engine','scraper','recipe scrapers','recipe-scrapers','enhanced','smart','json-ld','schema.org','parser','auto add ingredients','auto-create pantry','pantry catalog'],
+    cooking:       ['cooking','servings','default servings','yield','recipe','recipes','url import','url import engine','scraper','recipe scrapers','recipe-scrapers','enhanced','smart','json-ld','schema.org','parser','auto add ingredients','auto-create pantry','pantry catalog','shopping','shopping list','aisle','aisles','group by','grouping','checked','hide checked','sort','reorder'],
     nutrition:     ['nutrition','nutrients','nutriments','vitamins','minerals','visible nutriments','fda'],
     federation:    ['federation','nutritrace','nt','linked','share','token','instance','foods','pull foods','import foods','sync foods'],
     foodsources:   ['food sources','open food facts','off','usda','fooddata central','api key','barcode','scanner','beep','flashlight','search','language','country','contribute'],
@@ -668,6 +669,39 @@
               </div>
             </div>
           {/if}
+
+          <div class="setting-divider"></div>
+          <div class="setting-subhead">Shopping List</div>
+
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Default Grouping</span>
+              <div class="setting-desc">How the shopping list is grouped when it opens. By Aisle uses the per-item aisle (auto-populated from the linked pantry item's category); By Recipe keeps items with the recipe that added them; Flat is one uninterrupted list.</div>
+            </div>
+            <div class="select-wrap" style="width:170px">
+              <select class="select sel-sm" value={$shoppingGroupBy || 'aisle'}
+                on:change={e => shoppingGroupBy.set(e.target.value)}>
+                <option value="aisle">By Aisle</option>
+                <option value="recipe">By Recipe</option>
+                <option value="flat">Flat</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Checked Items</span>
+              <div class="setting-desc">What happens to items after you check them off. Sink to bottom keeps them visible so you can uncheck by mistake; Hide removes them from view with a one-tap "Show Checked" toggle if you need them back.</div>
+            </div>
+            <div class="select-wrap" style="width:170px">
+              <select class="select sel-sm" value={$shoppingCheckedBehavior || 'bottom'}
+                on:change={e => shoppingCheckedBehavior.set(e.target.value)}>
+                <option value="bottom">Sink to Bottom</option>
+                <option value="hide">Hide</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
     {/if}
@@ -1353,6 +1387,14 @@
     margin-top: 1px;
   }
   .setting-divider { height: 1px; background: var(--border); margin: 0 16px; }
+  .setting-subhead {
+    padding: 12px 16px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
 
   /* ── Select dropdown ─────────────────────────────────────────────────── */
   .select-wrap {

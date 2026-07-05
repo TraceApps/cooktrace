@@ -356,6 +356,7 @@ const _CtApiHttp = {
   toggleShoppingChecked(id, c)   { return this.patch(`/api/shopping/${id}/check`, { checked: c }); },
   deleteShoppingItem(id)         { return this.del(`/api/shopping/${id}`); },
   clearCheckedShopping()         { return this.del('/api/shopping/checked'); },
+  reorderShopping(items)         { return this.post('/api/shopping/reorder', { items }); },
   clearShoppingByRecipe(recipeId){ return this.del(`/api/shopping/by-recipe/${recipeId}`); },
   shopFromRecipe(id, opts = {})  {
     const qs = opts.only_missing === false ? '?only_missing=0' : '';

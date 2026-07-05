@@ -55,7 +55,7 @@ const TABLES = {
     softDelete: false,
   },
   pantry_categories: {
-    cols: ['name', 'slug', 'icon', 'color', 'sort_order'],
+    cols: ['name', 'slug', 'icon', 'color', 'sort_order', 'default_aisle'],
     parents: {},
     softDelete: false,
   },
@@ -103,7 +103,7 @@ const TABLES = {
     softDelete: true,
   },
   shopping_list: {
-    cols: ['name', 'quantity', 'unit', 'aisle', 'checked', 'pantry_id', 'recipe_id'],
+    cols: ['name', 'quantity', 'unit', 'aisle', 'checked', 'pantry_id', 'recipe_id', 'sort_order'],
     parents: { pantry_id: 'pantry_items', recipe_id: 'recipes' },
     softDelete: true,
   },

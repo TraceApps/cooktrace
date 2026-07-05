@@ -98,7 +98,7 @@ router.get('/categories', wrap((req, res) => {
   // Include the count of non-deleted pantry items that point at each
   // category so the Manage hub can surface a usage pill.
   const rows = db.prepare(
-    `SELECT c.id, c.name, c.slug, c.icon, c.color, c.sort_order,
+    `SELECT c.id, c.name, c.slug, c.icon, c.color, c.sort_order, c.default_aisle,
             (SELECT COUNT(*) FROM pantry_items p
               WHERE p.category_id = c.id AND p.deleted_at IS NULL
                 AND ${userClause(u).replace(/user_id/g, 'p.user_id')}) AS pantry_count
@@ -115,6 +115,8 @@ router.post('/categories', wrap((req, res) => {
   if (!name) return res.status(400).json({ error: 'name required' });
   const icon  = req.body?.icon  ? String(req.body.icon).slice(0, 32)  : null;
   const color = req.body?.color ? String(req.body.color).slice(0, 16) : null;
+  const defaultAisle = req.body?.default_aisle != null && String(req.body.default_aisle).trim()
+    ? String(req.body.default_aisle).trim().slice(0, 40) : null;
   let slug = _slugify(name);
   let n = 2;
   while (db.prepare(
@@ -126,11 +128,11 @@ router.post('/categories', wrap((req, res) => {
     `SELECT COALESCE(MAX(sort_order), -1) AS m FROM pantry_categories WHERE ${userClause(u)}`
   ).get(...userArgs(u)).m;
   const result = db.prepare(
-    `INSERT INTO pantry_categories (user_id, name, slug, icon, color, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(u, name, slug, icon, color, maxOrder + 1);
+    `INSERT INTO pantry_categories (user_id, name, slug, icon, color, sort_order, default_aisle)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(u, name, slug, icon, color, maxOrder + 1, defaultAisle);
   const row = db.prepare(
-    `SELECT id, name, slug, icon, color, sort_order FROM pantry_categories WHERE id = ?`
+    `SELECT id, name, slug, icon, color, sort_order, default_aisle FROM pantry_categories WHERE id = ?`
   ).get(result.lastInsertRowid);
   res.status(201).json(row);
 }));
@@ -149,14 +151,19 @@ router.put('/categories/:id', wrap((req, res) => {
   const color = req.body?.color !== undefined ? (req.body.color ? String(req.body.color).slice(0, 16) : null) : existing.color;
   const sort  = req.body?.sort_order != null && Number.isFinite(parseInt(req.body.sort_order, 10))
     ? parseInt(req.body.sort_order, 10) : existing.sort_order;
+  // default_aisle: null clears, non-empty string sets, undefined keeps
+  const defaultAisle = req.body?.default_aisle !== undefined
+    ? (req.body.default_aisle && String(req.body.default_aisle).trim()
+        ? String(req.body.default_aisle).trim().slice(0, 40) : null)
+    : existing.default_aisle;
 
   db.prepare(
     `UPDATE pantry_categories
-        SET name = ?, icon = ?, color = ?, sort_order = ?, updated_at = datetime('now')
+        SET name = ?, icon = ?, color = ?, sort_order = ?, default_aisle = ?, updated_at = datetime('now')
       WHERE id = ?`
-  ).run(name, icon, color, sort, id);
+  ).run(name, icon, color, sort, defaultAisle, id);
   const row = db.prepare(
-    `SELECT id, name, slug, icon, color, sort_order FROM pantry_categories WHERE id = ?`
+    `SELECT id, name, slug, icon, color, sort_order, default_aisle FROM pantry_categories WHERE id = ?`
   ).get(id);
   res.json(row);
 }));

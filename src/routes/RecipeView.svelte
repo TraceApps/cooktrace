@@ -282,30 +282,60 @@
     _saveChecks(id, 'tool', toolChecks);
   }
 
-  async function startCookMode() {
-    cookMode = true;
-    _saveCookMode(id, true);
+  // Keep-screen-awake in cook mode. Two paths: on Capacitor native we
+  // use @capacitor-community/keep-awake, which flips FLAG_KEEP_SCREEN_ON
+  // on the WebView activity — bulletproof. On PWA we fall back to the
+  // Web Wake Lock API, which is well-supported in modern browsers but
+  // was unreliable across Android WebView versions (silent failures
+  // are why native cook mode stopped keeping the screen on after some
+  // WebView update). Native path never touches wakeLockSentinel.
+  async function _acquireWakeLock() {
+    if (isNative) {
+      try {
+        const { KeepAwake } = await import('@capacitor-community/keep-awake');
+        await KeepAwake.keepAwake();
+      } catch { /* plugin missing or platform said no — silent */ }
+      return;
+    }
     if ('wakeLock' in navigator) {
       try { wakeLockSentinel = await navigator.wakeLock.request('screen'); }
-      catch { /* user denied or unavailable — silently degrade */ }
+      catch { /* user denied or API unavailable — silent */ }
     }
   }
-  function endCookMode() {
-    cookMode = false;
-    _saveCookMode(id, false);
-    // Session over — clear so the next cook starts fresh.
-    resetChecks();
+  async function _releaseWakeLock() {
+    if (isNative) {
+      try {
+        const { KeepAwake } = await import('@capacitor-community/keep-awake');
+        await KeepAwake.allowSleep();
+      } catch { /* silent */ }
+      return;
+    }
     if (wakeLockSentinel) {
       try { wakeLockSentinel.release(); } catch {}
       wakeLockSentinel = null;
     }
   }
+
+  async function startCookMode() {
+    cookMode = true;
+    _saveCookMode(id, true);
+    await _acquireWakeLock();
+  }
+  async function endCookMode() {
+    cookMode = false;
+    _saveCookMode(id, false);
+    // Session over — clear so the next cook starts fresh.
+    resetChecks();
+    await _releaseWakeLock();
+  }
   // If the user navigates away or backgrounds the tab, release the lock.
-  // It auto-re-acquires on visibility return when cookMode is still true.
+  // It auto-re-acquires on visibility return when cookMode is still
+  // true. Native re-uses the same path — KeepAwake.keepAwake() is
+  // idempotent (safe to call multiple times).
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', async () => {
-      if (cookMode && document.visibilityState === 'visible' && !wakeLockSentinel && 'wakeLock' in navigator) {
-        try { wakeLockSentinel = await navigator.wakeLock.request('screen'); } catch {}
+      if (cookMode && document.visibilityState === 'visible') {
+        await _acquireWakeLock();
       }
     });
   }

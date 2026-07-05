@@ -9,7 +9,6 @@
   import { confirmDialog } from '../stores/confirmDialog.js';
   import { push } from 'svelte-spa-router';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
-  import BulkActionBar from '../components/ui/BulkActionBar.svelte';
   import BarcodeScanner from '../components/ui/BarcodeScanner.svelte';
   import PantryItemSheet from '../components/pantry/PantryItemSheet.svelte';
   import { longpress } from '../lib/long-press.js';
@@ -155,22 +154,21 @@
   // state has been removed.
 
   // ── Selection mode ──────────────────────────────────────────────────
+  // NT-family pattern: enter via long-press action sheet, exit via top-
+  // right X, or automatically when the last item is deselected. No
+  // bottom pill — actions live in the header where the normal quick-
+  // action icons already sit.
   let selectMode = false;
   let selectedIds = new Set();
-  function toggleSelectMode() {
-    selectMode = !selectMode;
-    if (!selectMode) selectedIds = new Set();
+  function exitSelectMode() {
+    selectMode = false;
+    selectedIds = new Set();
   }
   function toggleSelected(id) {
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id); else next.add(id);
     selectedIds = next;
-  }
-  function selectAllVisible() {
-    selectedIds = new Set(filtered.map(i => i.id));
-  }
-  function clearSelection() {
-    selectedIds = new Set();
+    if (selectedIds.size === 0) selectMode = false;
   }
   async function bulkDelete() {
     if (selectedIds.size === 0) return;
@@ -599,11 +597,25 @@
 </script>
 
 <div class="page-shell" style="--header-h: {headerH}px">
-  <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'} bind:offsetHeight={headerH}>
-    <h1>{$_('routes.pantry.title')}</h1>
-    <button class="btn-icon header-action" on:click={startCreate} aria-label="Add item" title="Add item">
-      <span class="material-symbols-rounded">add</span>
-    </button>
+  <header class="page-header"
+    class:banner-gradient={$bannerStyle === 'gradient' && !selectMode}
+    class:banner-animated={$bannerStyle === 'animated' && !selectMode}
+    class:select-mode={selectMode}
+    bind:offsetHeight={headerH}>
+    {#if selectMode}
+      <h1>{selectedIds.size} Selected</h1>
+      <button class="btn-icon header-action" on:click={bulkDelete} disabled={selectedIds.size === 0} aria-label="Delete selected" title="Delete selected">
+        <span class="material-symbols-rounded">delete</span>
+      </button>
+      <button class="btn-icon header-action header-action-2" on:click={exitSelectMode} aria-label="Cancel selection" title="Cancel">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+    {:else}
+      <h1>{$_('routes.pantry.title')}</h1>
+      <button class="btn-icon header-action" on:click={startCreate} aria-label="Add item" title="Add item">
+        <span class="material-symbols-rounded">add</span>
+      </button>
+    {/if}
   </header>
 
   <div class="page-content">
@@ -698,25 +710,8 @@
               <span class="material-symbols-rounded" style="font-size:16px">view_list</span>
             </button>
           </div>
-          <button class="seg select-toggle" class:active={selectMode}
-            on:click={toggleSelectMode}
-            title={selectMode ? 'Exit selection' : 'Select multiple'}>
-            <span class="material-symbols-rounded" style="font-size:16px">{selectMode ? 'close' : 'checklist'}</span>
-            {selectMode ? 'Cancel' : 'Select'}
-          </button>
         </div>
       </div>
-
-      {#if selectMode}
-        <BulkActionBar
-          count={selectedIds.size}
-          total={filtered.length}
-          noun="item"
-          on:selectAll={selectAllVisible}
-          on:clear={clearSelection}
-          on:delete={bulkDelete}
-        />
-      {/if}
     {/if}
 
     {#if loading}
@@ -1004,6 +999,14 @@
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   }
   .header-action:hover  { background: rgba(0, 0, 0, 0.5); }
+  .header-action:disabled { opacity: 0.35; cursor: not-allowed; }
+  .header-action.header-action-2 { right: 60px; }
+  /* Kills the animated / gradient banner shimmer while multi-select is
+     active so the header reads as a distinct focused mode. */
+  .page-header.select-mode {
+    background: var(--surface-1);
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  }
 
   .toolbar { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 

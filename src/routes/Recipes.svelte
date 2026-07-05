@@ -8,7 +8,6 @@
   import { showError, showSuccess } from '../stores/toast.js';
   import { pageBanners, bannerStyle, aiEnabled, aiKeyVerified, recipesSort } from '../stores/settings.js';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
-  import BulkActionBar from '../components/ui/BulkActionBar.svelte';
   import ImportFromFileDialog from '../components/recipe/ImportFromFileDialog.svelte';
   import CookbookImportDialog from '../components/recipe/CookbookImportDialog.svelte';
   import ImportUrlDialog from '../components/recipe/ImportUrlDialog.svelte';
@@ -170,9 +169,7 @@
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id); else next.add(id);
     selectedIds = next;
-  }
-  function selectAll() {
-    selectedIds = new Set(filtered.map(r => r.id));
+    if (selectedIds.size === 0) selectMode = false;
   }
   async function bulkDeleteSelected() {
     const ids = [...selectedIds];
@@ -680,11 +677,28 @@
 </script>
 
 <div class="page-shell" style="--header-h: {headerH}px">
-  <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'} bind:offsetHeight={headerH}>
-    <h1>{$_('routes.recipes.title')}</h1>
-    <button class="btn-icon header-action" on:click={() => createSheetOpen = true} aria-label={$_('routes.recipes.new_recipe')} title={$_('routes.recipes.new_recipe')}>
-      <span class="material-symbols-rounded">add</span>
-    </button>
+  <header class="page-header"
+    class:banner-gradient={$bannerStyle === 'gradient' && !selectMode}
+    class:banner-animated={$bannerStyle === 'animated' && !selectMode}
+    class:select-mode={selectMode}
+    bind:offsetHeight={headerH}>
+    {#if selectMode}
+      <h1>{selectedIds.size} Selected</h1>
+      <button class="btn-icon header-action" on:click={bulkDeleteSelected} disabled={selectedIds.size === 0} aria-label="Delete selected" title="Delete selected">
+        <span class="material-symbols-rounded">delete</span>
+      </button>
+      <button class="btn-icon header-action header-action-2" on:click={openBulkCookbookDialog} disabled={selectedIds.size === 0} aria-label="Add to Cookbook" title="Add to Cookbook">
+        <span class="material-symbols-rounded">auto_stories</span>
+      </button>
+      <button class="btn-icon header-action header-action-3" on:click={exitSelectMode} aria-label="Cancel selection" title="Cancel">
+        <span class="material-symbols-rounded">close</span>
+      </button>
+    {:else}
+      <h1>{$_('routes.recipes.title')}</h1>
+      <button class="btn-icon header-action" on:click={() => createSheetOpen = true} aria-label={$_('routes.recipes.new_recipe')} title={$_('routes.recipes.new_recipe')}>
+        <span class="material-symbols-rounded">add</span>
+      </button>
+    {/if}
   </header>
 
   <ActionSheet
@@ -1047,26 +1061,7 @@
           <option value="most">Most Cooked</option>
           <option value="newest">Newest</option>
         </select>
-        <button class="sort-select select-toggle"
-          class:active={selectMode}
-          on:click={() => selectMode ? exitSelectMode() : enterSelectMode()}
-          title={selectMode ? 'Exit select mode' : 'Select multiple'}>
-          <span class="material-symbols-rounded">{selectMode ? 'close' : 'check_circle'}</span>
-          {selectMode ? 'Cancel' : 'Select'}
-        </button>
       </div>
-      {#if selectMode}
-        <BulkActionBar
-          count={selectedIds.size}
-          total={filtered.length}
-          noun="recipe"
-          showCookbook
-          on:selectAll={selectAll}
-          on:clear={() => selectedIds = new Set()}
-          on:delete={bulkDeleteSelected}
-          on:cookbook={openBulkCookbookDialog}
-        />
-      {/if}
     </div><!-- /.sticky-controls -->
     {/if}
 
@@ -1298,6 +1293,15 @@
   }
   .header-action:hover  { background: rgba(0, 0, 0, 0.5); }
   .header-action:active { transform: scale(0.92); }
+  .header-action:disabled { opacity: 0.35; cursor: not-allowed; }
+  .header-action.header-action-2 { right: 60px; }
+  .header-action.header-action-3 { right: 108px; }
+  /* Same select-mode header treatment used by Pantry — kill the banner
+     shimmer while multi-select is on so the mode reads as focused. */
+  .page-header.select-mode {
+    background: var(--surface-1);
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  }
 
   /* Sticky list controls — search + filters + sort/select stay
      pinned at the top of the scroll container so the user doesn't

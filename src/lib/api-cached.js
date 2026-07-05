@@ -35,7 +35,7 @@ const WRITE_METHODS = new Set([
   'createPantryItem', 'updatePantryItem', 'toggleStock', 'deletePantryItem',
   'createDiaryEntry', 'updateDiaryEntry', 'deleteDiaryEntry',
   'addShoppingItem', 'updateShoppingItem', 'toggleShoppingChecked',
-  'deleteShoppingItem', 'clearCheckedShopping',
+  'deleteShoppingItem', 'clearCheckedShopping', 'reorderShopping',
   'shopFromRecipe', 'shopFromPlan',
   'createRecipeCategory', 'updateRecipeCategory', 'deleteRecipeCategory',
   'reorderRecipeCategories',

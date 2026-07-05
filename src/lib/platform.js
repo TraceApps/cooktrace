@@ -155,12 +155,23 @@ export function resolveAssetUrl(path) {
   // The WebView can't load file:// directly for security reasons —
   // Capacitor.convertFileSrc() rewrites them to the WebView-served
   // scheme (https://localhost/_capacitor_file_/... on Android) which
-  // does load via <img src>.
+  // does load via <img src>. Fresh uploads (see api-native.uploadImage)
+  // already carry the converted URL — this branch backstops entries
+  // written before that change so old rows still render after the
+  // upgrade.
   if (path.startsWith('file:')) {
-    if (isNative && Capacitor.convertFileSrc) {
+    if (isNative && Capacitor?.convertFileSrc) {
       return Capacitor.convertFileSrc(path);
     }
     return path;
+  }
+  // Raw Android internal-storage path with no scheme (some Capacitor
+  // versions strip the file:// prefix on Filesystem.getUri). Prefix it
+  // so convertFileSrc treats it as a file URI.
+  if (isNative && path.startsWith('/data/')) {
+    if (Capacitor?.convertFileSrc) {
+      return Capacitor.convertFileSrc('file://' + path);
+    }
   }
   if (isNative) {
     // Always check local image cache first (fastest, works offline + disconnected)

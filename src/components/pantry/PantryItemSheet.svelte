@@ -46,7 +46,8 @@
   import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS, isDerived, deriveSodiumSalt } from '../../lib/nutriments.js';
   import { lookupBarcode, contributeToOFF } from '../../lib/off.js';
   import { displayVariantName as _sharedDisplayVariantName } from '../../lib/pantry-variants.js';
-  import { visibleNutriments, offEnabled, offUsername, offPassword, offUploadCountry } from '../../stores/settings.js';
+  import { visibleNutriments, offEnabled, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks } from '../../stores/settings.js';
+  import { scanNutritionLabel } from '../../lib/scan-nutrition.js';
 
   export let open = false;
   export let itemId = null;
@@ -68,6 +69,57 @@
   let _lastServingSize = null;
   let allNutrientsOpen = false;
   let editorScannerOpen = false;
+
+  // AI label scan — mirrors NutriTrace's FoodEditor scan-label flow.
+  // Native uses @capacitor/camera; web falls back to the hidden file
+  // input below. Sits next to the barcode scanner as a complementary
+  // action: barcode → OFF lookup (name-brand products), label → AI
+  // vision (store-brand jars, homemade batches, imports with stale
+  // OFF data). Gated on $aiEffectivelyEnabled so the button hides
+  // when AI isn't configured.
+  let scanningLabel = false;
+  let scanLabelFileInput;
+
+  async function scanLabel() {
+    if (scanningLabel || !draft) return;
+    scanningLabel = true;
+    try {
+      const parsed = await scanNutritionLabel({
+        fileInput: scanLabelFileInput,
+        aiProxy: !!$envLocks.ai,
+      });
+      if (parsed == null) return; // user canceled
+      if (typeof parsed !== 'object') {
+        showError('Could not read the label. Try a clearer photo.');
+        return;
+      }
+      // Overwrite (not smart-fill) — the label is the source of truth
+      // in this moment. Matches NT's semantics; distinct from an OFF
+      // refresh which smart-fills because OFF data can be stale.
+      if (typeof parsed.name === 'string' && parsed.name.trim()) draft.name = parsed.name.trim();
+      if (typeof parsed.brand === 'string' && parsed.brand.trim()) draft.brand = parsed.brand.trim();
+      // NT calls it portion + unit; CookTrace pantry calls it
+      // serving_size + serving_unit. Same concept, mapped here.
+      if (parsed.portion != null && !isNaN(parseFloat(parsed.portion))) {
+        draft.serving_size = parseFloat(parsed.portion);
+        _lastServingSize = draft.serving_size;
+      }
+      if (typeof parsed.unit === 'string' && parsed.unit.trim()) draft.serving_unit = parsed.unit.trim();
+      // Nutriment values overwrite whatever's in the draft. Any key we
+      // don't recognize is silently dropped (matches NT).
+      if (!draft.nutrition || typeof draft.nutrition !== 'object') draft.nutrition = {};
+      for (const n of NUTRIMENTS) {
+        const v = parsed[n.id];
+        if (v != null && !isNaN(parseFloat(v))) draft.nutrition[n.id] = parseFloat(v);
+      }
+      draft = { ...draft };
+      showSuccess('Nutrition extracted from label');
+    } catch (e) {
+      showError('Scan failed: ' + (e?.message || 'unknown error'));
+    } finally {
+      scanningLabel = false;
+    }
+  }
   let pantryCategories = [];
   let categoryName = '';
   let comboCategoryRef;
@@ -990,6 +1042,16 @@
                   <input class="input num" type="number" min="0" step="any"
                     bind:value={draft.serving_size} on:input={onServingSizeInput} placeholder="100" />
                   <UnitPicker bind:value={draft.serving_unit} placeholder="g" />
+                  <!-- Proportional-scaling toggle lives at the end of
+                       the serving-size row, matching NT's FoodEditor
+                       layout so users switching between the two apps
+                       find the affordance in the same place. -->
+                  <button type="button" class="btn-icon link-btn" class:linked
+                    title={linked ? 'All fields scale proportionally' : 'Fields are independent'}
+                    aria-label="Toggle proportional scaling"
+                    on:click={() => linked = !linked}>
+                    <span class="material-symbols-rounded">{linked ? 'link' : 'link_off'}</span>
+                  </button>
                 </div>
               {:else}
                 <div class="stat-value">
@@ -1013,19 +1075,28 @@
               <div class="nutrient-edit-head">
                 <span class="field-label">Nutrition <span class="muted">per serving</span></span>
                 <div class="nutrient-edit-actions">
-                  <button type="button" class="link-toggle small" class:linked
-                    title={linked
-                      ? 'Linked: nutrient values scale proportionally when serving size changes'
-                      : 'Unlinked: nutrient values stay put when serving size changes'}
-                    aria-label="Toggle proportional scaling"
-                    on:click={() => linked = !linked}>
-                    <span class="material-symbols-rounded">{linked ? 'link' : 'link_off'}</span>
-                  </button>
-                  <button class="btn-link" on:click={() => allNutrientsOpen = true}>
-                    Edit All Nutrients
-                  </button>
+                  {#if $aiEffectivelyEnabled}
+                    <!-- Pill matches NT FoodEditor: photo_camera icon +
+                         "Scan Label" text, progress_activity + "Scanning…"
+                         while the vision call is in flight. Same styling
+                         and copy so users switching between the two apps
+                         see the identical control. -->
+                    <button class="scan-label-btn" on:click={scanLabel} disabled={scanningLabel}
+                      title="Take a photo of the nutrition label to fill these fields"
+                      aria-label="Scan nutrition label">
+                      <span class="material-symbols-rounded scan-icon" class:spin={scanningLabel}>
+                        {scanningLabel ? 'progress_activity' : 'document_scanner'}
+                      </span>
+                      <span>{scanningLabel ? 'Scanning…' : 'Scan Label'}</span>
+                    </button>
+                  {/if}
                 </div>
               </div>
+              <!-- Hidden file input used by scanNutritionLabel on the
+                   web fallback path. Native uses @capacitor/camera and
+                   ignores this element. -->
+              <input type="file" accept="image/*" capture="environment"
+                bind:this={scanLabelFileInput} style="display:none" />
               <div class="nutrient-grid">
                 {#each visibleInlineNutriments as n}
                   {@const derived = (n.id === 'sodium' || n.id === 'salt') && isDerived(draft.nutrition, n.id)}
@@ -1047,6 +1118,15 @@
                   </label>
                 {/each}
               </div>
+              <!-- Full-width ghost button under the nutrient grid,
+                   matching NT FoodEditor's "Show all nutrients" spot.
+                   CookTrace opens a sheet with the full nutrient list
+                   for editing, so the label stays "Edit All Nutrients"
+                   rather than NT's inline "Show all / Show less". -->
+              <button class="btn btn-ghost all-nutrients-btn"
+                on:click={() => allNutrientsOpen = true}>
+                Edit All Nutrients
+              </button>
             </div>
           {/if}
         </div>
@@ -1603,21 +1683,59 @@
   .stat-edit :global(.unit-picker) { flex: 1 1 0; min-width: 60px; }
   .stat-edit :global(.unit-picker .input) { width: 100%; }
   .stat-edit > :global(*) { min-width: 0; }
-  /* Link-scaling toggle now lives in the nutrient header, not the
-     serving-size row. Compact size to match the inline-link Edit All
-     Nutrients button next to it. */
-  .link-toggle {
-    width: 30px; height: 30px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--surface-2);
-    color: var(--text-3); cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
-  .link-toggle.linked { color: var(--accent); border-color: var(--accent); }
-  .link-toggle .material-symbols-rounded { font-size: 16px; }
   .nutrient-edit-actions { display: inline-flex; align-items: center; gap: 8px; }
+  /* Full-width ghost button under the nutrient grid — mirrors NT
+     FoodEditor's "Show all nutrients" placement so the two forms
+     look interchangeable when you're switching between the apps. */
+  .all-nutrients-btn {
+    width: 100%;
+    margin-top: 8px;
+  }
+  /* Serving-size row link toggle — matches NT FoodEditor's
+     .link-btn (icon-only, accent color when linked). Same 20px glyph
+     so it reads at the same weight as the serving-size input. */
+  .link-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+    transition: color var(--dur-fast);
+  }
+  .link-btn:hover { color: var(--text-1); background: var(--surface-2); }
+  .link-btn.linked { color: var(--accent); }
+  .link-btn .material-symbols-rounded { font-size: 20px; }
+  /* Scan Label — pill button matching NT FoodEditor exactly. Neutral
+     surface (not accent-tinted); text + icon; sits at the right end
+     of the Nutrition card header. */
+  .scan-label-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    color: var(--text-1);
+    border: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+  .scan-label-btn:hover:not(:disabled) { background: var(--surface-3, var(--surface-2)); }
+  .scan-label-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .scan-label-btn .material-symbols-rounded { font-size: 18px; }
+  /* progress_activity glyph rotates while the AI vision call is in
+     flight. Same pattern used elsewhere in the app; kept scoped. */
+  .scan-icon.spin {
+    animation: scan-spin 1s linear infinite;
+    display: inline-block;
+  }
+  @keyframes scan-spin { to { transform: rotate(360deg); } }
 
   /* Inline nutrient inputs grid. */
   .nutrient-edit {

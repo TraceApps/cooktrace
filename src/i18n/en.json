@@ -40,7 +40,21 @@
       "empty_title": "List Is Empty",
       "empty_desc": "Add items above, or pull missing ingredients from a recipe.",
       "add_from_recipe": "Add from Recipe",
-      "add_placeholder": "Add item…"
+      "add_placeholder": "Add item…",
+      "group_by_label": "Group by",
+      "group_by_aisle": "By Aisle",
+      "group_by_recipe": "By Recipe",
+      "group_by_flat": "Flat",
+      "uncategorized": "Uncategorized",
+      "other": "Other",
+      "change_aisle": "Change Aisle",
+      "delete": "Delete",
+      "aisle_help": "Pick a known aisle or type a fresh label. Items added later from the same pantry category will use its default aisle automatically.",
+      "aisle_placeholder": "e.g. Produce, Dairy, Bakery…",
+      "aisle_set": "Set",
+      "aisle_none": "No aisle",
+      "hide_checked": "Hide checked",
+      "show_checked_n": "Show {n} checked"
     },
     "settings": { "title": "Settings" }
   },
