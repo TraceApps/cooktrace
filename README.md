@@ -271,9 +271,10 @@ With TLS in front, leave `INSECURE_COOKIES` unset.
 | `SMTP_USER` | No | — | SMTP username |
 | `SMTP_PASS` | No | — | SMTP password |
 | `SMTP_FROM` | No | — | From address, e.g. `CookTrace <noreply@example.com>` |
-| `AI_PROVIDER` | No | — | Lock Trace to a specific provider for all users: `claude` \| `openai` \| `gemini` |
-| `AI_API_KEY` | No | — | Shared AI API key. Server-side only — never sent to the browser |
-| `AI_MODEL` | No | provider default | Override the AI model (e.g. `claude-haiku-4-5-20251001`) |
+| `AI_PROVIDER` | No | — | Lock Trace to a specific provider for all users: `claude` \| `openai` \| `gemini` \| `oai-compat` |
+| `AI_API_KEY` | No | — | Shared AI API key. Server-side only — never sent to the browser. Optional when `AI_PROVIDER=oai-compat` and pointing at a local endpoint that doesn't require auth. |
+| `AI_MODEL` | No | provider default | Override the AI model (e.g. `claude-haiku-4-5-20251001`, `llama3.1:8b`). Required when `AI_PROVIDER=oai-compat` |
+| `AI_BASE_URL` | No | — | Required when `AI_PROVIDER=oai-compat`. Base URL of your OpenAI-compatible endpoint, e.g. `http://ollama:11434`. Must be reachable from the server container. |
 | `AI_ENABLED` | No | — | Set to `true` to auto-enable Trace for all users |
 | `OIDC_*` | No | — | OIDC SSO provider config; see Single Sign-On below |
 

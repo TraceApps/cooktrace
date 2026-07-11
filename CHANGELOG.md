@@ -9,6 +9,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.4] - 2026-07-10
+
+### Added
+
+- **AI Base URL support in env-locked mode.** Self-hosters who run
+  their LLM on a private Docker network (Ollama, LM Studio,
+  LocalAI, or any OpenAI-compatible endpoint) can now proxy Trace
+  chat through the server via `AI_BASE_URL`. Previously the
+  OpenAI-compatible flow ran client-only, meaning the browser had
+  to reach the LLM directly, awkward when the LLM lives on a
+  private network the browser can't see. `AI_PROVIDER=oai-compat`
+  plus `AI_BASE_URL=http://ollama:11434` in `.env` now works
+  end-to-end.
+
+### Fixed
+
+- **Kitchens created on the PWA now appear on the Android app.**
+  Same class of bug also affected the pending invites list, users
+  list, share peers, session config, and the Mealie / Tandoor /
+  Paprika ZIP import — all silently returned empty on Android in
+  server-connected mode because the local API layer was catching
+  those calls before they could reach the server.
+- **Pending invites populate correctly.** The User Management
+  section's data-load hook was orphaned, so opening Settings →
+  Users showed empty state even when invites had been created.
+  Fires on section open now.
+- **Full-backup restore no longer silently drops recipe columns.**
+  Restore was using hardcoded INSERT column lists — any column
+  added by later ALTER migrations (`rest_minutes`, `total_minutes`,
+  `category_id`, `share_token`, `video_url`) would silently vanish
+  on restore. Now schema-driven so future ALTER TABLE additions
+  are automatically covered.
+
+---
+
 ## [1.0.0-rc.3] - 2026-07-05
 
 ### Added

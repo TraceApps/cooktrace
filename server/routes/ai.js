@@ -76,17 +76,27 @@ router.post('/chat', requireAuth, aiChatLimit, wrap(async (req, res) => {
   }
 
   const cfg = getAiConfig();
-  if (!cfg.ai_api_key) return res.status(503).json({ error: 'AI not configured on server. Set AI_API_KEY in environment.' });
-
   const provider = cfg.ai_provider || 'claude';
   const model    = cfg.ai_model    || AI_DEFAULT_MODELS[provider] || '';
   const apiKey   = cfg.ai_api_key;
+  const baseUrl  = cfg.ai_base_url;
+
+  // API key required for cloud providers; oai-compat local endpoints
+  // (Ollama, LM Studio, etc.) often don't need one — mirror callAI().
+  if (!apiKey && provider !== 'oai-compat') {
+    return res.status(503).json({ error: 'AI not configured on server. Set AI_API_KEY in environment.' });
+  }
+  if (provider === 'oai-compat') {
+    if (!baseUrl) return res.status(503).json({ error: 'AI_PROVIDER=oai-compat requires AI_BASE_URL in environment.' });
+    if (!model)   return res.status(503).json({ error: 'AI_PROVIDER=oai-compat requires AI_MODEL in environment.' });
+  }
 
   let text;
   switch (provider) {
-    case 'claude':  text = await _callClaude(apiKey, model, messages, systemPrompt); break;
-    case 'openai':  text = await _callOpenAI(apiKey, model, messages, systemPrompt); break;
-    case 'gemini':  text = await _callGemini(apiKey, model, messages, systemPrompt); break;
+    case 'claude':     text = await _callClaude(apiKey, model, messages, systemPrompt); break;
+    case 'openai':     text = await _callOpenAI(apiKey, model, messages, systemPrompt, 'https://api.openai.com'); break;
+    case 'gemini':     text = await _callGemini(apiKey, model, messages, systemPrompt); break;
+    case 'oai-compat': text = await _callOpenAI(apiKey || 'no-key', model, messages, systemPrompt, baseUrl.replace(/\/+$/, '')); break;
     default: return res.status(400).json({ error: `Unknown provider: ${provider}` });
   }
   res.json({ text });
@@ -116,8 +126,8 @@ async function _callClaude(apiKey, model, messages, systemPrompt) {
   return data.content[0].text;
 }
 
-async function _callOpenAI(apiKey, model, messages, systemPrompt) {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+async function _callOpenAI(apiKey, model, messages, systemPrompt, baseUrl = 'https://api.openai.com') {
+  const res = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

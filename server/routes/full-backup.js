@@ -263,76 +263,32 @@ function restoreFromZip(zip) {
     `);
     for (const m of data.ai_chat_history || []) insChat.run(m);
 
-    // Recipes — schema includes the post-migration columns (rating,
-    // yield_text, etc.). _withDefaults fills missing keys for older
-    // backups so the prepared statement doesn't blow up.
-    const recipeDefaults = {
-      description: null, img_url: null, servings: null, yield_text: null,
-      prep_minutes: null, cook_minutes: null, rating: null, favorite: 0,
-      ingredients: '[]', steps: '[]', tags: '[]', tools: '[]', nutrition: '{}',
-      source_url: null, notes: null, visibility: 'private',
-      cook_count: 0, last_cooked_at: null, created_by_username: null,
-      created_at: null, updated_at: null, deleted_at: null,
-    };
-    const insRecipe = db.prepare(`
-      INSERT OR IGNORE INTO recipes (id, user_id, name, description, img_url,
-        servings, yield_text, prep_minutes, cook_minutes, rating, favorite,
-        ingredients, steps, tags, tools, nutrition,
-        source_url, notes, visibility, cook_count, last_cooked_at, created_by_username,
-        created_at, updated_at, deleted_at)
-      VALUES (@id, @user_id, @name, @description, @img_url,
-        @servings, @yield_text, @prep_minutes, @cook_minutes, @rating, @favorite,
-        @ingredients, @steps, @tags, @tools, @nutrition,
-        @source_url, @notes, @visibility, @cook_count, @last_cooked_at, @created_by_username,
-        @created_at, @updated_at, @deleted_at)
-    `);
-    for (const r of data.recipes || []) insRecipe.run(_withDefaults(r, recipeDefaults));
-
-    const pantryDefaults = {
-      brand: null, barcode: null,
-      in_stock: 1, quantity: null, unit: null, expires_on: null,
-      nt_food_id: null, img_url: null, notes: null,
-      category: null, category_id: null,
-      serving_size: null, serving_unit: null, serving_label: null,
-      nutrition: null, g_per_cup: null,
-      generic_parent_id: null, nutrition_source_variant_id: null,
-      created_at: null, updated_at: null, deleted_at: null,
-    };
-    const insPantry = db.prepare(`
-      INSERT OR IGNORE INTO pantry_items (id, user_id, name, brand, barcode, in_stock, quantity, unit,
-        expires_on, nt_food_id, img_url, notes,
-        category, category_id, serving_size, serving_unit, serving_label, nutrition, g_per_cup,
-        generic_parent_id, nutrition_source_variant_id,
-        created_at, updated_at, deleted_at)
-      VALUES (@id, @user_id, @name, @brand, @barcode, @in_stock, @quantity, @unit,
-        @expires_on, @nt_food_id, @img_url, @notes,
-        @category, @category_id, @serving_size, @serving_unit, @serving_label, @nutrition, @g_per_cup,
-        @generic_parent_id, @nutrition_source_variant_id,
-        @created_at, @updated_at, @deleted_at)
-    `);
-    for (const p of data.pantry_items || []) insPantry.run(_withDefaults(p, pantryDefaults));
-
-    const cookDefaults = {
-      kind: 'cooked', servings: null, notes: null, photo_url: null, photos: null,
-      meal_type: null, rating: null,
-      created_at: null, updated_at: null, deleted_at: null,
-    };
-    const insCook = db.prepare(`
-      INSERT OR IGNORE INTO cook_diary (id, user_id, recipe_id, date, kind, servings, notes, photo_url, photos,
-        meal_type, rating, created_at, updated_at, deleted_at)
-      VALUES (@id, @user_id, @recipe_id, @date, @kind, @servings, @notes, @photo_url, @photos,
-        @meal_type, @rating, @created_at, @updated_at, @deleted_at)
-    `);
-    for (const c of data.cook_diary || []) insCook.run(_withDefaults(c, cookDefaults));
-
-    const shoppingCols = _columnsOf('shopping_list');
-    if (shoppingCols.length > 0) {
-      const cols = shoppingCols.join(', ');
-      const placeholders = shoppingCols.map(c => '@' + c).join(', ');
-      const insShop = db.prepare(`INSERT OR IGNORE INTO shopping_list (${cols}) VALUES (${placeholders})`);
-      const defaults = Object.fromEntries(shoppingCols.map(c => [c, null]));
-      for (const s of data.shopping_list || []) insShop.run(_withDefaults(s, defaults));
+    // Recipes / pantry_items / cook_diary / shopping_list use the
+    // schema-driven insert helper below. Every column PRAGMA reports
+    // is included in the INSERT, so a future ALTER TABLE never
+    // silently drops a column at restore time (rc.3 audit found
+    // recipes was missing rest_minutes, total_minutes, category_id,
+    // share_token, and video_url from a hardcoded column list —
+    // switching to PRAGMA-driven closes that whole class of bug).
+    //
+    // _bulkRestoreSchemaDriven is a local helper hoisted above so it
+    // can be shared with the side-table _restoreTable path below.
+    // (Duplicates DELETE FROM already done by the wipe pass above;
+    // DELETE-from-empty is a no-op so idempotent.)
+    function _bulkRestoreSchemaDriven(table, rows) {
+      if (!Array.isArray(rows) || rows.length === 0) return;
+      const cols = _columnsOf(table);
+      if (cols.length === 0) return;
+      const colList = cols.join(', ');
+      const ph = cols.map(c => '@' + c).join(', ');
+      const ins = db.prepare(`INSERT OR IGNORE INTO ${table} (${colList}) VALUES (${ph})`);
+      const defaults = Object.fromEntries(cols.map(c => [c, null]));
+      for (const r of rows) ins.run(_withDefaults(r, defaults));
     }
+    _bulkRestoreSchemaDriven('recipes',       data.recipes);
+    _bulkRestoreSchemaDriven('pantry_items',  data.pantry_items);
+    _bulkRestoreSchemaDriven('cook_diary',    data.cook_diary);
+    _bulkRestoreSchemaDriven('shopping_list', data.shopping_list);
 
     // ── Categories, taxonomies, cookbooks, sharing, kitchens ──────────
     // All the user-curated organization that lives in side-tables.

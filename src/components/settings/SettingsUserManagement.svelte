@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
   import Toggle from './Toggle.svelte';
@@ -90,6 +91,12 @@
       }
     }
   }
+  // Load on mount — Settings.svelte lazily renders this component
+  // inside the collapsible Users section via {#if sectionOpen(...)},
+  // so mount == the user opened the section. Without this the
+  // exported loadData() was orphaned — users list stayed empty and
+  // pending invites never appeared even after creating them.
+  onMount(loadData);
 
   async function loadSessionConfig() {
     try {

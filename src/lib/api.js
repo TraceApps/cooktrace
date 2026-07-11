@@ -391,13 +391,38 @@ const _CtApiHttp = {
 import { CtApiNative } from './api-native.js';
 import { CtApiCached } from './api-cached.js';
 
+// Endpoints without a local mirror in CtApiNative — these are
+// inherently server-scoped (Kitchens, per-user sharing peers, user
+// management, app config, server-parser recipe imports). In pure
+// local mode CtApiNative returns empty / no-op stubs so the UI
+// guards collapse cleanly. In server-connected mode we bypass the
+// stub and go straight to _CtApiHttp so a Kitchen made on the PWA
+// actually appears on the phone, share peer lists reflect reality,
+// and User Management admin views populate correctly.
+const SERVER_ONLY_METHODS = new Set([
+  'getKitchens', 'getKitchenMembers', 'createKitchen', 'deleteKitchen',
+  'addKitchenMember', 'removeKitchenMember', 'shareRecipeWithKitchen',
+  'getSharePeers', 'getRecipeShares', 'shareRecipeWithUsers',
+  'unshareRecipeWithUser', 'mintRecipeShareToken',
+  'revokeRecipeShareToken', 'getRecipesSharedWithMe',
+  'getUsersList', 'getAppConfig',
+  'scanRecipeZip', 'commitRecipeZip',
+  // Low-level HTTP primitives — used by components that don't have a
+  // dedicated NtApi wrapper (invite list, session config, admin OIDC
+  // CRUD, etc.). CtApiNative stubs these to throw in pure local mode;
+  // in server-connected mode we want them to actually reach the
+  // server, not blow up in try/catch and silently return empty state.
+  'get', 'post', 'put', 'patch', 'del',
+]);
+
 // Dynamic proxy — picks the right impl per call based on platform mode.
 export const NtApi = new Proxy({}, {
   get(_, prop) {
     let impl;
-    if (!isNative)            impl = _CtApiHttp;
-    else if (!getServerUrl()) impl = CtApiNative;
-    else                      impl = CtApiCached;
+    if (!isNative)                                             impl = _CtApiHttp;
+    else if (!getServerUrl())                                  impl = CtApiNative;
+    else if (SERVER_ONLY_METHODS.has(prop))                    impl = _CtApiHttp;
+    else                                                       impl = CtApiCached;
     return typeof impl[prop] === 'function' ? impl[prop].bind(impl) : impl[prop];
   },
 });
