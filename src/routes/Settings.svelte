@@ -36,6 +36,7 @@
     offUsername, offPassword, barcodeBeep, barcodeFlashlight,
     usdaEnabled, usdaApiKey,
     urlImportEngine, urlImportFallback, autoCreatePantryFromRecipes,
+    mixSharedIntoRecipes,
     shoppingGroupBy, shoppingCheckedBehavior,
     aiEnabled, aiKeyVerified,
   } from '../stores/settings.js';
@@ -214,7 +215,7 @@
     profile:       ['profile','my profile','account','name','avatar','log out','logout','sign out','password','change password'],
     appearance:    ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','reduce motion','banner','page banner'],
     regional:      ['regional','language','translation','locale','date','time','12h','24h','units','energy','kcal','kj','calories','kilojoules','imperial','metric','measurement system'],
-    cooking:       ['cooking','servings','default servings','yield','recipe','recipes','url import','url import engine','scraper','recipe scrapers','recipe-scrapers','enhanced','smart','json-ld','schema.org','parser','auto add ingredients','auto-create pantry','pantry catalog','shopping','shopping list','aisle','aisles','group by','grouping','checked','hide checked','sort','reorder'],
+    cooking:       ['cooking','servings','default servings','yield','recipe','recipes','url import','url import engine','scraper','recipe scrapers','recipe-scrapers','enhanced','smart','json-ld','schema.org','parser','auto add ingredients','auto-create pantry','pantry catalog','shopping','shopping list','aisle','aisles','group by','grouping','checked','hide checked','sort','reorder','shared recipes','main list','kitchen recipes','mixed view'],
     nutrition:     ['nutrition','nutrients','nutriments','vitamins','minerals','visible nutriments','fda'],
     federation:    ['federation','nutritrace','nt','linked','share','token','instance','foods','pull foods','import foods','sync foods'],
     foodsources:   ['food sources','open food facts','off','usda','fooddata central','api key','barcode','scanner','beep','flashlight','search','language','country','contribute'],
@@ -618,6 +619,16 @@
             </div>
             <input type="checkbox" class="toggle-cb" checked={$autoCreatePantryFromRecipes}
               on:change={e => autoCreatePantryFromRecipes.set(e.target.checked)} />
+          </div>
+
+          <div class="setting-divider"></div>
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">Show Shared Recipes in My Main List</span>
+              <div class="setting-desc">When on, recipes shared with you (via a Kitchen or a direct grant) appear alongside your own on the Recipes tab. Each shared card keeps a "Shared by" badge plus a mint Kitchen chip so you can tell what's yours at a glance. Off by default; the Shared segment stays available either way.</div>
+            </div>
+            <input type="checkbox" class="toggle-cb" checked={$mixSharedIntoRecipes}
+              on:change={e => mixSharedIntoRecipes.set(e.target.checked)} />
           </div>
 
           <div class="setting-divider"></div>

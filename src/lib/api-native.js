@@ -1483,6 +1483,12 @@ export const CtApiNative = {
   async addKitchenMember()         { throw new Error('Kitchens require a server connection.'); },
   async removeKitchenMember()      { return { ok: true }; },
   async shareRecipeWithKitchen()   { return { added: 0 }; },
+  async setKitchenAutoShare()      { return { enabled: false, recipes: 0, added: 0 }; },
+  async shareCookbookWithKitchen() { return { added: 0 }; },
+  async getCookbooksSharedWithMe() { return []; },
+  async getCookbookShares()        { return []; },
+  async shareCookbookWithUsers()   { return { added: 0 }; },
+  async unshareCookbookWithUser()  { return { ok: true }; },
 
   // Recipe importers — Mealie / Tandoor / Paprika ZIPs need the
   // server-side parser pipeline. UI guard suppresses the dialog in

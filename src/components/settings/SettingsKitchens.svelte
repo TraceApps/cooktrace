@@ -79,8 +79,8 @@
     const ok = await confirmDialog({
       title: isSelf ? 'Leave this Kitchen?' : `Remove ${member.username}?`,
       message: isSelf
-        ? `You'll lose access to recipes that were shared via this Kitchen.`
-        : `${member.username} will lose access to recipes shared via this Kitchen.`,
+        ? `You'll lose access to every recipe others shared with the Kitchen. Recipes you contributed to the Kitchen stay accessible to the remaining members.`
+        : `${member.username} will lose access to every recipe others shared with the Kitchen. Recipes they contributed stay accessible to the rest of the Kitchen.`,
       confirmText: isSelf ? 'Leave' : 'Remove',
       dangerous: true,
     });
@@ -97,10 +97,47 @@
     } catch (e) { showError(e.message || 'Could not remove member'); }
   }
 
+  // Per-user auto-share toggle. On enable, backfill every existing
+  // recipe into every current member. On disable, existing grants
+  // persist (the "we still cook from what you already shared" case);
+  // Remove Member / Leave Kitchen is the destructive path that
+  // revokes access in both directions.
+  let autoShareBusyId = null;
+  async function toggleAutoShare(k) {
+    if (autoShareBusyId === k.id) return;
+    const enabling = !k.auto_share;
+    if (enabling) {
+      const otherMembers = Math.max(0, (k.member_count || 1) - 1);
+      const ok = await confirmDialog({
+        title: `Auto-Share Your Recipes with ${k.name}?`,
+        message: otherMembers === 0
+          ? `You're the only member so far. Once you add others, every recipe you own now (or create later) will be shared with them automatically.`
+          : `Every recipe you own now, and every recipe you create later, will be shared with the ${otherMembers} other ${otherMembers === 1 ? 'member' : 'members'} of this Kitchen. They'll see your full library.`,
+        confirmText: 'Turn On',
+      });
+      if (!ok) return;
+    }
+    autoShareBusyId = k.id;
+    try {
+      const res = await NtApi.setKitchenAutoShare(k.id, enabling);
+      kitchens = kitchens.map(x => x.id === k.id
+        ? { ...x, auto_share: !!res.enabled, auto_shared_count: enabling ? (res.recipes || 0) : x.auto_shared_count }
+        : x);
+      if (enabling) {
+        showSuccess(res.recipes > 0
+          ? `Sharing ${res.recipes} ${res.recipes === 1 ? 'recipe' : 'recipes'} with this Kitchen`
+          : `Auto-share is on — new recipes will be shared`);
+      } else {
+        showSuccess(`Auto-share turned off. Previously shared recipes stay visible; remove members to revoke access.`);
+      }
+    } catch (e) { showError(e.message || 'Could not update auto-share'); }
+    finally { autoShareBusyId = null; }
+  }
+
   async function deleteKitchen(k) {
     const ok = await confirmDialog({
       title: `Delete Kitchen "${k.name}"?`,
-      message: `Members will lose access to anything shared through this Kitchen. Recipes themselves are not deleted.`,
+      message: `The Kitchen goes away. Recipes shared through it stay accessible to the people they were shared with — this just ends the Kitchen structure.`,
       confirmText: 'Delete',
       dangerous: true,
     });
@@ -164,6 +201,29 @@
 
           {#if openId === k.id}
             <div class="kitchen-body">
+              <!-- Auto-share toggle. Per-user, per-kitchen. Enabling
+                   backfills every existing recipe I own; disabling
+                   leaves prior grants in place. -->
+              <div class="auto-share-row" class:on={k.auto_share}>
+                <div class="auto-share-copy">
+                  <span class="auto-share-title">Auto-Share My Recipes</span>
+                  <span class="auto-share-hint">
+                    {#if k.auto_share}
+                      Every recipe you create is shared with this Kitchen. {k.auto_shared_count || 0} recipe{(k.auto_shared_count || 0) === 1 ? '' : 's'} shared so far.
+                    {:else}
+                      Turn on to share your full recipe library with everyone in this Kitchen, now and going forward.
+                    {/if}
+                  </span>
+                </div>
+                <button class="switch" class:on={k.auto_share}
+                  disabled={autoShareBusyId === k.id}
+                  on:click={() => toggleAutoShare(k)}
+                  aria-pressed={k.auto_share}
+                  aria-label="Toggle auto-share">
+                  <span class="switch-knob"></span>
+                </button>
+              </div>
+
               <div class="member-list">
                 {#each (members[k.id] || []) as m (m.user_id)}
                   <div class="member-row">
@@ -281,6 +341,44 @@
   .chev.open { transform: rotate(180deg); }
 
   .kitchen-body { padding: 0 0 14px 46px; display: flex; flex-direction: column; gap: 10px; }
+  .auto-share-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: background var(--dur-fast), border-color var(--dur-fast);
+  }
+  .auto-share-row.on {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  .auto-share-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .auto-share-title { font-size: 13px; font-weight: 600; color: var(--text-1); }
+  .auto-share-hint { font-size: 11px; color: var(--text-3); line-height: 1.4; }
+  .switch {
+    width: 38px; height: 22px;
+    border-radius: 999px;
+    background: var(--surface-3, var(--border));
+    border: 1px solid var(--border);
+    position: relative;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: background var(--dur-fast);
+  }
+  .switch:disabled { opacity: 0.5; cursor: wait; }
+  .switch.on { background: var(--accent); border-color: var(--accent); }
+  .switch-knob {
+    position: absolute;
+    top: 1px; left: 1px;
+    width: 18px; height: 18px;
+    background: #fff;
+    border-radius: 999px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    transition: transform var(--dur-fast) var(--ease-spring);
+  }
+  .switch.on .switch-knob { transform: translateX(16px); }
   .member-list { display: flex; flex-direction: column; gap: 4px; }
   .member-row {
     display: flex; align-items: center; justify-content: space-between;

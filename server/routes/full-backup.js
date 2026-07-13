@@ -201,6 +201,7 @@ function dumpDatabase() {
     cookbooks:             _selectIfExists('cookbooks'),
     recipe_cookbook_links: _selectIfExists('recipe_cookbook_links'),
     recipe_shares:         _selectIfExists('recipe_shares'),
+    cookbook_shares:       _selectIfExists('cookbook_shares'),
     kitchens:              _selectIfExists('kitchens'),
     kitchen_members:       _selectIfExists('kitchen_members'),
     oidc_providers:        _selectIfExists('oidc_providers'),
@@ -314,6 +315,7 @@ function restoreFromZip(zip) {
     _restoreTable('cookbooks',             data.cookbooks);
     _restoreTable('recipe_cookbook_links', data.recipe_cookbook_links);
     _restoreTable('recipe_shares',         data.recipe_shares);
+    _restoreTable('cookbook_shares',       data.cookbook_shares);
     _restoreTable('kitchens',              data.kitchens);
     _restoreTable('kitchen_members',       data.kitchen_members);
     _restoreTable('recipe_comments',       data.recipe_comments);

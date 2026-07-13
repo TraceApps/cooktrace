@@ -41,6 +41,30 @@ function _userArgs(u) {
   return u == null ? [] : [u];
 }
 
+// Auto-share fanout — called after every recipe INSERT (manual create,
+// URL scrape, ZIP import, photo import, all paths). If the user has
+// auto_share=1 for any Kitchen they belong to, fan out per-user grants
+// to every other member of that Kitchen via recipe_shares. Idempotent
+// via UNIQUE(recipe_id, grantee_id). No-op when user has no kitchens
+// or hasn't enabled auto-share for any of them.
+function _autoShareNewRecipe(userId, recipeId) {
+  if (userId == null || !Number.isFinite(recipeId)) return;
+  const kitchens = db.prepare(
+    `SELECT kitchen_id FROM kitchen_members WHERE user_id = ? AND auto_share = 1`
+  ).all(userId);
+  if (kitchens.length === 0) return;
+  const ins = db.prepare(
+    `INSERT OR IGNORE INTO recipe_shares (recipe_id, grantee_id, granted_by, via_kitchen_id)
+     VALUES (?, ?, ?, ?)`
+  );
+  for (const k of kitchens) {
+    const members = db.prepare(
+      `SELECT user_id FROM kitchen_members WHERE kitchen_id = ? AND user_id != ?`
+    ).all(k.kitchen_id, userId);
+    for (const m of members) ins.run(recipeId, m.user_id, userId, k.kitchen_id);
+  }
+}
+
 // Tack the creator's current avatar onto a hydrated recipe so the
 // byline can render their photo. Live lookup (cheap PK fetch) keeps
 // avatars current without rewriting recipe rows. Used by GET/POST/PUT
@@ -519,10 +543,13 @@ router.get('/shared-with-me', wrap((req, res) => {
     catMap.set(c.id, c);
   }
   const rows = db.prepare(
-    `SELECT r.*, u.username AS shared_by_username
+    `SELECT r.*, u.username AS shared_by_username,
+            s.via_kitchen_id,
+            k.name AS via_kitchen_name
        FROM recipe_shares s
        JOIN recipes r ON r.id = s.recipe_id
        LEFT JOIN users u ON u.id = s.granted_by
+       LEFT JOIN kitchens k ON k.id = s.via_kitchen_id
       WHERE s.grantee_id = ? AND r.deleted_at IS NULL
       ORDER BY s.granted_at DESC`
   ).all(u);
@@ -530,6 +557,8 @@ router.get('/shared-with-me', wrap((req, res) => {
     ..._hydrate(r, catMap),
     shared_with_me: true,
     shared_by: r.shared_by_username || r.created_by_username || null,
+    via_kitchen_id: r.via_kitchen_id ?? null,
+    via_kitchen_name: r.via_kitchen_name ?? null,
   })));
 }));
 
@@ -586,6 +615,7 @@ router.post('/', wrap((req, res) => {
     data.ingredients, data.steps, data.tags, data.tools, data.nutrition,
     data.source_url, data.notes, data.visibility, creatorUsername, data.category_id, data.video_url,
   );
+  _autoShareNewRecipe(u, result.lastInsertRowid);
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(result.lastInsertRowid);
   res.status(201).json(_withCreatorAvatar(_hydrate(row), row));
 }));
@@ -599,7 +629,8 @@ router.put('/:id', wrap((req, res) => {
   const existing = db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
   const isOwner = (u == null && existing.user_id == null) || existing.user_id === u;
-  if (!isOwner) return res.status(403).json({ error: 'Forbidden' });
+  const isAdmin = req.user?.role === 'admin';
+  if (!isOwner && !isAdmin) return res.status(403).json({ error: 'Only the recipe owner or an admin can edit this recipe' });
 
   const body = { ...(req.body || {}) };
   if (_userSetting(u, 'autoCreatePantryFromRecipes') === 'true') {
@@ -1384,6 +1415,7 @@ function _saveImportedRecipe(u, parsed, opts = {}) {
     }
   }
 
+  _autoShareNewRecipe(u, result.lastInsertRowid);
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(result.lastInsertRowid);
   return _hydrate(row);
 }
@@ -2405,7 +2437,8 @@ router.delete('/:id', wrap((req, res) => {
   const existing = db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
   const isOwner = (u == null && existing.user_id == null) || existing.user_id === u;
-  if (!isOwner) return res.status(403).json({ error: 'Forbidden' });
+  const isAdmin = req.user?.role === 'admin';
+  if (!isOwner && !isAdmin) return res.status(403).json({ error: 'Only the recipe owner or an admin can delete this recipe' });
 
   db.prepare(
     `UPDATE recipes SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`

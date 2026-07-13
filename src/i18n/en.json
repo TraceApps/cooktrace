@@ -95,6 +95,7 @@
     "expires_on_hint":"(optional, helps catch items going bad)"
   },
   "trace": {
+    "panel_label":         "AI coach chat",
     "panel_sub":           "Your AI Cooking & Recipe Assistant",
     "welcome_name":        "Hi, I'm {name}!",
     "welcome_desc":        "Ask me anything about recipes, pantry, meal plans, or shopping. I have access to your kitchen data and can find recipes, scale them, log what you made, and tell you what you can cook from what's on hand.",
@@ -107,7 +108,9 @@
     "chip_shopping":       "Shopping List",
     "chip_shopping_ask":   "Build a shopping list for this week.",
     "ask_placeholder":     "Ask {name}…",
-    "listening":           "Listening…"
+    "listening":           "Listening…",
+    "clear_conversation":  "Clear conversation",
+    "attach_image":        "Attach image"
   },
   "editor": {
     "name_required":      "Name *",
@@ -509,12 +512,6 @@
       "deleted": "Deleted",
       "cloned":  "Cloned"
     }
-  },
-  "trace": {
-    "panel_label":        "AI coach chat",
-    "ask_placeholder":    "Ask me anything…",
-    "clear_conversation": "Clear conversation",
-    "attach_image":       "Attach image"
   },
   "smart_log": {
     "placeholder": "for breakfast I had 2 eggs and toast"

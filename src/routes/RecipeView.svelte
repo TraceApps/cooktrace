@@ -23,6 +23,7 @@
   import { formatStepText } from '../lib/step-format.js';
   import { startTimer, formatRemaining } from '../stores/cookTimers.js';
   import { cookModeActive } from '../stores/cookMode.js';
+  import { currentUser } from '../stores/auth.js';
   import { onDestroy, tick } from 'svelte';
   import { computeRecipeNutrition, computeRecipeMass, lookupCommonDensity } from '../lib/recipe-nutrition.js';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
@@ -39,6 +40,21 @@
   let loading = true;
   let loadError = null;
   let cookBusy = false;
+
+  // Owner-only edit / delete. Admins can edit anything (matches the
+  // server-side gate on PUT/DELETE). Anyone else viewing a recipe
+  // shared with them via a Kitchen or per-user grant sees a
+  // read-only view — the Edit / Delete buttons drop out and the
+  // header shows the creator's byline so they know who to ask about
+  // changes.
+  $: canEdit = !!recipe && (
+    recipe.user_id == null ||
+    recipe.user_id === $currentUser?.id ||
+    $currentUser?.role === 'admin'
+  );
+  $: isSharedView = !!recipe && recipe.user_id != null
+    && $currentUser?.id != null
+    && recipe.user_id !== $currentUser.id;
 
   // Scaling — multiplier applied to every ingredient qty + the displayed
   // serving count. 1 = original. Custom serving input drives this too.
@@ -662,15 +678,26 @@
       </button>
     {:else}
       {#if recipe}
+        {#if isSharedView}
+          <!-- Small lock chip so the reader knows the recipe is
+               read-only for them and who owns it. Byline appears in
+               the header body below. -->
+          <span class="shared-chip" title="Shared with you — read only">
+            <span class="material-symbols-rounded">lock</span>
+            <span class="shared-chip-label">Shared</span>
+          </span>
+        {/if}
         <button class="btn-icon" on:click={openShareSheet} aria-label="Share" title="Share">
           <span class="material-symbols-rounded">share</span>
         </button>
-        <button class="btn-icon" on:click={() => push(`/recipes/edit/${recipe.id}`)} aria-label="Edit" title="Edit">
-          <span class="material-symbols-rounded">edit</span>
-        </button>
-        <button class="btn-icon danger" on:click={remove} aria-label="Delete" title="Delete">
-          <span class="material-symbols-rounded">delete</span>
-        </button>
+        {#if canEdit}
+          <button class="btn-icon" on:click={() => push(`/recipes/edit/${recipe.id}`)} aria-label="Edit" title="Edit">
+            <span class="material-symbols-rounded">edit</span>
+          </button>
+          <button class="btn-icon danger" on:click={remove} aria-label="Delete" title="Delete">
+            <span class="material-symbols-rounded">delete</span>
+          </button>
+        {/if}
       {/if}
       <button class="btn-icon close-btn" on:click={() => push('/recipes')} aria-label="Close" title="Close">
         <span class="material-symbols-rounded">close</span>
@@ -1280,6 +1307,27 @@
   .btn-icon.close-btn:hover {
     background: color-mix(in srgb, var(--error, #ef4444) 18%, transparent);
     color: var(--error, #ef4444);
+  }
+  /* "Shared" chip in the header — signals read-only view for a
+     recipe the current user doesn't own. Text collapses under 480px
+     so the header stays uncluttered on phones. */
+  .shared-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    height: 28px;
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .shared-chip .material-symbols-rounded { font-size: 14px; }
+  @media (max-width: 480px) {
+    .shared-chip-label { display: none; }
+    .shared-chip { padding: 4px 8px; }
   }
 
   .state {

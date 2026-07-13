@@ -128,7 +128,43 @@ router.put('/order', wrap((req, res) => {
   res.json({ ok: true });
 }));
 
+// ── GET /shared-with-me — cookbooks others have shared with me ────────
+// Static route declared BEFORE /:id so the string 'shared-with-me'
+// doesn't get matched as an :id. Mirrors /api/recipes/shared-with-me
+// including the via_kitchen_name enrichment so the client can badge
+// each card with "Shared by X" + a Kitchen chip.
+router.get('/shared-with-me', wrap((req, res) => {
+  const u = uid(req);
+  if (u == null) return res.json([]);
+  const rows = db.prepare(
+    `SELECT c.*,
+            (SELECT COUNT(*) FROM recipe_cookbook_links l WHERE l.cookbook_id = c.id) AS recipe_count,
+            gu.username AS shared_by_username,
+            s.via_kitchen_id,
+            k.name AS via_kitchen_name
+       FROM cookbook_shares s
+       JOIN cookbooks c ON c.id = s.cookbook_id
+       LEFT JOIN users    gu ON gu.id = s.granted_by
+       LEFT JOIN kitchens k  ON k.id  = s.via_kitchen_id
+      WHERE s.grantee_id = ? AND c.deleted_at IS NULL
+      ORDER BY s.granted_at DESC`
+  ).all(u);
+  res.json(rows.map(r => ({
+    ..._hydrate(r, r.recipe_count),
+    shared_with_me: true,
+    shared_by: r.shared_by_username || null,
+    via_kitchen_id: r.via_kitchen_id ?? null,
+    via_kitchen_name: r.via_kitchen_name ?? null,
+  })));
+}));
+
 // ── GET /:id — single cookbook + the recipes inside ─────────────────────
+// Accessible to the owner OR anyone the cookbook has been shared with
+// (per-user grant or Kitchen fanout). Non-owner reads are read-only;
+// recipes inside the cookbook that the reader doesn't have their own
+// access to are flagged `locked: true` with everything but id/name
+// scrubbed, so the shared cookbook doesn't become a discovery
+// mechanism that bypasses recipe-level permissions.
 router.get('/:id', wrap((req, res) => {
   const u = uid(req);
   const id = parseInt(req.params.id, 10);
@@ -138,18 +174,33 @@ router.get('/:id', wrap((req, res) => {
   ).get(id);
   if (!cb) return res.status(404).json({ error: 'Not found' });
   const isOwner = (u == null && cb.user_id == null) || cb.user_id === u;
-  if (!isOwner) return res.status(403).json({ error: 'Forbidden' });
+
+  let sharedRow = null;
+  if (!isOwner && u != null) {
+    sharedRow = db.prepare(
+      `SELECT s.granted_by, s.via_kitchen_id,
+              gu.username AS shared_by_username,
+              k.name AS via_kitchen_name
+         FROM cookbook_shares s
+         LEFT JOIN users    gu ON gu.id = s.granted_by
+         LEFT JOIN kitchens k  ON k.id  = s.via_kitchen_id
+        WHERE s.cookbook_id = ? AND s.grantee_id = ?`
+    ).get(id, u);
+  }
+  if (!isOwner && !sharedRow) return res.status(403).json({ error: 'Forbidden' });
 
   let recipes;
   if (cb.is_smart) {
-    // Smart cookbook: re-evaluate the filter every read. No link table
-    // involvement — the matched recipe set is computed live.
+    // Smart cookbook: re-evaluate the filter every read. Smart filters
+    // always target the OWNER's recipes — the reader sees exactly
+    // what the owner sees. Recipes the reader can't independently
+    // access get locked below.
     let filter = null;
     try { filter = cb.smart_filter_json ? JSON.parse(cb.smart_filter_json) : null; } catch {}
-    recipes = _evalSmartFilter(u, filter || {});
+    recipes = _evalSmartFilter(cb.user_id, filter || {});
   } else {
     recipes = db.prepare(
-      `SELECT r.id, r.name, r.description, r.img_url, r.servings, r.rating, r.favorite,
+      `SELECT r.id, r.user_id, r.name, r.description, r.img_url, r.servings, r.rating, r.favorite,
               r.prep_minutes, r.cook_minutes, r.last_cooked_at, r.cook_count, l.sort_order AS link_order
          FROM recipe_cookbook_links l
          JOIN recipes r ON r.id = l.recipe_id
@@ -158,12 +209,51 @@ router.get('/:id', wrap((req, res) => {
     ).all(id);
   }
 
+  // Access filter for non-owner reads: owned by them OR shared to
+  // them via recipe_shares. Owners see everything they added.
+  let accessible = null;
+  if (!isOwner && u != null) {
+    const ids = recipes.map(r => r.id);
+    if (ids.length > 0) {
+      const ph = ids.map(() => '?').join(',');
+      accessible = new Set(
+        db.prepare(
+          `SELECT r.id FROM recipes r
+            WHERE r.id IN (${ph}) AND r.deleted_at IS NULL
+              AND (r.user_id = ?
+                   OR EXISTS (SELECT 1 FROM recipe_shares s
+                               WHERE s.recipe_id = r.id AND s.grantee_id = ?))`
+        ).all(...ids, u, u).map(r => r.id)
+      );
+    } else {
+      accessible = new Set();
+    }
+  }
+
+  const hydratedRecipes = recipes.map(r => {
+    if (accessible && !accessible.has(r.id)) {
+      // Locked — expose enough to render a placeholder row (name + id
+      // + link_order for sort stability) but strip everything else.
+      return {
+        id: r.id,
+        name: r.name,
+        link_order: r.link_order ?? null,
+        locked: true,
+      };
+    }
+    const { user_id, ...rest } = r;
+    return { ...rest, favorite: !!r.favorite };
+  });
+
   res.json({
-    ..._hydrate(cb, recipes.length),
-    recipes: recipes.map(r => ({
-      ...r,
-      favorite: !!r.favorite,
-    })),
+    ..._hydrate(cb, hydratedRecipes.length),
+    recipes: hydratedRecipes,
+    ...(sharedRow ? {
+      shared_with_me: true,
+      shared_by: sharedRow.shared_by_username || null,
+      via_kitchen_id: sharedRow.via_kitchen_id ?? null,
+      via_kitchen_name: sharedRow.via_kitchen_name ?? null,
+    } : {}),
   });
 }));
 
@@ -292,13 +382,24 @@ router.post('/:id/recipes', wrap((req, res) => {
   const ids = Array.isArray(req.body?.recipe_ids) ? req.body.recipe_ids.map(n => parseInt(n, 10)).filter(Number.isFinite) : [];
   if (ids.length === 0) return res.status(400).json({ error: 'recipe_ids required' });
 
-  // Filter out recipes the user can't reach. Currently same-user only —
-  // group-shared recipes can be linked later if visibility expands.
-  const ownedIds = new Set(
+  // Filter to recipes the user can actually see: their own OR recipes
+  // that have been shared with them via recipe_shares (per-user grant
+  // or fanned out from a Kitchen). Non-accessible ids are silently
+  // dropped so an accidental include doesn't 400 the whole batch.
+  const placeholders = ids.map(() => '?').join(',');
+  const accessibleIds = new Set(
     db.prepare(
-      `SELECT id FROM recipes WHERE id IN (${ids.map(() => '?').join(',')})
-        AND ${u == null ? 'user_id IS NULL' : 'user_id = ?'} AND deleted_at IS NULL`
-    ).all(...ids, ...userArgs(u)).map(r => r.id)
+      u == null
+        ? `SELECT id FROM recipes
+             WHERE id IN (${placeholders})
+               AND user_id IS NULL AND deleted_at IS NULL`
+        : `SELECT r.id FROM recipes r
+             WHERE r.id IN (${placeholders})
+               AND r.deleted_at IS NULL
+               AND (r.user_id = ?
+                    OR EXISTS (SELECT 1 FROM recipe_shares s
+                                WHERE s.recipe_id = r.id AND s.grantee_id = ?))`
+    ).all(...ids, ...(u == null ? [] : [u, u])).map(r => r.id)
   );
 
   const maxOrder = db.prepare(
@@ -312,7 +413,7 @@ router.post('/:id/recipes', wrap((req, res) => {
   let order = maxOrder + 1;
   const tx = db.transaction(() => {
     for (const rid of ids) {
-      if (!ownedIds.has(rid)) continue;
+      if (!accessibleIds.has(rid)) continue;
       const r = ins.run(id, rid, order++);
       if (r.changes > 0) added++;
     }
@@ -376,6 +477,69 @@ router.get('/by-recipe/:recipeId', wrap((req, res) => {
       WHERE l.recipe_id = ? AND c.deleted_at IS NULL AND ${userClauseAliased(u, 'c')}`
   ).all(recipeId, ...userArgs(u));
   res.json(rows);
+}));
+
+// ── GET /:id/shares — list current grantees (owner-only) ──────────────
+router.get('/:id/shares', wrap((req, res) => {
+  const u = uid(req);
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+  const cb = db.prepare(`SELECT user_id FROM cookbooks WHERE id = ? AND deleted_at IS NULL`).get(id);
+  if (!cb) return res.status(404).json({ error: 'Not found' });
+  if (cb.user_id !== u) return res.status(403).json({ error: 'Forbidden' });
+  const rows = db.prepare(
+    `SELECT s.grantee_id AS user_id, u.username, u.full_name,
+            s.via_kitchen_id, k.name AS via_kitchen_name, s.granted_at
+       FROM cookbook_shares s
+       JOIN users    u ON u.id = s.grantee_id
+       LEFT JOIN kitchens k ON k.id = s.via_kitchen_id
+      WHERE s.cookbook_id = ?
+      ORDER BY u.username COLLATE NOCASE ASC`
+  ).all(id);
+  res.json(rows);
+}));
+
+// ── POST /:id/shares — grant N users read access (owner-only) ────────
+// body: { user_ids: [1, 2, 3] } — silently drops ids that don't exist
+// or already have access. Returns { added } for a toastable summary.
+router.post('/:id/shares', wrap((req, res) => {
+  const u = uid(req);
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+  const cb = db.prepare(`SELECT user_id FROM cookbooks WHERE id = ? AND deleted_at IS NULL`).get(id);
+  if (!cb) return res.status(404).json({ error: 'Not found' });
+  if (cb.user_id !== u) return res.status(403).json({ error: 'Forbidden' });
+  const rawIds = Array.isArray(req.body?.user_ids) ? req.body.user_ids : [];
+  const ids = rawIds.map(n => parseInt(n, 10)).filter(Number.isFinite);
+  if (ids.length === 0) return res.status(400).json({ error: 'user_ids required' });
+  const ins = db.prepare(
+    `INSERT OR IGNORE INTO cookbook_shares (cookbook_id, grantee_id, granted_by) VALUES (?, ?, ?)`
+  );
+  let added = 0;
+  const tx = db.transaction(() => {
+    for (const gid of ids) {
+      if (gid === u) continue;
+      const exists = db.prepare(`SELECT 1 FROM users WHERE id = ?`).get(gid);
+      if (!exists) continue;
+      const r = ins.run(id, gid, u);
+      if (r.changes > 0) added++;
+    }
+  });
+  tx();
+  res.json({ ok: true, added });
+}));
+
+// ── DELETE /:id/shares/:userId — revoke a single grantee ──────────────
+router.delete('/:id/shares/:userId', wrap((req, res) => {
+  const u = uid(req);
+  const id = parseInt(req.params.id, 10);
+  const target = parseInt(req.params.userId, 10);
+  if (!Number.isFinite(id) || !Number.isFinite(target)) return res.status(400).json({ error: 'Invalid id' });
+  const cb = db.prepare(`SELECT user_id FROM cookbooks WHERE id = ? AND deleted_at IS NULL`).get(id);
+  if (!cb) return res.status(404).json({ error: 'Not found' });
+  if (cb.user_id !== u) return res.status(403).json({ error: 'Forbidden' });
+  db.prepare(`DELETE FROM cookbook_shares WHERE cookbook_id = ? AND grantee_id = ?`).run(id, target);
+  res.json({ ok: true });
 }));
 
 export default router;

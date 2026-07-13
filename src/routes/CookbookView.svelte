@@ -182,14 +182,21 @@
     </button>
     <h2 class="editor-title">{cookbook?.name || 'Cookbook'}</h2>
     {#if cookbook}
-      {#if !cookbook.is_smart}
-        <button class="btn-icon" on:click={openAddDialog} aria-label="Add recipes" title="Add recipes">
-          <span class="material-symbols-rounded">add</span>
+      {#if cookbook.shared_with_me}
+        <span class="shared-chip" title={cookbook.shared_by ? `Shared by ${cookbook.shared_by}${cookbook.via_kitchen_name ? ' via ' + cookbook.via_kitchen_name : ''}` : 'Shared with you — read only'}>
+          <span class="material-symbols-rounded">lock</span>
+          <span class="shared-chip-label">Shared</span>
+        </span>
+      {:else}
+        {#if !cookbook.is_smart}
+          <button class="btn-icon" on:click={openAddDialog} aria-label="Add recipes" title="Add recipes">
+            <span class="material-symbols-rounded">add</span>
+          </button>
+        {/if}
+        <button class="btn-icon danger" on:click={deleteCookbook} aria-label="Delete" title="Delete cookbook">
+          <span class="material-symbols-rounded">delete</span>
         </button>
       {/if}
-      <button class="btn-icon danger" on:click={deleteCookbook} aria-label="Delete" title="Delete cookbook">
-        <span class="material-symbols-rounded">delete</span>
-      </button>
     {/if}
   </header>
 
@@ -253,6 +260,22 @@
       {:else}
         <div class="grid">
           {#each cookbook.recipes as r, i (r.id)}
+            {#if r.locked}
+              <!-- Locked placeholder — the reader doesn't have their
+                   own access to this recipe. Show the name so they
+                   know what's here + a hint about how to unlock it,
+                   but don't navigate anywhere. -->
+              <div class="card recipe-card locked-card"
+                title="This recipe isn't shared with you individually. Ask the cookbook owner to share the recipe or add it to a Kitchen you're both in.">
+                <div class="card-image">
+                  <span class="material-symbols-rounded card-image-fallback">lock</span>
+                </div>
+                <div class="card-body">
+                  <h3 class="card-name">{r.name}</h3>
+                  <p class="card-desc locked-hint">Not shared with you — ask the cookbook owner to share it.</p>
+                </div>
+              </div>
+            {:else}
             <div class="card recipe-card">
               <button class="card-clickable" on:click={() => push(`/recipes/${r.id}`)}>
                 <div class="card-image">
@@ -278,7 +301,7 @@
                   </div>
                 </div>
               </button>
-              {#if !cookbook.is_smart}
+              {#if !cookbook.is_smart && !cookbook.shared_with_me}
                 <button class="remove-btn" on:click={() => removeRecipe(r)}
                   aria-label={`Remove ${r.name}`} title="Remove from cookbook">
                   <span class="material-symbols-rounded">close</span>
@@ -301,6 +324,7 @@
                 </div>
               {/if}
             </div>
+            {/if}
           {/each}
         </div>
       {/if}
@@ -679,5 +703,42 @@
     padding: 12px 16px;
     display: flex; justify-content: flex-end; gap: 8px;
     border-top: 1px solid var(--border);
+  }
+  /* "Shared" chip in the editor header — signals read-only cookbook.
+     Same shape as RecipeView's shared chip for cross-page consistency. */
+  .shared-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    height: 28px;
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .shared-chip .material-symbols-rounded { font-size: 14px; }
+  @media (max-width: 480px) {
+    .shared-chip-label { display: none; }
+    .shared-chip { padding: 4px 8px; }
+  }
+  /* Locked recipe card placeholder — recipe is in the cookbook but
+     the reader hasn't been granted their own access, so the row is a
+     hint, not a link. Dim and non-interactive to avoid promising
+     something the tap won't deliver. */
+  .locked-card {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  .locked-card .card-image-fallback {
+    color: var(--text-3);
+    font-size: 44px;
+  }
+  .locked-hint {
+    font-style: italic;
+    color: var(--text-3) !important;
+    font-size: 11px !important;
   }
 </style>

@@ -6,7 +6,7 @@
   import { formatDuration } from '../lib/duration.js';
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
-  import { pageBanners, bannerStyle, aiEnabled, aiKeyVerified, recipesSort } from '../stores/settings.js';
+  import { pageBanners, bannerStyle, aiEnabled, aiKeyVerified, recipesSort, mixSharedIntoRecipes } from '../stores/settings.js';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import ImportFromFileDialog from '../components/recipe/ImportFromFileDialog.svelte';
   import CookbookImportDialog from '../components/recipe/CookbookImportDialog.svelte';
@@ -265,6 +265,73 @@
   let shareDialogRecipe = null;
   let shareDialogToken = null;
   let shareDialogBusy = false;
+
+  // Cookbook share dialog — analogous to the recipe share dialog but
+  // scoped to cookbooks. Two sections: Share with Users (per-user
+  // grants) and Share with Kitchen (fan out to all members). No
+  // public-link section — cookbook sharing is member-scoped only.
+  let cookbookShareDialogOpen = false;
+  let cookbookShareTarget = null;         // the cookbook being shared
+  let cookbookSharePeers = [];            // users I can share with
+  let cookbookShareGrants = new Set();    // user_ids currently granted
+  let cookbookShareKitchens = [];         // my kitchens
+  let cookbookShareKitchenBusyId = null;
+  let cookbookShareBusy = false;
+  // Loaded lazily alongside `cookbooks` so the Cookbooks tab can
+  // show cookbooks that others shared with me, badged like Recipes'
+  // Shared tab.
+  let sharedCookbooks = [];
+
+  async function openCookbookShareDialog(cb) {
+    cookbookShareTarget = cb;
+    cookbookShareDialogOpen = true;
+    cookbookSharePeers = [];
+    cookbookShareGrants = new Set();
+    cookbookShareKitchens = [];
+    cookbookShareKitchenBusyId = null;
+    const [peers, grants, kitchens] = await Promise.all([
+      NtApi.getSharePeers().catch(() => []),
+      NtApi.getCookbookShares(cb.id).catch(() => []),
+      NtApi.getKitchens().catch(() => []),
+    ]);
+    cookbookSharePeers = peers || [];
+    cookbookShareGrants = new Set((grants || []).map(g => g.user_id));
+    cookbookShareKitchens = kitchens || [];
+  }
+  async function toggleCookbookShareUser(userId) {
+    if (!cookbookShareTarget || cookbookShareBusy) return;
+    cookbookShareBusy = true;
+    const isGranted = cookbookShareGrants.has(userId);
+    try {
+      if (isGranted) {
+        await NtApi.unshareCookbookWithUser(cookbookShareTarget.id, userId);
+        const next = new Set(cookbookShareGrants); next.delete(userId);
+        cookbookShareGrants = next;
+      } else {
+        await NtApi.shareCookbookWithUsers(cookbookShareTarget.id, [userId]);
+        const next = new Set(cookbookShareGrants); next.add(userId);
+        cookbookShareGrants = next;
+      }
+    } catch (e) { showError(e.message || 'Could not update share'); }
+    finally { cookbookShareBusy = false; }
+  }
+  async function shareCookbookWithKitchen(kitchen) {
+    if (!cookbookShareTarget) return;
+    cookbookShareKitchenBusyId = kitchen.id;
+    try {
+      const res = await NtApi.shareCookbookWithKitchen(kitchen.id, cookbookShareTarget.id);
+      const fresh = await NtApi.getCookbookShares(cookbookShareTarget.id).catch(() => []);
+      cookbookShareGrants = new Set((fresh || []).map(g => g.user_id));
+      const added = res?.added ?? 0;
+      if (added > 0) showSuccess(`Shared with ${added} ${added === 1 ? 'member' : 'members'} of ${kitchen.name}`);
+      else showSuccess(`Already shared with everyone in ${kitchen.name}`);
+    } catch (e) { showError(e.message || 'Could not share'); }
+    finally { cookbookShareKitchenBusyId = null; }
+  }
+  function closeCookbookShareDialog() {
+    cookbookShareDialogOpen = false;
+    cookbookShareTarget = null;
+  }
   // Per-user share grants (separate from public link). Loaded alongside
   // the dialog open so the user sees who already has access.
   let sharePeers = [];
@@ -506,13 +573,19 @@
   // text + count badges). Re-measured on viewMode change, on mount,
   // and on resize. CSS animates left/width via transitions.
   let vtContainer = null;
-  let vtBtns = [];
+  // Explicit refs — Shared is rendered conditionally between Recipes
+  // and Cookbooks so an integer-indexed array would shift depending
+  // on whether sharedRecipes.length > 0. Named refs stay stable.
+  let vtBtnRecipes = null;
+  let vtBtnShared = null;
+  let vtBtnCookbooks = null;
   let vtPillX = 0;
   let vtPillW = 0;
   function _measureVtPill() {
     if (!vtContainer) return;
-    const idx = viewMode === 'recipes' ? 0 : viewMode === 'cookbooks' ? 1 : 2;
-    const btn = vtBtns[idx];
+    const btn = viewMode === 'shared' ? vtBtnShared
+              : viewMode === 'cookbooks' ? vtBtnCookbooks
+              : vtBtnRecipes;
     if (!btn) return;
     const cRect = vtContainer.getBoundingClientRect();
     const bRect = btn.getBoundingClientRect();
@@ -521,7 +594,7 @@
   }
   // Wait for the DOM update to flush — the toggle buttons are mounted
   // inside `{#if recipes.length || cookbooks.length || sharedRecipes.length}`
-  // so on initial load `bind:this={vtBtns[0]}` only populates after the
+  // so on initial load the bind:this refs only populate after the
   // first reactive pass completes. tick() guarantees the bindings have
   // been applied before we measure; rAF could fire too early on cold
   // mount and leave the pill at zero width on the active "Recipes" tab.
@@ -584,7 +657,11 @@
 
   $: filtered = (() => {
     const q = query.trim().toLowerCase();
-    let list = recipes;
+    // Optional mix-in: when the user has "Show Shared Recipes in My
+    // Main List" on, append the /shared-with-me collection to the
+    // owned recipes. Cards keep their existing shared_by badge + the
+    // new via-kitchen chip so ownership is still visually clear.
+    let list = $mixSharedIntoRecipes ? [...recipes, ...sharedRecipes] : recipes;
     if (favoritesOnly) list = list.filter(r => r.favorite);
     if (activeCategorySlug) {
       list = list.filter(r => r.category && r.category.slug === activeCategorySlug);
@@ -642,16 +719,18 @@
     loading = true;
     loadError = null;
     try {
-      const [recipesRes, catsRes, cookbooksRes, sharedRes] = await Promise.all([
+      const [recipesRes, catsRes, cookbooksRes, sharedRes, sharedCbRes] = await Promise.all([
         NtApi.getRecipes(),
         NtApi.getRecipeCategories().catch(() => []),
         NtApi.getCookbooks().catch(() => []),
         NtApi.getRecipesSharedWithMe().catch(() => []),
+        NtApi.getCookbooksSharedWithMe().catch(() => []),
       ]);
       recipes = recipesRes;
       categories = catsRes || [];
       cookbooks = cookbooksRes || [];
       sharedRecipes = sharedRes || [];
+      sharedCookbooks = sharedCbRes || [];
       activeCategorySlug = _readCategoryFromHash();
       viewMode = _readViewFromHash();
       // Explicit re-measure after the toggle buttons render — the
@@ -814,6 +893,78 @@
             </div>
           {/if}
         </section>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Cookbook share dialog. Modeled on the recipe share dialog above
+       (Section 1: Share with Users; Section 1.5: Share with a Kitchen)
+       minus the public-link section — cookbook sharing is member-
+       scoped only. -->
+  {#if cookbookShareDialogOpen && cookbookShareTarget}
+    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+    <div class="cb-dialog-backdrop" on:click={closeCookbookShareDialog}>
+      <div class="cb-dialog share-dialog" on:click|stopPropagation>
+        <header class="cb-dialog-head">
+          <span class="material-symbols-rounded">share</span>
+          <h3>Share Cookbook</h3>
+          <button class="cb-close" on:click={closeCookbookShareDialog}
+            aria-label="Close">
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </header>
+        <p class="cb-dialog-sub">{cookbookShareTarget.name}</p>
+
+        <section class="share-section">
+          <h4 class="share-section-title">
+            <span class="material-symbols-rounded">person</span>
+            Share with Users
+          </h4>
+          <p class="share-section-hint">Grants read access. They can view and cook from the cookbook but can't edit it.</p>
+          {#if cookbookSharePeers.length === 0}
+            <p class="share-empty">No other users yet.</p>
+          {:else}
+            <ul class="peer-list">
+              {#each cookbookSharePeers as p (p.user_id)}
+                <li class="peer-row">
+                  <span class="peer-name">{p.full_name || p.username}</span>
+                  <span class="peer-handle">@{p.username}</span>
+                  <label class="peer-check">
+                    <input type="checkbox"
+                      checked={cookbookShareGrants.has(p.user_id)}
+                      disabled={cookbookShareBusy}
+                      on:change={() => toggleCookbookShareUser(p.user_id)} />
+                    <span>Share</span>
+                  </label>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </section>
+
+        {#if cookbookShareKitchens.length > 0}
+          <section class="share-section">
+            <h4 class="share-section-title">
+              <span class="material-symbols-rounded">cooking</span>
+              Share with a Kitchen
+            </h4>
+            <p class="share-section-hint">Sends the cookbook to every member of the Kitchen at once.</p>
+            <ul class="peer-list">
+              {#each cookbookShareKitchens as k (k.id)}
+                <li class="peer-row">
+                  <span class="material-symbols-rounded" style="font-size:18px;color:var(--accent);">cooking</span>
+                  <span class="peer-name">{k.name}</span>
+                  <span class="peer-handle">{k.member_count} {k.member_count === 1 ? 'member' : 'members'}</span>
+                  <button class="btn btn-secondary" style="margin-left:auto;height:30px;font-size:12px"
+                    on:click={() => shareCookbookWithKitchen(k)}
+                    disabled={cookbookShareKitchenBusyId === k.id}>
+                    {cookbookShareKitchenBusyId === k.id ? 'Sharing…' : 'Share'}
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/if}
       </div>
     </div>
   {/if}
@@ -988,24 +1139,19 @@
         style="--vt-pill-x:{vtPillX}px; --vt-pill-w:{vtPillW}px">
         <span class="vt-pill" aria-hidden="true"></span>
         <button class="vt-btn" class:active={viewMode === 'recipes'}
-          bind:this={vtBtns[0]}
+          bind:this={vtBtnRecipes}
           on:click={() => setViewMode('recipes')}
           aria-pressed={viewMode === 'recipes'}>
           <span class="material-symbols-rounded">menu_book</span>
           Recipes
           <span class="vt-count">{recipes.length}</span>
         </button>
-        <button class="vt-btn" class:active={viewMode === 'cookbooks'}
-          bind:this={vtBtns[1]}
-          on:click={() => setViewMode('cookbooks')}
-          aria-pressed={viewMode === 'cookbooks'}>
-          <span class="material-symbols-rounded">auto_stories</span>
-          Cookbooks
-          <span class="vt-count">{cookbooks.length}</span>
-        </button>
         {#if sharedRecipes.length > 0}
+          <!-- Shared sits between Recipes and Cookbooks — closer to
+               "my recipes" mentally, since these are things I cook
+               from. Cookbooks are curated collections, further right. -->
           <button class="vt-btn" class:active={viewMode === 'shared'}
-            bind:this={vtBtns[2]}
+            bind:this={vtBtnShared}
             on:click={() => setViewMode('shared')}
             aria-pressed={viewMode === 'shared'}>
             <span class="material-symbols-rounded">group</span>
@@ -1013,6 +1159,14 @@
             <span class="vt-count">{sharedRecipes.length}</span>
           </button>
         {/if}
+        <button class="vt-btn" class:active={viewMode === 'cookbooks'}
+          bind:this={vtBtnCookbooks}
+          on:click={() => setViewMode('cookbooks')}
+          aria-pressed={viewMode === 'cookbooks'}>
+          <span class="material-symbols-rounded">auto_stories</span>
+          Cookbooks
+          <span class="vt-count">{cookbooks.length}</span>
+        </button>
       </div>
     {/if}
 
@@ -1110,6 +1264,12 @@
                   <span class="material-symbols-rounded">group</span>
                   {r.shared_by || 'Shared'}
                 </span>
+                {#if r.via_kitchen_name}
+                  <span class="via-kitchen-badge" title={`Shared via ${r.via_kitchen_name}`}>
+                    <span class="material-symbols-rounded">cooking</span>
+                    {r.via_kitchen_name}
+                  </span>
+                {/if}
               </div>
               <div class="card-body">
                 {#if r.category}
@@ -1140,8 +1300,10 @@
         </div>
       {/if}
     {:else if viewMode === 'cookbooks'}
-      <!-- Cookbooks tab -->
-      {#if cookbooks.length === 0}
+      <!-- Cookbooks tab: your cookbooks first, then cookbooks others
+           shared with you. Shared cards keep a "Shared by" badge +
+           via-Kitchen chip so ownership is obvious. -->
+      {#if cookbooks.length === 0 && sharedCookbooks.length === 0}
         <div class="state empty" in:fade={{ duration: 120 }}>
           <span class="material-symbols-rounded empty-icon">auto_stories</span>
           <h2>No Cookbooks Yet</h2>
@@ -1158,6 +1320,44 @@
                   <img src={cb.cover_image_url} alt="" loading="lazy" />
                 {:else}
                   <span class="material-symbols-rounded">auto_stories</span>
+                {/if}
+                <!-- Owner-only share affordance. stopPropagation so
+                     tapping the icon opens the dialog instead of
+                     navigating into the cookbook. -->
+                <span class="cb-share-btn material-symbols-rounded"
+                  role="button" tabindex="0"
+                  title="Share cookbook"
+                  aria-label="Share cookbook"
+                  on:click|stopPropagation={() => openCookbookShareDialog(cb)}
+                  on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCookbookShareDialog(cb); } }}>share</span>
+              </div>
+              <div class="cb-card-body">
+                <h3 class="cb-card-name">{cb.name}</h3>
+                {#if cb.description}<p class="cb-card-desc">{cb.description}</p>{/if}
+                <span class="cb-card-count">
+                  {cb.recipe_count} {cb.recipe_count === 1 ? 'recipe' : 'recipes'}
+                </span>
+              </div>
+            </button>
+          {/each}
+          {#each sharedCookbooks as cb (cb.id)}
+            <button class="card cookbook-card"
+              on:click={() => push(`/cookbooks/${cb.id}`)}>
+              <div class="cb-card-cover">
+                {#if cb.cover_image_url}
+                  <img src={cb.cover_image_url} alt="" loading="lazy" />
+                {:else}
+                  <span class="material-symbols-rounded">auto_stories</span>
+                {/if}
+                <span class="shared-badge" title={cb.shared_by ? `Shared by ${cb.shared_by}` : 'Shared with you'}>
+                  <span class="material-symbols-rounded">group</span>
+                  {cb.shared_by || 'Shared'}
+                </span>
+                {#if cb.via_kitchen_name}
+                  <span class="via-kitchen-badge" title={`Shared via ${cb.via_kitchen_name}`}>
+                    <span class="material-symbols-rounded">cooking</span>
+                    {cb.via_kitchen_name}
+                  </span>
                 {/if}
               </div>
               <div class="cb-card-body">
@@ -1207,6 +1407,22 @@
               {/if}
               {#if r.favorite}
                 <span class="card-fav material-symbols-rounded" title="Favorite">favorite</span>
+              {/if}
+              <!-- When "Show Shared Recipes in My Main List" is on, the
+                   mixed-in cards keep their identity chips so ownership
+                   is still obvious at a glance. Only renders when the
+                   recipe was surfaced from /shared-with-me. -->
+              {#if r.shared_with_me}
+                <span class="shared-badge" title={r.shared_by ? `Shared by ${r.shared_by}` : 'Shared with you'}>
+                  <span class="material-symbols-rounded">group</span>
+                  {r.shared_by || 'Shared'}
+                </span>
+                {#if r.via_kitchen_name}
+                  <span class="via-kitchen-badge" title={`Shared via ${r.via_kitchen_name}`}>
+                    <span class="material-symbols-rounded">cooking</span>
+                    {r.via_kitchen_name}
+                  </span>
+                {/if}
               {/if}
             </div>
             <div class="card-body">
@@ -1418,6 +1634,7 @@
   }
   .cookbook-card:hover { transform: translateY(-2px); border-color: var(--accent-dim); }
   .cb-card-cover {
+    position: relative;
     aspect-ratio: 16 / 9;
     background: linear-gradient(135deg, var(--accent-dim), var(--surface-2));
     display: flex; align-items: center; justify-content: center;
@@ -1425,6 +1642,30 @@
   }
   .cb-card-cover img { width: 100%; height: 100%; object-fit: cover; }
   .cb-card-cover .material-symbols-rounded { font-size: 56px; color: var(--accent); opacity: 0.7; }
+  /* Share affordance on owner-only cookbook cards. Tap the icon
+     instead of the card to open the share dialog (stopPropagation
+     handles it). Small enough not to compete with the cover art. */
+  .cb-share-btn {
+    position: absolute;
+    top: 6px; right: 6px;
+    width: 28px; height: 28px;
+    background: rgba(0, 0, 0, 0.55);
+    color: white;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px !important;
+    opacity: 0;
+    transition: opacity var(--dur-fast), background var(--dur-fast);
+    cursor: pointer;
+  }
+  .cookbook-card:hover .cb-share-btn,
+  .cookbook-card:focus-within .cb-share-btn { opacity: 1; }
+  .cb-share-btn:hover { background: var(--accent); color: var(--accent-text, #0A0B0F); }
+  /* Touch devices don't have :hover — keep the share icon visible so
+     it's actually reachable on mobile. */
+  @media (hover: none) { .cb-share-btn { opacity: 0.85; } }
   .cb-card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 4px; }
   .cb-card-name { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-1); }
   .cb-card-desc {
@@ -1931,4 +2172,27 @@
     text-transform: uppercase;
   }
   .shared-badge .material-symbols-rounded { font-size: 12px; }
+  /* "via [Kitchen]" chip — mint accent to distinguish from the neutral
+     shared-by badge above it. Sits directly under so both are readable
+     at a glance without visual conflict. */
+  .via-kitchen-badge {
+    position: absolute;
+    top: 34px;
+    left: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: color-mix(in srgb, var(--accent) 78%, black 22%);
+    color: white;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    max-width: calc(100% - 16px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .via-kitchen-badge .material-symbols-rounded { font-size: 12px; }
 </style>

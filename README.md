@@ -35,9 +35,9 @@ Third app in the Trace family alongside [NutriTrace](https://github.com/traceapp
 - **Cook log** — date + notes + photo per cook event; per-recipe history with edit / delete
 - **FDA-style Nutrition Facts box** — 31 nutriments in real label order, %DV column, sodium ↔ salt auto-derive
 - **Auto-nutrition recompute** — sums each ingredient's contribution via its linked pantry row; Settings → Recompute Nutrition surfaces missing density hints
-- **Sharing** — per-user grants, public-link share tokens, Pinterest-style recipe-card share (SVG), Kitchens (multi-user soft groups for fanning shares out to a whole household at once)
+- **Sharing** — per-user grants, public-link share tokens, Pinterest-style recipe-card share (SVG), Kitchens (multi-user soft groups for fanning shares out to a whole household at once). Kitchens support **Auto-Share Your Recipes**: turn it on and every recipe you own (past and future) is shared with the current members automatically, with new members picking up existing members' recipes when they join. Recipes shared with you land in a dedicated **Shared** tab (with a per-recipe chip showing which Kitchen the grant came through), or you can flip a Settings toggle to blend them into your main Recipes list.
 - **Long-press / right-click** any card → action sheet (open, favorite, plan a cook, add to shopping, share card, share link, add to cookbook, share with Kitchen, duplicate, select multiple, delete)
-- **Cookbooks** — group recipes into named collections (`Weeknight`, `Holiday`, `Mom's recipes`)
+- **Cookbooks** — group recipes into named collections (`Weeknight`, `Holiday`, `Mom's recipes`). Cookbooks can hold recipes others have shared with you, and cookbooks themselves can be shared with specific users or a whole Kitchen. Recipes inside a shared cookbook that you haven't been granted individually appear as a locked placeholder, so cookbook access can't be used to bypass recipe permissions.
 - **Print** — `Cmd-P` on a recipe view yields a clean one- or two-page recipe card. Strips nav, FAB, comments, history, time chips, nutrition box. Keeps hero, name, servings, time, ingredients (left), steps (right), notes
 
 ### Recipe Editor
@@ -120,7 +120,7 @@ Third app in the Trace family alongside [NutriTrace](https://github.com/traceapp
 - **Password reset** — SMTP-backed when configured (env-locked or via Settings UI)
 - **OIDC Single Sign-On** — Authentik, Keycloak, Auth0, Authelia, Pocket-ID, Google. Multi-provider admin UI, encrypted client secrets, auto-link verified emails, optional auto-register of new users
 - **RP-initiated logout** — when an SSO user signs out, CookTrace also ends the session at the IdP via the standard OIDC end-session endpoint (using `id_token_hint`)
-- **Kitchens** — multi-user soft groups for fanning recipe shares out to every member at once
+- **Kitchens** — multi-user soft groups for fanning recipe and cookbook shares out to every member at once. Supports Auto-Share (existing plus future recipes) and cookbook fanout to the whole Kitchen. Leaving or being removed only revokes incoming grants; anything you shared into the Kitchen stays with the remaining members.
 - **Optional Strong Password policy** (admin) — zxcvbn strength checking on top of the standard rules
 - **Biometric sign-in on Android** — fingerprint or face, opt-in per device, password remains the always-available fallback
 

@@ -694,6 +694,39 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_kitchen_members_user ON kitchen_members(user_id);
 `);
 
+// Per-user auto-share opt-in per kitchen. When 1, every recipe the user
+// creates fans out per-user grants to every other kitchen member via
+// recipe_shares, and enabling backfills the same for their existing
+// recipes. On kitchen leave / remove we revoke every share tagged with
+// via_kitchen_id = <that kitchen> so exiting = losing access, both
+// directions.
+if (!columnExists('kitchen_members', 'auto_share')) {
+  db.exec(`ALTER TABLE kitchen_members ADD COLUMN auto_share INTEGER NOT NULL DEFAULT 0`);
+}
+if (!columnExists('recipe_shares', 'via_kitchen_id')) {
+  db.exec(`ALTER TABLE recipe_shares ADD COLUMN via_kitchen_id INTEGER REFERENCES kitchens(id) ON DELETE SET NULL`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_recipe_shares_via_kitchen ON recipe_shares(via_kitchen_id)`);
+}
+
+// Per-user cookbook sharing — mirrors recipe_shares including the
+// via_kitchen_id tag so kitchen leave / delete semantics stay
+// consistent between recipes and cookbooks. Explicit only; no
+// auto-share equivalent (cookbooks are personal curation, not raw
+// material). Reads on a shared cookbook are read-only for the
+// grantee; edits + membership stay owner-only.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS cookbook_shares (
+    cookbook_id    INTEGER NOT NULL REFERENCES cookbooks(id) ON DELETE CASCADE,
+    grantee_id     INTEGER NOT NULL REFERENCES users(id)    ON DELETE CASCADE,
+    granted_by     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    granted_at     TEXT DEFAULT (datetime('now')),
+    via_kitchen_id INTEGER REFERENCES kitchens(id) ON DELETE SET NULL,
+    PRIMARY KEY (cookbook_id, grantee_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_cookbook_shares_grantee     ON cookbook_shares(grantee_id);
+  CREATE INDEX IF NOT EXISTS idx_cookbook_shares_via_kitchen ON cookbook_shares(via_kitchen_id);
+`);
+
 // ── One-time fix: rewrite malformed recipe.last_cooked_at values ──────────
 // The earlier recompute SQL concatenated cook_diary.date with a full
 // timestamp via `date || ' ' || created_at`, producing strings like

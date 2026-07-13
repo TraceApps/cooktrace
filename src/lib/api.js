@@ -290,6 +290,11 @@ const _CtApiHttp = {
   addKitchenMember(id, username)              { return this.post(`/api/kitchens/${id}/members`, { username }); },
   removeKitchenMember(id, userId)             { return this.del(`/api/kitchens/${id}/members/${userId}`); },
   shareRecipeWithKitchen(kitchenId, recipeId) { return this.post(`/api/kitchens/${kitchenId}/share-recipe`, { recipe_id: recipeId }); },
+  // Per-user auto-share toggle. Enabling backfills every existing
+  // recipe you own to every current kitchen member. Server response
+  // carries { enabled, recipes, added } so the UI can toast a
+  // meaningful summary of the fanout.
+  setKitchenAutoShare(kitchenId, enabled)     { return this.put(`/api/kitchens/${kitchenId}/auto-share`, { enabled }); },
 
   getCookbooks()                              { return this.get('/api/cookbooks'); },
   async getCookbook(id) {
@@ -304,6 +309,14 @@ const _CtApiHttp = {
   reorderCookbookRecipes(id, recipeIds)       { return this.put(`/api/cookbooks/${id}/recipes/order`, { recipe_ids: recipeIds }); },
   reorderCookbooks(cookbookIds)               { return this.put('/api/cookbooks/order', { cookbook_ids: cookbookIds }); },
   getCookbooksForRecipe(recipeId)             { return this.get(`/api/cookbooks/by-recipe/${recipeId}`); },
+  // Cookbook sharing — mirrors the recipe share API. Per-user grants
+  // via /shares; kitchen fanout via /share-cookbook on the kitchens
+  // resource; /shared-with-me returns cookbooks others have shared.
+  getCookbooksSharedWithMe()                  { return this.get('/api/cookbooks/shared-with-me'); },
+  getCookbookShares(id)                       { return this.get(`/api/cookbooks/${id}/shares`); },
+  shareCookbookWithUsers(id, userIds)         { return this.post(`/api/cookbooks/${id}/shares`, { user_ids: userIds }); },
+  unshareCookbookWithUser(id, userId)         { return this.del(`/api/cookbooks/${id}/shares/${userId}`); },
+  shareCookbookWithKitchen(kitchenId, cookbookId) { return this.post(`/api/kitchens/${kitchenId}/share-cookbook`, { cookbook_id: cookbookId }); },
 
   // Pantry
   async getPantry(opts = {}) {
@@ -402,6 +415,9 @@ import { CtApiCached } from './api-cached.js';
 const SERVER_ONLY_METHODS = new Set([
   'getKitchens', 'getKitchenMembers', 'createKitchen', 'deleteKitchen',
   'addKitchenMember', 'removeKitchenMember', 'shareRecipeWithKitchen',
+  'setKitchenAutoShare', 'shareCookbookWithKitchen',
+  'getCookbooksSharedWithMe', 'getCookbookShares',
+  'shareCookbookWithUsers', 'unshareCookbookWithUser',
   'getSharePeers', 'getRecipeShares', 'shareRecipeWithUsers',
   'unshareRecipeWithUser', 'mintRecipeShareToken',
   'revokeRecipeShareToken', 'getRecipesSharedWithMe',

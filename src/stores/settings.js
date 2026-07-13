@@ -42,6 +42,13 @@ export const USER_PREFS = new Set([
   // What happens to items after check — 'bottom' (default, sink to end
   // of group) | 'hide' (soft-remove until Show Checked toggled)
   'shoppingCheckedBehavior',
+  // When true, recipes shared with the user (via a Kitchen or a
+  // direct grant) also appear in the main Recipes list alongside
+  // their own, badged so ownership is still clear. Off by default —
+  // the Shared tab stays as the canonical view for "not mine but
+  // I can cook from it". Users who prefer Mealie's one-pool feel
+  // flip this on.
+  'mixSharedIntoRecipes',
   // When true (default false), saving a recipe whose ingredients aren't
   // already linked to a pantry row will auto-create a pantry row by
   // ingredient name. Off by default — typing "flour" shouldn't silently
@@ -348,6 +355,7 @@ export const recipesSort = createSettingStore('recipesSort', 'fav-alpha');
 export const pantryView = createSettingStore('pantryView', 'grid');
 export const shoppingGroupBy         = createSettingStore('shoppingGroupBy',         'aisle');
 export const shoppingCheckedBehavior = createSettingStore('shoppingCheckedBehavior', 'bottom');
+export const mixSharedIntoRecipes    = createSettingStore('mixSharedIntoRecipes',    false);
 
 // Auto-create pantry rows when saving a recipe whose ingredients
 // aren't already linked. Off by default — typing "flour" in a recipe

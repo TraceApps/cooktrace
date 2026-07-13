@@ -9,6 +9,52 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0-rc.5] - 2026-07-13
+
+### Added
+
+- **Auto-Share with a Kitchen.** Turn on Auto-Share Your Recipes
+  in any Kitchen and every recipe you own (past and future) is
+  shared with current members automatically. New members who
+  join later pick up existing members' recipes too. Great for
+  household setups where everyone should see the same library
+  without having to share each recipe by hand.
+- **Shared Recipes Tab.** A dedicated Shared tab sits between
+  Recipes and Cookbooks and lists every recipe others have
+  shared with you, directly or via a Kitchen. Each card shows
+  a chip for which Kitchen the grant came through, plus a count
+  badge on the tab itself.
+- **Blend Shared Recipes into Main List (Optional).** Toggle
+  under Settings → Cooking. Off by default. On to see your own
+  and shared recipes together in the main Recipes tab.
+- **Cookbook Sharing.** Share a cookbook with specific users or
+  a whole Kitchen. Shared cookbooks appear alongside your own
+  with a Shared chip. Recipes inside a shared cookbook that you
+  haven't been granted individually appear as a locked
+  placeholder, so cookbook access can't be used to bypass
+  recipe permissions.
+- **Cookbooks Can Hold Shared Recipes.** Previously you could
+  only add your own recipes to your cookbooks. Now anything
+  someone else has shared with you can be organized into your
+  cookbooks the same way.
+
+### Changed
+
+- **Leaving a Kitchen Leaves Your Contributions Behind.** If
+  you leave or are removed from a Kitchen, recipes and
+  cookbooks you shared into it stay with the remaining members.
+  Only incoming grants (things others shared with you via that
+  Kitchen) are revoked.
+
+### Fixed
+
+- **Trace AI panel raw keys.** A duplicate `trace` block in the
+  English translation file was silently dropped by the JSON
+  parser, so several AI-panel labels rendered as their raw key
+  (e.g. `trace.panel_sub`). Merged and de-duped.
+
+---
+
 ## [1.0.0-rc.4] - 2026-07-10
 
 ### Added
