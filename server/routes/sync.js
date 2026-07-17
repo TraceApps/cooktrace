@@ -43,8 +43,11 @@ const userClause = (u) => u == null ? 'user_id IS NULL' : 'user_id = ?';
 const userArgs   = (u) => u == null ? [] : [u];
 
 // ── Table specs ──────────────────────────────────────────────────────
-// `cols` — columns the client may write. id / user_id / created_at /
-//          sync_status / server_id are server-managed.
+// `cols` — columns the client may WRITE via push. id / user_id /
+//          created_at / sync_status / server_id are server-managed on
+//          push. NOTE: the pull endpoint below still emits created_at
+//          separately so the client can preserve the original creation
+//          timestamp when it INSERTs the pulled row into its local DB.
 // `parents` — FK columns + the table they reference, used to rewrite
 //             client-local ids into server ids during a push.
 // `softDelete` — uses deleted_at instead of hard delete.
@@ -241,7 +244,12 @@ router.get('/pull', wrap((req, res) => {
 
   const out = {};
   for (const [name, spec] of Object.entries(TABLES)) {
-    const cols = ['id', ...spec.cols, 'updated_at'];
+    // created_at is included so the client can preserve the real
+    // creation timestamp. Without it, dbApplyPull's INSERT omits the
+    // column and SQLite's local `DEFAULT (datetime('now'))` stamps
+    // every synced row with the pull-time clock — every recipe ends
+    // up looking like it was created on first-connect day.
+    const cols = ['id', ...spec.cols, 'created_at', 'updated_at'];
     if (spec.softDelete) cols.push('deleted_at');
     // Sort self-referencing tables so parents come before children in
     // the pull payload. The client's dbApplyPull scans server_id →
