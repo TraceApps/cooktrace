@@ -3,15 +3,29 @@
 ## Quick start (Docker Compose)
 
 ```bash
-git clone https://github.com/traceapps/cooktrace-public.git cooktrace
+git clone https://github.com/traceapps/cooktrace.git
 cd cooktrace
 cp .env.example .env
-# Edit .env — at minimum set JWT_SECRET to a long random value
+# Edit .env, at minimum set JWT_SECRET to a long random value
 docker compose up -d
 # Open http://localhost:3000
 ```
 
-The image is published at `ghcr.io/traceapps/cooktrace:latest`.
+## Image tags
+
+Every release publishes a multi-arch (linux/amd64 + linux/arm64) image
+under several tags so you can pin to whatever risk level fits:
+
+| Tag | Updates when | Use case |
+|-----|--------------|----------|
+| `ghcr.io/traceapps/cooktrace:1.0.0` | Never (pinned exact) | Reproducible pin to a specific version |
+| `ghcr.io/traceapps/cooktrace:1.0` | Any 1.0.x patch release | Auto-receive bug fixes, no new features |
+| `ghcr.io/traceapps/cooktrace:1` | Any 1.x.y minor release | Auto-minor within a major, no breaking |
+| `ghcr.io/traceapps/cooktrace:latest` | Every stable release | Absolute latest stable |
+| `ghcr.io/traceapps/cooktrace:dev` | Every push to `dev` branch | Leading edge, not for production |
+
+Legacy `1.0.0-rc.N` tags from before the semver switch remain published
+indefinitely; anyone pinned to a specific rc release is unaffected.
 
 ## Environment variables
 

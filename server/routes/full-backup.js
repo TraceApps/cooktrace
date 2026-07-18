@@ -33,9 +33,10 @@ fs.mkdirSync(BACKUPS_DIR, { recursive: true });
 
 // ── Schedule config (admin-global, stored in app_config) ──────────────────
 // Mirrors NutriTrace's scheduled-backup feature 1:1 for TraceApps parity.
-// See server/routes/full-backup.js in nutritrace-dev for the canonical
-// design notes; same env-lock contract (BACKUP_SCHEDULE / BACKUP_TIME /
-// BACKUP_RETENTION) so ops operators can bake the policy into Compose.
+// See server/routes/full-backup.js in the nutritrace repo for the
+// canonical design notes; same env-lock contract (BACKUP_SCHEDULE /
+// BACKUP_TIME / BACKUP_RETENTION) so ops operators can bake the policy
+// into Compose.
 const SCHEDULES = new Set(['off', 'daily', 'weekly', 'monthly']);
 const DEFAULT_SCHEDULE = 'off';
 const DEFAULT_TIME = '03:00';
