@@ -160,6 +160,8 @@ A native Android app built on the same Svelte codebase, wrapped in Capacitor 8. 
 
 **Install** — download the signed APK from the [Releases page](https://github.com/traceapps/cooktrace/releases/latest) and install on your device. You may need to enable "Install from unknown sources" in Android settings.
 
+**Testing pre-release** — the [`dev-latest`](https://github.com/traceapps/cooktrace/releases/tag/dev-latest) pre-release carries a rolling signed APK built from the `dev` branch. Same signing key as stable, so you can upgrade from stable to dev in place (Android blocks the reverse without an uninstall). Not recommended for production, but useful for beta-testing incoming fixes and features.
+
 **Local mode** — pure offline. SQLite mirrors every server table on-device. The first-launch wizard offers `Use Locally` or `Connect to Server`.
 
 **Connected mode** — differential sync: a 30-second background timer plus a `visibilitychange` resume hook push local changes then pull server changes. Connecting to a server with existing local data shows a merge dialog so you can push local recipes / pantry / diary up and pick which settings win.
