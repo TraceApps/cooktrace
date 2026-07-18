@@ -2,7 +2,8 @@ name: Build & Push to GHCR
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
+    tags: [ 'v*.*.*' ]
   workflow_dispatch:
 
 jobs:
@@ -16,11 +17,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # QEMU lets the x86 GHA runner emulate ARM64 instructions during the
-      # arm64 build leg. Required for cross-arch builds without a separate
-      # arm64 runner. Adds a few minutes to total build time but covers the
-      # Raspberry Pi 4 / Pi 5 audience. Mirrors NT's multi-arch setup
-      # (TraceApps/nutritrace-dev commit e179225 for NT issue #76).
+      # QEMU lets the x86 GHA runner emulate ARM64 instructions during
+      # the arm64 build leg. Needed for cross-arch builds without a
+      # separate arm64 runner. Covers Raspberry Pi 4 / Pi 5.
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
@@ -36,26 +35,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Derive tags from the ref: a semver tag push yields
+      # 1.2.3 / 1.2 / 1, main push yields latest and sha.
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/traceapps/cooktrace
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,enable={{is_default_branch}}
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          # Multi-arch manifest. Skipping linux/arm/v7 (Pi 3 / 32-bit);
-          # audience too small to justify the test surface.
           platforms: linux/amd64,linux/arm64
-          tags: |
-            ghcr.io/traceapps/cooktrace:latest
-            ghcr.io/traceapps/cooktrace:${{ github.sha }}
-          # Buildx layer cache, backed by the GitHub Actions cache. Pulls
-          # any reusable layers from the previous run (npm install,
-          # Vite bundle, the recipe-scrapers Python install, etc.) and
-          # pushes the completed layers back for the next run. mode=max
-          # exports all intermediate layers for the highest hit rate.
-          # Falls back to a clean build automatically if the cache is
-          # empty or stale, so this can't break anything.
-          # Drops typical source-only commits from ~7m down to ~2-3m,
-          # because the slow arm64-via-QEMU layers don't have to rebuild
-          # unless their inputs actually changed.
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
