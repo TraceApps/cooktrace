@@ -86,7 +86,7 @@ export async function testSmtp({ overrides, to, origin, recipientName } = {}) {
   await transport.sendMail({
     from,
     to: recipient,
-    subject: 'CookTrace SMTP test',
+    subject: 'CookTrace SMTP Test',
     html: emailWrapper(origin || '', body, null, 'SMTP test from your CookTrace instance'),
     text: `Hi${recipientName ? ' ' + recipientName : ''},\n\nThis is a test email from your CookTrace instance. If you're reading this, your SMTP settings work end-to-end. Password resets, invites, and recipe-share notifications will be delivered through this config.\n\nSafe to delete this email.`,
   });
