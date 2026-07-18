@@ -9,6 +9,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0] - 2026-07-18
+
+Retiring `-rc.N`. This release and every future one uses strict semver
+(PATCH for fixes, MINOR for features, MAJOR for breaking). Docker
+images now publish under multiple tags (`:1.0.0`, `:1.0`, `:1`,
+`:latest`, `:dev`). Existing rc.N image tags stay live indefinitely.
+
+### Added
+
+- **Multi-Tag Docker Publishing.** `:1.0.0` exact, `:1.0` for
+  auto-patch, `:1` for auto-minor, `:latest` for absolute latest.
+- **`:dev` Docker Tag.** Rolling image built from the `dev` branch.
+  Not recommended for production.
+- **Send Test Email Dialog.** Settings → Email → Send Test now asks
+  where to send the test, pre-filled with your account email.
+- **Public Contributor Docs.** New `ARCHITECTURE.md` and `ROADMAP.md`
+  at the repo root.
+
+### Changed
+
+- **Retired the `-rc.N` suffix.** CookTrace now follows strict semver.
+- **Send Test actually sends an email.** Was verifying SMTP handshake
+  only; now sends a branded HTML email so you get end-to-end proof.
+- **Email section moved under Admin** (matches NutriTrace and
+  LiftTrace).
+- **Password field uses a Change button** when the server has a
+  stored value, instead of showing fake dots.
+
+### Fixed
+
+- **Recipes on the Android app showed the first-connect date instead
+  of the real creation date.** Existing libraries heal on the next
+  sync after upgrade.
+- **Email settings blank on the Android app.** SMTP form now loads
+  from the server correctly on Android server-connected mode.
+- **Trace AI chef hat clipped at the top of the FAB.**
+
+### Security
+
+- **adm-zip 0.5.x → 0.6.0** (CVE-2026-39244, high). Crafted ZIP file
+  could trigger a 4GB memory allocation during full-backup restore.
+
+---
+
 ## [1.0.0-rc.5] - 2026-07-13
 
 ### Added
