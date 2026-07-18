@@ -2,7 +2,7 @@ name: Build & Push to GHCR
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
     tags: [ 'v*.*.*' ]
   workflow_dispatch:
 
@@ -35,8 +35,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Derive tags from the ref: a semver tag push yields
-      # 1.2.3 / 1.2 / 1, main push yields latest and sha.
+      # Derive tags from the ref:
+      #   semver tag v1.2.3 → :1.2.3, :1.2, :1
+      #   push to main      → :latest, :main, :sha-<shortsha>
+      #   push to dev       → :dev, :sha-<shortsha>
+      # Users pin :dev for the leading edge, :latest for stable
+      # releases, or :1.0 for auto-patch within a minor.
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -47,7 +51,8 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=sha
 
       - name: Build and push
         uses: docker/build-push-action@v5
