@@ -67,12 +67,16 @@
     transform: translateY(12%);
   }
   /* Hat sits in its own SVG over the face's. Same viewBox keeps the
-     two perfectly aligned at any size. */
+     two perfectly aligned at any size. The middle puff's top edge
+     sits above the viewBox origin (cy=6 minus r=7.5 gives y=-1.5),
+     so allow the SVG to render outside its own box, otherwise the
+     browser's default `overflow: hidden` on <svg> clips the puff. */
   .chef-hat {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
+    overflow: visible;
     pointer-events: none;
     filter: drop-shadow(0 1.2px 1.6px rgba(0,0,0,0.28));
   }
