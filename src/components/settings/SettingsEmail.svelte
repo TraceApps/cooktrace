@@ -15,6 +15,24 @@
   import ConnectionStatus from './ConnectionStatus.svelte';
   import { showSuccess, showError } from '../../stores/toast.js';
   import { currentUser } from '../../stores/auth.js';
+  import { isNative, getServerUrl, getAuthToken, apiUrl } from '../../lib/platform.js';
+
+  // Build request headers matching SettingsUserManagement's pattern.
+  // On Android server-connected mode, uses Bearer auth. On PWA, uses
+  // CSRF cookie + token. Without this, /api/app-config calls from the
+  // Android app never route to the server, and the SMTP form shows up
+  // empty even though the server has real config.
+  function _authHeaders(extra = {}) {
+    const h = { 'Content-Type': 'application/json', ...extra };
+    if (isNative && getServerUrl()) {
+      const t = getAuthToken();
+      if (t) h['Authorization'] = `Bearer ${t}`;
+    } else {
+      const csrf = typeof localStorage !== 'undefined' ? localStorage.getItem('ct:csrf') : null;
+      if (csrf) h['X-CSRF-Token'] = csrf;
+    }
+    return h;
+  }
 
   export let envLocks = { smtp: false };
 
@@ -50,7 +68,10 @@
   async function loadSmtpConfig() {
     _loaded = true;
     try {
-      const cfg = await fetch('/api/app-config', { credentials: 'include' }).then(r => r.json());
+      const cfg = await fetch(apiUrl('/api/app-config'), {
+        credentials: 'include',
+        headers: _authHeaders(),
+      }).then(r => r.json());
       smtpHost   = cfg.smtp_host   || '';
       smtpPort   = cfg.smtp_port   || '587';
       smtpSecure = cfg.smtp_secure === 'true';
@@ -61,10 +82,9 @@
   }
 
   async function saveSmtpField(key, value) {
-    const csrf = typeof localStorage !== 'undefined' ? localStorage.getItem('ct:csrf') : null;
-    await fetch('/api/app-config', {
+    await fetch(apiUrl('/api/app-config'), {
       method: 'PUT', credentials: 'include',
-      headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
+      headers: _authHeaders(),
       body: JSON.stringify({ key: `smtp_${key}`, value: String(value) }),
     }).catch(() => {});
   }
@@ -114,7 +134,6 @@
     smtpTestStatus = 'testing';
     smtpTestRecipient = '';
     try {
-      const csrf = typeof localStorage !== 'undefined' ? localStorage.getItem('ct:csrf') : null;
       const body = {
         smtp_host: smtpHost,
         smtp_port: String(smtpPort),
@@ -124,9 +143,9 @@
         to,
       };
       if (smtpPass && smtpPass !== PASS_MASK) body.smtp_pass = smtpPass;
-      const res = await fetch('/api/app-config/test-email', {
+      const res = await fetch(apiUrl('/api/app-config/test-email'), {
         method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...(csrf ? { 'X-CSRF-Token': csrf } : {}) },
+        headers: _authHeaders(),
         body: JSON.stringify(body),
       });
       if (res.ok) {
