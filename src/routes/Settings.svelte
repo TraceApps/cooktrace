@@ -907,21 +907,6 @@
       </div>
     {/if}
 
-    <!-- ── Email (SMTP — admin only in multi-user; single-user installs
-         show it unconditionally). Mirrors NutriTrace's Email section. ── -->
-    {#if !$userMgmtActive || $currentUser?.role === 'admin'}
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'email')} on:click={() => toggleSection('email')}>
-      <span class="material-symbols-rounded si">mail</span>
-      <span>{$_('settings.email.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.email}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'email') && sectionVisible(settingsQuery, 'email')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <SettingsEmail {envLocks} />
-      </div>
-    {/if}
-    {/if}
-
     <!-- ── Backup & Restore ────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'backup')} on:click={() => toggleSection('backup')}>
       <span class="material-symbols-rounded si">backup</span>
@@ -1013,6 +998,21 @@
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'auth') && sectionVisible(settingsQuery, 'auth')}
       <SettingsAuth />
+    {/if}
+    {/if}
+
+    <!-- ── Email (SMTP, admin only). Matches LiftTrace / NutriTrace by
+         living last in the Admin group, after Users + Authentication. -->
+    {#if !$userMgmtActive || $currentUser?.role === 'admin'}
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'email')} on:click={() => toggleSection('email')}>
+      <span class="material-symbols-rounded si">mail</span>
+      <span>{$_('settings.email.section')}</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.email}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'email') && sectionVisible(settingsQuery, 'email')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+        <SettingsEmail {envLocks} />
+      </div>
     {/if}
     {/if}
     {/if}
