@@ -30,14 +30,19 @@ export const AI_PROVIDERS = [
 export const AI_DEFAULT_MODELS = {
   claude:  'claude-haiku-4-5-20251001',
   openai:  'gpt-4o-mini',
-  gemini:  'gemini-2.0-flash',
+  gemini:  'gemini-2.5-flash',
   custom:  '',
 };
 
+// Sentinel appended to each branded provider's model list. When the select
+// value is this sentinel, the UI reveals a free-text input so users can
+// enter a model ID we haven't hardcoded (e.g. after a vendor renames).
+export const AI_MODEL_CUSTOM = '__custom__';
+
 export const AI_MODELS = {
-  claude:  ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'],
-  openai:  ['gpt-4o', 'gpt-4o-mini'],
-  gemini:  ['gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'],
+  claude:  ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-4-8', AI_MODEL_CUSTOM],
+  openai:  ['gpt-4o-mini', 'gpt-4o', AI_MODEL_CUSTOM],
+  gemini:  ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro', AI_MODEL_CUSTOM],
   custom:  [],
 };
 
@@ -456,9 +461,18 @@ async function _callOpenAIWithTools(apiKey, model, messages, systemPrompt, tools
 }
 
 // ── Google Gemini ──────────────────────────────────────────────────────────
+// Models Google has shut down or scheduled for shutdown. Saved selections
+// pointing at any of these are quietly remapped to the current default so
+// users who never opened Settings after a bump don't suddenly hit 404s.
+const GEMINI_RETIRED = new Set([
+  'gemini-1.5-flash', 'gemini-1.5-pro',
+  'gemini-2.0-flash', 'gemini-2.0-flash-lite',
+]);
+
 async function _callGeminiWithTools(apiKey, model, messages, systemPrompt, tools, cb) {
   const { onToolCall, onToolResult } = cb || {};
-  const m = model || AI_DEFAULT_MODELS.gemini;
+  let m = model || AI_DEFAULT_MODELS.gemini;
+  if (GEMINI_RETIRED.has(m)) m = AI_DEFAULT_MODELS.gemini;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`;
   const geminiTools = (tools || []).length ? [{
     functionDeclarations: tools.map(t => ({

@@ -219,7 +219,7 @@
     nutrition:     ['nutrition','nutrients','nutriments','vitamins','minerals','visible nutriments','fda'],
     federation:    ['federation','nutritrace','nt','linked','share','token','instance','foods','pull foods','import foods','sync foods'],
     foodsources:   ['food sources','open food facts','off','usda','fooddata central','api key','barcode','scanner','beep','flashlight','search','language','country','contribute'],
-    ai:            ['ai','trace','assistant','provider','model','api key','chat','claude','openai','gemini','base url','artificial intelligence','smart log','smartlog','quick log','voice','dictate','hold to record','mic'],
+    ai:            ['ai','trace','assistant','provider','model','custom model','model id','api key','chat','claude','openai','gemini','sonnet','opus','haiku','gpt','gemini 3','base url','artificial intelligence','smart log','smartlog','quick log','voice','dictate','hold to record','mic'],
     notifications: ['notifications','reminders','cook day','thaw','alerts','push','apprise','gotify','ntfy','expiration','expiry','expires','expiring','pantry expiry','digest','weekly summary','shopping nudge'],
     email:         ['email','smtp','mail','password reset','invite','from address','tls','outgoing','send test','test email','recipient','test recipient','connection status','change password','change smtp'],
     backup:        ['backup','export','import','restore','json','full backup','reset','danger zone'],
