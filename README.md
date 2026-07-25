@@ -6,7 +6,7 @@
 No accounts, no telemetry, no cloud sync unless you opt in.</p>
 
 <p align="center">
-  <img src="public/icons/icon-512.png" alt="CookTrace" width="180" />
+  <img src="public/icons/logo-transparent.png" alt="CookTrace" width="180" />
 </p>
 
 <p align="center">
