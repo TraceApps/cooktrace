@@ -9,6 +9,106 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.1] - 2026-07-25
+
+### Added
+
+- **Origin-country flag on OFF search results in Pantry.** Each Open
+  Food Facts result now shows a small flag emoji next to the food name
+  when OFF has origin data for it (from `origins_tags`, falling back
+  to `manufacturing_places_tags`). Lets you see at a glance whether
+  that "olive oil" is Italian, Greek, or Spanish without opening the
+  entry. Countries OFF doesn't have origin data for show no flag
+  rather than a misleading placeholder.
+- **Data-completeness indicator on OFF search results in Pantry.**
+  Small colored dot next to each OFF row: green when the entry has
+  most nutriment fields filled in, orange for partial, grey for
+  sparse. Long-press or hover shows the exact percentage.
+- **USDA data-type badge on USDA search results in Pantry.** Small
+  color-coded label next to each USDA row (Foundation / SR Legacy /
+  Survey / Branded / Experimental) so you can favor curated Foundation
+  entries over manufacturer-submitted branded ones for common
+  ingredients.
+- **Per-source tier filter dropdowns on Pantry search.** A caret next
+  to the OFF and USDA source chips opens a checkbox panel to narrow
+  results by tier. Defaults to all tiers active; a small dot on the
+  source chip signals when a subset is applied. Filter is client-side
+  (no extra API calls) and also applies in All-mode and multi-source
+  mode.
+- **All-mode Pantry search.** New "All" chip fans out to Pantry + OFF
+  + USDA in parallel with per-row source badges, so you can compare
+  local matches against external DBs in one list.
+- **Long-press to combine sources on Pantry search.** Long-press any
+  external source chip to pin it alongside another — results become a
+  merged multi-source view with per-row source badges (same fan-out as
+  All-mode, but limited to your pinned set). Long-press an
+  already-pinned chip to remove it. Regular tap exits multi mode back
+  to single-source.
+- **"Custom…" option on the Model dropdown for Claude, OpenAI, and
+  Gemini.** Enter any model ID the vendor supports without waiting for
+  the preset list to catch up. Same behavior the OpenAI Compatible
+  provider has always had.
+- **Retirement remap for retired Gemini models.** Saved selections of
+  `gemini-1.5-*` or `gemini-2.0-*` (both retired by Google) are
+  quietly upgraded to the current default at request time.
+- **SSO-only mode via environment variable.** Set
+  `OIDC_ENABLE_EMAIL_PASSWORD_LOGIN=0` (or `false` / `no`) at boot to
+  disable password login server-wide, so users must sign in via an
+  OIDC provider. Locks the corresponding admin UI toggle with an
+  env-lock note. Mirrors the pattern across the TraceApps family
+  (asked for on LT #16).
+- **Settings search covers new territory:** auto-share, send test,
+  cookbook sharing.
+
+### Changed
+
+- **OFF search results in Pantry are now sorted by data quality within
+  each fetched page.** Entries with images and more complete nutrition
+  data surface higher than sparse ones. OFF's server-side relevance
+  still picks the initial batch; the re-rank runs within the batch to
+  reduce the "many near-identical variants" search noise.
+- **USDA search results in Pantry are now sorted by data-type tier
+  within each fetched page.** Foundation and SR Legacy entries surface
+  above the millions of Branded entries that would otherwise dominate
+  common searches like "chicken" or "milk".
+- **Claude model presets refreshed.** Sonnet bumped to Sonnet 5, Opus
+  4.8 added as a "smartest" tier option, older Sonnet 4.6 removed.
+
+### Fixed
+
+- **AI Assistant section in Settings would not expand.** The Trace
+  settings component ran an initialization block that referenced a
+  Svelte `$:` reactive variable before Svelte had a chance to run the
+  reactive declaration, throwing `TypeError: Cannot read properties of
+  undefined (reading 'includes')` at mount time. That crash left the
+  parent `openSections` state half-applied, so tapping the
+  section-toggle looked like nothing happened. Fixed by inlining the
+  lookup so no reactive dependency is required at init.
+- **OIDC sign-in now works on Android first-install for OIDC-only
+  servers.** NativeSetup previously required a username + password to
+  submit, blocking users on Authentik / Keycloak / Authelia-backed
+  servers with password login disabled. The setup form is now a
+  two-step flow: enter server URL → app fetches `/api/auth/status` →
+  renders whichever auth methods the server actually supports
+  (password fields only when enabled, OIDC provider buttons with logos
+  when configured, both when both).
+- **OIDC callbacks no longer fail on the first attempt** with a
+  spurious `callback_failed`. openid-client v5's default 3.5 s
+  outgoing HTTP timeout was tight enough that cold token-exchange
+  requests to slower IdPs would sometimes time out. Bumped to 10
+  seconds.
+
+### Security
+
+- **fast-uri bumped to 3.1.4** (GHSA-4c8g-83qw-93j6, high). ReDoS in
+  URI parsing.
+- **brace-expansion bumped to 5.0.8** (GHSA-mh99-v99m-4gvg, high). DoS
+  via unbounded expansion length.
+- **body-parser bumped to 2.3.0** (GHSA-v422-hmwv-36x6, low). DoS when
+  an invalid `limit` value silently disables size enforcement.
+
+---
+
 ## [1.0.0] - 2026-07-18
 
 Retiring `-rc.N`. This release and every future one uses strict semver
