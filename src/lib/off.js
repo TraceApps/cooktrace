@@ -20,6 +20,59 @@ import { deriveSodiumSalt } from './nutriments.js';
 
 const OFF_BASE = 'https://world.openfoodfacts.org';
 
+// Read the user's saved OFF country-filter preference from localStorage.
+// Returns the OFF tag form (lowercase, dashes for spaces) or null when
+// 'World' / unset. Store-free so this module doesn't take a settings dep.
+function _getOffSearchCountry() {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const userId = localStorage.getItem('wl:userId');
+    const setKey = userId ? `wl_u${userId}_offSearchCountry` : 'wl_offSearchCountry';
+    const raw = localStorage.getItem(setKey);
+    if (!raw) return null;
+    const country = JSON.parse(raw);
+    if (!country || country === 'World') return null;
+    return country.toLowerCase().replace(/\s+/g, '-');
+  } catch { return null; }
+}
+
+// Read the user's saved OFF language preference. Passed to OFF as
+// `lc=<code>` so product names / ingredients / categories come back
+// translated when OFF has translations. Defaults to 'en'.
+function _getOffSearchLanguage() {
+  try {
+    if (typeof localStorage === 'undefined') return 'en';
+    const userId = localStorage.getItem('wl:userId');
+    const setKey = userId ? `wl_u${userId}_offSearchLanguage` : 'wl_offSearchLanguage';
+    const raw = localStorage.getItem(setKey);
+    if (!raw) return 'en';
+    const lang = JSON.parse(raw);
+    if (!lang || typeof lang !== 'string') return 'en';
+    return lang.slice(0, 2).toLowerCase();
+  } catch { return 'en'; }
+}
+
+// Re-rank OFF search results within the fetched page so higher-quality
+// entries surface first. OFF's server-side relevance is name-match based
+// and doesn't consider completeness — a search for "yogurt" returns
+// entries with 3 nutriment fields set alongside entries with 40 filled
+// in. Sort by image presence, completeness score, then Nutri-Score
+// presence. Missing fields degrade to 0.
+function _rankOFFResults(items) {
+  if (!Array.isArray(items) || items.length < 2) return items;
+  return items.slice().sort((a, b) => {
+    const aImg = a.img_url ? 1 : 0;
+    const bImg = b.img_url ? 1 : 0;
+    if (aImg !== bImg) return bImg - aImg;
+    const aComp = a.completeness ?? 0;
+    const bComp = b.completeness ?? 0;
+    if (aComp !== bComp) return bComp - aComp;
+    const aNs = a.nutriscore ? 1 : 0;
+    const bNs = b.nutriscore ? 1 : 0;
+    return bNs - aNs;
+  });
+}
+
 // CapacitorHttp returns a different response shape than fetch — wrap
 // it so callers can `.ok` / `.json()` it the same way.
 function _wrapCapacitor(res) {
@@ -67,7 +120,9 @@ export async function lookupBarcode(barcode) {
   const code = canonicalizeBarcode(barcode);
   if (!code) return null;
   try {
-    const res = await _extFetch(`${OFF_BASE}/api/v0/product/${encodeURIComponent(code)}.json`);
+    const lc = _getOffSearchLanguage();
+    const url = `${OFF_BASE}/api/v0/product/${encodeURIComponent(code)}.json?lc=${encodeURIComponent(lc)}`;
+    const res = await _extFetch(url);
     if (!res.ok) return null;
     const data = await res.json();
     if (data.status !== 1) return null;
@@ -86,11 +141,15 @@ export async function searchByName(query, page = 1) {
   const q = (query || '').trim();
   if (!q) return [];
   try {
-    const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(q)}&json=1&page_size=20&page=${page}`;
+    const country = _getOffSearchCountry();
+    const cq = country ? `&countries_tags_en=${encodeURIComponent(country)}` : '';
+    const lc = `&lc=${encodeURIComponent(_getOffSearchLanguage())}`;
+    const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(q)}&json=1&page_size=20&page=${page}${cq}${lc}`;
     const res = await _extFetch(url);
     if (!res.ok) return [];
     const data = await res.json();
-    return (data.hits || []).map(p => _mapOFFProduct(p)).filter(Boolean);
+    const items = (data.hits || []).map(p => _mapOFFProduct(p)).filter(Boolean);
+    return _rankOFFResults(items);
   } catch (e) {
     console.warn('[off] name search failed:', e);
     return [];
@@ -201,6 +260,21 @@ function _mapOFFProduct(p) {
     cholesterol:     _numNut(n, 'cholesterol_100g', 1000),
   });
 
+  // Quality signals lifted from OFF for the pantry search UI. Used by
+  // _rankOFFResults to sort within a fetched page and by the Pantry
+  // page's completeness dot + Nutri-Score / NOVA / origin-flag
+  // decorations. Any missing field degrades gracefully.
+  const completeness = typeof p.completeness === 'number' ? p.completeness : null;
+  const nutriscore   = (p.nutriscore_grade || p.nutrition_grades || '').toLowerCase() || null;
+  const nova         = typeof p.nova_group === 'number' ? p.nova_group : null;
+  // origins_tags is the real manufacturing origin per OFF's taxonomy;
+  // fall back to manufacturing_places_tags. countries_tags (where sold)
+  // is deliberately NOT used — flagging a US-sold French product with
+  // a US flag would be misleading.
+  const originTag = (Array.isArray(p.origins_tags) && p.origins_tags[0])
+                 || (Array.isArray(p.manufacturing_places_tags) && p.manufacturing_places_tags[0])
+                 || null;
+
   return {
     name:         (p.product_name || '').trim(),
     brand:        (Array.isArray(p.brands) ? (p.brands[0] || '') : (p.brands || '').split(',')[0] || '').trim(),
@@ -209,6 +283,11 @@ function _mapOFFProduct(p) {
     serving_unit: 'g',
     img_url:      p.image_front_display_url || p.image_front_url || p.image_url || p.image_front_small_url || '',
     nutrition,
+    completeness,
+    nutriscore,
+    nova,
+    originTag,
+    _source:      'off',
   };
 }
 

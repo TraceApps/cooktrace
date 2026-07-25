@@ -30,7 +30,10 @@
   } from '../lib/pantry-variants.js';
   import * as OFF from '../lib/off.js';
   import * as USDA from '../lib/usda.js';
-  import { offEnabled, usdaEnabled, usdaApiKey } from '../stores/settings.js';
+  import { offEnabled, usdaEnabled, usdaApiKey, offSearchLanguage, offSearchCountry } from '../stores/settings.js';
+  import { offCountryTagToFlag, offCountryTagToName } from '../lib/off-country-flag.js';
+  import { portal } from '../lib/portal.js';
+  import { slide } from 'svelte/transition';
 
   let items = [];
   // Tracks which generic items the user has expanded to show their
@@ -111,35 +114,226 @@
   // 'local' = search only existing pantry items.
   // 'off'   = also query Open Food Facts when there's a query string.
   // 'usda'  = also query USDA when there's a query string.
+  // 'all'   = fan-out to pantry + OFF + USDA in parallel, merged view.
   let searchSource = 'local';
-  let externalResults = [];
+  let offResults = [];
+  let usdaResults = [];
   let externalLoading = false;
   let _searchTimer = null;
-  $: availableSources = [
+  // 'all' is only offered when at least 2 external sources are enabled —
+  // otherwise it's not meaningfully different from just picking that one
+  // source. Mirrors NutriTrace's availableSources shape.
+  $: _perSourceOptions = [
     { value: 'local', label: 'Pantry' },
     ...($offEnabled  ? [{ value: 'off',  label: 'OFF'  }] : []),
     ...($usdaEnabled && $usdaApiKey ? [{ value: 'usda', label: 'USDA' }] : []),
   ];
+  $: availableSources = _perSourceOptions.length >= 2
+    ? [{ value: 'all', label: 'All' }, ..._perSourceOptions]
+    : _perSourceOptions;
 
-  // Re-run external search whenever the query or the source changes.
-  $: { _runExternalSearch(query, searchSource); }
-  function _runExternalSearch(q, src) {
+  // Re-run external search whenever the query or the source changes. In
+  // 'all' or multi-mode, fan out to both OFF + USDA in parallel; the
+  // dedicated single-source render reads from offResults / usdaResults
+  // directly, and the all-mode render merges them.
+  $: { _runExternalSearch(query, searchSource, pinnedSources); }
+  function _runExternalSearch(q, src, _pinned) {
     clearTimeout(_searchTimer);
-    externalResults = [];
+    offResults = [];
+    usdaResults = [];
     if (src === 'local' || !q.trim()) return;
+    // In all-mode (or multi), fetch every source the user has enabled.
+    // In single-source mode, fetch only that source.
+    const wantOff  = ($offEnabled  && (src === 'off'  || src === 'all'));
+    const wantUsda = ($usdaEnabled && $usdaApiKey && (src === 'usda' || src === 'all'));
+    if (!wantOff && !wantUsda) return;
     externalLoading = true;
     _searchTimer = setTimeout(async () => {
       try {
-        if (src === 'off')  externalResults = await OFF.searchByName(q.trim()) || [];
-        if (src === 'usda') externalResults = await USDA.searchByName(q.trim(), 1, $usdaApiKey) || [];
+        const [offR, usdaR] = await Promise.all([
+          wantOff  ? OFF.searchByName(q.trim())               : Promise.resolve([]),
+          wantUsda ? USDA.searchByName(q.trim(), 1, $usdaApiKey) : Promise.resolve([]),
+        ]);
+        offResults  = offR  || [];
+        usdaResults = usdaR || [];
       } catch (e) {
-        externalResults = [];
+        offResults = [];
+        usdaResults = [];
         showError(e.message || 'Search failed');
       } finally {
         externalLoading = false;
       }
     }, 350);
   }
+
+  // Legacy single-source externalResults derived from whichever source is
+  // active. Kept as a derived value so the existing render block below
+  // doesn't need to know about the new fan-out plumbing.
+  $: externalResults = searchSource === 'off' ? offResults
+                     : searchSource === 'usda' ? usdaResults
+                     : [];
+
+  // ── Per-source quality-tier filters (OFF completeness + USDA data type) ──
+  // Backdrop-pattern dropdown attached to the OFF + USDA source chips
+  // via a caret. Multi-select checkboxes, default all-active (no filter).
+  // Filters apply client-side after fetch, in single-source mode AND in
+  // all/multi mode (filters items from that source within the merged view).
+  const _OFF_TIERS  = ['hi', 'mid', 'lo', 'unknown'];
+  const _USDA_TIERS = ['Foundation', 'SR Legacy', 'Survey (FNDDS)', 'Branded', 'Experimental', 'unknown'];
+  let offTiersActive  = new Set(_OFF_TIERS);
+  let usdaTiersActive = new Set(_USDA_TIERS);
+  let offDropdownOpen  = false;
+  let usdaDropdownOpen = false;
+  let offCaretEl = null;
+  let usdaCaretEl = null;
+  let offDropdownPos  = { top: 0, right: 0 };
+  let usdaDropdownPos = { top: 0, right: 0 };
+  let offDropdownPanelEl = null;
+  let usdaDropdownPanelEl = null;
+
+  function _bucketOff(c) {
+    if (typeof c !== 'number') return 'unknown';
+    if (c >= 0.7) return 'hi';
+    if (c >= 0.4) return 'mid';
+    return 'lo';
+  }
+  function toggleOffTier(t) {
+    const s = new Set(offTiersActive);
+    if (s.has(t)) s.delete(t); else s.add(t);
+    if (s.size === 0) s.add(t);  // never hide everything
+    offTiersActive = s;
+  }
+  function toggleUsdaTier(t) {
+    const s = new Set(usdaTiersActive);
+    if (s.has(t)) s.delete(t); else s.add(t);
+    if (s.size === 0) s.add(t);
+    usdaTiersActive = s;
+  }
+  function resetOffTiers()  { offTiersActive  = new Set(_OFF_TIERS); }
+  function resetUsdaTiers() { usdaTiersActive = new Set(_USDA_TIERS); }
+  $: offTiersFiltered  = offTiersActive.size  !== _OFF_TIERS.length;
+  $: usdaTiersFiltered = usdaTiersActive.size !== _USDA_TIERS.length;
+  // Filter helpers used by both single-source render + all-mode render.
+  $: offVisible  = offTiersFiltered  ? offResults.filter(f  => offTiersActive.has(_bucketOff(f.completeness)))
+                                     : offResults;
+  $: usdaVisible = usdaTiersFiltered ? usdaResults.filter(f => usdaTiersActive.has(f.dataType || 'unknown'))
+                                     : usdaResults;
+
+  // Dropdown open handlers — position via getBoundingClientRect from the
+  // caret + close the other so only one is open at a time.
+  function openOffDropdown() {
+    usdaDropdownOpen = false;
+    const r = offCaretEl?.getBoundingClientRect();
+    if (r) offDropdownPos = { top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) };
+    offDropdownOpen = true;
+  }
+  function openUsdaDropdown() {
+    offDropdownOpen = false;
+    const r = usdaCaretEl?.getBoundingClientRect();
+    if (r) usdaDropdownPos = { top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) };
+    usdaDropdownOpen = true;
+  }
+  function _closeTierDropdowns() {
+    offDropdownOpen = false;
+    usdaDropdownOpen = false;
+  }
+  function _onWindowClick(e) {
+    if (!offDropdownOpen && !usdaDropdownOpen) return;
+    const t = e.target;
+    if (offCaretEl && offCaretEl.contains(t)) return;
+    if (usdaCaretEl && usdaCaretEl.contains(t)) return;
+    if (offDropdownOpen  && offDropdownPanelEl  && offDropdownPanelEl.contains(t))  return;
+    if (usdaDropdownOpen && usdaDropdownPanelEl && usdaDropdownPanelEl.contains(t)) return;
+    _closeTierDropdowns();
+  }
+  function _onWindowTouchMove() {
+    if (offDropdownOpen || usdaDropdownOpen) _closeTierDropdowns();
+  }
+
+  // ── Multi-source chips (long-press to add) ─────────────────────────────
+  // Same behaviour as NutriTrace Foods: long-press pins a chip alongside
+  // the current source; multiple pins triggers a merged all-mode fan-out
+  // (searchSource flipped to 'all' + _allModeItems filtered by pinnedSources).
+  // Regular tap exits multi mode back to single-source.
+  let pinnedSources = new Set();
+  let _lpChipTimer = null;
+  let _lpChipStartX = 0;
+  let _lpChipStartY = 0;
+  let _lpChipJustFired = false;
+  function _startChipLongPress(sourceValue, e) {
+    const t = e?.touches?.[0];
+    _lpChipStartX = t?.clientX ?? 0;
+    _lpChipStartY = t?.clientY ?? 0;
+    clearTimeout(_lpChipTimer);
+    _lpChipTimer = setTimeout(() => {
+      _lpChipTimer = null;
+      _toggleChipInMulti(sourceValue);
+    }, 500);
+  }
+  function _maybeCancelChipLongPress(e) {
+    if (!_lpChipTimer) return;
+    const t = e?.touches?.[0];
+    if (!t) return;
+    const dx = Math.abs(t.clientX - _lpChipStartX);
+    const dy = Math.abs(t.clientY - _lpChipStartY);
+    if (dx > 10 || dy > 10) _cancelChipLongPress();
+  }
+  function _cancelChipLongPress() {
+    if (_lpChipTimer) { clearTimeout(_lpChipTimer); _lpChipTimer = null; }
+  }
+  function _toggleChipInMulti(sourceValue) {
+    if (sourceValue === 'all' || sourceValue === 'local') return;
+    // Guard against double-fire from contextmenu + touchstart-timer.
+    if (_lpChipJustFired) return;
+    _lpChipJustFired = true;
+    setTimeout(() => { _lpChipJustFired = false; }, 400);
+
+    const s = new Set(pinnedSources);
+    if (s.has(sourceValue)) {
+      s.delete(sourceValue);
+    } else {
+      if (s.size === 0 && searchSource !== 'all' && searchSource !== sourceValue) {
+        s.add(searchSource);
+      }
+      s.add(sourceValue);
+    }
+    if (s.size <= 1) {
+      pinnedSources = new Set();
+      if (s.size === 1) searchSource = [...s][0];
+    } else {
+      pinnedSources = s;
+      searchSource = 'all';
+    }
+  }
+  $: activeChips = {
+    local:  pinnedSources.size > 0 ? pinnedSources.has('local')  : searchSource === 'local',
+    off:    pinnedSources.size > 0 ? pinnedSources.has('off')    : searchSource === 'off',
+    usda:   pinnedSources.size > 0 ? pinnedSources.has('usda')   : searchSource === 'usda',
+    all:    pinnedSources.size === 0 && searchSource === 'all',
+  };
+  function _onChipTap(sourceValue) {
+    _cancelChipLongPress();
+    if (_lpChipJustFired) return;
+    pinnedSources = new Set();
+    searchSource = sourceValue;
+  }
+  function _isSourceActive(name) {
+    return pinnedSources.size === 0 || pinnedSources.has(name);
+  }
+
+  // ── All-mode merged results ───────────────────────────────────────────
+  // Fans out pantry + OFF + USDA into a single ordered list with per-row
+  // source badges. Only runs when searchSource === 'all' (either via the
+  // 'All' chip or via multi-mode which flips searchSource to 'all').
+  // Pantry match uses matchesSearch() so brand-variant search works too
+  // (mirrors what the local pantry render already does).
+  $: _allModeItems = searchSource !== 'all' ? [] : [
+    ...(_isSourceActive('local')
+      ? (items || []).filter(f => query.trim() ? matchesSearch(f, query, buildVariantsByParent(items)) : false).map(item => ({ source: 'local', item }))
+      : []),
+    ...(_isSourceActive('off')  ? offVisible.map(item  => ({ source: 'off',  item })) : []),
+    ...(_isSourceActive('usda') ? usdaVisible.map(item => ({ source: 'usda', item })) : []),
+  ];
   function pickExternalResult(r) {
     // Open the sheet in create mode with the external-search result as
     // the prefill payload. No route navigation; user stays on Pantry.
@@ -649,10 +843,59 @@
           {#if availableSources.length > 1}
             <div class="source-chip-row inline">
               {#each availableSources as src (src.value)}
-                <button class="source-chip" class:active={searchSource === src.value}
-                  on:click={() => searchSource = src.value}>
-                  {src.label}
-                </button>
+                {#if src.value === 'off'}
+                  <div class="source-chip-wrap">
+                    <button class="source-chip source-chip-split"
+                            class:active={activeChips.off}
+                            on:click={() => _onChipTap('off')}
+                            on:contextmenu|preventDefault={() => _toggleChipInMulti('off')}
+                            on:touchstart|passive={(e) => _startChipLongPress('off', e)}
+                            on:touchmove|passive={_maybeCancelChipLongPress}
+                            on:touchend={_cancelChipLongPress}
+                            on:touchcancel={_cancelChipLongPress}>
+                      {src.label}
+                      {#if offTiersFiltered}<span class="tier-active-dot" title="OFF tier filter active"></span>{/if}
+                    </button>
+                    <button class="source-chip-caret"
+                            class:active={activeChips.off}
+                            class:open={offDropdownOpen}
+                            bind:this={offCaretEl}
+                            on:click={openOffDropdown}
+                            aria-label="Filter OFF results by quality tier"
+                            aria-expanded={offDropdownOpen}>
+                      <span class="material-symbols-rounded">expand_more</span>
+                    </button>
+                  </div>
+                {:else if src.value === 'usda'}
+                  <div class="source-chip-wrap">
+                    <button class="source-chip source-chip-split"
+                            class:active={activeChips.usda}
+                            on:click={() => _onChipTap('usda')}
+                            on:contextmenu|preventDefault={() => _toggleChipInMulti('usda')}
+                            on:touchstart|passive={(e) => _startChipLongPress('usda', e)}
+                            on:touchmove|passive={_maybeCancelChipLongPress}
+                            on:touchend={_cancelChipLongPress}
+                            on:touchcancel={_cancelChipLongPress}>
+                      {src.label}
+                      {#if usdaTiersFiltered}<span class="tier-active-dot" title="USDA tier filter active"></span>{/if}
+                    </button>
+                    <button class="source-chip-caret"
+                            class:active={activeChips.usda}
+                            class:open={usdaDropdownOpen}
+                            bind:this={usdaCaretEl}
+                            on:click={openUsdaDropdown}
+                            aria-label="Filter USDA results by data type"
+                            aria-expanded={usdaDropdownOpen}>
+                      <span class="material-symbols-rounded">expand_more</span>
+                    </button>
+                  </div>
+                {:else}
+                  <button class="source-chip"
+                          class:active={activeChips[src.value]}
+                          on:click={() => _onChipTap(src.value)}>
+                    {src.label}
+                  </button>
+                {/if}
               {/each}
             </div>
             <span class="filter-divider" aria-hidden="true"></span>
@@ -913,8 +1156,63 @@
       {/each}
     {/if}
 
-    {#if searchSource !== 'local' && query.trim()}
+    {#if searchSource === 'all' && query.trim()}
+      <div class="ext-results">
+        {#if externalLoading}
+          <div class="loading-row">
+            <span class="material-symbols-rounded spin">refresh</span>
+            <span class="loading-text">Searching all sources…</span>
+          </div>
+        {:else if _allModeItems.length === 0}
+          <div class="state empty">
+            <span class="material-symbols-rounded empty-icon">search_off</span>
+            <p>No results in any source</p>
+          </div>
+        {:else}
+          <ul class="items">
+            {#each _allModeItems as r, i (r._source + ':' + i + ':' + (r.barcode || r.name))}
+              <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+              <li class="item ext-item" on:click={() => pickExternalResult(r)}
+                role="button" tabindex="0"
+                on:keydown={(e) => { if (e.key === 'Enter') pickExternalResult(r); }}>
+                {#if r.img_url}
+                  <img class="item-thumb" src={r.img_url} alt="" loading="lazy" />
+                {:else}
+                  <span class="material-symbols-rounded ext-stub-icon">qr_code_scanner</span>
+                {/if}
+                <div class="item-body">
+                  <div class="item-name">
+                    <span class="src-badge src-{r._source}">{r._source === 'off' ? 'OFF' : 'USDA'}</span>
+                    {r.name}
+                    {#if r._source === 'off' && r.completeness != null}
+                      <span class="completeness-dot" class:high={r.completeness >= 0.85}
+                            class:mid={r.completeness >= 0.6 && r.completeness < 0.85}
+                            class:low={r.completeness < 0.6}
+                            title="OFF completeness: {Math.round(r.completeness * 100)}%"></span>
+                    {/if}
+                    {#if r._source === 'off' && r.originTag}
+                      {@const _flag = offCountryTagToFlag(r.originTag)}
+                      {#if _flag}
+                        <span class="origin-flag" title="Origin: {offCountryTagToName(r.originTag)}">{_flag}</span>
+                      {/if}
+                    {/if}
+                    {#if r._source === 'usda' && r.dataType}
+                      <span class="usda-type-badge" title="USDA data type: {r.dataType}">{r.dataType}</span>
+                    {/if}
+                  </div>
+                  {#if r.brand}<div class="item-notes">{r.brand}</div>{/if}
+                  {#if r.barcode}<div class="item-qty" style="font-size:11px">{r.barcode}</div>{/if}
+                </div>
+                <span class="material-symbols-rounded ext-add">add_circle</span>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+    {:else if searchSource !== 'local' && query.trim()}
       {@const _srcLabel = searchSource === 'off' ? 'OFF' : 'USDA'}
+      {@const _visibleResults = searchSource === 'off' ? offVisible : usdaVisible}
+      {@const _tiersFilteredHere = searchSource === 'off' ? offTiersFiltered : usdaTiersFiltered}
       <div class="ext-results">
         {#if externalLoading}
           <div class="loading-row">
@@ -926,9 +1224,15 @@
             <span class="material-symbols-rounded empty-icon">search_off</span>
             <p>No results in {_srcLabel}</p>
           </div>
+        {:else if _visibleResults.length === 0}
+          <div class="state empty">
+            <span class="material-symbols-rounded empty-icon">filter_alt_off</span>
+            <p>All {_srcLabel} results hidden by tier filter</p>
+            <button class="btn secondary" style="margin-top:8px" on:click={() => searchSource === 'off' ? resetOffTiers() : resetUsdaTiers()}>Reset filter</button>
+          </div>
         {:else}
           <ul class="items">
-            {#each externalResults as r, i (i + (r.barcode || r.name))}
+            {#each _visibleResults as r, i (i + (r.barcode || r.name))}
               <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
               <li class="item ext-item" on:click={() => pickExternalResult(r)}
                 role="button" tabindex="0"
@@ -939,7 +1243,24 @@
                   <span class="material-symbols-rounded ext-stub-icon">qr_code_scanner</span>
                 {/if}
                 <div class="item-body">
-                  <div class="item-name">{r.name}</div>
+                  <div class="item-name">
+                    {r.name}
+                    {#if searchSource === 'off' && r.completeness != null}
+                      <span class="completeness-dot" class:high={r.completeness >= 0.85}
+                            class:mid={r.completeness >= 0.6 && r.completeness < 0.85}
+                            class:low={r.completeness < 0.6}
+                            title="OFF completeness: {Math.round(r.completeness * 100)}%"></span>
+                    {/if}
+                    {#if searchSource === 'off' && r.originTag}
+                      {@const _flag = offCountryTagToFlag(r.originTag)}
+                      {#if _flag}
+                        <span class="origin-flag" title="Origin: {offCountryTagToName(r.originTag)}">{_flag}</span>
+                      {/if}
+                    {/if}
+                    {#if searchSource === 'usda' && r.dataType}
+                      <span class="usda-type-badge" title="USDA data type: {r.dataType}">{r.dataType}</span>
+                    {/if}
+                  </div>
                   {#if r.brand}<div class="item-notes">{r.brand}</div>{/if}
                   {#if r.barcode}<div class="item-qty" style="font-size:11px">{r.barcode}</div>{/if}
                 </div>
@@ -980,6 +1301,55 @@
   on:refresh={onSheetRefresh}
 />
 
+<svelte:window on:click={_onWindowClick} on:touchmove={_onWindowTouchMove}
+               on:scroll={_closeTierDropdowns} on:resize={_closeTierDropdowns} />
+
+{#if offDropdownOpen}
+  <div class="tier-dropdown-backdrop" use:portal></div>
+  <div class="tier-dropdown-panel" use:portal
+       bind:this={offDropdownPanelEl}
+       style="top:{offDropdownPos.top}px; right:{offDropdownPos.right}px"
+       transition:slide={{ duration: 140 }}>
+    <div class="tier-dropdown-head">
+      <span>OFF quality</span>
+      {#if offTiersFiltered}
+        <button class="tier-dropdown-reset" on:click={resetOffTiers}>Reset</button>
+      {/if}
+    </div>
+    <div class="tier-dropdown-options">
+      {#each [['hi','Complete (85%+)','high'], ['mid','Partial (60-85%)','mid'], ['lo','Sparse (<60%)','low'], ['unknown','Unknown','low']] as [key, label, swatch] (key)}
+        <label class="tier-option">
+          <input type="checkbox" checked={offTiersActive.has(key)} on:change={() => toggleOffTier(key)} />
+          <span class="tier-swatch tier-{swatch}"></span>
+          <span class="tier-label">{label}</span>
+        </label>
+      {/each}
+    </div>
+  </div>
+{/if}
+
+{#if usdaDropdownOpen}
+  <div class="tier-dropdown-backdrop" use:portal></div>
+  <div class="tier-dropdown-panel" use:portal
+       bind:this={usdaDropdownPanelEl}
+       style="top:{usdaDropdownPos.top}px; right:{usdaDropdownPos.right}px"
+       transition:slide={{ duration: 140 }}>
+    <div class="tier-dropdown-head">
+      <span>USDA data type</span>
+      {#if usdaTiersFiltered}
+        <button class="tier-dropdown-reset" on:click={resetUsdaTiers}>Reset</button>
+      {/if}
+    </div>
+    <div class="tier-dropdown-options">
+      {#each _USDA_TIERS as tier (tier)}
+        <label class="tier-option">
+          <input type="checkbox" checked={usdaTiersActive.has(tier)} on:change={() => toggleUsdaTier(tier)} />
+          <span class="tier-label">{tier}</span>
+        </label>
+      {/each}
+    </div>
+  </div>
+{/if}
 
 <style>
   .header-action {
@@ -1112,6 +1482,128 @@
     background: var(--accent-dim); color: var(--accent);
     border-color: color-mix(in srgb, var(--accent) 30%, transparent);
   }
+  /* Suppress Android WebView long-press text selection on chips. */
+  .source-chip, .source-chip-caret {
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  }
+  .source-chip-wrap {
+    display: inline-flex; align-items: stretch; gap: 0;
+    border-radius: var(--radius-full, 99px);
+    overflow: hidden;
+  }
+  .source-chip-split {
+    border-top-right-radius: 0; border-bottom-right-radius: 0;
+    border-right: none; padding-right: 8px;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .source-chip-caret {
+    background: var(--surface-2); color: var(--text-2);
+    border: 1px solid var(--border);
+    border-top-left-radius: 0; border-bottom-left-radius: 0;
+    border-top-right-radius: var(--radius-full, 99px);
+    border-bottom-right-radius: var(--radius-full, 99px);
+    padding: 0 6px 0 4px;
+    display: inline-flex; align-items: center;
+    cursor: pointer;
+    transition: all var(--dur-fast);
+  }
+  .source-chip-caret .material-symbols-rounded {
+    font-size: 16px;
+    transition: transform var(--dur-fast);
+  }
+  .source-chip-caret.open .material-symbols-rounded { transform: rotate(180deg); }
+  .source-chip-caret:hover { border-color: var(--accent); color: var(--text-1); }
+  .source-chip-caret.active {
+    background: var(--accent-dim); color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  .tier-active-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent, #4caf50);
+    display: inline-block;
+  }
+
+  /* Backdrop is transparent to pointer events so page scroll still works;
+     dismiss is handled by <svelte:window> click/touchmove/scroll listeners. */
+  .tier-dropdown-backdrop {
+    position: fixed; inset: 0;
+    z-index: 1000;
+    pointer-events: none;
+  }
+  .tier-dropdown-panel {
+    position: fixed;
+    z-index: 1001;
+    background: var(--surface-1); color: var(--text-1);
+    border: 1px solid var(--border); border-radius: var(--radius-md, 10px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    padding: 8px 4px;
+    max-width: 260px;
+  }
+  .tier-dropdown-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 10px 6px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+  .tier-dropdown-reset {
+    background: transparent; border: none; color: var(--accent);
+    font-size: 11px; font-weight: 700; cursor: pointer;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .tier-dropdown-options { display: flex; flex-direction: column; }
+  .tier-option {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; cursor: pointer;
+    font-size: 13px;
+    border-radius: 6px;
+  }
+  .tier-option:hover { background: var(--surface-2); }
+  .tier-option input[type="checkbox"] { margin: 0; }
+  .tier-swatch {
+    width: 10px; height: 10px; border-radius: 50%;
+    display: inline-block; flex-shrink: 0;
+    background: var(--text-2);
+  }
+  .tier-swatch.tier-high { background: #4caf50; }
+  .tier-swatch.tier-mid  { background: #ff9800; }
+  .tier-swatch.tier-low  { background: #9e9e9e; }
+  .tier-label { flex: 1; }
+
+  /* Per-row quality decorations */
+  .completeness-dot {
+    display: inline-block;
+    width: 8px; height: 8px; border-radius: 50%;
+    vertical-align: middle;
+    margin-left: 6px;
+    background: var(--text-2);
+  }
+  .completeness-dot.high { background: #4caf50; }
+  .completeness-dot.mid  { background: #ff9800; }
+  .completeness-dot.low  { background: #9e9e9e; }
+  .origin-flag {
+    display: inline-block; margin-left: 6px; font-size: 14px;
+    vertical-align: middle;
+  }
+  .usda-type-badge {
+    display: inline-block; margin-left: 6px;
+    font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 4px;
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent);
+    vertical-align: middle;
+    text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .src-badge {
+    display: inline-block;
+    font-size: 10px; font-weight: 700;
+    padding: 1px 6px; border-radius: 4px;
+    margin-right: 6px;
+    vertical-align: middle;
+    text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .src-badge.src-off  { background: #2e7d32; color: #fff; }
+  .src-badge.src-usda { background: #1565c0; color: #fff; }
 
   /* External-search results — no heading since the active source-chip
      already labels which API is being queried. */
