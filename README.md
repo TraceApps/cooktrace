@@ -281,8 +281,8 @@ With TLS in front, leave `INSECURE_COOKIES` unset.
 | `PORT` | No | `3001` | Port the server listens on inside the container |
 | `LOG_LEVEL` | No | `info` | Log verbosity: `error` \| `warn` \| `info` \| `debug` |
 | `MAX_SESSION_HOURS` | No | `8760` | Cap session length in hours (default 1 year). Lower for shared / kiosk machines |
-| `IMPORT_ZIP_MAX_MB` | No | `256` | Cap upload size for bulk Mealie / Tandoor / Paprika import zips |
-| `BACKUP_UPLOAD_MAX_MB` | No | `1024` | Cap upload size for `Upload & Restore` of a full-backup ZIP |
+| `IMPORT_ZIP_MAX_MB` | No | `512` | Cap upload size for bulk Mealie / Tandoor / Paprika import zips |
+| `BACKUP_UPLOAD_MAX_MB` | No | `512` | Cap upload size for `Upload & Restore` of a full-backup ZIP |
 | `BACKUP_SCHEDULE` | No | — | Auto-backup cadence: `off` \| `daily` \| `weekly` \| `monthly`. Locks the UI fields when set |
 | `BACKUP_TIME` | No | `02:00` | Auto-backup time of day (HH:MM, container timezone). Locks the UI field when set |
 | `BACKUP_RETENTION` | No | — | How many auto-backups to retain (older ones purged). Locks the UI field when set |
