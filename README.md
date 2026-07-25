@@ -13,6 +13,7 @@ No accounts, no telemetry, no cloud sync unless you opt in.</p>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-blue"></a>
   <a href="https://github.com/traceapps/cooktrace/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/traceapps/cooktrace?label=release&color=blue"></a>
   <a href="https://github.com/traceapps/cooktrace/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/traceapps/cooktrace/total?label=downloads&color=blue"></a>
+  <a href="https://traceapps.github.io/docs/cooktrace/"><img alt="Documentation" src="https://img.shields.io/badge/docs-traceapps.github.io-4A90E2?logo=readthedocs&logoColor=white"></a>
   <a href="https://github.com/traceapps/cooktrace/pkgs/container/cooktrace"><img alt="Docker image" src="https://img.shields.io/badge/docker-ghcr.io%2Ftraceapps%2Fcooktrace-2496ED?logo=docker&logoColor=white"></a>
   <a href="https://github.com/traceapps/cooktrace/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/traceapps/cooktrace?style=flat"></a>
 </p>
