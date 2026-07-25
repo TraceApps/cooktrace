@@ -71,7 +71,8 @@
   let aiCustomModelVal = '';
   {
     const saved = $aiModel;
-    const isPreset = providerModels.includes(saved) && saved !== AI_MODEL_CUSTOM;
+    const _pm = AI_MODELS[$aiProvider] || [];
+    const isPreset = _pm.includes(saved) && saved !== AI_MODEL_CUSTOM;
     if (saved && !isPreset && $aiProvider !== 'custom') {
       aiModelSelectVal = AI_MODEL_CUSTOM;
       aiCustomModelVal = saved;
