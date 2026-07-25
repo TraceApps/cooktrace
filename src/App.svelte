@@ -224,6 +224,16 @@
                 }
                 import('./stores/toast.js').then(({ showSuccess }) => showSuccess('Signed in'));
                 await loadAuthState();
+                // Re-evaluate the NativeSetup gate. Without this the user
+                // completes OIDC from NativeSetup, gets a valid token, and
+                // stays visually stuck on the setup screen — because the
+                // showNativeSetup flag was captured at App.svelte mount and
+                // never re-checked. needsNativeSetup() reads the current
+                // nativeMode + serverUrl which NativeSetup persists before
+                // opening the OIDC browser, so this correctly flips to
+                // false and reveals the router. Cross-app fix mirrored
+                // from NutriTrace #110.
+                showNativeSetup = needsNativeSetup();
                 window.location.hash = '#/';
               }
             }

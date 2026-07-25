@@ -1,6 +1,23 @@
-# CookTrace
+<h1 align="center">CookTrace</h1>
 
-**Trace Every Recipe, from pantry to plate** — A self-hosted recipe, pantry, and cooking tracker built for privacy and full data ownership.
+<p align="center"><b>Trace Every Recipe, From Pantry to Plate</b></p>
+
+<p align="center">A self-hosted recipe, pantry, and cooking tracker.<br/>
+No accounts, no telemetry, no cloud sync unless you opt in.</p>
+
+<p align="center">
+  <img src="public/icons/logo-transparent.png" alt="CookTrace" width="180" />
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-blue"></a>
+  <a href="https://github.com/traceapps/cooktrace/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/traceapps/cooktrace?label=release&color=blue"></a>
+  <a href="https://github.com/traceapps/cooktrace/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/traceapps/cooktrace/total?label=downloads&color=blue"></a>
+  <a href="https://github.com/traceapps/cooktrace/pkgs/container/cooktrace"><img alt="Docker image" src="https://img.shields.io/badge/docker-ghcr.io%2Ftraceapps%2Fcooktrace-2496ED?logo=docker&logoColor=white"></a>
+  <a href="https://github.com/traceapps/cooktrace/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/traceapps/cooktrace?style=flat"></a>
+</p>
+
+---
 
 CookTrace runs as a single Docker container on your own hardware, with a PWA for the browser and a native Android app for your phone. No accounts on external services, no data leaving your network, no subscriptions.
 
@@ -159,6 +176,8 @@ CookTrace runs as a Progressive Web App in any modern browser. Add it to your ho
 A native Android app built on the same Svelte codebase, wrapped in Capacitor 8. Use it standalone (fully offline) or connect it to a CookTrace server for sync.
 
 **Install** — download the signed APK from the [Releases page](https://github.com/traceapps/cooktrace/releases/latest) and install on your device. You may need to enable "Install from unknown sources" in Android settings.
+
+**Testing pre-release** — the [`dev-latest`](https://github.com/traceapps/cooktrace/releases/tag/dev-latest) pre-release carries a rolling signed APK built from the `dev` branch. Same signing key as stable, so you can upgrade from stable to dev in place (Android blocks the reverse without an uninstall). Not recommended for production, but useful for beta-testing incoming fixes and features.
 
 **Local mode** — pure offline. SQLite mirrors every server table on-device. The first-launch wizard offers `Use Locally` or `Connect to Server`.
 
@@ -354,10 +373,15 @@ Optional. Connect any OpenID Connect 1.0 compliant identity provider — **Authe
 
    # Optional fields (per-provider)
    OIDC_SCOPE=openid profile email
+   OIDC_TOKEN_AUTH_METHOD=client_secret_post   # or client_secret_basic / none (for PKCE public clients)
    OIDC_ADMIN_GROUP_CLAIM=groups
    OIDC_ADMIN_GROUP_VALUE=CookTraceAdmins
    OIDC_AUTO_LINK=1
    OIDC_AUTO_REGISTER=0
+
+   # SSO-only mode (optional) — disable password login server-wide so users
+   # must sign in via OIDC. Truthy = enabled (default), falsy = SSO only.
+   OIDC_ENABLE_EMAIL_PASSWORD_LOGIN=0
 
    # Multi-provider — use numbered prefix instead
    OIDC_PROVIDER_2_ISSUER=https://other-idp.example.com
@@ -366,7 +390,7 @@ Optional. Connect any OpenID Connect 1.0 compliant identity provider — **Authe
    OIDC_PROVIDER_2_DISPLAY_NAME=Keycloak
    ```
 
-   `OIDC_*` (unnumbered) is an alias for `OIDC_PROVIDER_1_*`. Env-defined providers show with a lock badge in the Settings UI and are read-only.
+   `OIDC_*` (unnumbered) is an alias for `OIDC_PROVIDER_1_*`. Env-defined providers show with a lock badge in the Settings UI and are read-only. When `OIDC_ENABLE_EMAIL_PASSWORD_LOGIN` is set, the "Allow Password Login" toggle in Settings also becomes read-only with an env-lock note.
 
 **Per-provider toggles**:
 - **Auto-link existing users (verified email)** — when the IdP says `email_verified=true` and the email matches an existing CookTrace user, link them silently on first SSO sign-in. Defaults ON.

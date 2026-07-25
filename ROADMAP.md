@@ -385,6 +385,31 @@ concrete benefit worth the cost. Audit cadence is monthly (see memory
 - **Skip**: better-sqlite3 already on 11.x (further bumps need no
   CookTrace-specific reason).
 
+## Planned for v1.1.0
+
+### Full i18n Coverage
+
+Baseline as of v1.0.0 is ~50% coverage: 535 keys in `en.json`, ~500
+strings still hardcoded across the 76 `.svelte` files (roughly 346 in
+text content + 285 in attributes, minus overlap). Section headers and
+some routes are covered; SettingsEmail, SettingsKitchens, cookbook
+sharing UI, most dialogs, and most attribute strings (placeholder,
+title, aria-label) are not.
+
+Scope:
+
+- Extract every remaining user-facing string into a key
+- Extend `en.json` to the full set
+- Stub matching keys in `sv.json` so the community translator can fill
+- Add a CI lint rule that fails if a new component adds hardcoded
+  English (Svelte template `>Some Text<` or `placeholder="Some Text"`
+  without a `$_()` wrap), so coverage doesn't backslide after this
+  release
+- Sizing: 1-2 focused days
+
+Apply the same sweep to LT and NT in their respective v1.1.0 releases
+once the CT pattern is proven.
+
 ## Out of scope (until requested)
 - Multi-database (Postgres etc.), SQLite-only, intentionally
 - Built-in barcode scanner (use Pantry add-by-name)

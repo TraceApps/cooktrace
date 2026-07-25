@@ -1,6 +1,6 @@
 <script>
   import { aiEnabled, aiProvider, aiApiKey, aiModel, aiBaseUrl, aiAssistantName, aiKeyVerified, smartLogEnabled, traceChefHat, envLocks as envLocksStore } from '../../stores/settings.js';
-  import { AI_PROVIDERS, AI_DEFAULT_MODELS, AI_MODELS, callAI, callAIProxy } from '../../lib/aiChat.js';
+  import { AI_PROVIDERS, AI_DEFAULT_MODELS, AI_MODELS, AI_MODEL_CUSTOM, callAI, callAIProxy } from '../../lib/aiChat.js';
   import { showError, showSuccess } from '../../stores/toast.js';
   import ConnectionStatus from './ConnectionStatus.svelte';
 
@@ -62,6 +62,36 @@
   }
 
   $: providerModels = AI_MODELS[$aiProvider] || [];
+
+  // Escape hatch: branded providers' preset list includes an AI_MODEL_CUSTOM
+  // sentinel. When the select shows the sentinel, a free-text input appears
+  // so users can enter a model ID we haven't hardcoded (e.g. after a vendor
+  // renames). $aiModel remains the source of truth persisted to the store.
+  let aiModelSelectVal;
+  let aiCustomModelVal = '';
+  {
+    const saved = $aiModel;
+    const _pm = AI_MODELS[$aiProvider] || [];
+    const isPreset = _pm.includes(saved) && saved !== AI_MODEL_CUSTOM;
+    if (saved && !isPreset && $aiProvider !== 'custom') {
+      aiModelSelectVal = AI_MODEL_CUSTOM;
+      aiCustomModelVal = saved;
+    } else {
+      aiModelSelectVal = saved || AI_DEFAULT_MODELS[$aiProvider] || '';
+    }
+  }
+
+  function _syncModelFromSelect() {
+    if ($aiProvider === 'custom') return;
+    const next = (aiModelSelectVal === AI_MODEL_CUSTOM)
+      ? aiCustomModelVal.trim()
+      : (aiModelSelectVal || '');
+    aiModel.set(next);
+    _invalidate();
+  }
+  function _modelLabel(m) {
+    return m === AI_MODEL_CUSTOM ? 'Custom…' : m;
+  }
   // Required fields the user must fill in for a meaningful test.
   $: canTest = !envLocks.ai
     && !!$aiApiKey?.trim()
@@ -83,6 +113,18 @@
     const valid = AI_MODELS[next] || [];
     if (next !== 'custom' && !valid.includes($aiModel)) {
       aiModel.set(AI_DEFAULT_MODELS[next] || '');
+    }
+    // Sync escape-hatch state so the select reflects the new provider
+    if (next !== 'custom') {
+      const saved = $aiModel;
+      const isPreset = (AI_MODELS[next] || []).includes(saved) && saved !== AI_MODEL_CUSTOM;
+      if (saved && !isPreset) {
+        aiModelSelectVal = AI_MODEL_CUSTOM;
+        aiCustomModelVal = saved;
+      } else {
+        aiModelSelectVal = saved;
+        aiCustomModelVal = '';
+      }
     }
     _invalidate();
   }
@@ -186,8 +228,8 @@
       <span class="setting-label">Model</span>
       {#if providerModels.length > 0 && $aiProvider !== 'custom'}
         <div class="select-wrap" style="width:220px">
-          <select class="select sel-sm" value={$aiModel} on:change={e => { aiModel.set(e.target.value); _invalidate(); }}>
-            {#each providerModels as m}<option value={m}>{m}</option>{/each}
+          <select class="select sel-sm" bind:value={aiModelSelectVal} on:change={_syncModelFromSelect}>
+            {#each providerModels as m}<option value={m}>{_modelLabel(m)}</option>{/each}
           </select>
         </div>
       {:else}
@@ -196,6 +238,24 @@
           on:change={e => { aiModel.set(e.target.value); _invalidate(); }} />
       {/if}
     </div>
+    {#if aiModelSelectVal === AI_MODEL_CUSTOM && $aiProvider !== 'custom'}
+      <div class="setting-divider"></div>
+      <div class="setting-row">
+        <span class="setting-label">Custom Model ID</span>
+        <input class="input" type="text" style="width:220px"
+          placeholder={$aiProvider === 'gemini' ? 'gemini-3.5-flash' : $aiProvider === 'claude' ? 'claude-sonnet-5' : 'gpt-4o'}
+          bind:value={aiCustomModelVal} on:input={_syncModelFromSelect} />
+      </div>
+      <div style="padding:8px 16px 12px;display:flex;gap:8px;align-items:flex-start">
+        <span class="material-symbols-rounded" style="font-size:16px;color:var(--muted);flex-shrink:0;margin-top:2px">info</span>
+        <div class="setting-desc" style="margin:0;line-height:1.5">
+          Enter the exact model ID from the vendor (e.g.
+          {#if $aiProvider === 'gemini'}<a href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener" class="about-link">Google's model list</a>
+          {:else if $aiProvider === 'claude'}<a href="https://docs.anthropic.com/en/docs/about-claude/models/overview" target="_blank" rel="noopener" class="about-link">Anthropic's model list</a>
+          {:else}<a href="https://platform.openai.com/docs/models" target="_blank" rel="noopener" class="about-link">OpenAI's model list</a>{/if}). Use this if the preset dropdown doesn't have the model you want.
+        </div>
+      </div>
+    {/if}
 
     <div class="setting-divider"></div>
     <div class="setting-row stack">

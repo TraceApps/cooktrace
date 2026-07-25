@@ -13,6 +13,33 @@ import { deriveSodiumSalt } from './nutriments.js';
 
 const USDA_BASE = 'https://api.nal.usda.gov/fdc/v1';
 
+// USDA data-type priority (lower = higher quality, surface first).
+// Foundation Foods are laboratory-analyzed staples; SR Legacy is the
+// classic USDA Standard Reference; Survey (FNDDS) is composite dietary
+// data; Branded is manufacturer-submitted with widely varying quality;
+// Experimental is tiny research data. Unknown/null sinks to the bottom.
+const _USDA_TYPE_PRIORITY = {
+  'Foundation':      1,
+  'SR Legacy':       2,
+  'Survey (FNDDS)':  3,
+  'Branded':         4,
+  'Experimental':    5,
+};
+
+// Re-rank USDA search results within each fetched page so higher-quality
+// tiers surface above manufacturer-submitted Branded entries. USDA's
+// server-side relevance is text-match based and doesn't consider tier
+// quality, so a search for "chicken" returns dozens of branded chicken
+// products before the one curated Foundation entry.
+function _rankUSDAResults(items) {
+  if (!Array.isArray(items) || items.length < 2) return items;
+  return items.slice().sort((a, b) => {
+    const aP = _USDA_TYPE_PRIORITY[a.dataType] || 99;
+    const bP = _USDA_TYPE_PRIORITY[b.dataType] || 99;
+    return aP - bP;
+  });
+}
+
 function _wrapCapacitor(res) {
   return {
     ok: res.status >= 200 && res.status < 300,
@@ -104,6 +131,10 @@ function _mapProduct(item, servingSize) {
     serving_unit: unit,
     img_url:      '',
     nutrition,
+    // USDA's `dataType` distinguishes the source database (Foundation,
+    // SR Legacy, Survey/FNDDS, Branded, Experimental). Feeds the tier
+    // sort + the small badge shown next to each USDA result row.
+    dataType:     item.dataType || null,
     _source:      'usda',
   };
 }
@@ -118,10 +149,11 @@ export async function searchByName(query, page = 1, apiKey) {
     const res = await _extFetch(url);
     if (!res.ok) return [];
     const data = await res.json();
-    return (data.foods || []).map(f => {
+    const items = (data.foods || []).map(f => {
       const ss = (f.servingSize && !isNaN(f.servingSize)) ? f.servingSize : 100;
       return _mapProduct(f, ss);
     }).filter(f => f.name);
+    return _rankUSDAResults(items);
   } catch (e) {
     console.warn('[usda] search failed:', e);
     return [];

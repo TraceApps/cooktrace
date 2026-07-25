@@ -27,6 +27,37 @@ under several tags so you can pin to whatever risk level fits:
 Legacy `1.0.0-rc.N` tags from before the semver switch remain published
 indefinitely; anyone pinned to a specific rc release is unaffected.
 
+## Testing pre-release builds
+
+For beta-testing incoming fixes and features before they hit a stable
+release:
+
+- **Docker:** switch your compose image to `ghcr.io/traceapps/cooktrace:dev`
+  and run `docker compose pull && docker compose up -d`. Rebuilt on
+  every push to the `dev` branch.
+- **Android APK:** grab the rolling APK from the
+  [`dev-latest`](https://github.com/traceapps/cooktrace/releases/tag/dev-latest)
+  pre-release. Signed with the same key as stable releases, so it
+  upgrades over a stable install in place. Android blocks the reverse
+  (dev → stable) without an uninstall, so back up first if you plan
+  to switch back.
+
+## Pinning Android to a specific version
+
+Sideloaded APKs don't auto-update the way docker containers do. Every
+version has its own APK on the [Releases page](https://github.com/traceapps/cooktrace/releases):
+
+- **[Latest stable](https://github.com/traceapps/cooktrace/releases/latest)** —
+  auto-redirects to the newest stable release
+- **`/releases/tag/v1.0.0`** (or any version) — exact-version pin,
+  won't change
+- **`/releases/tag/dev-latest`** — rolling dev channel
+
+To "auto-patch" on Android, redownload from the latest URL whenever
+you want to upgrade. Because APKs are signed with the same shared
+key across every stable version and dev-latest, in-place upgrade to a
+newer version is always allowed. Downgrading requires an uninstall.
+
 ## Environment variables
 
 See [.env.example](.env.example) for the full list. Required for any
