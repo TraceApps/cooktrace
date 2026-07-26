@@ -74,7 +74,7 @@ Third app in the Trace family alongside [NutriTrace](https://github.com/traceapp
 - **Inline nutrient editing** — one input row per nutrient in your visibleNutriments setting (default ~10 staples). `Edit all nutrients` opens a stacked sub-sheet with the full 31-nutrient picker
 - **Grid + List view modes** — toggle in the filter row; per-user preference syncs across devices
 - **Bulk multi-select** — checklist mode, Select All, bulk delete
-- **External lookup** — Open Food Facts search + barcode scanner via `@capacitor-mlkit/barcode-scanning` (native) or QuaggaJS (web). Optional USDA FoodData Central search when you enter a key in Settings
+- **External lookup with quality signals** — Open Food Facts search + barcode scanner via `@capacitor-mlkit/barcode-scanning` (native) or QuaggaJS (web). Optional USDA FoodData Central search when you enter a key in Settings. OFF results carry an **origin badge** and a **data-completeness dot** so you can prefer richer records at a glance; USDA results carry a **data-type badge** (Foundation, SR Legacy, Branded, Survey (FNDDS)). Tier filters + source pinning + an **All-mode** search that pulls from every regional OFF instance in one query (added v1.0.1)
 - **Catalog grows organically** — opt-in via Settings → Cooking → Auto-add ingredients to Pantry (default off). Manual links from the Link picker always work either way
 - **Pantry-match pill** on every recipe card: `8 / 10 in pantry`, color-coded full / partial / none. Variant-aware — a generic counts as in-stock if any of its variants are stocked
 
