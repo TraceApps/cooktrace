@@ -72,9 +72,34 @@ const GEMINI_RETIRED = new Set([
 const AI_MAX_MESSAGES   = 60;
 const AI_MAX_BYTES      = 200_000; // ~200 KB combined messages + system prompt
 
+// Normalise any image content part on an incoming message to the OpenAI
+// wire shape `{type:'image_url', image_url:{url:'data:...'}}` so the
+// oai-compat forward path never sees Anthropic-shape (which LiteLLM /
+// strict schema proxies reject with `invalid content type=image`).
+// Idempotent; non-array content untouched. Defense-in-depth against
+// NT #114-class client drift.
+function _normaliseImagePartsToOpenAI(msg) {
+  if (!msg || !Array.isArray(msg.content)) return msg;
+  const normalised = msg.content.map(part => {
+    if (!part || typeof part !== 'object') return part;
+    if (part.type === 'image' && part.source?.type === 'base64' && part.source.media_type && part.source.data) {
+      return {
+        type: 'image_url',
+        image_url: { url: `data:${part.source.media_type};base64,${part.source.data}` },
+      };
+    }
+    if (part.type === 'image' && typeof part.dataUrl === 'string') {
+      return { type: 'image_url', image_url: { url: part.dataUrl } };
+    }
+    return part;
+  });
+  return { ...msg, content: normalised };
+}
+
 router.post('/chat', requireAuth, aiChatLimit, wrap(async (req, res) => {
-  const { messages, systemPrompt } = req.body;
-  if (!Array.isArray(messages)) return res.status(400).json({ error: 'messages array required' });
+  const { messages: rawMessages, systemPrompt } = req.body;
+  if (!Array.isArray(rawMessages)) return res.status(400).json({ error: 'messages array required' });
+  const messages = rawMessages.map(_normaliseImagePartsToOpenAI);
   if (messages.length > AI_MAX_MESSAGES) {
     return res.status(413).json({ error: `Too many messages (max ${AI_MAX_MESSAGES})` });
   }
