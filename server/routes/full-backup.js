@@ -179,8 +179,10 @@ const upload = multer({
 });
 
 // ── Tables we dump / restore ──────────────────────────────────────────
-// Server-only ephemera (oauth_state, password_reset_tokens) is
-// intentionally skipped — their lifetime is shorter than a backup.
+// Server-only ephemera (oauth_state, password_reset_tokens,
+// notification_log) is intentionally skipped — their lifetime is
+// shorter than a backup and restoring stale rows would either
+// re-fire notifications or hand out consumed tokens.
 function dumpDatabase() {
   return {
     users:           db.prepare('SELECT * FROM users').all(),
@@ -207,6 +209,12 @@ function dumpDatabase() {
     kitchen_members:       _selectIfExists('kitchen_members'),
     oidc_providers:        _selectIfExists('oidc_providers'),
     user_oidc_links:       _selectIfExists('user_oidc_links'),
+    // Admin-created invitations that have not been consumed yet.
+    // Expired rows are cleaned up by the scheduler on the next tick
+    // (see server/lib/scheduler.js), so including them is safe.
+    // TODO(review): should invite_tokens be included in backups? Rows
+    // may be expired or already-used by the time the restore runs.
+    invite_tokens:         _selectIfExists('invite_tokens'),
   };
 }
 
@@ -259,19 +267,17 @@ function restoreFromZip(zip) {
     `);
     for (const c of data.app_config || []) insConfig.run(c);
 
-    const insChat = db.prepare(`
-      INSERT OR IGNORE INTO ai_chat_history (id, user_id, role, content, created_at)
-      VALUES (@id, @user_id, @role, @content, @created_at)
-    `);
-    for (const m of data.ai_chat_history || []) insChat.run(m);
-
+    // ai_chat_history uses the schema-driven helper below so the
+    // migrated updated_at column (added in rc.2 as part of the sync
+    // pull fix) is written back verbatim instead of being replaced
+    // with a restore-time NOW() by the AFTER INSERT trigger.
     // Recipes / pantry_items / cook_diary / shopping_list use the
-    // schema-driven insert helper below. Every column PRAGMA reports
-    // is included in the INSERT, so a future ALTER TABLE never
-    // silently drops a column at restore time (rc.3 audit found
-    // recipes was missing rest_minutes, total_minutes, category_id,
-    // share_token, and video_url from a hardcoded column list —
-    // switching to PRAGMA-driven closes that whole class of bug).
+    // same helper. Every column PRAGMA reports is included in the
+    // INSERT, so a future ALTER TABLE never silently drops a column
+    // at restore time (rc.3 audit found recipes was missing
+    // rest_minutes, total_minutes, category_id, share_token, and
+    // video_url from a hardcoded column list — switching to
+    // PRAGMA-driven closes that whole class of bug).
     //
     // _bulkRestoreSchemaDriven is a local helper hoisted above so it
     // can be shared with the side-table _restoreTable path below.
@@ -287,6 +293,7 @@ function restoreFromZip(zip) {
       const defaults = Object.fromEntries(cols.map(c => [c, null]));
       for (const r of rows) ins.run(_withDefaults(r, defaults));
     }
+    _bulkRestoreSchemaDriven('ai_chat_history', data.ai_chat_history);
     _bulkRestoreSchemaDriven('recipes',       data.recipes);
     _bulkRestoreSchemaDriven('pantry_items',  data.pantry_items);
     _bulkRestoreSchemaDriven('cook_diary',    data.cook_diary);
@@ -315,11 +322,20 @@ function restoreFromZip(zip) {
     _restoreTable('disabled_units',        data.disabled_units);
     _restoreTable('cookbooks',             data.cookbooks);
     _restoreTable('recipe_cookbook_links', data.recipe_cookbook_links);
-    _restoreTable('recipe_shares',         data.recipe_shares);
-    _restoreTable('cookbook_shares',       data.cookbook_shares);
+    // kitchens + kitchen_members must land BEFORE recipe_shares and
+    // cookbook_shares. Kitchens survives the DELETE-FROM-users wipe
+    // pass (owner_user_id is ON DELETE SET NULL, not CASCADE), so
+    // _restoreTable('kitchens') actually deletes rows and its
+    // ON DELETE SET NULL cascade nulls out via_kitchen_id on any
+    // recipe_shares / cookbook_shares already inserted before it.
+    // Restoring kitchens first keeps via_kitchen_id intact.
     _restoreTable('kitchens',              data.kitchens);
     _restoreTable('kitchen_members',       data.kitchen_members);
+    _restoreTable('recipe_shares',         data.recipe_shares);
+    _restoreTable('cookbook_shares',       data.cookbook_shares);
     _restoreTable('recipe_comments',       data.recipe_comments);
+    // See TODO(review) in dumpDatabase — pending invitations only.
+    _restoreTable('invite_tokens',         data.invite_tokens);
 
     // OIDC — restore only when target tables exist.
     try {
