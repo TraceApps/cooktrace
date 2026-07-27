@@ -10,7 +10,7 @@ repo; feature suggestions tracked in [FUTURE.md](FUTURE.md).
 git clone https://github.com/traceapps/cooktrace.git
 cd cooktrace
 npm install
-npm run dev          # Vite dev server on :5175
+npm run dev          # Vite dev server on :5173
 node server/index.js # API on :3001
 ```
 
