@@ -17,6 +17,7 @@
  * via setToolHandler(), keeping the catalog and execution code
  * loosely coupled so we can iterate on either independently.
  */
+import { getOpenAIChatParams } from './openai-chat-params.js';
 
 // ── Provider catalog (kept in CookTrace's `id`-keyed shape so the
 //    existing SettingsTrace dropdown keeps working). ───────────────────────
@@ -427,10 +428,15 @@ async function _callOpenAIWithTools(apiKey, model, messages, systemPrompt, tools
   const MAX_ROUNDS = 5;
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
+    const selectedModel = model || AI_DEFAULT_MODELS.openai;
     const body = {
-      model: model || AI_DEFAULT_MODELS.openai,
-      max_tokens: 4096,
+      model: selectedModel,
       messages: currentMessages,
+      ...getOpenAIChatParams({
+        baseUrl,
+        model: selectedModel,
+        hasTools: openaiTools.length > 0,
+      }),
     };
     if (openaiTools.length) body.tools = openaiTools;
     const headers = { 'Content-Type': 'application/json' };
