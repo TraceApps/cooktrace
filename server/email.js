@@ -300,40 +300,6 @@ export async function sendInvite(email, inviteUrl, inviterName) {
   });
 }
 
-// ── Welcome ────────────────────────────────────────────────────────────────
-// Fired right after a user finishes registration (either via invite or
-// the first-admin setup). Friendly orientation, not a marketing blast.
-export async function sendWelcome(email, fullName, appUrl) {
-  if (!email) return;
-  const origin = new URL(appUrl).origin;
-  const greet = fullName
-    ? `Welcome, <strong style="color:#FFFFFF;">${String(fullName).split(/\s+/)[0]}</strong>.`
-    : `Welcome aboard.`;
-  const body = `
-    ${greeting(null)}
-    <p class="nt-heading" style="margin:0 0 10px;font-size:20px;font-weight:700;color:#FFFFFF;line-height:1.3;">
-      ${greet}
-    </p>
-    <p class="nt-body-txt" style="margin:0 0 16px;font-size:15px;color:#8A93A8;line-height:1.7;">
-      Your <strong style="color:#FFFFFF;">CookTrace</strong> account is live. Here are
-      a few good first moves:
-    </p>
-    <ul style="margin:0 0 24px 18px;padding:0;font-family:${_FONT};font-size:14px;color:#8A93A8;line-height:1.8;">
-      <li>Add a recipe by URL, photo, or paste from your favorite cookbook export.</li>
-      <li>Stock your pantry &mdash; we&rsquo;ll show "X of Y in pantry" on every recipe card.</li>
-      <li>Plan a cook for this week and Trace will remind you the morning of.</li>
-      <li>Ask Trace anything (mic icon in the chat) &mdash; "what can I cook tonight?"</li>
-    </ul>
-    ${ctaButton(appUrl, 'Open CookTrace')}
-    ${fallbackUrl(appUrl)}`;
-  await sendMail({
-    to: email,
-    subject: 'Welcome to CookTrace',
-    html: emailWrapper(origin, body, null, 'Welcome to CookTrace — your self-hosted recipe + pantry + meal planner.'),
-    text: `Welcome to CookTrace! Open the app: ${appUrl}`,
-  });
-}
-
 // ── Recipe Shared With You ─────────────────────────────────────────────────
 // Fired when a user grants another user access to a recipe via the
 // per-user share dialog. Best-effort — sharing succeeds even if the
