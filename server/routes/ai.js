@@ -3,6 +3,7 @@ import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { wrap } from '../logger.js';
 import { getAiConfig } from '../ai.js';
 import { makeRateLimiter } from '../middleware/rate-limit.js';
+import { getOpenAIChatParams } from '../lib/openai-chat-params.js';
 import db from '../db.js';
 
 const router = Router();
@@ -51,8 +52,16 @@ router.delete('/history', requireAuth, wrap((req, res) => {
 const AI_DEFAULT_MODELS = {
   claude: 'claude-haiku-4-5-20251001',
   openai: 'gpt-4o-mini',
-  gemini: 'gemini-1.5-flash',
+  gemini: 'gemini-2.5-flash',
 };
+
+// Models Google has shut down (404) or scheduled for shutdown.
+// Saved env-locked configs pointing at any of these are remapped to the
+// current default so the proxy doesn't 404 against a dead endpoint.
+const GEMINI_RETIRED = new Set([
+  'gemini-1.5-flash', 'gemini-1.5-pro',
+  'gemini-2.0-flash', 'gemini-2.0-flash-lite',
+]);
 
 /**
  * POST /api/ai/chat
@@ -64,9 +73,34 @@ const AI_DEFAULT_MODELS = {
 const AI_MAX_MESSAGES   = 60;
 const AI_MAX_BYTES      = 200_000; // ~200 KB combined messages + system prompt
 
+// Normalise any image content part on an incoming message to the OpenAI
+// wire shape `{type:'image_url', image_url:{url:'data:...'}}` so the
+// oai-compat forward path never sees Anthropic-shape (which LiteLLM /
+// strict schema proxies reject with `invalid content type=image`).
+// Idempotent; non-array content untouched. Defense-in-depth against
+// NT #114-class client drift.
+function _normaliseImagePartsToOpenAI(msg) {
+  if (!msg || !Array.isArray(msg.content)) return msg;
+  const normalised = msg.content.map(part => {
+    if (!part || typeof part !== 'object') return part;
+    if (part.type === 'image' && part.source?.type === 'base64' && part.source.media_type && part.source.data) {
+      return {
+        type: 'image_url',
+        image_url: { url: `data:${part.source.media_type};base64,${part.source.data}` },
+      };
+    }
+    if (part.type === 'image' && typeof part.dataUrl === 'string') {
+      return { type: 'image_url', image_url: { url: part.dataUrl } };
+    }
+    return part;
+  });
+  return { ...msg, content: normalised };
+}
+
 router.post('/chat', requireAuth, aiChatLimit, wrap(async (req, res) => {
-  const { messages, systemPrompt } = req.body;
-  if (!Array.isArray(messages)) return res.status(400).json({ error: 'messages array required' });
+  const { messages: rawMessages, systemPrompt } = req.body;
+  if (!Array.isArray(rawMessages)) return res.status(400).json({ error: 'messages array required' });
+  const messages = rawMessages.map(_normaliseImagePartsToOpenAI);
   if (messages.length > AI_MAX_MESSAGES) {
     return res.status(413).json({ error: `Too many messages (max ${AI_MAX_MESSAGES})` });
   }
@@ -135,8 +169,8 @@ async function _callOpenAI(apiKey, model, messages, systemPrompt, baseUrl = 'htt
     },
     body: JSON.stringify({
       model,
-      max_tokens: 1024,
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
+      ...getOpenAIChatParams({ baseUrl, model, hasTools: false, maxTokens: 1024 }),
     }),
   });
   const data = await res.json();
@@ -145,7 +179,8 @@ async function _callOpenAI(apiKey, model, messages, systemPrompt, baseUrl = 'htt
 }
 
 async function _callGemini(apiKey, model, messages, systemPrompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const m = GEMINI_RETIRED.has(model) ? AI_DEFAULT_MODELS.gemini : (model || AI_DEFAULT_MODELS.gemini);
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`;
   const contents = messages.map(msg => ({
     role: msg.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: msg.content }],

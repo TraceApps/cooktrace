@@ -9,6 +9,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.2] - 2026-07-28
+
+### Added
+
+- **Unified docs site** at [traceapps.github.io/docs/](https://traceapps.github.io/docs/) covering CookTrace, LiftTrace, and NutriTrace in one place. Docker install, OIDC recipes for Authentik / Keycloak / Pocket-ID / Authelia / Google / Auth0, Trace AI setup for every provider, mobile install, backups, troubleshooting, and full per-app feature guides.
+- **Documentation badge** in the README hero pointing at the new docs section, plus a transparent-background logo and a jump strip near the top.
+- **GPT-5.6 chat parameter support.** When the configured OpenAI model is GPT-5.6 or newer, requests use `max_completion_tokens` + `reasoning_effort` instead of the legacy `max_tokens` shape. Older models are unaffected.
+
+### Fixed
+
+- **Backup JSON export was silently missing 12 tables.** `user_settings`, `ai_chat_history`, `recipe_categories`, `recipe_comments`, `pantry_categories`, `custom_units`, `disabled_units`, `cookbooks`, `recipe_cookbook_links`, `recipe_shares`, `cookbook_shares`, and `kitchens` + `kitchen_members` were not captured by the portable JSON export. Restore now brings everything the ZIP contains.
+- **Kitchen-share restore ordering bug.** Restoring a backup nulled out `via_kitchen_id` on every kitchen-fanned share because `kitchens` restored after `recipe_shares` / `cookbook_shares`, triggering the `ON DELETE SET NULL` cascade on the just-inserted rows. Kitchens are now restored first, provenance survives.
+- **Gemini AI default bumped** to `gemini-2.5-flash` (was `gemini-1.5-flash`, which Google is retiring). Saved configs that still point at any retired 1.5 / 2.0 ID auto-remap server-side so requests never 404 against a dead endpoint.
+- **oai-compat vision requests** (LiteLLM, LM Studio, LocalAI, vLLM) now work end-to-end. Image content is normalized to OpenAI wire shape at the proxy boundary, so strict-schema endpoints stop rejecting requests that mix the internal `{type:'image', dataUrl}` shape with OpenAI's `{type:'image_url', image_url}` shape.
+- **README env-var defaults corrected.** `IMPORT_ZIP_MAX_MB` and `BACKUP_UPLOAD_MAX_MB` were misdocumented as `256` and `1024`; both actually default to `512`.
+
+### Changed
+
+- **README restructured** from 491 to 185 lines using a headline-features + docs-links pattern. Deep feature explanations moved to the docs site.
+- **Welcome-on-registration email removed** for parity with LiftTrace and NutriTrace. Invited users already received the invite email; self-registered users no longer receive a redundant confirmation. Password reset, invites, and weekly summaries still send.
+- **Hybrid dev-release model documented in DEPLOY.md.** Rolling `dev-latest` remains the primary tester channel; occasional milestone `v<version>-dev.N` pre-releases exist for anyone who wants to pin a specific build.
+
+---
+
 ## [1.0.1] - 2026-07-25
 
 ### Added

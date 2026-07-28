@@ -5,7 +5,7 @@ import db from '../db.js';
 import { wrap } from '../logger.js';
 import { signToken, sessionMaxAge, userMgmtActive, requireAuth, requireAdmin } from '../middleware/auth.js';
 import { listProviders as oidcListProviders, publicProvider as oidcPublicProvider, isPasswordLoginEnabled, listUserLinks } from '../lib/oidc.js';
-import { sendPasswordReset, sendInvite, sendWelcome, isEmailConfigured } from '../email.js';
+import { sendPasswordReset, sendInvite, isEmailConfigured } from '../email.js';
 import { estimate as estimatePasswordStrength, STRONG_MIN_SCORE } from '../lib/password-strength.js';
 
 const router = Router();
@@ -183,15 +183,6 @@ router.post('/register', wrap((req, res) => {
     // POST /recover set it. Re-enabling user management implicitly here.
     db.prepare(`DELETE FROM app_config WHERE key = 'single_user_mode'`).run();
     res.cookie('ct_token', signToken(user), COOKIE_OPTS);
-  }
-
-  // Best-effort welcome email. Non-blocking so registration doesn't
-  // hang on a slow SMTP server.
-  if (user.email && isEmailConfigured()) {
-    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-    const host  = req.headers['x-forwarded-host']  || req.headers.host || '';
-    const appUrl = `${proto}://${host}/`;
-    sendWelcome(user.email, user.full_name || user.username, appUrl).catch(() => {});
   }
 
   res.json({ user: safeUser(user) });
