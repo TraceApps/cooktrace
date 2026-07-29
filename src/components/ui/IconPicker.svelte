@@ -13,6 +13,7 @@
     placeholder      — input placeholder
 -->
 <script>
+  import { _ } from 'svelte-i18n';
   import { createEventDispatcher } from 'svelte';
   import Sheet from './Sheet.svelte';
 
@@ -160,7 +161,7 @@
            list. Lower-priority placement so the curated grid stays the
            default path. -->
       <details class="custom">
-        <summary>Use a different Material Symbol</summary>
+        <summary>{$_('icon_picker_ct.summary')}</summary>
         <div class="custom-row">
           <input class="input" type="text" placeholder="e.g. dining"
             bind:value={customName}
@@ -176,7 +177,7 @@
       </details>
 
       <div class="footer-row">
-        <button class="btn btn-secondary" type="button" on:click={clear}>Clear</button>
+        <button class="btn btn-secondary" type="button" on:click={clear}>{$_('icon_picker_ct.clear')}</button>
       </div>
     </div>
   </Sheet>

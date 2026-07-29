@@ -16,6 +16,7 @@
   view on resize.
 -->
 <script>
+  import { _ } from 'svelte-i18n';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { onMount, onDestroy } from 'svelte';
@@ -160,7 +161,7 @@
               <circle class="ring-arc"   cx="18" cy="18" r="15.5"
                 style="stroke-dashoffset: {97.4 - (97.4 * pct) / 100}"/>
             </svg>
-            <span class="ring-time pulse">Done</span>
+            <span class="ring-time pulse">{$_('top_timer_pill.done')}</span>
           </button>
         {:else}
           <div class="ring-wrap">

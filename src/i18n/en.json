@@ -1221,6 +1221,47 @@
     "notes":                     "Notes",
     "powered_by_html":           "Powered by <strong>CookTrace</strong>."
   },
+  "barcode_scanner": {
+    "toast": {
+      "camera_denied":           "Camera permission denied",
+      "scan_failed":             "Barcode scan failed: {reason}",
+      "scan_unknown":            "Unknown error"
+    },
+    "title":                     "Scan Barcode",
+    "library":                   "Library",
+    "camera":                    "Camera",
+    "look_up":                   "Look Up"
+  },
+  "time_picker_ct": {
+    "hour":                      "Hour",
+    "minute":                    "Minute",
+    "cancel":                    "Cancel",
+    "set_time":                  "Set Time"
+  },
+  "cook_heatmap": {
+    "title":                     "Cook Activity",
+    "less":                      "Less",
+    "more":                      "More"
+  },
+  "image_picker_ct": {
+    "toast": {
+      "camera_denied":           "Camera access denied or unavailable."
+    },
+    "title":                     "Take Photo"
+  },
+  "icon_picker_ct": {
+    "summary":                   "Use a different Material Symbol",
+    "clear":                     "Clear"
+  },
+  "top_timer_pill": {
+    "done":                      "Done"
+  },
+  "cook_timer_rail": {
+    "snooze":                    "Snooze"
+  },
+  "sidebar_ct": {
+    "brand":                     "CookTrace"
+  },
   "trace_ai_ct": {
     "toast": {
       "voice_unsupported":       "Voice input not supported in this browser",

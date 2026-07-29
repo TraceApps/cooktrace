@@ -13,6 +13,7 @@
   GitHub uses on phones. Pinning the labels makes it scannable.
 -->
 <script>
+  import { _ } from 'svelte-i18n';
   import { createEventDispatcher } from 'svelte';
 
   /** Array of { date: 'YYYY-MM-DD', count: number } */
@@ -111,7 +112,7 @@
   <header class="hm-head">
     <div class="hm-title">
       <span class="material-symbols-rounded">grid_on</span>
-      <h2>Cook Activity</h2>
+      <h2>{$_('cook_heatmap.title')}</h2>
     </div>
     <div class="hm-summary">
       {total} {total === 1 ? 'Cook' : 'Cooks'} · {activeDays} Active {activeDays === 1 ? 'Day' : 'Days'}
@@ -156,13 +157,13 @@
 
   <!-- Legend at the bottom — same colour ramp as the cells. -->
   <footer class="hm-legend">
-    <span class="hm-legend-label">Less</span>
+    <span class="hm-legend-label">{$_('cook_heatmap.less')}</span>
     <span class="legend-cell" data-level="0"></span>
     <span class="legend-cell" data-level="1"></span>
     <span class="legend-cell" data-level="2"></span>
     <span class="legend-cell" data-level="3"></span>
     <span class="legend-cell" data-level="4"></span>
-    <span class="hm-legend-label">More</span>
+    <span class="hm-legend-label">{$_('cook_heatmap.more')}</span>
   </footer>
 </section>
 

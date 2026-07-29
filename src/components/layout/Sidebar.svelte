@@ -79,7 +79,7 @@
     <div class="sidebar-brand">
       <img class="brand-icon" src={resolveAssetUrl('/icons/logo.png')} alt="CookTrace" />
       <div class="brand-text">
-        <span class="brand-name">CookTrace</span>
+        <span class="brand-name">{$_('sidebar_ct.brand')}</span>
         <span class="brand-tagline">Trace Every Recipe — From Pantry to Plate</span>
       </div>
     </div>
