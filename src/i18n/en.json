@@ -814,13 +814,37 @@
     }
   },
   "backup_page": {
+    "toast": {
+      "deleted":                "Deleted",
+      "restored_reloading":     "Restored, reloading…",
+      "all_data_cleared":       "All data cleared",
+      "clear_failed":           "Clear failed: {msg}",
+      "all_settings_cleared":   "All settings cleared",
+      "exported":               "Exported",
+      "backup_saved":           "Backup saved",
+      "imported_reloading":     "Imported, reloading",
+      "imported":               "Imported"
+    },
+    "full_backup":              "Full Backup",
     "auto_backup":              "Auto Backup",
-    "frequency":                "Frequency",
+    "env_lock_pill":            "Locked by env",
+    "env_lock_title":           "Locked by BACKUP_SCHEDULE / BACKUP_TIME / BACKUP_RETENTION env var",
+    "schedule":                 "Schedule",
+    "daily":                    "Daily",
+    "weekly":                   "Weekly",
+    "monthly":                  "Monthly",
+    "time":                     "Time",
     "keep_last":                "Keep Last",
-    "backup_now":               "Backup Now",
-    "restore_from_file":        "Restore from File",
+    "col_name":                 "Name",
+    "col_created":              "Created",
+    "col_size":                 "Size",
+    "restore_from_zip":         "Restore From ZIP",
+    "portable_json":            "Portable JSON Export",
+    "export_json":              "Export JSON",
+    "import_json":              "Import JSON",
     "danger_zone":              "Danger Zone",
-    "reset_app":                "Reset App"
+    "clear_all_data":           "Clear All Data",
+    "clear_all_settings":       "Clear All Settings"
   },
   "pantry_sheet_extra": {
     "add_item":                 "Add Item",
