@@ -11,6 +11,7 @@
    * rows show a "Built-in" badge and can only be toggled. Custom rows
    * support rename + delete.
    */
+  import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { UNIT_GROUPS } from '../../lib/units.js';
   import { NtApi } from '../../lib/api.js';
@@ -97,7 +98,7 @@
       newAbbr = '';
       newFull = '';
       refreshUnitsOverlay();
-      showSuccess('Custom unit added');
+      showSuccess($_('manage_units.toast.unit_added'));
     } catch (e) {
       showError(e.message || 'Could not create');
     } finally {
@@ -123,7 +124,7 @@
       custom = custom.map(x => x.id === u.id ? updated : x);
       cancelEdit();
       refreshUnitsOverlay();
-      showSuccess('Saved');
+      showSuccess($_('manage_units.toast.saved'));
     } catch (e) {
       showError(e.message || 'Could not save');
     }
@@ -159,13 +160,13 @@
     }
     disabled = new Set();
     refreshUnitsOverlay();
-    showSuccess('All built-ins restored');
+    showSuccess($_('manage_units.toast.builtins_restored'));
   }
 </script>
 
 <div class="mgr">
   <header class="mgr-head">
-    <h2>Units</h2>
+    <h2>{$_('manage_units.title')}</h2>
     <p class="mgr-desc">
       All cooking units available in recipe + pantry editors. Toggle a built-in
       to hide it from your pickers, or add custom units. Hiding is non-destructive,
@@ -180,7 +181,7 @@
       <span class="meta">{BUILTIN_ABBRS.size} built-ins · {disabled.size} hidden</span>
       <span class="meta">{custom.length} custom</span>
       {#if disabled.size > 0}
-        <button class="btn btn-secondary tiny reset-btn" on:click={resetAll}>Restore All</button>
+        <button class="btn btn-secondary tiny reset-btn" on:click={resetAll}>{$_('manage_units.restore_all')}</button>
       {/if}
     </div>
 
@@ -210,7 +211,7 @@
     {/each}
 
     <section class="grp">
-      <h3 class="grp-title">Custom</h3>
+      <h3 class="grp-title">{$_('manage_units.custom_group')}</h3>
       {#if custom.length === 0}
         <p class="empty">No custom units yet.</p>
       {:else}
@@ -225,13 +226,13 @@
                     {#each CATEGORY_OPTIONS as cat}<option>{cat}</option>{/each}
                   </select>
                   <div class="row-actions">
-                    <button class="btn btn-secondary tiny" on:click={cancelEdit}>Cancel</button>
-                    <button class="btn btn-primary tiny" on:click={() => saveEdit(u)} disabled={!editAbbr.trim()}>Save</button>
+                    <button class="btn btn-secondary tiny" on:click={cancelEdit}>{$_('manage_units.cancel')}</button>
+                    <button class="btn btn-primary tiny" on:click={() => saveEdit(u)} disabled={!editAbbr.trim()}>{$_('manage_units.save')}</button>
                   </div>
                 </div>
               {:else}
                 {@const uses = _uses(u.abbr)}
-                <span class="badge custom-badge">Custom</span>
+                <span class="badge custom-badge">{$_('manage_units.custom_badge')}</span>
                 <span class="abbr">{u.abbr}</span>
                 <span class="full">{u.full_name}</span>
                 {#if u.category}<span class="cat-tag">{u.category}</span>{/if}

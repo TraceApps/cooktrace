@@ -1221,6 +1221,81 @@
     "notes":                     "Notes",
     "powered_by_html":           "Powered by <strong>CookTrace</strong>."
   },
+  "trace_ai_ct": {
+    "toast": {
+      "voice_unsupported":       "Voice input not supported in this browser",
+      "configure_ai":            "Configure Trace AI in Settings to use hold-to-talk",
+      "enable_smart_log":        "Enable Smart Log in Settings, Trace AI, to use hold-to-talk",
+      "voice_needs_https":       "Voice needs HTTPS. Plain HTTP blocks the mic, set up TLS or use the public domain.",
+      "voice_cancelled":         "Voice cancelled",
+      "trace_disabled":          "Trace is disabled. Enable it in Settings, Trace.",
+      "voice_unsupported_full":  "Voice input not supported in this browser. Try Chrome on desktop or mobile Safari/Chrome.",
+      "voice_needs_https_smart": "Voice needs HTTPS. Smart Log won't work over plain HTTP, set up TLS or use the public domain.",
+      "mic_denied":              "Microphone permission denied",
+      "pick_image":              "Pick an image file."
+    }
+  },
+  "manage_cookbooks": {
+    "toast": {
+      "cookbook_created":        "Cookbook created",
+      "saved":                   "Saved",
+      "cover_updated":           "Cover updated"
+    },
+    "title":                     "Cookbooks",
+    "name_ph":                   "Name",
+    "cancel":                    "Cancel",
+    "smart_badge":               "Smart",
+    "smart":                     "Smart",
+    "category":                  "Category",
+    "favorites_only":            "Favorites Only"
+  },
+  "manage_units": {
+    "toast": {
+      "unit_added":              "Custom unit added",
+      "saved":                   "Saved",
+      "builtins_restored":       "All built-ins restored"
+    },
+    "title":                     "Units",
+    "restore_all":               "Restore All",
+    "custom_group":              "Custom",
+    "cancel":                    "Cancel",
+    "save":                      "Save",
+    "custom_badge":              "Custom"
+  },
+  "manage_pantry_cats": {
+    "toast": {
+      "saved":                   "Saved",
+      "category_added":          "Category added"
+    },
+    "title":                     "Pantry Categories",
+    "name_ph":                   "Name",
+    "icon_ph":                   "Icon",
+    "cancel":                    "Cancel",
+    "save":                      "Save"
+  },
+  "manage_recipe_cats": {
+    "toast": {
+      "saved":                   "Saved",
+      "category_added":          "Category added"
+    },
+    "title":                     "Recipe Categories",
+    "name_ph":                   "Name",
+    "cancel":                    "Cancel",
+    "save":                      "Save"
+  },
+  "manage_taxonomy": {
+    "cancel":                    "Cancel",
+    "save":                      "Save"
+  },
+  "profile_ct": {
+    "toast": {
+      "biometric_cancelled":     "Biometric verification was canceled or failed."
+    },
+    "biometric_signin":          "Sign In with Biometric"
+  },
+  "manage_ct": {
+    "title":                     "Manage"
+  },
   "cookdiary_page": {
     "toast": {
       "pick_recipe":             "Pick a recipe",

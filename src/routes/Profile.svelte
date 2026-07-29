@@ -34,7 +34,7 @@
       const ok = await biometric.authenticate('Enable biometric sign-in');
       if (!ok) {
         biometricLoginEnabled.set(false);
-        showError('Biometric verification was canceled or failed.');
+        showError($_('profile_ct.toast.biometric_cancelled'));
         return;
       }
       const tok = getAuthToken();
@@ -447,7 +447,7 @@
       <div class="setting-row">
         <span class="material-symbols-rounded security-icon">fingerprint</span>
         <div style="flex:1">
-          <span class="security-label">Sign In with Biometric</span>
+          <span class="security-label">{$_('profile_ct.biometric_signin')}</span>
           <div class="security-desc">
             {#if _biometricSupported}
               Use fingerprint or face unlock instead of typing your password each time. Your password is still required on the first sign-in. Sign-in sessions stay valid for up to a year by default — admins can change this in <strong>Settings → Users → Session Duration</strong>.
