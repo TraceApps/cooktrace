@@ -1029,6 +1029,198 @@
     "weekly_summary_email":        "Weekly Summary Email",
     "note":                        "Note"
   },
+  "import_url_dialog": {
+    "toast": {
+      "recipe_imported":         "Recipe imported",
+      "url_batch_limit":         "Up to 100 URLs per batch. Split into smaller batches.",
+      "pick_one_url":            "Pick at least one URL to save."
+    },
+    "title":                     "Import from URL",
+    "link_to_pantry":            "Link Ingredients to Pantry",
+    "apply_tags":                "Apply Tags from Source",
+    "import_source_category":    "Import Source Category",
+    "cancel":                    "Cancel",
+    "select_all":                "Select All",
+    "clear":                     "Clear",
+    "failed":                    "Failed",
+    "try_again":                 "Try Again"
+  },
+  "bulk_import_dialog": {
+    "toast": {
+      "no_ai_saved":             "AI did not save a recipe for this row.",
+      "pick_one_recipe":         "Pick at least one recipe to save."
+    },
+    "title":                     "Bulk Import",
+    "dz_title":                  "Drop files here or click to pick",
+    "cancel":                    "Cancel",
+    "select_all":                "Select All",
+    "select_clean":              "Select Clean Only",
+    "clear":                     "Clear",
+    "saved_via_ai":              "Saved via AI",
+    "skipped":                   "Skipped",
+    "no_text":                   "No text",
+    "try_again":                 "Try Again"
+  },
+  "file_import_dialog": {
+    "toast": {
+      "unsupported_file":        "Pick an image, PDF, RTF, TXT, or MD file."
+    },
+    "title":                     "Import from File",
+    "pick_a_file":               "Pick a File",
+    "use_camera":                "Use Camera",
+    "camera_sub":                "Snap a cookbook page",
+    "cancel":                    "Cancel",
+    "done":                      "Done",
+    "try_again":                 "Try Again"
+  },
+  "cookbook_import_dialog": {
+    "toast": {
+      "pick_pdf":                "Pick a PDF file."
+    },
+    "title":                     "Import Cookbook",
+    "close":                     "Close",
+    "pick_cookbook_pdf":         "Pick a Cookbook PDF",
+    "cancel":                    "Cancel",
+    "try_again":                 "Try Again"
+  },
+  "recipe_comments": {
+    "toast": {
+      "comment_updated":         "Comment updated"
+    },
+    "title":                     "Comments",
+    "cancel":                    "Cancel",
+    "save":                      "Save"
+  },
+  "cook_log_dialog": {
+    "date":                      "Date",
+    "meal":                      "Meal",
+    "optional":                  "(optional)",
+    "notes":                     "Notes",
+    "notes_hint":                "(how did it turn out?)",
+    "cancel":                    "Cancel"
+  },
+  "import_from_file": {
+    "toast": {
+      "unsupported":             "Pick an image, PDF, RTF, TXT, MD, or a ZIP."
+    },
+    "title":                     "Import from File",
+    "dz_title":                  "Drop files here or click to pick",
+    "cancel":                    "Cancel"
+  },
+  "nutrition_facts": {
+    "title":                     "Nutrition Facts",
+    "serving_size":              "Serving Size",
+    "amount_per_serving":        "Amount Per Serving"
+  },
+  "recipes_page": {
+    "toast": {
+      "paste_or_pick":           "Paste a recipe or pick a file first",
+      "recipe_imported":         "Recipe imported",
+      "new_link_generated":      "New link generated",
+      "link_revoked":            "Link revoked",
+      "copied":                  "Copied to clipboard",
+      "copy_failed":             "Copy failed",
+      "clipboard_unavailable":   "Clipboard not available",
+      "recipe_duplicated":       "Recipe duplicated",
+      "preparing_share":         "Preparing share…",
+      "deleted":                 "Deleted"
+    },
+    "share_recipe":              "Share Recipe",
+    "share_cookbook":            "Share Cookbook",
+    "share":                     "Share",
+    "add_to_cookbook":           "Add to Cookbook",
+    "cancel":                    "Cancel",
+    "save":                      "Save",
+    "opt_link_pantry":           "Link ingredients to your Pantry",
+    "opt_apply_tags":            "Apply tags from the source",
+    "sort_recent":               "Recently Cooked",
+    "sort_most":                 "Most Cooked",
+    "sort_newest":               "Newest",
+    "retry":                     "Retry",
+    "nothing_shared_yet":        "Nothing Shared with You Yet",
+    "no_cookbooks_yet":          "No Cookbooks Yet",
+    "create_cookbook":           "Create Cookbook"
+  },
+  "recipe_editor_ct": {
+    "toast": {
+      "pick_video":              "Pick a video file.",
+      "video_uploaded":          "Video uploaded",
+      "draft_restored":          "Draft restored",
+      "cant_restore_draft":      "Could not restore draft",
+      "name_required":           "Name is required"
+    },
+    "discard":                   "Discard",
+    "restore":                   "Restore",
+    "name_ph":                   "Banana bread",
+    "yield":                     "Yield",
+    "yield_hint":                "(e.g. \"12 cookies\", \"1 loaf\")",
+    "ingredients":               "Ingredients",
+    "steps":                     "Steps",
+    "category_hint_html":        "One category per recipe. Manage the full list in <a href=\"#/manage\">Manage</a>.",
+    "nutrition":                 "Nutrition",
+    "nutrition_hint":            "(per serving, optional)",
+    "video_instructions":        "Video Instructions",
+    "optional_hint":             "(optional)",
+    "record":                    "Record",
+    "upload":                    "Upload",
+    "local_upload":              "Local Upload",
+    "external_url":              "External URL",
+    "cancel":                    "Cancel",
+    "cat_modal_title":           "Create New Category",
+    "name":                      "Name",
+    "color":                     "Color",
+    "create":                    "Create",
+    "add_step_photo_ph":         "Add a step photo",
+    "done":                      "Done"
+  },
+  "recipe_view_ct": {
+    "toast": {
+      "recipe_deleted":          "Recipe deleted",
+      "preparing_share":         "Preparing share…",
+      "link_copied":             "Link copied",
+      "share_unsupported":       "Sharing not supported on this browser",
+      "diary_updated":           "Diary entry updated",
+      "logged_cooked":           "Logged, cooked it!"
+    },
+    "shared_chip":               "Shared",
+    "retry":                     "Retry",
+    "serves":                    "Serves",
+    "yield":                     "Yield",
+    "tags":                      "Tags",
+    "step":                      "Step",
+    "notes":                     "Notes",
+    "cancel":                    "Cancel"
+  },
+  "cookbook_view_ct": {
+    "toast": {
+      "cookbook_deleted":        "Cookbook deleted"
+    },
+    "shared_chip":               "Shared",
+    "retry":                     "Retry",
+    "smart_badge":               "Smart",
+    "favorites_filter":          "Favorites",
+    "add_recipes":               "Add Recipes",
+    "move_or_copy":              "Move or Copy",
+    "copy_label_html":           "Copy <small>(keep here too)</small>",
+    "move_label_html":           "Move <small>(remove from here)</small>",
+    "cancel":                    "Cancel"
+  },
+  "public_recipe_ct": {
+    "shared_by_prefix":          "Shared by ",
+    "from_prefix":               "From ",
+    "prep":                      "Prep",
+    "cook":                      "Cook",
+    "rest":                      "Rest",
+    "total":                     "Total",
+    "servings":                  "Servings",
+    "ingredients":               "Ingredients",
+    "scale":                     "Scale",
+    "no_ingredients":            "No ingredients listed.",
+    "steps":                     "Steps",
+    "no_steps":                  "No steps yet.",
+    "notes":                     "Notes",
+    "powered_by_html":           "Powered by <strong>CookTrace</strong>."
+  },
   "pantry_editor_ct": {
     "toast": {
       "enter_barcode":           "Enter a barcode first",

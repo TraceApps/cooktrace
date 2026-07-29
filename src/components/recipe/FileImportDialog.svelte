@@ -19,6 +19,7 @@
    * files; only the AI fallback is unavailable in that mode (the server
    * proxy doesn't relay tool calls).
    */
+  import { _ } from 'svelte-i18n';
   import { createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
@@ -115,7 +116,7 @@
     const isText = !isImage && /\.(pdf|rtf|txt|md|markdown)$/.test(lowerName);
 
     if (!isImage && !isText) {
-      showError('Pick an image, PDF, RTF, TXT, or MD file.');
+      showError($_('file_import_dialog.toast.unsupported_file'));
       return;
     }
 
@@ -391,7 +392,7 @@ ${parseResult.text}
     in:fade={{ duration: 140 }} out:fade={{ duration: 100 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="head">
-        <h3>Import from File</h3>
+        <h3>{$_('file_import_dialog.title')}</h3>
         <button class="btn-icon" on:click={close} aria-label="Close" title="Close">
           <span class="material-symbols-rounded">close</span>
         </button>
@@ -425,13 +426,13 @@ ${parseResult.text}
           <div class="picker-row">
             <button class="picker" on:click={_pickFile}>
               <span class="material-symbols-rounded">upload_file</span>
-              <span>Pick a File</span>
+              <span>{$_('file_import_dialog.pick_a_file')}</span>
               <span class="picker-sub">Image, PDF, RTF, TXT, or MD</span>
             </button>
             <button class="picker picker-camera" on:click={_openCamera}>
               <span class="material-symbols-rounded">photo_camera</span>
-              <span>Use Camera</span>
-              <span class="picker-sub">Snap a cookbook page</span>
+              <span>{$_('file_import_dialog.use_camera')}</span>
+              <span class="picker-sub">{$_('file_import_dialog.camera_sub')}</span>
             </button>
           </div>
         {/if}
@@ -441,7 +442,7 @@ ${parseResult.text}
         <input type="file" accept="image/*" capture="environment"
           bind:this={_cameraInput} on:change={_onFile} hidden />
         <footer class="actions">
-          <button class="btn btn-secondary" on:click={close}>Cancel</button>
+          <button class="btn btn-secondary" on:click={close}>{$_('file_import_dialog.cancel')}</button>
           <button class="btn btn-primary" on:click={importIt} disabled={!rawImage && !textFile}>
             <span class="material-symbols-rounded">auto_awesome</span>
             Import
@@ -466,7 +467,7 @@ ${parseResult.text}
           </p>
         </div>
         <footer class="actions">
-          <button class="btn btn-secondary" on:click={close}>Cancel</button>
+          <button class="btn btn-secondary" on:click={close}>{$_('file_import_dialog.cancel')}</button>
           <button class="btn btn-primary" on:click={importScannedPdf}>
             <span class="material-symbols-rounded">auto_awesome</span>
             Read with AI Vision
@@ -504,7 +505,7 @@ ${parseResult.text}
           {/if}
         </div>
         <footer class="actions wrap">
-          <button class="btn btn-secondary" on:click={close}>Cancel</button>
+          <button class="btn btn-secondary" on:click={close}>{$_('file_import_dialog.cancel')}</button>
           {#if confidence < confidenceThreshold && $aiEnabled && !envLocked}
             <button class="btn btn-secondary" on:click={retryWithAi}>
               <span class="material-symbols-rounded">smart_toy</span>
@@ -524,7 +525,7 @@ ${parseResult.text}
           <p>Saved to your library. Open it to review and edit.</p>
         </div>
         <footer class="actions">
-          <button class="btn btn-secondary" on:click={close}>Done</button>
+          <button class="btn btn-secondary" on:click={close}>{$_('file_import_dialog.done')}</button>
           <button class="btn btn-primary" on:click={openCreated}>
             <span class="material-symbols-rounded">open_in_new</span>
             Open Recipe
@@ -537,8 +538,8 @@ ${parseResult.text}
           <p>{errorMessage}</p>
         </div>
         <footer class="actions">
-          <button class="btn btn-secondary" on:click={close}>Cancel</button>
-          <button class="btn btn-primary" on:click={() => { phase = 'pick'; errorMessage = ''; }}>Try Again</button>
+          <button class="btn btn-secondary" on:click={close}>{$_('file_import_dialog.cancel')}</button>
+          <button class="btn btn-primary" on:click={() => { phase = 'pick'; errorMessage = ''; }}>{$_('file_import_dialog.try_again')}</button>
         </footer>
       {/if}
     </div>

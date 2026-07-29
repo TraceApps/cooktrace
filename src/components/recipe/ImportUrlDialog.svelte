@@ -16,6 +16,7 @@
    * Both paths share the same options (Link to Pantry, Apply Tags,
    * Import Categories).
    */
+  import { _ } from 'svelte-i18n';
   import { createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
@@ -107,7 +108,7 @@
       if (stepCount === 0) {
         showError("Imported, but the source page didn't include cooking steps. Open the recipe to add them manually.");
       } else {
-        showSuccess('Recipe imported');
+        showSuccess($_('import_url_dialog.toast.recipe_imported'));
       }
       open = false;
       dispatch('close');
@@ -122,7 +123,7 @@
 
   async function _importBatch(urls) {
     if (urls.length > 100) {
-      showError('Up to 100 URLs per batch. Split into smaller batches.');
+      showError($_('import_url_dialog.toast.url_batch_limit'));
       return;
     }
     phase = 'busy';
@@ -160,7 +161,7 @@
 
   async function commit() {
     if (!scanResult?.cacheUuid) return;
-    if (selected.size === 0) { showError('Pick at least one URL to save.'); return; }
+    if (selected.size === 0) { showError($_('import_url_dialog.toast.pick_one_url')); return; }
     phase = 'saving';
     progressLine = `Saving ${selected.size} recipes…`;
     try {
@@ -202,7 +203,7 @@
     in:fade={{ duration: 140 }} out:fade={{ duration: 100 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="head">
-        <h3>Import from URL</h3>
+        <h3>{$_('import_url_dialog.title')}</h3>
         <button class="btn-icon" on:click={close} aria-label="Close" title="Close">
           <span class="material-symbols-rounded">close</span>
         </button>
@@ -223,27 +224,27 @@
           <label class="opt-row">
             <input type="checkbox" bind:checked={addToPantry} />
             <span>
-              <span class="opt-label">Link Ingredients to Pantry</span>
+              <span class="opt-label">{$_('import_url_dialog.link_to_pantry')}</span>
               <span class="opt-desc">Matches imported names to your existing Pantry items and creates new rows for any that don't exist. Off = ingredients save as plain text only.</span>
             </span>
           </label>
           <label class="opt-row">
             <input type="checkbox" bind:checked={applyTags} />
             <span>
-              <span class="opt-label">Apply Tags from Source</span>
+              <span class="opt-label">{$_('import_url_dialog.apply_tags')}</span>
               <span class="opt-desc">Off by default. Tags from food blogs are usually noisy.</span>
             </span>
           </label>
           <label class="opt-row">
             <input type="checkbox" bind:checked={importCategories} />
             <span>
-              <span class="opt-label">Import Source Category</span>
+              <span class="opt-label">{$_('import_url_dialog.import_source_category')}</span>
               <span class="opt-desc">Carries the recipe's category from the source page; auto-creates one if it doesn't already exist in your catalog.</span>
             </span>
           </label>
         </div>
         <footer class="actions">
-          <button class="btn btn-secondary" on:click={close}>Cancel</button>
+          <button class="btn btn-secondary" on:click={close}>{$_('import_url_dialog.cancel')}</button>
           <button class="btn btn-primary" on:click={submit} disabled={urlCount === 0}>
             <span class="material-symbols-rounded">{urlCount > 1 ? 'travel_explore' : 'download'}</span>
             {urlCount > 1 ? `Scrape ${urlCount} URLs` : 'Import'}
@@ -264,8 +265,8 @@
             <span class="summary-meta">{selected.size} selected</span>
           </div>
           <div class="summary-actions">
-            <button class="link-btn" on:click={_selectAll}>Select all</button>
-            <button class="link-btn" on:click={_selectNone}>Clear</button>
+            <button class="link-btn" on:click={_selectAll}>{$_('import_url_dialog.select_all')}</button>
+            <button class="link-btn" on:click={_selectNone}>{$_('import_url_dialog.clear')}</button>
           </div>
         </div>
         <div class="rows">
@@ -279,7 +280,7 @@
                 <div class="row-name">{item.name || item.url}</div>
                 <div class="row-meta">
                   {#if item.error}
-                    <span class="confidence-pill low">Failed</span>
+                    <span class="confidence-pill low">{$_('import_url_dialog.failed')}</span>
                     <span class="row-msg">{item.error}</span>
                   {:else}
                     <span class="confidence-pill high">Scraped ({item.tier || 'standard'})</span>
@@ -292,7 +293,7 @@
           {/each}
         </div>
         <footer class="actions">
-          <button class="btn btn-secondary" on:click={close}>Cancel</button>
+          <button class="btn btn-secondary" on:click={close}>{$_('import_url_dialog.cancel')}</button>
           <button class="btn btn-primary" on:click={commit} disabled={selected.size === 0}>
             <span class="material-symbols-rounded">save</span>
             Save {selected.size || ''} Recipes
@@ -322,8 +323,8 @@
           <p>{errorMessage}</p>
         </div>
         <footer class="actions">
-          <button class="btn btn-secondary" on:click={close}>Cancel</button>
-          <button class="btn btn-primary" on:click={() => { phase = 'input'; errorMessage = ''; }}>Try Again</button>
+          <button class="btn btn-secondary" on:click={close}>{$_('import_url_dialog.cancel')}</button>
+          <button class="btn btn-primary" on:click={() => { phase = 'input'; errorMessage = ''; }}>{$_('import_url_dialog.try_again')}</button>
         </footer>
       {/if}
     </div>

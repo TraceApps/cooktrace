@@ -8,6 +8,7 @@
    * capped at one level (replies-of-replies still attach to the root
    * thread for readability) — server still preserves the full chain.
    */
+  import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { NtApi } from '../../lib/api.js';
   import { currentUser, userMgmtActive } from '../../stores/auth.js';
@@ -141,7 +142,7 @@
       const updated = await NtApi.updateRecipeComment(recipeId, c.id, body);
       comments = comments.map(x => x.id === c.id ? updated : x);
       cancelEdit();
-      showSuccess('Comment updated');
+      showSuccess($_('recipe_comments.toast.comment_updated'));
     } catch (e) {
       showError(e.message || 'Could not save');
     }
@@ -185,7 +186,7 @@
   <div class="head">
     <h2 class="title">
       <span class="material-symbols-rounded title-icon">forum</span>
-      <span class="title-text">Comments</span>
+      <span class="title-text">{$_('recipe_comments.title')}</span>
     </h2>
     <span class="count" class:zero={comments.length === 0}>{comments.length}</span>
   </div>
@@ -226,9 +227,9 @@
               {#if editingId === c.id}
                 <RichTextEditor bind:value={editDraft} placeholder="Edit your comment…" rows={3} />
                 <div class="edit-actions">
-                  <button class="btn btn-secondary tiny" on:click={cancelEdit}>Cancel</button>
+                  <button class="btn btn-secondary tiny" on:click={cancelEdit}>{$_('recipe_comments.cancel')}</button>
                   <button class="btn btn-primary tiny" on:click={() => saveEdit(c)}
-                    disabled={!editDraft.trim()}>Save</button>
+                    disabled={!editDraft.trim()}>{$_('recipe_comments.save')}</button>
                 </div>
               {:else}
                 <div class="text">{@html sanitizeRichText(c.body)}</div>
@@ -272,9 +273,9 @@
                         {#if editingId === r.id}
                           <RichTextEditor bind:value={editDraft} placeholder="Edit reply…" rows={2} />
                           <div class="edit-actions">
-                            <button class="btn btn-secondary tiny" on:click={cancelEdit}>Cancel</button>
+                            <button class="btn btn-secondary tiny" on:click={cancelEdit}>{$_('recipe_comments.cancel')}</button>
                             <button class="btn btn-primary tiny" on:click={() => saveEdit(r)}
-                              disabled={!editDraft.trim()}>Save</button>
+                              disabled={!editDraft.trim()}>{$_('recipe_comments.save')}</button>
                           </div>
                         {:else}
                           <div class="text">{@html sanitizeRichText(r.body)}</div>
@@ -300,7 +301,7 @@
                   <RichTextEditor bind:value={replyDraft}
                     placeholder={`Reply to ${displayName(c)}…`} rows={2} />
                   <div class="edit-actions">
-                    <button class="btn btn-secondary tiny" on:click={() => { replyingTo = null; replyDraft = ''; }}>Cancel</button>
+                    <button class="btn btn-secondary tiny" on:click={() => { replyingTo = null; replyDraft = ''; }}>{$_('recipe_comments.cancel')}</button>
                     <button class="btn btn-primary tiny" on:click={() => submitReply(c.id)}
                       disabled={posting || !replyDraft.trim()}>
                       {posting ? 'Posting…' : 'Post reply'}

@@ -1,4 +1,5 @@
 <script>
+  import { _ } from 'svelte-i18n';
   import { scale, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { createEventDispatcher } from 'svelte';
@@ -213,12 +214,12 @@
 
       <div class="cl-body">
         <div class="cl-field">
-          <span class="cl-label">Date</span>
+          <span class="cl-label">{$_('cook_log_dialog.date')}</span>
           <DateInput bind:value={date} max={_todayIso()} />
         </div>
 
         <div class="cl-field">
-          <span class="cl-label">Meal <span class="cl-hint">(optional)</span></span>
+          <span class="cl-label">{$_('cook_log_dialog.meal')} <span class="cl-hint">{$_('cook_log_dialog.optional')}</span></span>
           <div class="meal-chips" role="radiogroup" aria-label="Meal type">
             {#each MEAL_TYPES as m}
               <button type="button"
@@ -253,7 +254,7 @@
         </div>
 
         <label class="cl-field">
-          <span class="cl-label">Notes <span class="cl-hint">(how did it turn out?)</span></span>
+          <span class="cl-label">{$_('cook_log_dialog.notes')} <span class="cl-hint">{$_('cook_log_dialog.notes_hint')}</span></span>
           <textarea
             class="input"
             rows="3"
@@ -289,7 +290,7 @@
                 on:keydown={e => e.key === 'Enter' && applyUrlEntry()}
                 autofocus />
               <button type="button" class="btn btn-primary" on:click={applyUrlEntry}>Add</button>
-              <button type="button" class="btn btn-secondary" on:click={() => { urlEntryOpen = false; urlEntry = ''; }}>Cancel</button>
+              <button type="button" class="btn btn-secondary" on:click={() => { urlEntryOpen = false; urlEntry = ''; }}>{$_('cook_log_dialog.cancel')}</button>
             </div>
           {/if}
 
@@ -316,7 +317,7 @@
       </div>
 
       <footer class="cl-footer">
-        <button class="btn btn-secondary" on:click={cancel} disabled={busy}>Cancel</button>
+        <button class="btn btn-secondary" on:click={cancel} disabled={busy}>{$_('cook_log_dialog.cancel')}</button>
         <button class="btn btn-primary" on:click={save} disabled={busy || photoUploading}>
           <span class="material-symbols-rounded">restaurant</span>
           {photoUploading ? 'Uploading photo…' : busy ? 'Saving…' : (editing ? 'Save changes' : 'Add to Diary')}

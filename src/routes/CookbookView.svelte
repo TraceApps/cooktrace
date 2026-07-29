@@ -8,6 +8,7 @@
    * full library, with a search box and a checkbox per recipe. Each
    * tile has a remove-from-cookbook X.
    */
+  import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
@@ -162,7 +163,7 @@
     if (!ok) return;
     try {
       await NtApi.deleteCookbook(id);
-      showSuccess('Cookbook deleted');
+      showSuccess($_('cookbook_view_ct.toast.cookbook_deleted'));
       push('/recipes?view=cookbooks');
     } catch (e) {
       showError(e.message || 'Could not delete');
@@ -185,7 +186,7 @@
       {#if cookbook.shared_with_me}
         <span class="shared-chip" title={cookbook.shared_by ? `Shared by ${cookbook.shared_by}${cookbook.via_kitchen_name ? ' via ' + cookbook.via_kitchen_name : ''}` : 'Shared with you — read only'}>
           <span class="material-symbols-rounded">lock</span>
-          <span class="shared-chip-label">Shared</span>
+          <span class="shared-chip-label">{$_('cookbook_view_ct.shared_chip')}</span>
         </span>
       {:else}
         {#if !cookbook.is_smart}
@@ -209,7 +210,7 @@
       <div class="state error">
         <span class="material-symbols-rounded">error</span>
         <p>{loadError}</p>
-        <button class="btn btn-secondary" on:click={load}>Retry</button>
+        <button class="btn btn-secondary" on:click={load}>{$_('cookbook_view_ct.retry')}</button>
       </div>
     {:else if cookbook}
       <header class="cb-hero">
@@ -223,7 +224,7 @@
         <div class="cb-meta">
           <div class="cb-name-row">
             <h1 class="cb-name">{cookbook.name}</h1>
-            {#if cookbook.is_smart}<span class="smart-badge" title="Auto-populated from a saved filter">Smart</span>{/if}
+            {#if cookbook.is_smart}<span class="smart-badge" title="Auto-populated from a saved filter">{$_('cookbook_view_ct.smart_badge')}</span>{/if}
           </div>
           {#if cookbook.description}
             <p class="cb-desc">{cookbook.description}</p>
@@ -233,7 +234,7 @@
             {#if cookbook.is_smart && cookbook.smart_filter}
               {@const f = cookbook.smart_filter}
               {@const bits = []}
-              {#if f.favorites_only}<span class="filter-tag">Favorites</span>{/if}
+              {#if f.favorites_only}<span class="filter-tag">{$_('cookbook_view_ct.favorites_filter')}</span>{/if}
               {#if Array.isArray(f.tags) && f.tags.length > 0}
                 {#each f.tags as t}<span class="filter-tag">#{t}</span>{/each}
               {/if}
@@ -254,7 +255,7 @@
             {/if}
           </p>
           {#if !cookbook.is_smart}
-            <button class="btn btn-primary" on:click={openAddDialog}>Add Recipes</button>
+            <button class="btn btn-primary" on:click={openAddDialog}>{$_('cookbook_view_ct.add_recipes')}</button>
           {/if}
         </div>
       {:else}
@@ -336,7 +337,7 @@
   <div use:portal class="modal-backdrop" on:click={closeMoveDialog}>
     <div class="modal" on:click|stopPropagation style="max-width:420px">
       <header class="modal-head">
-        <h3>Move or Copy</h3>
+        <h3>{$_('cookbook_view_ct.move_or_copy')}</h3>
         <button class="btn-icon" on:click={closeMoveDialog} aria-label="Close" title="Close">
           <span class="material-symbols-rounded">close</span>
         </button>
@@ -348,11 +349,11 @@
         <div class="seg-radio">
           <label class:on={moveAction === 'copy'}>
             <input type="radio" bind:group={moveAction} value="copy" />
-            <span>Copy <small>(keep here too)</small></span>
+            <span>{@html $_('cookbook_view_ct.copy_label_html')}</span>
           </label>
           <label class:on={moveAction === 'move'}>
             <input type="radio" bind:group={moveAction} value="move" />
-            <span>Move <small>(remove from here)</small></span>
+            <span>{@html $_('cookbook_view_ct.move_label_html')}</span>
           </label>
         </div>
         <select class="input" style="width: 100%; margin-top: 12px;" bind:value={moveTargetId}>
@@ -368,7 +369,7 @@
         {/if}
       </div>
       <footer class="modal-actions">
-        <button class="btn btn-secondary" on:click={closeMoveDialog}>Cancel</button>
+        <button class="btn btn-secondary" on:click={closeMoveDialog}>{$_('cookbook_view_ct.cancel')}</button>
         <button class="btn btn-primary" on:click={confirmMove}
           disabled={!moveTargetId}>
           {moveAction === 'move' ? 'Move' : 'Copy'}
@@ -382,7 +383,7 @@
   <div use:portal class="modal-backdrop" on:click={closeAddDialog}>
     <div class="modal" on:click|stopPropagation>
       <header class="modal-head">
-        <h3>Add Recipes</h3>
+        <h3>{$_('cookbook_view_ct.add_recipes')}</h3>
         <button class="btn-icon" on:click={closeAddDialog} aria-label="Close" title="Close">
           <span class="material-symbols-rounded">close</span>
         </button>
@@ -413,7 +414,7 @@
         {/if}
       </div>
       <footer class="modal-actions">
-        <button class="btn btn-secondary" on:click={closeAddDialog}>Cancel</button>
+        <button class="btn btn-secondary" on:click={closeAddDialog}>{$_('cookbook_view_ct.cancel')}</button>
         <button class="btn btn-primary" on:click={confirmAddRecipes}
           disabled={addSelected.size === 0}>
           Add {addSelected.size > 0 ? addSelected.size : ''}
