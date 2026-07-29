@@ -268,7 +268,7 @@
     try {
       await NtApi.clearCheckedShopping();
       items = items.filter(i => !i.checked);
-      showSuccess('Cleared');
+      showSuccess($_('shopping_page.toast.cleared'));
     } catch (e) {
       showError(e.message || 'Clear failed');
     }
@@ -430,7 +430,7 @@
   ];
   function openShareSheet() {
     if (items.length === 0) {
-      showError('Add some items first');
+      showError($_('shopping_page.toast.add_items'));
       return;
     }
     shareSheetOpen = true;
@@ -441,13 +441,13 @@
     else if (v === 'text') await shareAsText();
   }
   async function shareAsImage() {
-    showSuccess('Preparing share…');
+    showSuccess($_('shopping_page.toast.preparing_share'));
     try {
       const { svg, width, height } = buildShoppingCardSvg(items);
       const blob = await svgToPngBlob(svg, width, height);
       const fname = `shopping-list-${new Date().toISOString().slice(0,10)}.png`;
       const res = await shareBlob(blob, fname, 'Shopping List');
-      if (res.downloaded) showSuccess('Saved image');
+      if (res.downloaded) showSuccess($_('shopping_page.toast.saved_image'));
       else if (res.canceled) { /* silent */ }
     } catch (e) {
       showError(e.message || 'Could not share');
@@ -457,7 +457,7 @@
     try {
       const text = buildShoppingText(items);
       const res = await shareText(text, 'Shopping List');
-      if (res.copied) showSuccess('Copied to clipboard');
+      if (res.copied) showSuccess($_('shopping_page.toast.copied'));
     } catch (e) {
       showError(e.message || 'Could not share');
     }
@@ -506,9 +506,9 @@
       });
       if (result.added === 0) {
         if (result.planned_cooks === 0) {
-          showSuccess('Nothing planned in that range');
+          showSuccess($_('shopping_page.toast.nothing_planned'));
         } else {
-          showSuccess('Everything\'s already in your pantry');
+          showSuccess($_('shopping_page.toast.already_in_pantry'));
         }
       } else {
         showSuccess(`Added ${result.added} ${result.added === 1 ? 'item' : 'items'} from ${result.planned_cooks} planned ${result.planned_cooks === 1 ? 'cook' : 'cooks'}`);
@@ -632,7 +632,7 @@
       <div class="state error">
         <span class="material-symbols-rounded">error</span>
         <p>{loadError}</p>
-        <button class="btn btn-secondary" on:click={load}>Retry</button>
+        <button class="btn btn-secondary" on:click={load}>{$_('shopping_page.retry')}</button>
       </div>
     {:else if items.length === 0}
       <div class="state empty" in:fade={{ duration: 120 }}>
@@ -777,31 +777,31 @@
   <div class="modal-backdrop" on:click|self={() => { editSheetOpen = false; editTarget = null; }} transition:fade={{ duration: 160 }}>
     <div class="modal modal-edit" on:click|stopPropagation>
       <header class="modal-header">
-        <h2>Edit Item</h2>
+        <h2>{$_('shopping_page.edit_item')}</h2>
         <button class="btn-icon" on:click={() => { editSheetOpen = false; editTarget = null; }} aria-label="Close"><span class="material-symbols-rounded">close</span></button>
       </header>
       <div class="modal-body">
         <label class="field">
-          <span class="field-label">Name</span>
+          <span class="field-label">{$_('shopping_page.name')}</span>
           <input class="input" type="text" bind:value={editName}
                  on:keydown={(e) => { if (e.key === 'Enter') commitEdit(); }} />
         </label>
         <div class="edit-qty-row">
           <label class="field field-qty">
-            <span class="field-label">Quantity</span>
+            <span class="field-label">{$_('shopping_page.quantity')}</span>
             <input class="input" type="number" min="0" step="0.01"
                    bind:value={editQty}
                    placeholder="0" />
           </label>
           <label class="field field-unit">
-            <span class="field-label">Unit</span>
+            <span class="field-label">{$_('shopping_page.unit')}</span>
             <UnitPicker bind:value={editUnit} placeholder="unit" />
           </label>
         </div>
       </div>
       <footer class="modal-footer">
-        <button class="btn btn-secondary" on:click={() => { editSheetOpen = false; editTarget = null; }}>Cancel</button>
-        <button class="btn btn-primary" on:click={commitEdit}>Save</button>
+        <button class="btn btn-secondary" on:click={() => { editSheetOpen = false; editTarget = null; }}>{$_('shopping_page.cancel')}</button>
+        <button class="btn btn-primary" on:click={commitEdit}>{$_('shopping_page.save')}</button>
       </footer>
     </div>
   </div>
@@ -848,7 +848,7 @@
   <div class="modal-backdrop" on:click|self={() => pickerOpen = false} transition:fade={{ duration: 160 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="modal-header">
-        <h2>Add from Recipe</h2>
+        <h2>{$_('shopping_page.add_from_recipe')}</h2>
         <button class="btn-icon" on:click={() => pickerOpen = false} aria-label="Close"><span class="material-symbols-rounded">close</span></button>
       </header>
       <div class="modal-body">
@@ -888,14 +888,14 @@
   <div class="modal-backdrop" on:click|self={() => planImportOpen = false} transition:fade={{ duration: 160 }}>
     <div class="modal modal-plan" on:click|stopPropagation>
       <header class="modal-header">
-        <h2>Add from Planned Cooks</h2>
+        <h2>{$_('shopping_page.add_from_planned')}</h2>
         <button class="btn-icon" on:click={() => planImportOpen = false} aria-label="Close"><span class="material-symbols-rounded">close</span></button>
       </header>
       <div class="modal-body">
         <p class="plan-help">Pull ingredients from every planned cook in this window and dedupe them into one list.</p>
         <div class="plan-dates">
           <label class="field">
-            <span class="field-label">From</span>
+            <span class="field-label">{$_('shopping_page.from')}</span>
             <DateInput bind:value={planFrom} max={planTo} />
           </label>
           <label class="field">
@@ -909,7 +909,7 @@
         </label>
       </div>
       <footer class="modal-footer">
-        <button class="btn btn-secondary" on:click={() => planImportOpen = false} disabled={planBusy}>Cancel</button>
+        <button class="btn btn-secondary" on:click={() => planImportOpen = false} disabled={planBusy}>{$_('shopping_page.cancel')}</button>
         <button class="btn btn-primary" on:click={runPlanImport} disabled={planBusy || !planFrom || !planTo}>
           {planBusy ? 'Adding…' : 'Add to List'}
         </button>

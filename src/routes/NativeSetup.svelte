@@ -1,4 +1,5 @@
 <script>
+  import { _ } from 'svelte-i18n';
   import { setNativeMode, setServerUrl, setAuthToken, resolveAssetUrl, explainConnectError } from '../lib/platform.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { DB } from '../lib/db.js';
@@ -39,7 +40,7 @@
   // Step 1 → step 2: validate server reachability + discover which auth
   // methods the server supports. Uses CapacitorHttp to bypass WebView CORS.
   async function validateAndNext() {
-    if (!serverUrl.trim()) { showError('Enter your server URL'); return; }
+    if (!serverUrl.trim()) { showError($_('native_setup_ct.toast.enter_url')); return; }
     const url = serverUrl.trim().replace(/\/$/, '');
     connecting = true;
     try {
@@ -78,7 +79,7 @@
   // in behaviour from the pre-fix single-form flow — only reached when the
   // server actually has password login enabled.
   async function loginWithPassword() {
-    if (!username.trim() || !password.trim()) { showError('Enter your credentials'); return; }
+    if (!username.trim() || !password.trim()) { showError($_('native_setup_ct.toast.enter_credentials')); return; }
     connecting = true;
     try {
       const { CapacitorHttp } = await import('@capacitor/core');
@@ -94,7 +95,7 @@
       setAuthToken(loginData.token);
       setNativeMode('server');
       DB.setSetting('setupComplete', true);
-      showSuccess('Connected to server');
+      showSuccess($_('native_setup_ct.toast.connected_to_server'));
       window.location.reload();
     } catch (e) {
       showError(explainConnectError(e, validatedUrl));
@@ -126,7 +127,7 @@
       // App.svelte's appUrlOpen listener — it sets the token, calls
       // loadAuthState, redirects to '#/', and the main app renders.
     } catch (e) {
-      showError('Could not open sign-in browser');
+      showError($_('native_setup_ct.toast.cant_open_signin'));
     }
   }
 
@@ -155,15 +156,15 @@
     <!-- Logo / branding -->
     <div class="setup-brand">
       <img src={resolveAssetUrl('/icons/icon-192.png')} alt="CookTrace" class="setup-logo" />
-      <h1 class="setup-title">CookTrace</h1>
-      <p class="setup-subtitle">Trace Every Bite</p>
+      <h1 class="setup-title">{$_('native_setup_ct.app_name')}</h1>
+      <p class="setup-subtitle">{$_('native_setup_ct.tagline')}</p>
     </div>
 
     {#if step === 'choose'}
       <div class="setup-cards">
         <button class="setup-card" on:click={chooseLocal}>
           <span class="material-symbols-rounded setup-card-icon">smartphone</span>
-          <div class="setup-card-title">Use Locally</div>
+          <div class="setup-card-title">{$_('native_setup_ct.use_locally')}</div>
           <p class="setup-card-desc">
             All data stays on this device. Works offline, no server needed.
             You can connect to a server later in Settings.
@@ -172,7 +173,7 @@
 
         <button class="setup-card" on:click={chooseServer}>
           <span class="material-symbols-rounded setup-card-icon">cloud_sync</span>
-          <div class="setup-card-title">Connect to Server</div>
+          <div class="setup-card-title">{$_('native_setup_ct.connect_to_server')}</div>
           <p class="setup-card-desc">
             Sync with your CookTrace server. Your data is available on all
             devices and the web app.
@@ -183,7 +184,7 @@
     {:else if step === 'server-url'}
       <div class="setup-form">
         <div class="form-group">
-          <label class="form-label">Server URL</label>
+          <label class="form-label">{$_('native_setup_ct.server_url')}</label>
           <input
             class="input"
             type="url"
@@ -246,23 +247,23 @@
         {/if}
         {#if passwordLoginEnabled}
           <div class="form-group">
-            <label class="form-label">Username</label>
+            <label class="form-label">{$_('native_setup_ct.username')}</label>
             <input
               class="input"
               type="text"
-              placeholder="Your username"
+              placeholder={$_('native_setup_ct.username_ph')}
               bind:value={username}
               autocapitalize="off"
               autocorrect="off"
             />
           </div>
           <div class="form-group">
-            <label class="form-label">Password</label>
+            <label class="form-label">{$_('native_setup_ct.password')}</label>
             <div style="position:relative">
               {#if showPw}
-                <input class="input" type="text" placeholder="Your password" bind:value={password} style="padding-right:40px" />
+                <input class="input" type="text" placeholder={$_('native_setup_ct.password_ph')} bind:value={password} style="padding-right:40px" />
               {:else}
-                <input class="input" type="password" placeholder="Your password" bind:value={password} style="padding-right:40px" />
+                <input class="input" type="password" placeholder={$_('native_setup_ct.password_ph')} bind:value={password} style="padding-right:40px" />
               {/if}
               <button type="button" class="pw-toggle" on:click={() => showPw = !showPw}>
                 <span class="material-symbols-rounded" style="font-size:20px">{showPw ? 'visibility_off' : 'visibility'}</span>

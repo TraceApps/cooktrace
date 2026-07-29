@@ -1221,6 +1221,100 @@
     "notes":                     "Notes",
     "powered_by_html":           "Powered by <strong>CookTrace</strong>."
   },
+  "cookdiary_page": {
+    "toast": {
+      "pick_recipe":             "Pick a recipe",
+      "planned":                 "Planned",
+      "marked_cooked":           "Marked cooked",
+      "removed":                 "Removed"
+    },
+    "this_week":                 "This Week",
+    "current_streak":            "Current Streak",
+    "longest_streak":            "Longest Streak",
+    "this_month":                "This Month",
+    "view_list":                 "List",
+    "view_month":                "Month",
+    "view_photos":               "Photos",
+    "retry":                     "Retry",
+    "planned_tag":               "Planned",
+    "no_photos":                 "No Photos Yet",
+    "plan_a_cook":               "Plan a Cook",
+    "date":                      "Date",
+    "meal":                      "Meal",
+    "optional":                  "(optional)",
+    "recipe":                    "Recipe",
+    "cancel":                    "Cancel",
+    "filter_by_recipe":          "Filter by Recipe",
+    "clear":                     "Clear",
+    "done":                      "Done"
+  },
+  "wizard_ct": {
+    "welcome":                   "Welcome to CookTrace",
+    "get_started":               "Get Started",
+    "name_ph":                   "Your name",
+    "back":                      "Back",
+    "next":                      "Next",
+    "create_admin":              "Create your admin account",
+    "enable_user_accounts":      "Enable User Accounts",
+    "admin_account":             "Admin Account",
+    "nickname":                  "Nickname",
+    "optional_ph":               "Optional",
+    "full_name":                 "Full Name",
+    "email":                     "Email",
+    "continue":                  "Continue",
+    "cooking_preferences":       "Cooking Preferences",
+    "measurement_system":        "Measurement System",
+    "default_servings":          "Default Servings",
+    "dietary_preferences":       "Dietary Preferences",
+    "open_cooktrace":            "Open CookTrace"
+  },
+  "shopping_page": {
+    "toast": {
+      "cleared":                 "Cleared",
+      "add_items":               "Add some items first",
+      "preparing_share":         "Preparing share…",
+      "saved_image":             "Saved image",
+      "copied":                  "Copied to clipboard",
+      "nothing_planned":         "Nothing planned in that range",
+      "already_in_pantry":       "Everything's already in your pantry"
+    },
+    "retry":                     "Retry",
+    "edit_item":                 "Edit Item",
+    "name":                      "Name",
+    "quantity":                  "Quantity",
+    "unit":                      "Unit",
+    "cancel":                    "Cancel",
+    "save":                      "Save",
+    "add_from_recipe":           "Add from Recipe",
+    "add_from_planned":          "Add from Planned Cooks",
+    "from":                      "From"
+  },
+  "native_setup_ct": {
+    "toast": {
+      "enter_url":               "Enter your server URL",
+      "enter_credentials":       "Enter your credentials",
+      "connected_to_server":     "Connected to server",
+      "cant_open_signin":        "Could not open sign-in browser"
+    },
+    "app_name":                  "CookTrace",
+    "tagline":                   "Trace Every Bite",
+    "use_locally":               "Use Locally",
+    "connect_to_server":         "Connect to Server",
+    "server_url":                "Server URL",
+    "username":                  "Username",
+    "username_ph":               "Your username",
+    "password":                  "Password",
+    "password_ph":               "Your password"
+  },
+  "login_ct": {
+    "toast": {
+      "no_saved":                "No saved sign-in. Please use your password once first.",
+      "saved_expired":           "Your saved sign-in expired. Use your password to sign in.",
+      "biometric_failed":        "Biometric sign-in failed. Use your password instead."
+    },
+    "app_name":                  "CookTrace",
+    "biometric_signin":          "Sign In with Biometric"
+  },
   "pantry_editor_ct": {
     "toast": {
       "enter_barcode":           "Enter a barcode first",

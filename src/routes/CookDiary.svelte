@@ -298,7 +298,7 @@
     : planRecipes;
 
   async function savePlan() {
-    if (!planRecipeId) { showError('Pick a recipe'); return; }
+    if (!planRecipeId) { showError($_('cookdiary_page.toast.pick_recipe')); return; }
     planBusy = true;
     try {
       await NtApi.createDiaryEntry({
@@ -307,7 +307,7 @@
         kind: 'planned',
         meal_type: planMealType || null,
       });
-      showSuccess('Planned');
+      showSuccess($_('cookdiary_page.toast.planned'));
       planOpen = false;
       await load();
       loadStats();
@@ -322,7 +322,7 @@
   async function markPlannedAsCooked(entry) {
     try {
       await NtApi.updateDiaryEntry(entry.id, { kind: 'cooked' });
-      showSuccess('Marked cooked');
+      showSuccess($_('cookdiary_page.toast.marked_cooked'));
       await load();
       loadStats();
       loadHeatmap();
@@ -365,7 +365,7 @@
     if (!ok) return;
     try {
       await NtApi.deleteDiaryEntry(entry.id);
-      showSuccess('Removed');
+      showSuccess($_('cookdiary_page.toast.removed'));
       await load();
       loadStats();
       loadHeatmap();
@@ -394,18 +394,18 @@
       <div class="stats-card">
         <div class="stat-tile">
           <span class="stat-value">{stats.cooks_this_week}</span>
-          <span class="stat-label">This Week</span>
+          <span class="stat-label">{$_('cookdiary_page.this_week')}</span>
         </div>
         <div class="stat-tile">
           <span class="stat-value">
             {stats.current_streak}
             {#if stats.current_streak > 0}<span class="stat-flame material-symbols-rounded">local_fire_department</span>{/if}
           </span>
-          <span class="stat-label">Current Streak</span>
+          <span class="stat-label">{$_('cookdiary_page.current_streak')}</span>
         </div>
         <div class="stat-tile">
           <span class="stat-value">{stats.longest_streak}</span>
-          <span class="stat-label">Longest Streak</span>
+          <span class="stat-label">{$_('cookdiary_page.longest_streak')}</span>
         </div>
         {#if stats.top_recipe}
           <button class="stat-tile stat-link"
@@ -417,7 +417,7 @@
         {:else}
           <div class="stat-tile">
             <span class="stat-value">{stats.cooks_this_month}</span>
-            <span class="stat-label">This Month</span>
+            <span class="stat-label">{$_('cookdiary_page.this_month')}</span>
           </div>
         {/if}
       </div>
@@ -430,9 +430,9 @@
         bind:this={segContainer}
         style="--seg-x:{segX}px; --seg-w:{segW}px">
         <span class="seg-pill" aria-hidden="true"></span>
-        <button class="seg" class:active={view === 'list'}   on:click={() => view = 'list'}   aria-pressed={view === 'list'}   bind:this={segBtns[0]}>List</button>
-        <button class="seg" class:active={view === 'month'}  on:click={() => view = 'month'}  aria-pressed={view === 'month'}  bind:this={segBtns[1]}>Month</button>
-        <button class="seg" class:active={view === 'photos'} on:click={() => view = 'photos'} aria-pressed={view === 'photos'} bind:this={segBtns[2]}>Photos</button>
+        <button class="seg" class:active={view === 'list'}   on:click={() => view = 'list'}   aria-pressed={view === 'list'}   bind:this={segBtns[0]}>{$_('cookdiary_page.view_list')}</button>
+        <button class="seg" class:active={view === 'month'}  on:click={() => view = 'month'}  aria-pressed={view === 'month'}  bind:this={segBtns[1]}>{$_('cookdiary_page.view_month')}</button>
+        <button class="seg" class:active={view === 'photos'} on:click={() => view = 'photos'} aria-pressed={view === 'photos'} bind:this={segBtns[2]}>{$_('cookdiary_page.view_photos')}</button>
       </div>
       {#if view === 'month'}
         <div class="month-nav">
@@ -467,7 +467,7 @@
       <div class="state error">
         <span class="material-symbols-rounded">error</span>
         <p>{loadError}</p>
-        <button class="btn btn-secondary" on:click={load}>Retry</button>
+        <button class="btn btn-secondary" on:click={load}>{$_('cookdiary_page.retry')}</button>
       </div>
     {:else if entries.length === 0}
       <div class="state empty" in:fade={{ duration: 120 }}>
@@ -490,7 +490,7 @@
           <div class="day-header">
             <span class="day-date">{shortDate(date)}</span>
             <span class="day-rel">{relativeTime(date)}</span>
-            {#if planned}<span class="day-tag">Planned</span>{/if}
+            {#if planned}<span class="day-tag">{$_('cookdiary_page.planned_tag')}</span>{/if}
           </div>
           <ul class="day-list">
             {#each items as e (e.id)}
@@ -535,7 +535,7 @@
                   {#if e.notes}<div class="entry-notes">{e.notes}</div>{/if}
                 </div>
                 {#if e.kind === 'planned'}
-                  <span class="entry-badge">Planned</span>
+                  <span class="entry-badge">{$_('cookdiary_page.planned_tag')}</span>
                 {/if}
               </li>
             {/each}
@@ -570,7 +570,7 @@
       {#if photoTiles.length === 0}
         <div class="state empty" in:fade={{ duration: 120 }}>
           <span class="material-symbols-rounded empty-icon">photo_library</span>
-          <h2>No Photos Yet</h2>
+          <h2>{$_('cookdiary_page.no_photos')}</h2>
           <p>Add a photo when you log a cook and it'll show up here.</p>
         </div>
       {:else}
@@ -617,16 +617,16 @@
   <div class="modal-backdrop" on:click|self={() => planOpen = false} transition:fade={{ duration: 160 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="modal-header">
-        <h2>Plan a Cook</h2>
+        <h2>{$_('cookdiary_page.plan_a_cook')}</h2>
         <button class="btn-icon" on:click={() => planOpen = false} aria-label="Close"><span class="material-symbols-rounded">close</span></button>
       </header>
       <div class="modal-body">
         <label class="field">
-          <span class="field-label">Date</span>
+          <span class="field-label">{$_('cookdiary_page.date')}</span>
           <DateInput bind:value={planDate} />
         </label>
         <div class="field">
-          <span class="field-label">Meal <span class="field-hint">(optional)</span></span>
+          <span class="field-label">{$_('cookdiary_page.meal')} <span class="field-hint">{$_('cookdiary_page.optional')}</span></span>
           <div class="plan-meal-chips" role="radiogroup" aria-label="Meal type">
             {#each PLAN_MEAL_TYPES as m}
               <button type="button"
@@ -640,7 +640,7 @@
           </div>
         </div>
         <label class="field">
-          <span class="field-label">Recipe</span>
+          <span class="field-label">{$_('cookdiary_page.recipe')}</span>
           <input class="input" type="search" placeholder="Search…" bind:value={planSearch} />
         </label>
         <div class="recipe-picker">
@@ -660,7 +660,7 @@
         </div>
       </div>
       <footer class="modal-footer">
-        <button class="btn btn-secondary" on:click={() => planOpen = false}>Cancel</button>
+        <button class="btn btn-secondary" on:click={() => planOpen = false}>{$_('cookdiary_page.cancel')}</button>
         <button class="btn btn-primary" on:click={savePlan} disabled={planBusy}>
           {planBusy ? 'Saving…' : 'Plan it'}
         </button>
@@ -675,12 +675,12 @@
   <div class="modal-backdrop" on:click|self={() => filterPickerOpen = false} transition:fade={{ duration: 160 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="modal-header">
-        <h2>Filter by Recipe</h2>
+        <h2>{$_('cookdiary_page.filter_by_recipe')}</h2>
         <button class="btn-icon" on:click={() => filterPickerOpen = false} aria-label="Close"><span class="material-symbols-rounded">close</span></button>
       </header>
       <div class="modal-body">
         <label class="field">
-          <span class="field-label">Recipe</span>
+          <span class="field-label">{$_('cookdiary_page.recipe')}</span>
           <input class="input" type="search" placeholder="Search…" bind:value={filterSearch} />
         </label>
         <div class="recipe-picker">
@@ -701,9 +701,9 @@
       </div>
       <footer class="modal-footer">
         {#if filterRecipeId}
-          <button class="btn btn-secondary" on:click={() => { clearFilter(); filterPickerOpen = false; }}>Clear</button>
+          <button class="btn btn-secondary" on:click={() => { clearFilter(); filterPickerOpen = false; }}>{$_('cookdiary_page.clear')}</button>
         {/if}
-        <button class="btn btn-secondary" on:click={() => filterPickerOpen = false}>Done</button>
+        <button class="btn btn-secondary" on:click={() => filterPickerOpen = false}>{$_('cookdiary_page.done')}</button>
       </footer>
     </div>
   </div>

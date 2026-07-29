@@ -1,4 +1,5 @@
 <script>
+  import { _ } from 'svelte-i18n';
   import { push } from 'svelte-spa-router';
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
@@ -164,24 +165,24 @@
       {#if STEPS[step] === 'welcome'}
         <div class="step-hero">
           <div class="logo-icon">🍳</div>
-          <h1 class="step-title">Welcome to CookTrace</h1>
+          <h1 class="step-title">{$_('wizard_ct.welcome')}</h1>
           <p class="step-desc">
             Trace Every Recipe — From Pantry to Plate.
             Self-hosted recipes, pantry, and cook diary.
           </p>
         </div>
         <div class="step-actions center">
-          <button class="btn-primary" on:click={next}>Get Started</button>
+          <button class="btn-primary" on:click={next}>{$_('wizard_ct.get_started')}</button>
         </div>
 
       <!-- Name (native local) -->
       {:else if STEPS[step] === 'name'}
         <h1 class="step-title">What should Trace call you?</h1>
         <p class="step-desc">Used in Trace assistant greetings and the sidebar header.</p>
-        <input class="input" bind:value={displayName} placeholder="Your name" />
+        <input class="input" bind:value={displayName} placeholder={$_('wizard_ct.name_ph')} />
         <div class="step-actions">
-          <button class="btn-secondary" on:click={back}>Back</button>
-          <button class="btn-primary" on:click={next}>Next</button>
+          <button class="btn-secondary" on:click={back}>{$_('wizard_ct.back')}</button>
+          <button class="btn-primary" on:click={next}>{$_('wizard_ct.next')}</button>
         </div>
 
       <!-- Account (PWA) -->
@@ -189,7 +190,7 @@
         {#if _forceAccountCreation}
           <div class="step-hero compact">
             <span class="material-symbols-rounded hero-icon">person_add</span>
-            <h1 class="step-title">Create your admin account</h1>
+            <h1 class="step-title">{$_('wizard_ct.create_admin')}</h1>
             <p class="step-desc">Set up an admin account to secure your CookTrace instance. You can invite household members later.</p>
           </div>
         {:else}
@@ -201,7 +202,7 @@
 
           <div class="toggle-row">
             <div>
-              <div class="toggle-label">Enable User Accounts</div>
+              <div class="toggle-label">{$_('wizard_ct.enable_user_accounts')}</div>
               <div class="toggle-hint">Each user gets their own recipes, pantry, settings, and profile</div>
             </div>
             <Toggle checked={enableUserMgmt} on:change={e => enableUserMgmt = e.detail} />
@@ -210,7 +211,7 @@
 
         {#if enableUserMgmt}
           <div class="um-form" transition:fly={{ y: 10, duration: 200 }}>
-            <p class="um-section-label">Admin Account</p>
+            <p class="um-section-label">{$_('wizard_ct.admin_account')}</p>
 
             <div class="form-row-2">
               <label class="field">
@@ -218,18 +219,18 @@
                 <input class="input" type="text" bind:value={umUsername} placeholder="admin" autocomplete="username" />
               </label>
               <label class="field">
-                <span class="field-label">Nickname</span>
-                <input class="input" type="text" bind:value={umNickname} placeholder="Optional" />
+                <span class="field-label">{$_('wizard_ct.nickname')}</span>
+                <input class="input" type="text" bind:value={umNickname} placeholder={$_('wizard_ct.optional_ph')} />
               </label>
             </div>
 
             <label class="field">
-              <span class="field-label">Full Name</span>
-              <input class="input" type="text" bind:value={umFullName} placeholder="Optional" />
+              <span class="field-label">{$_('wizard_ct.full_name')}</span>
+              <input class="input" type="text" bind:value={umFullName} placeholder={$_('wizard_ct.optional_ph')} />
             </label>
 
             <label class="field">
-              <span class="field-label">Email</span>
+              <span class="field-label">{$_('wizard_ct.email')}</span>
               <input class="input" type="email" bind:value={umEmail}
                 placeholder="Used for password resets (optional)" autocomplete="email" />
             </label>
@@ -279,17 +280,17 @@
               {umBusy ? 'Creating…' : 'Create Account'}
             </button>
           {:else}
-            <button class="btn-primary" on:click={next}>Continue</button>
+            <button class="btn-primary" on:click={next}>{$_('wizard_ct.continue')}</button>
           {/if}
         </div>
 
       <!-- Cooking preferences -->
       {:else if STEPS[step] === 'prefs'}
-        <h1 class="step-title">Cooking Preferences</h1>
+        <h1 class="step-title">{$_('wizard_ct.cooking_preferences')}</h1>
         <p class="step-desc">These shape how recipes display and what shopping units use.</p>
 
         <label class="field">
-          <span>Measurement System</span>
+          <span>{$_('wizard_ct.measurement_system')}</span>
           <div class="seg-group">
             {#each ['imperial','metric'] as opt}
               <button
@@ -301,7 +302,7 @@
         </label>
 
         <label class="field">
-          <span>Default Servings</span>
+          <span>{$_('wizard_ct.default_servings')}</span>
           <input
             type="number" min="1" max="20" class="input num"
             bind:value={defaultServings}
@@ -309,7 +310,7 @@
         </label>
 
         <label class="field">
-          <span>Dietary Preferences</span>
+          <span>{$_('wizard_ct.dietary_preferences')}</span>
           <div class="checks">
             {#each [['vegetarian','Vegetarian'], ['vegan','Vegan'], ['glutenFree','Gluten-free'], ['dairyFree','Dairy-free']] as [key, label]}
               <label class="check">
@@ -321,8 +322,8 @@
         </label>
 
         <div class="step-actions">
-          <button class="btn-secondary" on:click={back}>Back</button>
-          <button class="btn-primary" on:click={next}>Next</button>
+          <button class="btn-secondary" on:click={back}>{$_('wizard_ct.back')}</button>
+          <button class="btn-primary" on:click={next}>{$_('wizard_ct.next')}</button>
         </div>
 
       <!-- Done -->
@@ -330,7 +331,7 @@
         <h1 class="step-title">You're all set</h1>
         <p class="step-desc">CookTrace is ready. Start by browsing or importing your first recipe.</p>
         <div class="step-actions">
-          <button class="btn-primary" on:click={finish}>Open CookTrace</button>
+          <button class="btn-primary" on:click={finish}>{$_('wizard_ct.open_cooktrace')}</button>
         </div>
       {/if}
     </div>
