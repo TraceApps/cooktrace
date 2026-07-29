@@ -280,7 +280,7 @@
     "signing_in":           "Signing in…",
     "forgot_password":      "Forgot Password?",
     "locked_out":           "Locked Out?",
-    "sso_sign_in_with":     "Sign in with {provider}",
+    "sso_sign_in_with":     "Sign In with {provider}",
     "sso_or":               "or",
     "no_signin_methods":    "No sign-in methods available. Ask your administrator.",
     "errors": {
@@ -291,7 +291,7 @@
       "explainer":         "If you never set up user accounts intentionally, you can disable user management. <strong>This will delete all user accounts.</strong> Your food &amp; diary data will be kept.",
       "token_prompt":      "Enter the <code>RECOVERY_TOKEN</code> from your server environment:",
       "token_placeholder": "Recovery token",
-      "action":            "Disable user management & reset",
+      "action":            "Disable User Management & Reset",
       "disabling":         "Disabling…",
       "failed":            "Recovery failed",
       "success":           "User management disabled — you are now in single-user mode",
@@ -1370,7 +1370,7 @@
     "name_ph":                   "Your name",
     "back":                      "Back",
     "next":                      "Next",
-    "create_admin":              "Create your admin account",
+    "create_admin":              "Create Your Admin Account",
     "enable_user_accounts":      "Enable User Accounts",
     "admin_account":             "Admin Account",
     "nickname":                  "Nickname",
@@ -1466,7 +1466,7 @@
     "toast": {
       "removed":                 "Removed"
     },
-    "variant_banner_title":      "Pantry now supports product variants",
+    "variant_banner_title":      "Pantry Now Supports Product Variants",
     "sort_updated":              "Last Updated",
     "sort_usage":                "Most Used",
     "retry":                     "Retry",

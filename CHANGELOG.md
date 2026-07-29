@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Full i18n retrofit across the app.** Every hardcoded UI string has been extracted into `src/i18n/en.json` and reads via `svelte-i18n`. Covers Settings (main page + Backup, Notifications, ServerConnection, Auth, ImportFromNT, Email, Trace, UserManagement, Kitchens, Import, Federation, Nutrition), Pantry (PantryItemSheet + PantryEditor + Pantry + PantryView), Recipes (Recipes + RecipeEditor + RecipeView + CookbookView + PublicRecipe + import/comment/cook dialogs + NutritionFacts), core routes (CookDiary, Shopping, NativeSetup, Login, Wizard, Profile, Manage), manage tables (Cookbooks, Units, Pantry/Recipe Categories, Taxonomy), Trace AI, and shared UI (BarcodeScanner, TimePicker, CookHeatmap, ImagePicker, IconPicker, timer pills, Sidebar). ~460 new keys added, Weblate-ready. Chicago-style title case for labels/buttons/headings, sentence case for body prose / errors / placeholders / toasts. Uses paired `<key>_desc` sibling keys and column-aligned values (Fathom-inspired conventions carried across the TraceApps family) so translators get inline context.
+
 ---
 
 ## [1.0.3] - 2026-07-28
