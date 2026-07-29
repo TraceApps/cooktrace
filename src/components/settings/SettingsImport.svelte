@@ -12,6 +12,7 @@
    * archives, plain CookTrace JSON exports, and any zip containing
    * schema.org/Recipe JSON files.
    */
+  import { _ } from 'svelte-i18n';
   import { slide } from 'svelte/transition';
   import { onMount } from 'svelte';
   import { NtApi } from '../../lib/api.js';
@@ -211,10 +212,9 @@
     <!-- Initial: explainer + upload trigger -->
     <div class="setting-row">
       <div>
-        <span class="setting-label">Import from Another App</span>
+        <span class="setting-label">{$_('settings_import_ct.import_section')}</span>
         <span class="setting-desc">
-          Drop in a <strong>Mealie</strong> backup zip, <strong>Tandoor</strong> export, or <strong>Paprika</strong>
-          <code>.paprikarecipes</code> archive. We'll scan it, show you everything inside, and let you tick which recipes to import.
+          {@html $_('settings_import_ct.import_desc_html')}
         </span>
       </div>
       <button class="btn btn-primary" disabled={scanning} on:click={() => fileInput?.click()}>
@@ -272,9 +272,9 @@
           </div>
         </div>
         <div class="picker-bulk">
-          <button class="btn-link" on:click={selectAll}>Select All</button>
+          <button class="btn-link" on:click={selectAll}>{$_('settings_import_ct.select_all')}</button>
           <span class="dot">·</span>
-          <button class="btn-link" on:click={selectNone}>Select None</button>
+          <button class="btn-link" on:click={selectNone}>{$_('settings_import_ct.select_none')}</button>
         </div>
       </div>
 
@@ -323,7 +323,7 @@
       <div class="opts">
         <label class="opt">
           <input type="checkbox" bind:checked={importImages} />
-          <span>Transfer images from the archive</span>
+          <span>{$_('settings_import_ct.transfer_images')}</span>
         </label>
         <label class="opt">
           <input type="checkbox" bind:checked={addToPantry} />
@@ -331,7 +331,7 @@
         </label>
         <label class="opt">
           <input type="checkbox" bind:checked={applyTags} />
-          <span>Keep tags from the source</span>
+          <span>{$_('settings_import_ct.keep_tags')}</span>
         </label>
         <label class="opt">
           <input type="checkbox" bind:checked={importCategories} />
@@ -347,8 +347,8 @@
           <span class="opt-label">If a recipe already exists:</span>
           <select class="select sel-sm" bind:value={dedup}>
             <option value="skip">Skip it (default)</option>
-            <option value="replace">Replace with the imported version</option>
-            <option value="force">Allow duplicates</option>
+            <option value="replace">{$_('settings_import_ct.opt_replace')}</option>
+            <option value="force">{$_('settings_import_ct.opt_force')}</option>
           </select>
         </div>
         {#if dedup === 'skip' && hasTimelineInZip}
@@ -380,7 +380,7 @@
       {/if}
 
       <div class="actions">
-        <button class="btn btn-secondary" on:click={reset} disabled={committing}>Cancel</button>
+        <button class="btn btn-secondary" on:click={reset} disabled={committing}>{$_('settings_import_ct.cancel')}</button>
         <button
           class="btn btn-primary"
           on:click={commit}
@@ -425,7 +425,7 @@
       {/if}
 
       <div class="actions">
-        <button class="btn btn-primary" on:click={reset}>Import Another</button>
+        <button class="btn btn-primary" on:click={reset}>{$_('settings_import_ct.import_another')}</button>
       </div>
     </div>
   {/if}

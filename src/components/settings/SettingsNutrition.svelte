@@ -1,4 +1,5 @@
 <script>
+  import { _ } from 'svelte-i18n';
   import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS } from '../../lib/nutriments.js';
   import { visibleNutriments } from '../../stores/settings.js';
 
@@ -39,12 +40,12 @@
 <div class="setting-card">
   <div class="setting-row stack">
     <div>
-      <span class="setting-label">Nutrition Facts Visibility</span>
+      <span class="setting-label">{$_('settings_nutrition_ct.visibility')}</span>
       <span class="setting-desc">Pick which nutrients show up in the Nutrition Facts box on every recipe. Hidden nutrients can still be entered in the editor but won't display.</span>
     </div>
     <div class="actions-row">
-      <button class="seg" on:click={resetToDefaults}>Defaults</button>
-      <button class="seg" on:click={showAll}>Show All</button>
+      <button class="seg" on:click={resetToDefaults}>{$_('settings_nutrition_ct.defaults')}</button>
+      <button class="seg" on:click={showAll}>{$_('settings_nutrition_ct.show_all')}</button>
     </div>
   </div>
 

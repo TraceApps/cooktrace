@@ -11,6 +11,7 @@
    *   GET  /api/nt/foods?q=…    (search proxy)
    *   POST /api/nt/import-foods (bulk insert into pantry)
    */
+  import { _ } from 'svelte-i18n';
   import { ntFederationEnabled, ntInstanceUrl } from '../../stores/settings.js';
   import { resolveAssetUrl, apiUrl, isNative, getServerUrl, getAuthToken } from '../../lib/platform.js';
   import { showSuccess, showError } from '../../stores/toast.js';
@@ -102,11 +103,11 @@
     // as-is and creates the new generic when asked; client-side gate
     // is just so the request never goes out half-baked.
     if (variantMode === 'variant-of-existing' && !existingGenericId) {
-      showError('Pick a pantry item to attach these as variants of.');
+      showError($_('settings_import_nt.toast.pick_pantry_first'));
       return;
     }
     if (variantMode === 'variant-of-new' && !newGenericName.trim()) {
-      showError('Name the new generic item first.');
+      showError($_('settings_import_nt.toast.name_generic_first'));
       return;
     }
     importing = true;
@@ -151,13 +152,13 @@
   {#if !$ntFederationEnabled || !$ntInstanceUrl}
     <div class="setting-row">
       <div>
-        <span class="setting-label">NutriTrace Federation Disabled</span>
+        <span class="setting-label">{$_('settings_import_nt.federation_disabled')}</span>
         <span class="setting-desc">Configure your NutriTrace URL + access token in the Federation section above and toggle it on, then come back here.</span>
       </div>
     </div>
   {:else}
     <div class="setting-row stack">
-      <span class="setting-label">Import From NutriTrace</span>
+      <span class="setting-label">{$_('settings_import_nt.import_from_nt')}</span>
       <span class="setting-desc">
         Search your NutriTrace foods library and pick the ones you want to bring into your CookTrace pantry. Imports include name, brand, barcode, serving size, full nutrition, and image. Active duplicates are skipped; previously deleted items are restored with the latest data.
       </span>
@@ -182,9 +183,9 @@
           <span class="picker-bulk">
             <strong>{selected.size}</strong> selected
             <span class="dot">·</span>
-            <button class="btn-link" on:click={selectAll}>Select All</button>
+            <button class="btn-link" on:click={selectAll}>{$_('settings_import_nt.select_all')}</button>
             <span class="dot">·</span>
-            <button class="btn-link" on:click={selectNone}>Select None</button>
+            <button class="btn-link" on:click={selectNone}>{$_('settings_import_nt.select_none')}</button>
           </span>
         </div>
         <ul class="results">
@@ -211,18 +212,18 @@
           {/each}
         </ul>
         <fieldset class="variant-mode">
-          <legend class="variant-mode-legend">Import as</legend>
+          <legend class="variant-mode-legend">{$_('settings_import_nt.import_as')}</legend>
           <label class="variant-mode-row">
             <input type="radio" bind:group={variantMode} value="flat" />
             <span class="variant-mode-label">
-              <span class="variant-mode-title">New flat items</span>
+              <span class="variant-mode-title">{$_('settings_import_nt.mode_flat')}</span>
               <span class="variant-mode-desc">Each picked food becomes its own pantry item. Default behavior.</span>
             </span>
           </label>
           <label class="variant-mode-row">
             <input type="radio" bind:group={variantMode} value="variant-of-existing" />
             <span class="variant-mode-label">
-              <span class="variant-mode-title">Variants of an existing pantry item</span>
+              <span class="variant-mode-title">{$_('settings_import_nt.mode_variants_existing')}</span>
               <span class="variant-mode-desc">Attach all picked foods as branded variants of a generic you already have.</span>
               {#if variantMode === 'variant-of-existing'}
                 <select class="select variant-mode-select" bind:value={existingGenericId}>
@@ -237,7 +238,7 @@
           <label class="variant-mode-row">
             <input type="radio" bind:group={variantMode} value="variant-of-new" />
             <span class="variant-mode-label">
-              <span class="variant-mode-title">Variants of a new generic item</span>
+              <span class="variant-mode-title">{$_('settings_import_nt.mode_variants_new')}</span>
               <span class="variant-mode-desc">Create a new generic (e.g. "Milk"), then drop all picked foods in as its variants.</span>
               {#if variantMode === 'variant-of-new'}
                 <input class="input variant-mode-input" type="text"
@@ -249,10 +250,10 @@
         </fieldset>
         <label class="opt">
           <input type="checkbox" bind:checked={inStock} />
-          <span>Mark Imported Items as In Stock</span>
+          <span>{$_('settings_import_nt.mark_in_stock')}</span>
         </label>
         <div class="actions">
-          <button class="btn btn-secondary" on:click={reset} disabled={importing}>Cancel</button>
+          <button class="btn btn-secondary" on:click={reset} disabled={importing}>{$_('settings_import_nt.cancel')}</button>
           <button class="btn btn-primary" on:click={commit} disabled={importing || selected.size === 0}>
             {#if importing}Importing…{:else}Import {selected.size} {selected.size === 1 ? 'Item' : 'Items'}{/if}
           </button>
@@ -286,7 +287,7 @@
         {/if}
 
         <div class="actions">
-          <button class="btn btn-primary" on:click={reset}>Import More</button>
+          <button class="btn btn-primary" on:click={reset}>{$_('settings_import_nt.import_more')}</button>
         </div>
       </div>
     {/if}

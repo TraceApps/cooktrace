@@ -245,11 +245,11 @@
   async function saveProvider() {
     if (oidcBusy) return;
     if (!oidcEditing.issuer_url?.trim() || !oidcEditing.client_id?.trim()) {
-      showError('Issuer URL and Client ID are required');
+      showError($_('settings_auth_extra.toast.issuer_client_required'));
       return;
     }
     if (!oidcEditing.redirect_uris?.filter(Boolean).length) {
-      showError('At least one redirect URI is required');
+      showError($_('settings_auth_extra.toast.redirect_required'));
       return;
     }
     oidcBusy = true;
@@ -272,7 +272,7 @@
       oidcEditing = null;
       await loadData();
     } catch (e) {
-      showError('Could not reach server');
+      showError($_('settings_auth_extra.toast.cant_reach_server'));
     } finally {
       oidcBusy = false;
     }
@@ -302,16 +302,16 @@
         const data = await r.json().catch(() => ({}));
         showError(data?.error || 'Delete failed'); return;
       }
-      showSuccess('Provider deleted');
+      showSuccess($_('settings_auth_extra.toast.provider_deleted'));
       await loadData();
-    } catch { showError('Could not reach server'); }
+    } catch { showError($_('settings_auth_extra.toast.cant_reach_server')); }
     finally { oidcBusy = false; }
   }
 
   async function togglePasswordLogin() {
     const next = !enablePasswordLogin;
     if (!next && !oidcProviders.some(p => p.is_active)) {
-      showError('Add at least one active OIDC provider before disabling password login.');
+      showError($_('settings_auth_extra.toast.need_active_provider'));
       return;
     }
     if (!next && !confirm('Disable password login? Users without an OIDC link will not be able to sign in until you re-enable it. RECOVERY_TOKEN will still work.')) return;
@@ -324,7 +324,7 @@
       if (!r.ok) { showError(data?.error || 'Save failed'); return; }
       enablePasswordLogin = !!data.enable_email_password_login;
       showSuccess(enablePasswordLogin ? 'Password login enabled' : 'Password login disabled');
-    } catch { showError('Could not reach server'); }
+    } catch { showError($_('settings_auth_extra.toast.cant_reach_server')); }
   }
 
   function addRedirectUri() {
@@ -342,7 +342,7 @@
     <div class="card settings-card">
       <div class="setting-row">
         <div>
-          <span class="setting-label">User Management Is Required</span>
+          <span class="setting-label">{$_('settings_auth_extra.user_mgmt_required')}</span>
           <div class="setting-desc">Single Sign-On is scoped to user accounts, so User Management has to be enabled first. Set it up in <strong>Settings → User Management</strong>, then come back here.</div>
         </div>
       </div>
@@ -351,7 +351,7 @@
     <div class="card settings-card">
       <div class="setting-row">
         <div>
-          <span class="setting-label">Admin Only</span>
+          <span class="setting-label">{$_('settings_auth_extra.admin_only')}</span>
           <div class="setting-desc">Only admins can configure identity providers. If you need this access, ask the admin of this CookTrace instance to promote your account.</div>
         </div>
       </div>
@@ -411,13 +411,13 @@
         {#if oidcTestResult}
           <div class="oidc-test-result" class:ok={oidcTestResult.ok}>
             {#if oidcTestResult.ok}
-              <strong>Discovery OK</strong>
+              <strong>{$_('settings_auth_extra.discovery_ok')}</strong>
               <div class="text-3 text-sm">issuer: {oidcTestResult.issuer}</div>
               <div class="text-3 text-sm">authorization_endpoint: {oidcTestResult.authorization_endpoint || '—'}</div>
               <div class="text-3 text-sm">token_endpoint: {oidcTestResult.token_endpoint || '—'}</div>
               <div class="text-3 text-sm">end_session_endpoint: {oidcTestResult.end_session_endpoint || '—'}</div>
             {:else}
-              <strong style="color:var(--danger)">Discovery failed</strong>
+              <strong style="color:var(--danger)">{$_('settings_auth_extra.discovery_failed')}</strong>
               <div class="text-3 text-sm">{oidcTestResult.error}</div>
             {/if}
           </div>
@@ -427,7 +427,7 @@
           <div class="oidc-form" transition:slide={{ duration: 180 }}>
             {#if !oidcEditing.id}
               <div class="form-group">
-                <label class="form-label">Provider Type</label>
+                <label class="form-label">{$_('settings_auth_extra.provider_type')}</label>
                 <div class="oidc-preset-grid">
                   {#each PROVIDER_PRESETS as preset (preset.id)}
                     <button
@@ -455,7 +455,7 @@
               </div>
             {/if}
             <div class="form-group">
-              <label class="form-label">Display Name</label>
+              <label class="form-label">{$_('settings_auth_extra.display_name')}</label>
               <input class="input" bind:value={oidcEditing.display_name} placeholder={oidcPreset.defaults.display_name || 'Authentik / Pocket ID / Google'} />
             </div>
             <div class="form-group">
@@ -484,11 +484,11 @@
               <div class="text-3 text-sm" style="margin-top:4px">Must match exactly what your IdP has configured. The path is <code>/api/auth/oidc/callback/&lt;provider-id&gt;</code> under your CookTrace base URL.</div>
             </div>
             <div class="form-group">
-              <label class="form-label">Scope</label>
+              <label class="form-label">{$_('settings_auth_extra.scope')}</label>
               <input class="input" bind:value={oidcEditing.scope} />
             </div>
             <div class="form-group">
-              <label class="form-label">Token Endpoint Auth Method</label>
+              <label class="form-label">{$_('settings_auth_extra.token_endpoint_auth_method')}</label>
               <select class="select" bind:value={oidcEditing.token_endpoint_auth_method}>
                 <option value="client_secret_post">client_secret_post (default)</option>
                 <option value="client_secret_basic">client_secret_basic</option>
@@ -498,7 +498,7 @@
             <div class="setting-row" style="padding:0">
               <div>
                 <span class="setting-label">Auto-Link Existing Users (Verified Email)</span>
-                <div class="setting-desc">When the IdP says <code>email_verified=true</code> and the email matches an existing CookTrace user, link them silently on first SSO sign-in. Recommended ON for any IdP you trust to verify emails.</div>
+                <div class="setting-desc">{@html $_('settings_auth_extra.auto_link_desc_html')}</div>
               </div>
               <Toggle checked={!!oidcEditing.auto_link_verified_email} on:change={e => oidcEditing.auto_link_verified_email = e.detail ? 1 : 0} />
             </div>
@@ -511,7 +511,7 @@
             </div>
             <div class="setting-row" style="padding:0">
               <div>
-                <span class="setting-label">Provider Active</span>
+                <span class="setting-label">{$_('settings_auth_extra.provider_active')}</span>
                 <div class="setting-desc">Inactive providers won't show on the Login page.</div>
               </div>
               <Toggle checked={!!oidcEditing.is_active} on:change={e => oidcEditing.is_active = e.detail ? 1 : 0} />
@@ -526,7 +526,7 @@
             {#if !oidcPreset.hides?.includes('admin_group_value')}
               <div class="form-group">
                 <label class="form-label">Admin Group Value (Optional)</label>
-                <input class="input" bind:value={oidcEditing.admin_group_value} placeholder="CookTraceAdmins" />
+                <input class="input" bind:value={oidcEditing.admin_group_value} placeholder={$_('settings_auth_extra.admin_group_value_ph')} />
                 <div class="text-3 text-sm">If a user's groups claim contains this value, they're set to admin on each login.</div>
               </div>
             {/if}
@@ -535,7 +535,7 @@
               <input class="input" bind:value={oidcEditing.logo_url} placeholder="https://…/authentik.png" />
             </div>
             <div style="display:flex;gap:8px;margin-top:8px">
-              <button class="btn btn-ghost" style="flex:1" on:click={cancelProviderEdit}>Cancel</button>
+              <button class="btn btn-ghost" style="flex:1" on:click={cancelProviderEdit}>{$_('settings_auth_extra.cancel')}</button>
               <button class="btn btn-primary" style="flex:1" on:click={saveProvider} disabled={oidcBusy}>
                 {oidcBusy ? 'Saving…' : (oidcEditing.id ? 'Save Changes' : 'Create Provider')}
               </button>
@@ -547,11 +547,11 @@
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Allow Password Login</span>
+          <span class="setting-label">{$_('settings_auth_extra.allow_password_login')}</span>
           <div class="setting-desc">
             When off, users sign in only via OIDC. Recovery still works via the <code>RECOVERY_TOKEN</code> env var.
             {#if passwordLoginEnvLocked}
-              <br /><em>Locked by <code>OIDC_ENABLE_EMAIL_PASSWORD_LOGIN</code> environment variable.</em>
+              {@html $_('settings_auth_extra.env_locked_html')}
             {/if}
           </div>
         </div>

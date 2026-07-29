@@ -12,6 +12,7 @@
   //   - Cook day reminder (planned cook today)
   //   - Thaw alert (recipe planned for tomorrow needs ingredients out)
   //   - Shopping list nudge (unchecked items lingering)
+  import { _ } from 'svelte-i18n';
   import { showSuccess, showError } from '../../stores/toast.js';
   import { isNative, getServerUrl, getAuthToken, apiUrl } from '../../lib/platform.js';
   import TimePicker from '../ui/TimePicker.svelte';
@@ -68,7 +69,7 @@
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error || `HTTP ${res.status}`);
       }
-      showSuccess('Test sent — check your push service.');
+      showSuccess($_('settings_notifications.toast.test_sent'));
       testStatus = 'ok';
     } catch (e) {
       showError(e.message || 'Push test failed');
@@ -83,13 +84,13 @@
   // separately on the native side via the Settings UI).
   async function requestDevicePermission() {
     if (typeof Notification === 'undefined') {
-      showError('This browser does not support notifications.');
+      showError($_('settings_notifications.toast.not_supported'));
       return;
     }
     try {
       const result = await Notification.requestPermission();
-      if (result === 'granted') showSuccess('Notification permission granted.');
-      else if (result === 'denied') showError('Permission denied. Enable it in browser settings.');
+      if (result === 'granted') showSuccess($_('settings_notifications.toast.permission_granted'));
+      else if (result === 'denied') showError($_('settings_notifications.toast.permission_denied'));
     } catch (e) {
       showError(e.message || 'Permission request failed');
     }
@@ -97,11 +98,11 @@
 </script>
 
 <div class="notif-body">
-  <p class="sub-label">Device Notifications</p>
+  <p class="sub-label">{$_('settings_notifications.device_notifications')}</p>
   <div class="card settings-card">
     <div class="setting-row">
       <div>
-        <span class="setting-label">Enable on This Device</span>
+        <span class="setting-label">{$_('settings_notifications.enable_on_device')}</span>
         <span class="setting-desc">Use this browser / phone's notification system for reminders. Works alongside the push service below.</span>
       </div>
       <input type="checkbox" class="toggle-cb" checked={$notifLocalEnabled}
@@ -111,7 +112,7 @@
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Browser Permission</span>
+          <span class="setting-label">{$_('settings_notifications.browser_permission')}</span>
           <span class="setting-desc">Most browsers require explicit permission before fired notifications appear.</span>
         </div>
         <button class="btn btn-secondary" on:click={requestDevicePermission}>
@@ -121,19 +122,19 @@
     {/if}
   </div>
 
-  <p class="sub-label">Push Service</p>
+  <p class="sub-label">{$_('settings_notifications.push_service')}</p>
   <div class="card settings-card">
     <div class="setting-row">
       <div>
-        <span class="setting-label">Service</span>
+        <span class="setting-label">{$_('settings_notifications.service')}</span>
         <span class="setting-desc">External delivery via Apprise, Gotify, or ntfy. Secrets stay on your server.</span>
       </div>
       <div class="select-wrap">
         <select class="select sel-sm" value={$notifPushService}
           on:change={e => notifPushService.set(e.target.value)}>
-          <option value="none">None</option>
-          <option value="apprise">Apprise</option>
-          <option value="gotify">Gotify</option>
+          <option value="none">{$_('settings_notifications.svc_none')}</option>
+          <option value="apprise">{$_('settings_notifications.svc_apprise')}</option>
+          <option value="gotify">{$_('settings_notifications.svc_gotify')}</option>
           <option value="ntfy">ntfy</option>
         </select>
       </div>
@@ -142,7 +143,7 @@
     {#if $notifPushService === 'apprise'}
       <div class="setting-divider"></div>
       <div class="form-block">
-        <label class="form-label">Apprise URL</label>
+        <label class="form-label">{$_('settings_notifications.apprise_url')}</label>
         <input class="input" type="url" placeholder="https://apprise.example.com"
           value={$appriseUrl} on:change={e => appriseUrl.set(e.target.value)} />
         <label class="form-label">Tag (Optional)</label>
@@ -152,10 +153,10 @@
     {:else if $notifPushService === 'gotify'}
       <div class="setting-divider"></div>
       <div class="form-block">
-        <label class="form-label">Gotify URL</label>
+        <label class="form-label">{$_('settings_notifications.gotify_url')}</label>
         <input class="input" type="url" placeholder="https://gotify.example.com"
           value={$gotifyUrl} on:change={e => gotifyUrl.set(e.target.value)} />
-        <label class="form-label">App Token</label>
+        <label class="form-label">{$_('settings_notifications.app_token')}</label>
         <input class="input" type="text"
           value={$gotifyToken} on:change={e => gotifyToken.set(e.target.value)} />
       </div>
@@ -165,7 +166,7 @@
         <label class="form-label">ntfy Server</label>
         <input class="input" type="url" placeholder="https://ntfy.sh"
           value={$ntfyUrl} on:change={e => ntfyUrl.set(e.target.value)} />
-        <label class="form-label">Topic</label>
+        <label class="form-label">{$_('settings_notifications.topic')}</label>
         <input class="input" type="text" placeholder="cooktrace-myhome"
           value={$ntfyTopic} on:change={e => ntfyTopic.set(e.target.value)} />
         <label class="form-label">Bearer Token (Optional)</label>
@@ -178,7 +179,7 @@
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Send Test</span>
+          <span class="setting-label">{$_('settings_notifications.send_test')}</span>
           <span class="setting-desc">Verifies the server can reach your service.</span>
         </div>
         <button class="btn btn-primary" on:click={sendTestPush} disabled={testing}>
@@ -194,7 +195,7 @@
     {/if}
   </div>
 
-  <p class="sub-label">Reminders</p>
+  <p class="sub-label">{$_('settings_notifications.reminders')}</p>
   <div class="card settings-card">
     <div class="setting-row">
       <div>
@@ -207,7 +208,7 @@
     <div class="setting-divider"></div>
     <div class="setting-row">
       <div>
-        <span class="setting-label">Thaw Alert</span>
+        <span class="setting-label">{$_('settings_notifications.thaw_alert')}</span>
         <span class="setting-desc">Recipes planned for tomorrow ping the day before so the meat / dough has time to come up.</span>
       </div>
       <input type="checkbox" class="toggle-cb" checked={notifThawAlert}
@@ -216,7 +217,7 @@
     <div class="setting-divider"></div>
     <div class="setting-row">
       <div>
-        <span class="setting-label">Shopping List Nudge</span>
+        <span class="setting-label">{$_('settings_notifications.shopping_nudge')}</span>
         <span class="setting-desc">Unchecked shopping list lingers more than 3 days → gentle reminder.</span>
       </div>
       <input type="checkbox" class="toggle-cb" checked={notifShoppingNudge}
@@ -224,7 +225,7 @@
     </div>
     <div class="setting-row">
       <div>
-        <span class="setting-label">Comment Replies</span>
+        <span class="setting-label">{$_('settings_notifications.comment_replies')}</span>
         <span class="setting-desc">When someone else comments on a recipe you own.</span>
       </div>
       <input type="checkbox" class="toggle-cb" checked={notifRecipeComments}
@@ -233,7 +234,7 @@
     <div class="setting-divider"></div>
     <div class="setting-row">
       <div>
-        <span class="setting-label">Expiration Digest</span>
+        <span class="setting-label">{$_('settings_notifications.expiration_digest')}</span>
         <span class="setting-desc">One roll-up per day covering everything in your pantry expiring within the window below. Delivered through the same channels above (device + configured push service). No message when nothing's expiring.</span>
       </div>
       <input type="checkbox" class="toggle-cb" checked={$notifExpiryEnabled}
@@ -242,7 +243,7 @@
     {#if $notifExpiryEnabled}
       <div class="setting-row">
         <div>
-          <span class="setting-label">Warn Me This Many Days Ahead</span>
+          <span class="setting-label">{$_('settings_notifications.warn_days_ahead')}</span>
           <span class="setting-desc">The digest lists every item whose expiration date falls within the next N days. Past-expiry items always surface.</span>
         </div>
         <div class="select-wrap">
@@ -258,7 +259,7 @@
       </div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Delivery Time</span>
+          <span class="setting-label">{$_('settings_notifications.delivery_time')}</span>
           <span class="setting-desc">The digest fires once per day at this time (server-local). Default 9:00 am so it lands before your first grocery run.</span>
         </div>
         <TimePicker value={$notifExpiryTime} on:change={e => notifExpiryTime.set(e.detail)} />
@@ -267,7 +268,7 @@
     <div class="setting-divider"></div>
     <div class="setting-row">
       <div>
-        <span class="setting-label">Weekly Summary Email</span>
+        <span class="setting-label">{$_('settings_notifications.weekly_summary_email')}</span>
         <span class="setting-desc">Sundays at 8am: cooks logged, all-time favorite, what's planned, pantry + shopping snapshot. Requires SMTP and an email address on your account.</span>
       </div>
       <input type="checkbox" class="toggle-cb" checked={notifWeeklySummary}
@@ -275,7 +276,7 @@
     </div>
   </div>
 
-  <p class="sub-label">Note</p>
+  <p class="sub-label">{$_('settings_notifications.note')}</p>
   <div class="card settings-card">
     <div class="setting-row">
       <div>

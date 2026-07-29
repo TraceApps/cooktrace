@@ -846,6 +846,189 @@
     "clear_all_data":           "Clear All Data",
     "clear_all_settings":       "Clear All Settings"
   },
+  "settings_import_nt": {
+    "toast": {
+      "pick_pantry_first":       "Pick a pantry item to attach these as variants of.",
+      "name_generic_first":      "Name the new generic item first."
+    },
+    "federation_disabled":       "NutriTrace Federation Disabled",
+    "import_from_nt":            "Import From NutriTrace",
+    "select_all":                "Select All",
+    "select_none":               "Select None",
+    "import_as":                 "Import as",
+    "mode_flat":                 "New Flat Items",
+    "mode_variants_existing":    "Variants of an Existing Pantry Item",
+    "mode_variants_new":         "Variants of a New Generic Item",
+    "mark_in_stock":             "Mark Imported Items as In Stock",
+    "cancel":                    "Cancel",
+    "import_more":               "Import More"
+  },
+  "settings_email_ct": {
+    "toast": {
+      "smtp_host_required":      "SMTP test failed: host required",
+      "invalid_email":           "Enter a valid email address"
+    },
+    "hint":                      "Used for password resets and user invites",
+    "smtp_host":                 "SMTP Host",
+    "port":                      "Port",
+    "username":                  "Username",
+    "username_ph":               "SMTP username or email",
+    "password":                  "Password",
+    "password_ph":               "SMTP password or app password",
+    "from_address":              "From Address",
+    "send_test_email":           "Send Test Email",
+    "cancel":                    "Cancel",
+    "send":                      "Send"
+  },
+  "settings_trace_ct": {
+    "toast": {
+      "fill_fields":             "Fill in provider, API key, and model first",
+      "connected":               "Trace AI connected, assistant is ready"
+    },
+    "enable_assistant":          "Enable Trace Assistant",
+    "provider":                  "Provider",
+    "base_url":                  "Base URL",
+    "base_url_desc":             "/v1/chat/completions endpoint",
+    "model":                     "Model",
+    "custom_model_id":           "Custom Model ID",
+    "assistant_name":            "Assistant Name",
+    "assistant_name_ph":         "Trace",
+    "chef_hat":                  "Chef Hat",
+    "smart_log":                 "Smart Log"
+  },
+  "settings_users_ct": {
+    "toast": {
+      "invite_revoked":          "Invite revoked",
+      "invite_email_or_blank":   "Enter a valid email or leave blank to generate a shareable link",
+      "cant_create_invite":      "Could not create invite"
+    },
+    "pending_invites":           "Pending Invites",
+    "require_strong_passwords":  "Require Strong Passwords",
+    "session_duration":          "Session Duration",
+    "session_never":             "Never Expires",
+    "disable_um":                "Disable User Management",
+    "enable_um":                 "Enable User Management",
+    "create_admin_account":      "Create Admin Account"
+  },
+  "settings_kitchens_ct": {
+    "toast": {
+      "kitchen_deleted":         "Kitchen deleted"
+    },
+    "um_required":               "User Management Required",
+    "create_new_kitchen":        "Create a New Kitchen",
+    "new_name_ph":               "Smith Family Kitchen",
+    "owner_badge":               "Owner",
+    "remove":                    "Remove",
+    "leave":                     "Leave",
+    "invite_username_ph":        "Username to invite",
+    "delete_kitchen":            "Delete Kitchen"
+  },
+  "settings_import_ct": {
+    "import_section":            "Import from Another App",
+    "import_desc_html":          "Drop in a <strong>Mealie</strong> backup zip, <strong>Tandoor</strong> export, or <strong>Paprika</strong> <code>.paprikarecipes</code> archive. We'll scan it, show you everything inside, and let you tick which recipes to import.",
+    "select_all":                "Select All",
+    "select_none":               "Select None",
+    "transfer_images":           "Transfer images from the archive",
+    "keep_tags":                 "Keep tags from the source",
+    "opt_replace":               "Replace with the Imported Version",
+    "opt_force":                 "Allow Duplicates",
+    "cancel":                    "Cancel",
+    "import_another":            "Import Another"
+  },
+  "settings_federation_ct": {
+    "toast": {
+      "url_token_required":      "Enter a URL and access token first"
+    },
+    "connect_to_nt":             "Connect to NutriTrace",
+    "instance_url":              "Instance URL",
+    "access_token":              "Access Token",
+    "access_token_ph":           "Bearer token from NutriTrace"
+  },
+  "settings_nutrition_ct": {
+    "visibility":                "Nutrition Facts Visibility",
+    "defaults":                  "Defaults",
+    "show_all":                  "Show All"
+  },
+  "settings_auth_extra": {
+    "toast": {
+      "issuer_client_required":     "Issuer URL and Client ID are required",
+      "redirect_required":          "At least one redirect URI is required",
+      "cant_reach_server":          "Could not reach server",
+      "provider_deleted":           "Provider deleted",
+      "need_active_provider":       "Add at least one active OIDC provider before disabling password login."
+    },
+    "user_mgmt_required":            "User Management Is Required",
+    "admin_only":                    "Admin Only",
+    "discovery_ok":                  "Discovery OK",
+    "discovery_failed":              "Discovery failed",
+    "provider_type":                 "Provider Type",
+    "display_name":                  "Display Name",
+    "scope":                         "Scope",
+    "token_endpoint_auth_method":    "Token Endpoint Auth Method",
+    "auto_link_desc_html":           "When the IdP says <code>email_verified=true</code> and the email matches an existing CookTrace user, link them silently on first SSO sign-in. Recommended ON for any IdP you trust to verify emails.",
+    "provider_active":               "Provider Active",
+    "admin_group_value_ph":          "CookTraceAdmins",
+    "cancel":                        "Cancel",
+    "allow_password_login":          "Allow Password Login",
+    "env_locked_html":               "<br /><em>Locked by <code>OIDC_ENABLE_EMAIL_PASSWORD_LOGIN</code> environment variable.</em>"
+  },
+  "settings_server_conn": {
+    "toast": {
+      "enter_url":               "Enter your server URL",
+      "enter_credentials":       "Enter your credentials",
+      "sync_failed":             "Sync failed: {reason}",
+      "sync_unknown":            "Unknown error",
+      "connected_reloading":     "Connected, reloading",
+      "synced":                  "Synced",
+      "pushed_all":              "Pushed all data",
+      "logged_out_reloading":    "Logged out, reloading",
+      "disconnected_reloading":  "Disconnected, reloading"
+    },
+    "state_connected":           "Connected",
+    "last_synced":               "Last Synced",
+    "state_local":               "Local Mode",
+    "server_url":                "Server URL",
+    "username":                  "Username",
+    "username_ph":               "Your username",
+    "password":                  "Password",
+    "password_ph":               "Your password",
+    "sync_options":              "Sync Options",
+    "upload_phone_to_server":    "Upload Phone to Server",
+    "download_server_to_phone":  "Download Server to Phone",
+    "merge_both":                "Merge Both",
+    "cancel":                    "Cancel",
+    "continue":                  "Continue"
+  },
+  "settings_notifications": {
+    "toast": {
+      "test_sent":                 "Test sent, check your push service.",
+      "not_supported":             "This browser does not support notifications.",
+      "permission_granted":        "Notification permission granted.",
+      "permission_denied":         "Permission denied. Enable it in browser settings."
+    },
+    "device_notifications":        "Device Notifications",
+    "enable_on_device":            "Enable on This Device",
+    "browser_permission":          "Browser Permission",
+    "push_service":                "Push Service",
+    "service":                     "Service",
+    "svc_none":                    "None",
+    "svc_apprise":                 "Apprise",
+    "svc_gotify":                  "Gotify",
+    "apprise_url":                 "Apprise URL",
+    "gotify_url":                  "Gotify URL",
+    "app_token":                   "App Token",
+    "topic":                       "Topic",
+    "send_test":                   "Send Test",
+    "reminders":                   "Reminders",
+    "thaw_alert":                  "Thaw Alert",
+    "shopping_nudge":              "Shopping List Nudge",
+    "comment_replies":             "Comment Replies",
+    "expiration_digest":           "Expiration Digest",
+    "warn_days_ahead":             "Warn Me This Many Days Ahead",
+    "delivery_time":               "Delivery Time",
+    "weekly_summary_email":        "Weekly Summary Email",
+    "note":                        "Note"
+  },
   "pantry_sheet_extra": {
     "add_item":                 "Add Item",
     "edit_item":                "Edit Item",

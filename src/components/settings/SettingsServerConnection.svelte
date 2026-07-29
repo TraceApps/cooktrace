@@ -19,6 +19,7 @@
     isNative, getNativeMode, getServerUrl, setNativeMode, setServerUrl,
     setAuthToken, getAuthToken, explainConnectError,
   } from '../../lib/platform.js';
+  import { _ } from 'svelte-i18n';
   import { showError, showSuccess } from '../../stores/toast.js';
   import { fullSync, pushAllFromDevice, syncState } from '../../lib/sync.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
@@ -64,8 +65,8 @@
 
   // ── Connect flow ─────────────────────────────────────────────────────
   async function connect() {
-    if (!serverUrl.trim()) { showError('Enter your server URL'); return; }
-    if (!username.trim() || !password.trim()) { showError('Enter your credentials'); return; }
+    if (!serverUrl.trim()) { showError($_('settings_server_conn.toast.enter_url')); return; }
+    if (!username.trim() || !password.trim()) { showError($_('settings_server_conn.toast.enter_credentials')); return; }
     const url = serverUrl.trim().replace(/\/$/, '');
     busy = true;
     try {
@@ -158,7 +159,7 @@
       }
     } catch (e) {
       mergeStep = null;
-      showError('Sync failed: ' + (e.message || 'Unknown error'));
+      showError($_('settings_server_conn.toast.sync_failed', { values: { reason: e.message || $_('settings_server_conn.toast.sync_unknown') } }));
     }
   }
 
@@ -167,7 +168,7 @@
     setNativeMode('server');
     mode = 'server';
     mergeStep = null;
-    showSuccess('Connected — reloading');
+    showSuccess($_('settings_server_conn.toast.connected_reloading'));
     setTimeout(() => window.location.reload(), 600);
   }
 
@@ -189,7 +190,7 @@
     try {
       const r = await fullSync(false);
       if (r?.ok === false && r.error) showError(r.error);
-      else showSuccess('Synced');
+      else showSuccess($_('settings_server_conn.toast.synced'));
     } finally { busy = false; }
   }
 
@@ -204,7 +205,7 @@
     try {
       const r = await pushAllFromDevice();
       if (r?.ok === false && r.error) showError(r.error);
-      else showSuccess('Pushed all data');
+      else showSuccess($_('settings_server_conn.toast.pushed_all'));
     } finally { busy = false; }
   }
 
@@ -222,7 +223,7 @@
     busy = true;
     try {
       await logout();
-      showSuccess('Logged out — reloading');
+      showSuccess($_('settings_server_conn.toast.logged_out_reloading'));
       setTimeout(() => window.location.reload(), 300);
     } finally { busy = false; }
   }
@@ -240,7 +241,7 @@
     setServerUrl(null);
     setAuthToken(null);
     setNativeMode('local');
-    showSuccess('Disconnected — reloading');
+    showSuccess($_('settings_server_conn.toast.disconnected_reloading'));
     setTimeout(() => window.location.reload(), 300);
   }
 </script>
@@ -252,14 +253,14 @@
       <div class="row state-row">
         <span class="material-symbols-rounded state-icon ok">cloud_done</span>
         <div class="state-body">
-          <div class="state-title">Connected</div>
+          <div class="state-title">{$_('settings_server_conn.state_connected')}</div>
           <div class="state-sub">{connectedUrl}</div>
         </div>
       </div>
 
       <div class="row sync-row" title={lastSyncTitle}>
         <div class="state-body">
-          <div class="row-label">Last Synced</div>
+          <div class="row-label">{$_('settings_server_conn.last_synced')}</div>
           <div class="row-value">{lastSyncDisplay}{$syncState.syncing ? ' · syncing…' : ''}</div>
           {#if $syncState.error}<div class="state-error">{$syncState.error}</div>{/if}
         </div>
@@ -288,33 +289,33 @@
       <div class="row state-row">
         <span class="material-symbols-rounded state-icon">smartphone</span>
         <div class="state-body">
-          <div class="state-title">Local Mode</div>
+          <div class="state-title">{$_('settings_server_conn.state_local')}</div>
           <div class="state-sub">All data stays on this device. Connect to a CookTrace server below to sync.</div>
         </div>
       </div>
 
       <div class="form">
         <label class="form-group">
-          <span class="form-label">Server URL</span>
+          <span class="form-label">{$_('settings_server_conn.server_url')}</span>
           <input class="input" type="url"
             placeholder="https://cooktrace.example.com"
             bind:value={serverUrl}
             autocapitalize="off" autocorrect="off" />
         </label>
         <label class="form-group">
-          <span class="form-label">Username</span>
+          <span class="form-label">{$_('settings_server_conn.username')}</span>
           <input class="input" type="text"
-            placeholder="Your username"
+            placeholder={$_('settings_server_conn.username_ph')}
             bind:value={username}
             autocapitalize="off" autocorrect="off" />
         </label>
         <label class="form-group">
-          <span class="form-label">Password</span>
+          <span class="form-label">{$_('settings_server_conn.password')}</span>
           <div class="pw-wrap">
             {#if showPw}
-              <input class="input" type="text" placeholder="Your password" bind:value={password} />
+              <input class="input" type="text" placeholder={$_('settings_server_conn.password_ph')} bind:value={password} />
             {:else}
-              <input class="input" type="password" placeholder="Your password" bind:value={password} />
+              <input class="input" type="password" placeholder={$_('settings_server_conn.password_ph')} bind:value={password} />
             {/if}
             <button type="button" class="pw-toggle" on:click={() => showPw = !showPw} aria-label={showPw ? 'Hide password' : 'Show password'}>
               <span class="material-symbols-rounded">{showPw ? 'visibility_off' : 'visibility'}</span>
@@ -335,7 +336,7 @@
 {#if mergeStep === 'ask-settings'}
   <div class="merge-overlay" use:portal transition:fade={{ duration: 150 }}>
     <div class="merge-dialog">
-      <h3 class="merge-title">Sync Options</h3>
+      <h3 class="merge-title">{$_('settings_server_conn.sync_options')}</h3>
       <p class="merge-sub">
         You have data on this phone. How should it be handled when connecting?
       </p>
@@ -356,25 +357,25 @@
         <button class="merge-option" on:click={() => _mergeAndConnect('upload')}>
           <span class="material-symbols-rounded merge-icon">cloud_upload</span>
           <div>
-            <div class="merge-option-title">Upload phone to server</div>
+            <div class="merge-option-title">{$_('settings_server_conn.upload_phone_to_server')}</div>
             <div class="merge-option-desc">Send this phone's data to the server. Existing server data stays.</div>
           </div>
         </button>
         <button class="merge-option" on:click={() => _mergeAndConnect('download')}>
           <span class="material-symbols-rounded merge-icon">cloud_download</span>
           <div>
-            <div class="merge-option-title">Download server to phone</div>
+            <div class="merge-option-title">{$_('settings_server_conn.download_server_to_phone')}</div>
             <div class="merge-option-desc">Replace this phone's data with everything from the server. Local data is discarded.</div>
           </div>
         </button>
         <button class="merge-option" on:click={() => _mergeAndConnect('merge')}>
           <span class="material-symbols-rounded merge-icon">sync</span>
           <div>
-            <div class="merge-option-title">Merge both</div>
+            <div class="merge-option-title">{$_('settings_server_conn.merge_both')}</div>
             <div class="merge-option-desc">Upload phone data AND pull server data. Nothing is lost, but duplicates are possible.</div>
           </div>
         </button>
-        <button class="btn btn-secondary merge-cancel" on:click={cancelMerge}>Cancel</button>
+        <button class="btn btn-secondary merge-cancel" on:click={cancelMerge}>{$_('settings_server_conn.cancel')}</button>
       </div>
     </div>
   </div>
@@ -424,7 +425,7 @@
           </ul>
         </div>
       {/if}
-      <button class="btn btn-primary w-full" on:click={_finalizeConnect}>Continue</button>
+      <button class="btn btn-primary w-full" on:click={_finalizeConnect}>{$_('settings_server_conn.continue')}</button>
     </div>
   </div>
 {/if}
