@@ -79,7 +79,7 @@
       _logsCopied = true;
       setTimeout(() => _logsCopied = false, 2000);
     } catch {
-      showError('Copy failed — select the text manually');
+      showError($_('settings_page.toast.copy_failed'));
     }
   }
   async function _shareLogs() {
@@ -121,7 +121,7 @@
   async function _shareLogFile() {
     try {
       const f = await getLogFileUri();
-      if (!f) { showError('No log file yet — turn on Diagnostic Mode and reproduce the issue first'); return; }
+      if (!f) { showError($_('settings_page.toast.no_log_file')); return; }
       await _shareFileViaCache({
         srcPath: f.path,
         cacheBasename: 'cooktrace-log',
@@ -400,16 +400,16 @@
       <div class="profile-hero-info">
         <span class="profile-hero-name">{_displayName}</span>
         {#if _hasName && _u.role === 'admin' && $userMgmtActive}
-          <span class="profile-hero-role">Admin</span>
+          <span class="profile-hero-role">{$_('settings_page.profile_hero.admin_badge')}</span>
         {:else if !_hasName}
-          <span class="profile-hero-sub">Tap to set up your profile</span>
+          <span class="profile-hero-sub">{$_('settings_page.profile_hero.tap_to_setup')}</span>
         {/if}
       </div>
       <span class="material-symbols-rounded profile-hero-chev">chevron_right</span>
     </button>
     {/if}
 
-    <p class="settings-group-label">Display</p>
+    <p class="settings-group-label">{$_('settings_page.group.display')}</p>
 
     <!-- ── Appearance ──────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'appearance')} on:click={() => toggleSection('appearance')}>
@@ -421,7 +421,7 @@
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="setting-row">
-            <span class="setting-label">Theme</span>
+            <span class="setting-label">{$_('settings_page.appearance.theme')}</span>
             <div class="select-wrap" style="width:160px">
               <select class="select sel-sm" value={$appearance} on:change={e => applyAppearance(e.target.value)}>
                 {#each APPEARANCE_OPTS as o}<option value={o.value}>{o.label}</option>{/each}
@@ -430,7 +430,7 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:10px">
-            <span class="setting-label">Accent Color</span>
+            <span class="setting-label">{$_('settings_page.appearance.accent_color')}</span>
             <div class="accent-swatches">
               {#each ACCENT_COLORS as c}
                 <button
@@ -454,7 +454,7 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Navigation Style</span>
+            <span class="setting-label">{$_('settings_page.appearance.navigation_style')}</span>
             <div class="select-wrap" style="width:160px">
               <select class="select sel-sm" value={$navStyle} on:change={e => navStyle.set(e.target.value)}>
                 {#each NAV_STYLE_OPTS as o}<option value={o.value}>{o.label}</option>{/each}
@@ -465,7 +465,7 @@
             <div class="setting-divider"></div>
             <div class="setting-row">
               <div>
-                <span class="setting-label">Persistent Sidebar</span>
+                <span class="setting-label">{$_('settings_page.appearance.persistent_sidebar')}</span>
                 <div class="setting-desc">Sidebar stays open and shifts page content instead of overlaying it.</div>
               </div>
               <input type="checkbox" class="toggle-cb" checked={$sidebarPersistent} on:change={e => sidebarPersistent.set(e.target.checked)} />
@@ -473,7 +473,7 @@
           {/if}
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Start Page</span>
+            <span class="setting-label">{$_('settings_page.appearance.start_page')}</span>
             <div class="select-wrap" style="width:160px">
               <select class="select sel-sm" value={$startPage} on:change={e => startPage.set(e.target.value)}>
                 {#each START_PAGE_OPTS as o}<option value={o.value}>{o.label}</option>{/each}
@@ -482,19 +482,19 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Reduce Motion</span>
+            <span class="setting-label">{$_('settings_page.appearance.reduce_motion')}</span>
             <input type="checkbox" class="toggle-cb" checked={$disableAnimations} on:change={e => disableAnimations.set(e.target.checked)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">Page Banners</span>
+              <span class="setting-label">{$_('settings_page.appearance.page_banners')}</span>
               <div class="setting-desc">Header style at the top of every page. Animated is a compact accent-gradient bar with a chosen motion style; Gradient is the same bar, static; Off is a plain glass header.</div>
             </div>
             <div class="select-wrap" style="width:130px">
               <select class="select sel-sm" value={$bannerStyle} on:change={e => bannerStyle.set(e.currentTarget.value)}>
-                <option value="animated">Animated</option>
-                <option value="gradient">Gradient</option>
+                <option value="animated">{$_('settings_page.appearance.banner_animated')}</option>
+                <option value="gradient">{$_('settings_page.appearance.banner_gradient')}</option>
                 <option value="off">Off</option>
               </select>
             </div>
@@ -502,15 +502,15 @@
           {#if $bannerStyle === 'animated'}
             <div class="setting-row">
               <div>
-                <span class="setting-label">Animation Style</span>
+                <span class="setting-label">{$_('settings_page.appearance.animation_style')}</span>
                 <div class="setting-desc">Shimmer is a soft white sweep, Drift is a slow hue rotation, Pulse is a gentle breathing, Aurora is a soft accent-tinted cloud-of-light. All honour Reduce Motion.</div>
               </div>
               <div class="select-wrap" style="width:130px">
                 <select class="select sel-sm" value={$bannerAnimation} on:change={e => bannerAnimation.set(e.currentTarget.value)}>
-                  <option value="shimmer">Shimmer</option>
-                  <option value="drift">Drift</option>
-                  <option value="pulse">Pulse</option>
-                  <option value="aurora">Aurora</option>
+                  <option value="shimmer">{$_('settings_page.appearance.anim_shimmer')}</option>
+                  <option value="drift">{$_('settings_page.appearance.anim_drift')}</option>
+                  <option value="pulse">{$_('settings_page.appearance.anim_pulse')}</option>
+                  <option value="aurora">{$_('settings_page.appearance.anim_aurora')}</option>
                 </select>
               </div>
             </div>
@@ -530,7 +530,7 @@
         <div class="card settings-card">
           <div class="setting-row">
             <div>
-              <span class="setting-label">Language</span>
+              <span class="setting-label">{$_('settings_page.regional.language')}</span>
               <div class="setting-desc">UI language. A translation may lag one or two releases behind English; missing strings fall back to English.</div>
             </div>
             <div class="select-wrap" style="width:160px">
@@ -543,19 +543,19 @@
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Date Format</span>
+            <span class="setting-label">{$_('settings_page.regional.date_format')}</span>
             <div class="select-wrap" style="width:160px">
               <select class="select sel-sm" value={$dateFormat} on:change={e => dateFormat.set(e.target.value)}>
                 <option value="ISO">YYYY-MM-DD</option>
                 <option value="US">MM/DD/YYYY</option>
                 <option value="EU">DD/MM/YYYY</option>
-                <option value="natural">D MMM YYYY</option>
+                <option value="natural">{$_('settings_page.regional.date_natural')}</option>
               </select>
             </div>
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
-            <span class="setting-label">Time Format</span>
+            <span class="setting-label">{$_('settings_page.regional.time_format')}</span>
             <div class="select-wrap" style="width:160px">
               <select class="select sel-sm" value={$timeFormat} on:change={e => timeFormat.set(e.target.value)}>
                 <option value="12h">12-hour (AM/PM)</option>
@@ -566,20 +566,20 @@
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">Measurement System</span>
+              <span class="setting-label">{$_('settings_page.regional.measurement_system')}</span>
               <div class="setting-desc">Imperial uses cups, oz, lb, °F. Metric uses ml, g, kg, °C.</div>
             </div>
             <div class="select-wrap" style="width:130px">
               <select class="select sel-sm" value={$measurementSystem} on:change={e => measurementSystem.set(e.target.value)}>
-                <option value="imperial">Imperial</option>
-                <option value="metric">Metric</option>
+                <option value="imperial">{$_('settings_page.regional.imperial')}</option>
+                <option value="metric">{$_('settings_page.regional.metric')}</option>
               </select>
             </div>
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">Energy</span>
+              <span class="setting-label">{$_('settings_page.regional.energy')}</span>
               <div class="setting-desc">Most countries (US / UK / EU / Canada) use kilocalories; Australia and New Zealand use kilojoules. Independent from your measurement-system choice.</div>
             </div>
             <div class="select-wrap" style="width:160px">
@@ -604,7 +604,7 @@
         <div class="card settings-card">
           <div class="setting-row">
             <div>
-              <span class="setting-label">Default Servings</span>
+              <span class="setting-label">{$_('settings_page.cooking.default_servings')}</span>
               <div class="setting-desc">Used when a new recipe doesn't specify how many it makes.</div>
             </div>
             <input type="number" min="1" max="20" class="input num" value={$defaultServings}
@@ -624,7 +624,7 @@
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">Show Shared Recipes in My Main List</span>
+              <span class="setting-label">{$_('settings_page.cooking.show_shared')}</span>
               <div class="setting-desc">When on, recipes shared with you (via a Kitchen or a direct grant) appear alongside your own on the Recipes tab. Each shared card keeps a "Shared by" badge plus a mint Kitchen chip so you can tell what's yours at a glance. Off by default; the Shared segment stays available either way.</div>
             </div>
             <input type="checkbox" class="toggle-cb" checked={$mixSharedIntoRecipes}
@@ -634,22 +634,22 @@
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">URL Import Engine</span>
+              <span class="setting-label">{$_('settings_page.cooking.url_import_engine')}</span>
               <div class="setting-desc">
-                <strong>Standard</strong> reads the page's schema.org/Recipe data. Free and fast; works on most major recipe sites.
-                <strong>Enhanced</strong> runs recipe-scrapers, which has site-specific extractors for ~300 popular sites and falls back to schema.org on everything else.
-                <strong>Smart</strong> hands the page to your Trace AI. Slower and uses your AI quota, but recovers recipes from sites that block scrapers or hide their content in non-standard markup.
+                {@html $_('settings_page.cooking.url_engine_desc_standard_html')}
+                {@html $_('settings_page.cooking.url_engine_desc_enhanced_html')}
+                {@html $_('settings_page.cooking.url_engine_desc_smart_html')}
               </div>
             </div>
             <div class="select-wrap" style="width:170px">
               <select class="select sel-sm" value={$urlImportEngine || 'standard'}
                 on:change={e => urlImportEngine.set(e.target.value)}>
-                <option value="standard">Standard</option>
+                <option value="standard">{$_('settings_page.cooking.engine_standard')}</option>
                 <option value="enhanced" disabled={!enhancedAvailable}>
-                  Enhanced{!enhancedAvailable ? ' (server required)' : ''}
+                  {$_('settings_page.cooking.engine_enhanced')}{!enhancedAvailable ? $_('settings_page.cooking.engine_enhanced_server_suffix') : ''}
                 </option>
                 <option value="smart" disabled={!smartAvailable}>
-                  Smart{!smartAvailable ? ' (Trace AI required)' : ''}
+                  {$_('settings_page.cooking.engine_smart')}{!smartAvailable ? $_('settings_page.cooking.engine_smart_required_suffix') : ''}
                 </option>
               </select>
             </div>
@@ -658,7 +658,7 @@
           {#if ($urlImportEngine || 'standard') === 'smart'}
             <div class="setting-note">
               <span class="material-symbols-rounded">info</span>
-              <span>Smart sends every URL import to your AI, which uses your provider's quota on every paste. Standard or Enhanced are free and handle most sites; consider setting Smart only as a fallback.</span>
+              <span>{$_('settings_page.cooking.smart_note')}</span>
             </div>
           {/if}
 
@@ -666,15 +666,15 @@
             <div class="setting-divider"></div>
             <div class="setting-row">
               <div>
-                <span class="setting-label">Enhanced Fallback</span>
-                <div class="setting-desc">When the server is unreachable or recipe-scrapers isn't installed, fall back to this.</div>
+                <span class="setting-label">{$_('settings_page.cooking.enhanced_fallback')}</span>
+                <div class="setting-desc">{$_('settings_page.cooking.enhanced_fallback_desc')}</div>
               </div>
               <div class="select-wrap" style="width:170px">
                 <select class="select sel-sm" value={$urlImportFallback || 'standard'}
                   on:change={e => urlImportFallback.set(e.target.value)}>
-                  <option value="standard">Standard</option>
+                  <option value="standard">{$_('settings_page.cooking.engine_standard')}</option>
                   <option value="smart" disabled={!smartAvailable}>
-                    Smart{!smartAvailable ? ' (Trace AI required)' : ''}
+                    {$_('settings_page.cooking.engine_smart')}{!smartAvailable ? $_('settings_page.cooking.engine_smart_required_suffix') : ''}
                   </option>
                 </select>
               </div>
@@ -682,19 +682,19 @@
           {/if}
 
           <div class="setting-divider"></div>
-          <div class="setting-subhead">Shopping List</div>
+          <div class="setting-subhead">{$_('settings_page.cooking.shopping_list')}</div>
 
           <div class="setting-row">
             <div>
-              <span class="setting-label">Default Grouping</span>
+              <span class="setting-label">{$_('settings_page.cooking.default_grouping')}</span>
               <div class="setting-desc">How the shopping list is grouped when it opens. By Aisle uses the per-item aisle (auto-populated from the linked pantry item's category); By Recipe keeps items with the recipe that added them; Flat is one uninterrupted list.</div>
             </div>
             <div class="select-wrap" style="width:170px">
               <select class="select sel-sm" value={$shoppingGroupBy || 'aisle'}
                 on:change={e => shoppingGroupBy.set(e.target.value)}>
-                <option value="aisle">By Aisle</option>
-                <option value="recipe">By Recipe</option>
-                <option value="flat">Flat</option>
+                <option value="aisle">{$_('settings_page.cooking.group_by_aisle')}</option>
+                <option value="recipe">{$_('settings_page.cooking.group_by_recipe')}</option>
+                <option value="flat">{$_('settings_page.cooking.group_by_flat')}</option>
               </select>
             </div>
           </div>
@@ -702,14 +702,14 @@
           <div class="setting-divider"></div>
           <div class="setting-row">
             <div>
-              <span class="setting-label">Checked Items</span>
+              <span class="setting-label">{$_('settings_page.cooking.checked_items')}</span>
               <div class="setting-desc">What happens to items after you check them off. Sink to bottom keeps them visible so you can uncheck by mistake; Hide removes them from view with a one-tap "Show Checked" toggle if you need them back.</div>
             </div>
             <div class="select-wrap" style="width:170px">
               <select class="select sel-sm" value={$shoppingCheckedBehavior || 'bottom'}
                 on:change={e => shoppingCheckedBehavior.set(e.target.value)}>
-                <option value="bottom">Sink to Bottom</option>
-                <option value="hide">Hide</option>
+                <option value="bottom">{$_('settings_page.cooking.sink_to_bottom')}</option>
+                <option value="hide">{$_('settings_page.cooking.hide')}</option>
               </select>
             </div>
           </div>
@@ -731,7 +731,7 @@
       </div>
     {/if}
 
-    <p class="settings-group-label">Integrations</p>
+    <p class="settings-group-label">{$_('settings_page.group.integrations')}</p>
 
     <!-- ── AI Assistant ────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'ai')} on:click={() => toggleSection('ai')}>
@@ -766,11 +766,11 @@
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'foodsources') && sectionVisible(settingsQuery, 'foodsources')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
-        <p class="sub-label">Open Food Facts</p>
+        <p class="sub-label">{$_('settings_page.off.section')}</p>
         <div class="card settings-card">
           <div class="setting-row">
             <div>
-              <span class="setting-label">Enable Open Food Facts</span>
+              <span class="setting-label">{$_('settings_page.off.enable')}</span>
               <div class="setting-desc">
                 Look up barcodes against the global crowd-sourced food database. No account needed for lookups; one is only required to upload edits via Share to OFF.
               </div>
@@ -780,7 +780,7 @@
           {#if $offEnabled}
             <div class="setting-divider"></div>
             <div class="setting-row">
-              <span class="setting-label">Search Language</span>
+              <span class="setting-label">{$_('settings_page.off.search_language')}</span>
               <div class="select-wrap" style="width:120px">
                 <select class="select sel-sm" value={$offSearchLanguage} on:change={e => offSearchLanguage.set(e.target.value)}>
                   {#each OFF_LANGUAGE_OPTS as [v,l]}<option value={v}>{l}</option>{/each}
@@ -789,7 +789,7 @@
             </div>
             <div class="setting-divider"></div>
             <div class="setting-row">
-              <span class="setting-label">Search Country</span>
+              <span class="setting-label">{$_('settings_page.off.search_country')}</span>
               <div class="select-wrap" style="width:150px">
                 <select class="select sel-sm" value={$offSearchCountry} on:change={e => offSearchCountry.set(e.target.value)}>
                   {#each OFF_COUNTRY_OPTS as c}<option value={c}>{c}</option>{/each}
@@ -798,29 +798,29 @@
             </div>
             <div class="setting-divider"></div>
             <div class="setting-row">
-              <span class="setting-label">Upload Country</span>
+              <span class="setting-label">{$_('settings_page.off.upload_country')}</span>
               <div class="select-wrap" style="width:150px">
                 <select class="select sel-sm" value={$offUploadCountry} on:change={e => offUploadCountry.set(e.target.value)}>
-                  <option value="Auto">Auto</option>
+                  <option value="Auto">{$_('settings_page.off.auto')}</option>
                   {#each OFF_COUNTRY_OPTS.filter(c => c !== 'World') as c}<option value={c}>{c}</option>{/each}
                 </select>
               </div>
             </div>
             <div class="setting-divider"></div>
             <div class="form-block">
-              <label class="form-label">Account Username</label>
+              <label class="form-label">{$_('settings_page.off.account_username')}</label>
               <p class="hint">Optional — only needed to upload edits.
                 <a href="https://world.openfoodfacts.org/cgi/user.pl" target="_blank" rel="noopener" class="link">Create an OFF account →</a>
               </p>
-              <input class="input" type="text" placeholder="OFF username" value={$offUsername}
+              <input class="input" type="text" placeholder={$_('settings_page.off.off_username_ph')} value={$offUsername}
                 on:change={e => offUsername.set(e.target.value)} />
-              <label class="form-label">Account Password</label>
+              <label class="form-label">{$_('settings_page.off.account_password')}</label>
               <div style="display:flex;gap:8px;align-items:center">
                 {#if offShowPass}
-                  <input class="input" type="text" style="flex:1" placeholder="OFF password"
+                  <input class="input" type="text" style="flex:1" placeholder={$_('settings_page.off.off_password_ph')}
                     value={$offPassword} on:change={e => offPassword.set(e.target.value)} />
                 {:else}
-                  <input class="input" type="password" style="flex:1" placeholder="OFF password"
+                  <input class="input" type="password" style="flex:1" placeholder={$_('settings_page.off.off_password_ph')}
                     value={$offPassword} on:change={e => offPassword.set(e.target.value)} />
                 {/if}
                 <button class="btn-icon" on:click={() => offShowPass = !offShowPass}
@@ -832,11 +832,11 @@
           {/if}
         </div>
 
-        <p class="sub-label">USDA FoodData Central</p>
+        <p class="sub-label">{$_('settings_page.usda.section')}</p>
         <div class="card settings-card">
           <div class="setting-row">
             <div>
-              <span class="setting-label">Enable USDA FoodData</span>
+              <span class="setting-label">{$_('settings_page.usda.enable')}</span>
               <div class="setting-desc">
                 Search the USDA nutrition database when adding pantry items.
                 <a href="https://fdc.nal.usda.gov/api-key-signup" target="_blank" rel="noopener" class="link">Get a free API key →</a>
@@ -847,18 +847,18 @@
           {#if $usdaEnabled}
             <div class="setting-divider"></div>
             <div class="form-block">
-              <label class="form-label">API Key</label>
-              <input class="input" type="text" placeholder="Paste your USDA API key here"
+              <label class="form-label">{$_('settings_page.usda.api_key')}</label>
+              <input class="input" type="text" placeholder={$_('settings_page.usda.api_key_ph')}
                 value={$usdaApiKey} on:change={e => usdaApiKey.set(e.target.value)} />
             </div>
           {/if}
         </div>
 
-        <p class="sub-label">Barcode Scanner</p>
+        <p class="sub-label">{$_('settings_page.scanner.section')}</p>
         <div class="card settings-card">
           <div class="setting-row">
             <div>
-              <span class="setting-label">Beep on Scan</span>
+              <span class="setting-label">{$_('settings_page.scanner.beep_on_scan')}</span>
               <div class="setting-desc">Short audio confirmation when a barcode is recognized.</div>
             </div>
             <input type="checkbox" class="toggle-cb" checked={$barcodeBeep} on:change={e => barcodeBeep.set(e.target.checked)} />
@@ -954,16 +954,16 @@
         <div class="card settings-card">
           <div class="setting-row">
             <div>
-              <span class="setting-label">Diagnostic Mode</span>
+              <span class="setting-label">{$_('settings_page.diag.mode')}</span>
               <div class="setting-desc">Enables detailed app-internal logs (sync, settings, notifications){isNative ? ' and writes them to a daily log file on disk so they survive crashes and reloads.' : ' and verbose console output.'} Off by default; turn on while reproducing a bug, then export below.</div>
             </div>
             <Toggle checked={_verboseLogging} on:change={e => _toggleVerbose(e.detail)} />
           </div>
           <div class="setting-divider"></div>
           <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
-            <span class="setting-label">View Diagnostic Logs</span>
+            <span class="setting-label">{$_('settings_page.diag.view_logs')}</span>
             <p class="setting-desc" style="line-height:1.5">
-              Recent log lines from the app's console. Useful for bug reports; copy or share into a <a href="https://github.com/traceapps/cooktrace/issues" target="_blank" rel="noopener" class="about-link">GitHub issue</a>.{isNative ? ' On Android with Diagnostic Mode on, you can also share the persisted log file or any captured crash report.' : ''} Nothing is sent anywhere automatically.
+              {$_('settings_page.diag.logs_desc_prefix')}<a href="https://github.com/traceapps/cooktrace/issues" target="_blank" rel="noopener" class="about-link">{$_('settings_page.diag.logs_desc_github')}</a>.{isNative ? $_('settings_page.diag.logs_desc_android') : ''}{$_('settings_page.diag.logs_desc_suffix')}
             </p>
             <button class="btn btn-secondary" style="height:40px;font-size:13px" on:click={_openLogsSheet}>
               <span class="material-symbols-rounded" style="font-size:16px">terminal</span>
@@ -977,7 +977,7 @@
     <!-- ── Admin group (server-side users / auth — only meaningful when
          there's a real server with user management to administer). -->
     {#if showAdminGroup}
-    <p class="settings-group-label">Admin</p>
+    <p class="settings-group-label">{$_('settings_page.group.admin')}</p>
 
     <!-- ── Users ─────────────────────────────────────────────────────── -->
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'users')} on:click={() => toggleSection('users')}>
@@ -1029,7 +1029,7 @@
           <div class="about-hero">
             <img src={resolveAssetUrl('/icons/logo.png')} alt="CookTrace" class="about-icon" />
             <div>
-              <div class="about-name">CookTrace</div>
+              <div class="about-name">{$_('settings_page.about.app_name')}</div>
               <div class="about-version text-3 text-sm">
                 {APP_VERSION}
                 <span class="platform-tag">{isNative ? 'Android' : 'PWA'}</span>
@@ -1061,18 +1061,18 @@
           <div class="setting-divider"></div>
           <div class="about-row">
             <span class="material-symbols-rounded about-feat-icon">hub</span>
-            <span>Optional federation with <a href="https://github.com/traceapps/nutritrace" target="_blank" rel="noopener" class="about-link">NutriTrace</a> for nutrition tracking</span>
+            <span>{$_('settings_page.about.federation_prefix')}<a href="https://github.com/traceapps/nutritrace" target="_blank" rel="noopener" class="about-link">NutriTrace</a>{$_('settings_page.about.federation_suffix')}</span>
           </div>
           <div class="setting-divider"></div>
           <div class="about-row">
             <span class="material-symbols-rounded about-feat-icon">code</span>
-            <span>Part of the <a href="https://github.com/traceapps" target="_blank" rel="noopener" class="about-link">TraceApps</a> family (with NutriTrace and LiftTrace)</span>
+            <span>{$_('settings_page.about.family_prefix')}<a href="https://github.com/traceapps" target="_blank" rel="noopener" class="about-link">TraceApps</a>{$_('settings_page.about.family_suffix')}</span>
           </div>
           <div class="setting-divider"></div>
           <div class="about-row" style="flex-direction:column;align-items:flex-start;gap:8px">
             <div style="display:flex;align-items:center;gap:8px">
               <span class="material-symbols-rounded about-feat-icon">volunteer_activism</span>
-              <span>Support Development</span>
+              <span>{$_('settings_page.about.support_dev')}</span>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;padding-left:30px">
               <a href="https://ko-fi.com/traceapps" target="_blank" rel="noopener" class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px">
@@ -1132,7 +1132,7 @@
       <div style="margin-top:14px;padding:10px;background:color-mix(in srgb,var(--danger) 8%, transparent);border-left:3px solid var(--danger);border-radius:var(--radius-sm,6px)">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
           <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger)">warning</span>
-          <strong style="color:var(--danger);font-size:14px">Crash report available</strong>
+          <strong style="color:var(--danger);font-size:14px">{$_('settings_page.diag.crash_available')}</strong>
         </div>
         <p class="setting-desc" style="margin:0 0 8px;font-size:12px">
           The app captured an uncaught error. Share the report to help track it down, then dismiss it.
@@ -1167,7 +1167,7 @@
     </div>
 
     <div class="cp-slider-group">
-      <label class="form-label">Saturation</label>
+      <label class="form-label">{$_('settings_page.custom_color.saturation')}</label>
       <div class="cp-slider-wrap">
         <input type="range" class="cp-slider cp-sat" min="0" max="100"
           bind:value={cpSat} on:input={cpUpdateFromSliders}
@@ -1176,7 +1176,7 @@
     </div>
 
     <div class="cp-slider-group">
-      <label class="form-label">Lightness</label>
+      <label class="form-label">{$_('settings_page.custom_color.lightness')}</label>
       <div class="cp-slider-wrap">
         <input type="range" class="cp-slider cp-lgt" min="0" max="100"
           bind:value={cpLgt} on:input={cpUpdateFromSliders}
@@ -1203,7 +1203,7 @@
     </div>
 
     <div class="cp-slider-group">
-      <label class="form-label">Hex Code</label>
+      <label class="form-label">{$_('settings_page.custom_color.hex_code')}</label>
       <div class="cp-hex-row">
         <span class="cp-hex-dot" style="background:{/^#[0-9a-fA-F]{6}$/.test(customHexInput) ? customHexInput : '#ccc'}"></span>
         <input class="input" type="text" placeholder="#rrggbb" maxlength="7"
@@ -1214,7 +1214,7 @@
       </div>
     </div>
 
-    <button class="btn btn-primary cp-apply" on:click={applyCustomColor}>Apply Color</button>
+    <button class="btn btn-primary cp-apply" on:click={applyCustomColor}>{$_('settings_page.custom_color.apply')}</button>
   </div>
 </Sheet>
 

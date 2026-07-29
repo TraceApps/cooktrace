@@ -697,5 +697,142 @@
       "username_required": "Username is required",
       "failed":            "Failed to create account"
     }
+  },
+  "settings_page": {
+    "toast": {
+      "copy_failed":            "Copy failed, select the text manually",
+      "no_log_file":            "No log file yet, turn on Diagnostic Mode and reproduce the issue first"
+    },
+    "profile_hero": {
+      "admin_badge":            "Admin",
+      "tap_to_setup":           "Tap to set up your profile"
+    },
+    "group": {
+      "display":                "Display",
+      "integrations":           "Integrations",
+      "admin":                  "Admin"
+    },
+    "appearance": {
+      "theme":                  "Theme",
+      "accent_color":           "Accent Color",
+      "navigation_style":       "Navigation Style",
+      "persistent_sidebar":     "Persistent Sidebar",
+      "persistent_sidebar_desc": "Sidebar stays open and shifts page content instead of overlaying it.",
+      "start_page":             "Start Page",
+      "reduce_motion":          "Reduce Motion",
+      "page_banners":           "Page Banners",
+      "page_banners_desc":      "Header style at the top of every page. Animated is a compact accent-gradient bar with a chosen motion style; Gradient is the same bar, static; Off is a plain glass header.",
+      "banner_animated":        "Animated",
+      "banner_gradient":        "Gradient",
+      "banner_off":             "Off",
+      "animation_style":        "Animation Style",
+      "animation_style_desc":   "Shimmer is a soft white sweep, Drift is a slow hue rotation, Pulse is a gentle breathing, Aurora is a soft accent-tinted cloud-of-light. All honour Reduce Motion.",
+      "anim_shimmer":           "Shimmer",
+      "anim_drift":             "Drift",
+      "anim_pulse":             "Pulse",
+      "anim_aurora":            "Aurora"
+    },
+    "regional": {
+      "language":               "Language",
+      "language_desc":          "UI language. A translation may lag one or two releases behind English; missing strings fall back to English.",
+      "date_format":            "Date Format",
+      "date_natural":           "D MMM YYYY",
+      "time_format":            "Time Format",
+      "measurement_system":     "Measurement System",
+      "imperial":               "Imperial",
+      "metric":                 "Metric",
+      "energy":                 "Energy"
+    },
+    "cooking": {
+      "default_servings":       "Default Servings",
+      "show_shared":            "Show Shared Recipes in My Main List",
+      "url_import_engine":      "URL Import Engine",
+      "url_engine_desc_standard_html": "<strong>Standard</strong> reads the page's schema.org/Recipe data. Free and fast; works on most major recipe sites.",
+      "url_engine_desc_enhanced_html": "<strong>Enhanced</strong> runs recipe-scrapers, which has site-specific extractors for ~300 popular sites and falls back to schema.org on everything else.",
+      "url_engine_desc_smart_html":  "<strong>Smart</strong> hands the page to your Trace AI. Slower and uses your AI quota, but recovers recipes from sites that block scrapers or hide their content in non-standard markup.",
+      "engine_standard":        "Standard",
+      "engine_enhanced":        "Enhanced",
+      "engine_enhanced_server_suffix": " (server required)",
+      "engine_smart":           "Smart",
+      "engine_smart_required_suffix": " (Trace AI required)",
+      "smart_note":             "Smart sends every URL import to your AI, which uses your provider's quota on every paste. Standard or Enhanced are free and handle most sites; consider setting Smart only as a fallback.",
+      "enhanced_fallback":      "Enhanced Fallback",
+      "enhanced_fallback_desc": "When the server is unreachable or recipe-scrapers isn't installed, fall back to this.",
+      "shopping_list":          "Shopping List",
+      "default_grouping":       "Default Grouping",
+      "group_by_aisle":         "By Aisle",
+      "group_by_recipe":        "By Recipe",
+      "group_by_flat":          "Flat",
+      "checked_items":          "Checked Items",
+      "sink_to_bottom":         "Sink to Bottom",
+      "hide":                   "Hide"
+    },
+    "off": {
+      "section":                "Open Food Facts",
+      "enable":                 "Enable Open Food Facts",
+      "search_language":        "Search Language",
+      "search_country":         "Search Country",
+      "upload_country":         "Upload Country",
+      "auto":                   "Auto",
+      "account_username":       "Account Username",
+      "off_username_ph":        "OFF username",
+      "account_password":       "Account Password",
+      "off_password_ph":        "OFF password"
+    },
+    "usda": {
+      "section":                "USDA FoodData Central",
+      "enable":                 "Enable USDA FoodData",
+      "api_key":                "API Key",
+      "api_key_ph":             "Paste your USDA API key here"
+    },
+    "scanner": {
+      "section":                "Barcode Scanner",
+      "beep_on_scan":           "Beep on Scan"
+    },
+    "diag": {
+      "mode":                   "Diagnostic Mode",
+      "view_logs":              "View Diagnostic Logs",
+      "logs_desc_prefix":       "Recent log lines from the app's console. Useful for bug reports; copy or share into a ",
+      "logs_desc_github":       "GitHub issue",
+      "logs_desc_android":      " On Android with Diagnostic Mode on, you can also share the persisted log file or any captured crash report.",
+      "logs_desc_suffix":       ". Nothing is sent anywhere automatically.",
+      "crash_available":        "Crash report available"
+    },
+    "about": {
+      "app_name":               "CookTrace",
+      "federation_prefix":      "Optional federation with ",
+      "federation_suffix":      " for nutrition tracking",
+      "family_prefix":          "Part of the ",
+      "family_suffix":          " family (with NutriTrace and LiftTrace)",
+      "support_dev":            "Support Development"
+    },
+    "custom_color": {
+      "saturation":             "Saturation",
+      "lightness":              "Lightness",
+      "hex_code":               "Hex Code",
+      "apply":                  "Apply Color"
+    }
+  },
+  "backup_page": {
+    "auto_backup":              "Auto Backup",
+    "frequency":                "Frequency",
+    "keep_last":                "Keep Last",
+    "backup_now":               "Backup Now",
+    "restore_from_file":        "Restore from File",
+    "danger_zone":              "Danger Zone",
+    "reset_app":                "Reset App"
+  },
+  "pantry_sheet_extra": {
+    "add_item":                 "Add Item",
+    "edit_item":                "Edit Item",
+    "quantity":                 "Quantity",
+    "unit":                     "Unit",
+    "category":                 "Category",
+    "location":                 "Location",
+    "expiry":                   "Expiry",
+    "notes":                    "Notes",
+    "delete":                   "Delete",
+    "cancel":                   "Cancel",
+    "save":                     "Save"
   }
 }
