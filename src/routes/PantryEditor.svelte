@@ -7,6 +7,7 @@
    * Notes), each with a small caps title. Replaces the in-page modal
    * that used to live inside Pantry.svelte.
    */
+  import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { push, pop } from 'svelte-spa-router';
   import { fade } from 'svelte/transition';
@@ -156,13 +157,13 @@
   }
 
   async function downloadFromOFF() {
-    if (!item.barcode) { showError('Enter a barcode first'); return; }
+    if (!item.barcode) { showError($_('pantry_editor_ct.toast.enter_barcode')); return; }
     downloading = true;
     downloadSuccess = false;
     try {
       const result = await lookupBarcode(item.barcode);
       if (!result) {
-        showError('Not found on Open Food Facts');
+        showError($_('pantry_editor_ct.toast.not_found_off'));
         return;
       }
       // Don't blow away an existing name the user typed deliberately.
@@ -215,9 +216,9 @@
   }
 
   async function shareOrViewOnOFF() {
-    if (!item.barcode) { showError('Add a barcode first'); return; }
+    if (!item.barcode) { showError($_('pantry_editor_ct.toast.add_barcode')); return; }
     if (offProductExists) { await _openOffPage(); return; }
-    if (!item.name) { showError('Add a name first'); return; }
+    if (!item.name) { showError($_('pantry_editor_ct.toast.add_name')); return; }
     contributing = true;
     offSuccess = false;
     offVerified = null;
@@ -343,7 +344,7 @@
 
   async function save() {
     if (!item.name?.trim()) {
-      showError('Name is required');
+      showError($_('pantry_editor_ct.toast.name_required'));
       return;
     }
     saving = true;
@@ -372,10 +373,10 @@
       };
       if (isEdit) {
         await NtApi.updatePantryItem(id, payload);
-        showSuccess('Saved');
+        showSuccess($_('pantry_editor_ct.toast.saved'));
       } else {
         await NtApi.createPantryItem(payload);
-        showSuccess('Added to pantry');
+        showSuccess($_('pantry_editor_ct.toast.added_to_pantry'));
       }
       pop();
     } catch (e) {
@@ -396,7 +397,7 @@
     if (!ok) return;
     try {
       await NtApi.deletePantryItem(id);
-      showSuccess('Removed');
+      showSuccess($_('pantry_editor_ct.toast.removed'));
       pop();
     } catch (e) {
       showError(e.message || 'Delete failed');
@@ -452,7 +453,7 @@
            tasteful ~360–420px square instead of stretching to the full
            editor-card width. Mirrors NT FoodEditor's photo card. -->
       <div class="card editor-card">
-        <div class="editor-card-title">Photo</div>
+        <div class="editor-card-title">{$_('pantry_editor_ct.photo')}</div>
         <ImagePicker bind:value={item.img_url} bind:uploading={imgUploading}
           aspect="1 / 1" placeholder="" />
       </div>
@@ -461,23 +462,23 @@
            Name → Brand → Serving size + Unit (with linked-scaling toggle)
            → Barcode (with inline scan icon) → Share / Refresh from OFF. -->
       <div class="card editor-card">
-        <div class="editor-card-title">Basic Info</div>
+        <div class="editor-card-title">{$_('pantry_editor_ct.basic_info')}</div>
         <div class="form-group">
           <label class="form-label">Name *</label>
           <input class="input" type="text" placeholder="All-purpose flour" bind:value={item.name} />
         </div>
         <div class="form-group">
-          <label class="form-label">Brand</label>
+          <label class="form-label">{$_('pantry_editor_ct.brand')}</label>
           <input class="input" type="text" placeholder="e.g. King Arthur" bind:value={item.brand} />
         </div>
         <div class="form-row" style="align-items:flex-end">
           <div class="form-group" style="flex:1">
-            <label class="form-label">Serving Size</label>
+            <label class="form-label">{$_('pantry_editor_ct.serving_size')}</label>
             <input class="input" type="number" min="0" step="0.01" placeholder="100"
               bind:value={item.serving_size} on:input={onServingSizeInput} />
           </div>
           <div class="form-group" style="width:120px">
-            <label class="form-label">Unit</label>
+            <label class="form-label">{$_('pantry_editor_ct.unit')}</label>
             <UnitPicker bind:value={item.serving_unit} />
           </div>
           <button type="button" class="btn-icon link-btn" class:linked
@@ -512,10 +513,10 @@
           </button>
         </div>
         <div class="form-group">
-          <label class="form-label">Barcode</label>
+          <label class="form-label">{$_('pantry_editor_ct.barcode')}</label>
           <div class="barcode-input-wrap">
             <input class="input barcode-input" type="text" inputmode="numeric"
-              placeholder="Optional" bind:value={item.barcode} />
+              placeholder={$_('pantry_editor_ct.optional_ph')} bind:value={item.barcode} />
             <button type="button" class="barcode-scan-inline" aria-label="Scan barcode" title="Scan barcode"
               on:click={() => editorScannerOpen = true}>
               <span class="material-symbols-rounded">barcode_scanner</span>
@@ -564,14 +565,14 @@
 
       <!-- Inventory — pantry-specific. NT food items don't have this. -->
       <div class="card editor-card">
-        <div class="editor-card-title">Inventory</div>
+        <div class="editor-card-title">{$_('pantry_editor_ct.inventory')}</div>
         <div class="form-row">
           <div class="form-group" style="flex:1">
-            <label class="form-label">On Hand</label>
+            <label class="form-label">{$_('pantry_editor_ct.on_hand')}</label>
             <input class="input" type="number" min="0" step="0.01" placeholder="0" bind:value={item.quantity} />
           </div>
           <div class="form-group" style="flex:1">
-            <label class="form-label">Unit</label>
+            <label class="form-label">{$_('pantry_editor_ct.unit')}</label>
             <UnitPicker bind:value={item.unit} />
           </div>
         </div>
@@ -584,7 +585,7 @@
 
       <!-- Category — DB-backed catalog with type-to-filter + inline create. -->
       <div class="card editor-card">
-        <div class="editor-card-title">Category</div>
+        <div class="editor-card-title">{$_('pantry_editor_ct.category')}</div>
         <Combobox
           bind:this={comboCategoryRef}
           mode="single"
@@ -605,7 +606,7 @@
       <!-- Notes — kept above Nutrition so the field order matches NT
            FoodEditor (Photo / Basic info / Categories / Notes / Nutrition). -->
       <div class="card editor-card">
-        <div class="editor-card-title">Notes</div>
+        <div class="editor-card-title">{$_('pantry_editor_ct.notes')}</div>
         <textarea class="input textarea" rows="3" placeholder="Where you keep it, expiration, anything else…"
           bind:value={item.notes}></textarea>
       </div>
@@ -613,7 +614,7 @@
       <!-- Nutrition — per-serving values use the Serving size + unit
            entered in Basic info above. Sodium ↔ salt auto-derives. -->
       <div class="card editor-card">
-        <div class="editor-card-title">Nutrition</div>
+        <div class="editor-card-title">{$_('pantry_editor_ct.nutrition')}</div>
         <p class="card-hint">Values are per the Serving size set in Basic info. Filling these in unlocks recipe nutrition auto-calc, but they're useful on their own too.</p>
         {#each visibleNutriments as n (n.id)}
           {@const derived = (n.id === 'sodium' || n.id === 'salt') && isDerived(item.nutrition, n.id)}
@@ -641,7 +642,7 @@
 
       {#if isEdit}
         <div class="card editor-card danger-card">
-          <div class="editor-card-title danger">Danger Zone</div>
+          <div class="editor-card-title danger">{$_('pantry_editor_ct.danger_zone')}</div>
           <button class="btn btn-secondary danger-btn" on:click={deleteItem}>
             <span class="material-symbols-rounded">delete</span>
             Remove from Pantry
@@ -661,18 +662,18 @@
 {#if categoryNewOpen}
   <div class="cat-modal-backdrop" on:click={() => categoryNewOpen = false}>
     <div class="cat-modal" on:click|stopPropagation>
-      <h3 class="cat-modal-title">Create New Pantry Category</h3>
+      <h3 class="cat-modal-title">{$_('pantry_editor_ct.cat_modal_title')}</h3>
       <label class="field">
-        <span class="field-label">Name</span>
+        <span class="field-label">{$_('pantry_editor_ct.name')}</span>
         <input class="input" type="text" bind:value={categoryNewName} autofocus />
       </label>
       <label class="field">
-        <span class="field-label">Icon name <span class="field-hint">(Material Symbols)</span></span>
+        <span class="field-label">{$_('pantry_editor_ct.icon_name')} <span class="field-hint">{$_('pantry_editor_ct.icon_hint')}</span></span>
         <input class="input" type="text" bind:value={categoryNewIcon} placeholder="kitchen" />
       </label>
       <div class="cat-modal-actions">
-        <button class="btn btn-secondary" on:click={() => categoryNewOpen = false}>Cancel</button>
-        <button class="btn btn-primary" on:click={confirmNewPantryCategory} disabled={!categoryNewName.trim()}>Create</button>
+        <button class="btn btn-secondary" on:click={() => categoryNewOpen = false}>{$_('pantry_editor_ct.cancel')}</button>
+        <button class="btn btn-primary" on:click={confirmNewPantryCategory} disabled={!categoryNewName.trim()}>{$_('pantry_editor_ct.create')}</button>
       </div>
     </div>
   </div>

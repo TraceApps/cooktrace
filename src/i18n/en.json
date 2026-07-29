@@ -1029,17 +1029,97 @@
     "weekly_summary_email":        "Weekly Summary Email",
     "note":                        "Note"
   },
+  "pantry_editor_ct": {
+    "toast": {
+      "enter_barcode":           "Enter a barcode first",
+      "not_found_off":           "Not found on Open Food Facts",
+      "add_barcode":             "Add a barcode first",
+      "add_name":                "Add a name first",
+      "name_required":           "Name is required",
+      "saved":                   "Saved",
+      "added_to_pantry":         "Added to pantry",
+      "removed":                 "Removed"
+    },
+    "photo":                     "Photo",
+    "basic_info":                "Basic Info",
+    "brand":                     "Brand",
+    "serving_size":              "Serving Size",
+    "unit":                      "Unit",
+    "barcode":                   "Barcode",
+    "optional_ph":               "Optional",
+    "inventory":                 "Inventory",
+    "on_hand":                   "On Hand",
+    "category":                  "Category",
+    "notes":                     "Notes",
+    "nutrition":                 "Nutrition",
+    "danger_zone":               "Danger Zone",
+    "cat_modal_title":           "Create New Pantry Category",
+    "name":                      "Name",
+    "icon_name":                 "Icon Name",
+    "icon_hint":                 "(Material Symbols)",
+    "cancel":                    "Cancel",
+    "create":                    "Create"
+  },
+  "pantry_page": {
+    "toast": {
+      "removed":                 "Removed"
+    },
+    "variant_banner_title":      "Pantry now supports product variants",
+    "sort_updated":              "Last Updated",
+    "sort_usage":                "Most Used",
+    "retry":                     "Retry",
+    "no_results_all":            "No Results in Any Source",
+    "reset_filter":              "Reset Filter",
+    "off_quality":               "OFF Quality",
+    "usda_data_type":            "USDA Data Type",
+    "reset":                     "Reset"
+  },
+  "pantry_view_ct": {
+    "toast": {
+      "removed":                 "Removed"
+    },
+    "retry":                     "Retry",
+    "in_stock":                  "In Stock",
+    "serving_size":              "Serving Size",
+    "not_set":                   "Not set",
+    "on_hand":                   "On Hand",
+    "notes":                     "Notes"
+  },
   "pantry_sheet_extra": {
-    "add_item":                 "Add Item",
-    "edit_item":                "Edit Item",
-    "quantity":                 "Quantity",
-    "unit":                     "Unit",
-    "category":                 "Category",
-    "location":                 "Location",
-    "expiry":                   "Expiry",
-    "notes":                    "Notes",
-    "delete":                   "Delete",
-    "cancel":                   "Cancel",
-    "save":                     "Save"
+    "toast": {
+      "cant_read_label":         "Could not read the label. Try a clearer photo.",
+      "nutrition_extracted":     "Nutrition extracted from label",
+      "scan_failed":             "Scan failed: {reason}",
+      "scan_unknown":            "unknown error",
+      "brand_or_name_required":  "Add a brand or override name to tell this variant apart.",
+      "added_variant":           "Added variant {name}",
+      "linked_as_variant":       "Linked as a variant",
+      "enter_barcode":           "Enter a barcode first",
+      "not_found_off":           "Not found on Open Food Facts",
+      "add_barcode":             "Add a barcode first",
+      "add_name":                "Add a name first",
+      "name_required":           "Name is required",
+      "added_to_pantry":         "Added to pantry",
+      "saved":                   "Saved"
+    },
+    "retry":                     "Retry",
+    "add_a_photo":               "Add a Photo",
+    "name_ph":                   "Iodized Salt",
+    "brand_ph":                  "Morton",
+    "serving_size":              "Serving Size",
+    "not_set":                   "Not set",
+    "nutrition":                 "Nutrition",
+    "per_serving":               "per serving",
+    "recipe_nutrition_source":   "Recipe Nutrition Source",
+    "add_a_variant":             "Add a Variant",
+    "attach_as_variant":         "Attach as variant",
+    "cancel":                    "Cancel",
+    "done":                      "Done",
+    "name":                      "Name",
+    "cat_new_name_ph":           "Baking",
+    "cat_field_hint_html":       "Browse names at <a href=\"https://fonts.google.com/icons\" target=\"_blank\" rel=\"noopener\">Material Symbols</a>. The picker page (Manage → Pantry Categories) has an icon search.",
+    "create":                    "Create",
+    "keep_standalone":           "Keep as Standalone Items",
+    "remove_variants_too":       "Remove the Variants Too"
   }
 }

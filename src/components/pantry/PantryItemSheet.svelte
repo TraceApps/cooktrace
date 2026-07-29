@@ -90,7 +90,7 @@
       });
       if (parsed == null) return; // user canceled
       if (typeof parsed !== 'object') {
-        showError('Could not read the label. Try a clearer photo.');
+        showError($_('pantry_sheet_extra.toast.cant_read_label'));
         return;
       }
       // Overwrite (not smart-fill) — the label is the source of truth
@@ -113,9 +113,9 @@
         if (v != null && !isNaN(parseFloat(v))) draft.nutrition[n.id] = parseFloat(v);
       }
       draft = { ...draft };
-      showSuccess('Nutrition extracted from label');
+      showSuccess($_('pantry_sheet_extra.toast.nutrition_extracted'));
     } catch (e) {
-      showError('Scan failed: ' + (e?.message || 'unknown error'));
+      showError($_('pantry_sheet_extra.toast.scan_failed', { values: { reason: e?.message || $_('pantry_sheet_extra.toast.scan_unknown') } }));
     } finally {
       scanningLabel = false;
     }
@@ -334,7 +334,7 @@
     const brand = (newVariantBrand || '').trim();
     const overrideName = newVariantNameOverride ? (newVariantName || '').trim() : '';
     if (!brand && !overrideName) {
-      showError('Add a brand or override name to tell this variant apart.');
+      showError($_('pantry_sheet_extra.toast.brand_or_name_required'));
       return;
     }
     if (!item?.id) return;
@@ -364,7 +364,7 @@
       newVariantNameOverride = false;
       addingVariantRow = false;
       await _loadVariantContext();
-      showSuccess('Added variant ' + _displayVariantName(created, item, { nested: false }));
+      showSuccess($_('pantry_sheet_extra.toast.added_variant', { values: { name: _displayVariantName(created, item, { nested: false }) } }));
       dispatch('changed', { item });
       // A new row landed and (when promoting a flat item) the parent may
       // have been auto-converted to a generic. Local patch can't infer
@@ -444,7 +444,7 @@
       newVariantName = '';
       newVariantNameOverride = false;
       await _loadVariantContext();
-      showSuccess('Linked as a variant');
+      showSuccess($_('pantry_sheet_extra.toast.linked_as_variant'));
       dispatch('changed', { item });
       // Patch the CHILD's row in the host list synchronously so the
       // parent's chevron appears immediately instead of after the
@@ -598,11 +598,11 @@
   }
 
   async function downloadFromOFF() {
-    if (!draft.barcode) { showError('Enter a barcode first'); return; }
+    if (!draft.barcode) { showError($_('pantry_sheet_extra.toast.enter_barcode')); return; }
     downloading = true; downloadSuccess = false;
     try {
       const result = await lookupBarcode(draft.barcode);
-      if (!result) { showError('Not found on Open Food Facts'); return; }
+      if (!result) { showError($_('pantry_sheet_extra.toast.not_found_off')); return; }
       if (!draft.name) draft.name = result.name || '';
       if (!draft.brand) draft.brand = result.brand || '';
       draft.serving_size = result.serving_size ?? draft.serving_size;
@@ -641,9 +641,9 @@
   }
 
   async function shareOrViewOnOFF() {
-    if (!draft.barcode) { showError('Add a barcode first'); return; }
+    if (!draft.barcode) { showError($_('pantry_sheet_extra.toast.add_barcode')); return; }
     if (offProductExists) { await _openOffPage(); return; }
-    if (!draft.name) { showError('Add a name first'); return; }
+    if (!draft.name) { showError($_('pantry_sheet_extra.toast.add_name')); return; }
     contributing = true; offSuccess = false; offVerified = null;
     try {
       const existing = await lookupBarcode(draft.barcode);
@@ -722,7 +722,7 @@
 
   // ── Save / Cancel / Delete ─────────────────────────────────────────
   async function saveEdit() {
-    if (!draft.name?.trim()) { showError('Name is required'); return; }
+    if (!draft.name?.trim()) { showError($_('pantry_sheet_extra.toast.name_required')); return; }
     saving = true;
     try {
       const qtyNum = draft.quantity === '' || draft.quantity == null ? null : Number(draft.quantity);
@@ -743,13 +743,13 @@
       };
       if (itemId == null) {
         const row = await NtApi.createPantryItem(payload);
-        showSuccess('Added to pantry');
+        showSuccess($_('pantry_sheet_extra.toast.added_to_pantry'));
         const finalRow = row && row.id ? row : { ...payload, id: row?.id };
         dispatch('created', finalRow);
         open = false;
       } else {
         await NtApi.updatePantryItem(itemId, payload);
-        showSuccess('Saved');
+        showSuccess($_('pantry_sheet_extra.toast.saved'));
         item = { ...item, ...payload, id: itemId };
         dispatch('changed', { ...item });
         editing = false;
@@ -859,7 +859,7 @@
       <span class="material-symbols-rounded">error</span>
       <p>{loadError}</p>
       {#if itemId != null}
-        <button class="btn btn-secondary" on:click={() => _enterViewOrEditMode(itemId, false)}>Retry</button>
+        <button class="btn btn-secondary" on:click={() => _enterViewOrEditMode(itemId, false)}>{$_('pantry_sheet_extra.retry')}</button>
       {/if}
     </div>
   {:else if item}
@@ -873,7 +873,7 @@
         <div class="col-identity">
           {#if editing}
             <ImagePicker bind:value={draft.img_url} bind:uploading={imgUploading}
-              aspect="1 / 1" expand placeholder="Add a Photo" />
+              aspect="1 / 1" expand placeholder={$_('pantry_sheet_extra.add_a_photo')} />
           {:else}
             {#if item.img_url}
               <!-- Wrapper clips the image to rounded corners via
@@ -896,11 +896,11 @@
             {#if editing}
               <label class="field">
                 <span class="field-label">{$_('pantry_sheet.name')}</span>
-                <input class="input" type="text" bind:value={draft.name} placeholder="Iodized Salt" />
+                <input class="input" type="text" bind:value={draft.name} placeholder={$_('pantry_sheet_extra.name_ph')} />
               </label>
               <label class="field">
                 <span class="field-label">{$_('pantry_sheet.brand')}</span>
-                <input class="input" type="text" bind:value={draft.brand} placeholder="Morton" />
+                <input class="input" type="text" bind:value={draft.brand} placeholder={$_('pantry_sheet_extra.brand_ph')} />
               </label>
               <label class="field">
                 <span class="field-label">
@@ -1036,7 +1036,7 @@
               {/if}
             </div>
             <div class="stat">
-              <div class="stat-label">Serving Size</div>
+              <div class="stat-label">{$_('pantry_sheet_extra.serving_size')}</div>
               {#if editing}
                 <div class="stat-edit">
                   <input class="input num" type="number" min="0" step="any"
@@ -1058,7 +1058,7 @@
                   {#if item.serving_size}
                     {item.serving_size} {item.serving_unit || 'g'}
                   {:else}
-                    <span class="muted">Not set</span>
+                    <span class="muted">{$_('pantry_sheet_extra.not_set')}</span>
                   {/if}
                 </div>
               {/if}
@@ -1073,7 +1073,7 @@
           {#if editing}
             <div class="nutrient-edit">
               <div class="nutrient-edit-head">
-                <span class="field-label">Nutrition <span class="muted">per serving</span></span>
+                <span class="field-label">{$_('pantry_sheet_extra.nutrition')} <span class="muted">{$_('pantry_sheet_extra.per_serving')}</span></span>
                 <div class="nutrient-edit-actions">
                   {#if $aiEffectivelyEnabled}
                     <!-- Pill matches NT FoodEditor: photo_camera icon +
@@ -1223,7 +1223,7 @@
 
             {#if !addingVariantRow}
               <div class="nutrition-source">
-                <div class="nutrition-source-head">Recipe nutrition source</div>
+                <div class="nutrition-source-head">{$_('pantry_sheet_extra.recipe_nutrition_source')}</div>
                 <p class="nutrition-source-hint">
                   Which numbers should recipes use when an ingredient links to this generic? Variants still keep their own nutrition for their own detail view; this just picks which one feeds the recipe math.
                 </p>
@@ -1249,7 +1249,7 @@
             {/if}
             {#if addingVariantRow}
               <div class="variant-add-card">
-                <div class="variant-add-head">Add a Variant</div>
+                <div class="variant-add-head">{$_('pantry_sheet_extra.add_a_variant')}</div>
                 <p class="variant-add-hint">
                   Type a brand or store. If you already have a matching pantry item, you'll be able to attach it directly. Otherwise a brand-new variant gets created.
                 </p>
@@ -1264,7 +1264,7 @@
                           <button class="variant-suggest-row" on:click={() => _addExistingAsVariant(s.id)}>
                             <span class="material-symbols-rounded">link</span>
                             <span class="variant-suggest-name">{s.name}{s.brand ? ' (' + s.brand + ')' : ''}</span>
-                            <span class="variant-suggest-meta">Attach as variant</span>
+                            <span class="variant-suggest-meta">{$_('pantry_sheet_extra.attach_as_variant')}</span>
                           </button>
                         </li>
                       {/each}
@@ -1285,7 +1285,7 @@
                       </button>
                     {/if}
                     <span class="variant-add-spacer"></span>
-                    <button class="btn btn-secondary" on:click={() => { addingVariantRow = false; newVariantBrand = ''; newVariantName = ''; newVariantNameOverride = false; }}>Cancel</button>
+                    <button class="btn btn-secondary" on:click={() => { addingVariantRow = false; newVariantBrand = ''; newVariantName = ''; newVariantNameOverride = false; }}>{$_('pantry_sheet_extra.cancel')}</button>
                     <button class="btn btn-primary" on:click={_addNewVariant} disabled={!newVariantBrand.trim()}>{newVariantBrand.trim() ? `Create "${newVariantBrand.trim()}"` : 'Create Variant'}</button>
                   </div>
                 </div>
@@ -1305,7 +1305,7 @@
             </p>
             {#if addingVariantRow}
               <div class="variant-add-card">
-                <div class="variant-add-head">Add a Variant</div>
+                <div class="variant-add-head">{$_('pantry_sheet_extra.add_a_variant')}</div>
                 <p class="variant-add-hint">
                   Type a brand or store. If you already have a matching pantry item, you'll be able to attach it directly. Otherwise a brand-new variant gets created.
                 </p>
@@ -1320,7 +1320,7 @@
                           <button class="variant-suggest-row" on:click={() => _addExistingAsVariant(s.id)}>
                             <span class="material-symbols-rounded">link</span>
                             <span class="variant-suggest-name">{s.name}{s.brand ? ' (' + s.brand + ')' : ''}</span>
-                            <span class="variant-suggest-meta">Attach as variant</span>
+                            <span class="variant-suggest-meta">{$_('pantry_sheet_extra.attach_as_variant')}</span>
                           </button>
                         </li>
                       {/each}
@@ -1341,7 +1341,7 @@
                       </button>
                     {/if}
                     <span class="variant-add-spacer"></span>
-                    <button class="btn btn-secondary" on:click={() => { addingVariantRow = false; newVariantBrand = ''; newVariantName = ''; newVariantNameOverride = false; }}>Cancel</button>
+                    <button class="btn btn-secondary" on:click={() => { addingVariantRow = false; newVariantBrand = ''; newVariantName = ''; newVariantNameOverride = false; }}>{$_('pantry_sheet_extra.cancel')}</button>
                     <button class="btn btn-primary" on:click={_addNewVariant} disabled={!newVariantBrand.trim()}>{newVariantBrand.trim() ? `Create "${newVariantBrand.trim()}"` : 'Create Variant'}</button>
                   </div>
                 </div>
@@ -1398,7 +1398,7 @@
       {/each}
     </div>
     <div class="all-nutrients-footer">
-      <button class="btn btn-primary" on:click={() => allNutrientsOpen = false}>Done</button>
+      <button class="btn btn-primary" on:click={() => allNutrientsOpen = false}>{$_('pantry_sheet_extra.done')}</button>
     </div>
   </Sheet>
 {/if}
@@ -1406,14 +1406,14 @@
 <!-- New-category dialog (stacked over the sheet). -->
 <Sheet bind:open={categoryNewOpen} title="New Pantry Category" height="auto">
   <div class="newcat-body">
-    <label class="field-label">Name</label>
-    <input class="input" type="text" bind:value={categoryNewName} placeholder="Baking" />
+    <label class="field-label">{$_('pantry_sheet_extra.name')}</label>
+    <input class="input" type="text" bind:value={categoryNewName} placeholder={$_('pantry_sheet_extra.cat_new_name_ph')} />
     <label class="field-label" style="margin-top:10px">Icon (Material Symbols name)</label>
     <input class="input" type="text" bind:value={categoryNewIcon} placeholder="kitchen" />
-    <p class="field-hint">Browse names at <a href="https://fonts.google.com/icons" target="_blank" rel="noopener">Material Symbols</a>. The picker page (Manage → Pantry Categories) has an icon search.</p>
+    <p class="field-hint">{@html $_('pantry_sheet_extra.cat_field_hint_html')}</p>
     <div class="newcat-actions">
-      <button class="btn btn-secondary" on:click={() => categoryNewOpen = false}>Cancel</button>
-      <button class="btn btn-primary" on:click={confirmNewPantryCategory}>Create</button>
+      <button class="btn btn-secondary" on:click={() => categoryNewOpen = false}>{$_('pantry_sheet_extra.cancel')}</button>
+      <button class="btn btn-primary" on:click={confirmNewPantryCategory}>{$_('pantry_sheet_extra.create')}</button>
     </div>
   </div>
 </Sheet>
@@ -1443,7 +1443,7 @@
       {/each}
     </ul>
     <div class="variant-picker-actions">
-      <button class="btn btn-secondary" on:click={() => variantPickerOpen = false}>Cancel</button>
+      <button class="btn btn-secondary" on:click={() => variantPickerOpen = false}>{$_('pantry_sheet_extra.cancel')}</button>
     </div>
   </div>
 </Sheet>
@@ -1472,7 +1472,7 @@
         checked={!deleteCascade}
         on:change={() => deleteCascade = false} />
       <span class="variant-delete-label">
-        <span class="variant-delete-title">Keep as standalone items</span>
+        <span class="variant-delete-title">{$_('pantry_sheet_extra.keep_standalone')}</span>
         <span class="variant-delete-hint">The variants stay in your pantry as their own rows. Recommended.</span>
       </span>
     </label>
@@ -1481,7 +1481,7 @@
         checked={deleteCascade}
         on:change={() => deleteCascade = true} />
       <span class="variant-delete-label">
-        <span class="variant-delete-title">Remove the variants too</span>
+        <span class="variant-delete-title">{$_('pantry_sheet_extra.remove_variants_too')}</span>
         <span class="variant-delete-hint">All {variantContext.children.length} variant{variantContext.children.length === 1 ? '' : 's'} get removed alongside this item.</span>
       </span>
     </label>

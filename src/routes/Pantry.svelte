@@ -783,7 +783,7 @@
     try {
       await NtApi.deletePantryItem(it.id);
       items = items.filter(i => i.id !== it.id);
-      showSuccess('Removed');
+      showSuccess($_('pantry_page.toast.removed'));
     } catch (e) {
       showError(e.message || 'Delete failed');
     }
@@ -817,7 +817,7 @@
       <div class="variant-banner" in:fade={{ duration: 160 }}>
         <span class="material-symbols-rounded variant-banner-icon">category</span>
         <div class="variant-banner-body">
-          <div class="variant-banner-title">Pantry now supports product variants</div>
+          <div class="variant-banner-title">{$_('pantry_page.variant_banner_title')}</div>
           <p class="variant-banner-desc">
             Group different brands of the same ingredient under one pantry entry. Open any item, scroll to Variants, and add a brand or store. Recipes that link to the generic match any of the variants. Your existing pantry works exactly as before until you opt in per item.
           </p>
@@ -939,8 +939,8 @@
             <span class="material-symbols-rounded">sort</span>
             <select class="sort-select" bind:value={sortKey}>
               <option value="name">A → Z</option>
-              <option value="updated">Last Updated</option>
-              <option value="usage">Most Used</option>
+              <option value="updated">{$_('pantry_page.sort_updated')}</option>
+              <option value="usage">{$_('pantry_page.sort_usage')}</option>
             </select>
           </label>
           <div class="view-toggle" role="group" aria-label="View mode">
@@ -978,7 +978,7 @@
       <div class="state error">
         <span class="material-symbols-rounded">error</span>
         <p>{loadError}</p>
-        <button class="btn btn-secondary" on:click={load}>Retry</button>
+        <button class="btn btn-secondary" on:click={load}>{$_('pantry_page.retry')}</button>
       </div>
     {:else if items.length === 0}
       <div class="state empty">
@@ -1166,7 +1166,7 @@
         {:else if _allModeItems.length === 0}
           <div class="state empty">
             <span class="material-symbols-rounded empty-icon">search_off</span>
-            <p>No results in any source</p>
+            <p>{$_('pantry_page.no_results_all')}</p>
           </div>
         {:else}
           <ul class="items">
@@ -1228,7 +1228,7 @@
           <div class="state empty">
             <span class="material-symbols-rounded empty-icon">filter_alt_off</span>
             <p>All {_srcLabel} results hidden by tier filter</p>
-            <button class="btn secondary" style="margin-top:8px" on:click={() => searchSource === 'off' ? resetOffTiers() : resetUsdaTiers()}>Reset filter</button>
+            <button class="btn secondary" style="margin-top:8px" on:click={() => searchSource === 'off' ? resetOffTiers() : resetUsdaTiers()}>{$_('pantry_page.reset_filter')}</button>
           </div>
         {:else}
           <ul class="items">
@@ -1311,9 +1311,9 @@
        style="top:{offDropdownPos.top}px; right:{offDropdownPos.right}px"
        transition:slide={{ duration: 140 }}>
     <div class="tier-dropdown-head">
-      <span>OFF quality</span>
+      <span>{$_('pantry_page.off_quality')}</span>
       {#if offTiersFiltered}
-        <button class="tier-dropdown-reset" on:click={resetOffTiers}>Reset</button>
+        <button class="tier-dropdown-reset" on:click={resetOffTiers}>{$_('pantry_page.reset')}</button>
       {/if}
     </div>
     <div class="tier-dropdown-options">
@@ -1335,9 +1335,9 @@
        style="top:{usdaDropdownPos.top}px; right:{usdaDropdownPos.right}px"
        transition:slide={{ duration: 140 }}>
     <div class="tier-dropdown-head">
-      <span>USDA data type</span>
+      <span>{$_('pantry_page.usda_data_type')}</span>
       {#if usdaTiersFiltered}
-        <button class="tier-dropdown-reset" on:click={resetUsdaTiers}>Reset</button>
+        <button class="tier-dropdown-reset" on:click={resetUsdaTiers}>{$_('pantry_page.reset')}</button>
       {/if}
     </div>
     <div class="tier-dropdown-options">
