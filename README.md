@@ -108,7 +108,7 @@ docker compose up -d
 
 Open `http://localhost:3000` and a first-run wizard walks you through enabling user management and creating an admin account.
 
-Full walkthrough (env-file layout, reverse proxy, LAN-HTTP notes) at [docs/getting-started/compose](https://traceapps.github.io/docs/getting-started/compose/). Pre-release testers can grab the rolling `dev-latest` APK; occasional milestone builds also get numbered `-dev.N` pre-releases. See [DEPLOY.md](DEPLOY.md) for details.
+Full walkthrough (env-file layout, reverse proxy, LAN-HTTP notes) at [docs/getting-started/compose](https://traceapps.github.io/docs/getting-started/compose/). Pre-release testers can grab the rolling `dev-latest` APK; occasional milestone builds also get numbered `-devNN` pre-releases. See [DEPLOY.md](DEPLOY.md) for details.
 
 ---
 
