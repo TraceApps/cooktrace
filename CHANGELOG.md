@@ -9,6 +9,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.3] - 2026-07-28
+
+### Fixed
+
+- **Backups, SMTP config, and other admin panels now work in single-user mode.** With User Management turned off, `POST /api/full-backup`, `PUT /api/app-config`, `POST /api/app-config/test-email`, `POST /api/off-local/refresh`, and `GET /api/updates/server-status` all returned 403 "Admin only", even though CookTrace's own frontend correctly identifies the sole owner as effectively-admin. `requireAdmin` middleware now passes through when User Management is off, mirroring `requireAuth`. Fourteen previously-broken admin routes come back to life. LiftTrace already had this fix; parity restored.
+
+---
+
 ## [1.0.2] - 2026-07-28
 
 ### Added
