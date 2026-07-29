@@ -510,7 +510,7 @@
     else if (v === 'duplicate') {
       try {
         const fresh = await NtApi.getRecipe(r.id);
-        const { id: _, created_at, updated_at, last_cooked_at, cook_count, created_by_username, ...rest } = fresh;
+        const { id: _id, created_at, updated_at, last_cooked_at, cook_count, created_by_username, ...rest } = fresh;
         const dup = await NtApi.createRecipe({ ...rest, name: rest.name + ' (copy)', favorite: false, rating: null });
         recipes = [dup, ...recipes];
         showSuccess($_('recipes_page.toast.recipe_duplicated'));
