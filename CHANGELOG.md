@@ -7,9 +7,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Accent-tinted browser chrome.** The browser tab bar / address strip now picks up your current accent color via `<meta name="theme-color">`. Running CookTrace alongside NutriTrace / LiftTrace? Pick a distinct accent per install and the tabs read as visually different at a glance. Favicon stays the branded CookTrace mark.
+
 ### Changed
 
+- **SMTP "Username" field relabeled to "Email or Username".** Most SMTP providers want the full email as the username; label change removes the guesswork.
+
 - **Full i18n retrofit across the app.** Every hardcoded UI string has been extracted into `src/i18n/en.json` and reads via `svelte-i18n`. Covers Settings (main page + Backup, Notifications, ServerConnection, Auth, ImportFromNT, Email, Trace, UserManagement, Kitchens, Import, Federation, Nutrition), Pantry (PantryItemSheet + PantryEditor + Pantry + PantryView), Recipes (Recipes + RecipeEditor + RecipeView + CookbookView + PublicRecipe + import/comment/cook dialogs + NutritionFacts), core routes (CookDiary, Shopping, NativeSetup, Login, Wizard, Profile, Manage), manage tables (Cookbooks, Units, Pantry/Recipe Categories, Taxonomy), Trace AI, and shared UI (BarcodeScanner, TimePicker, CookHeatmap, ImagePicker, IconPicker, timer pills, Sidebar). ~460 new keys added, Weblate-ready. Chicago-style title case for labels/buttons/headings, sentence case for body prose / errors / placeholders / toasts. Uses paired `<key>_desc` sibling keys and column-aligned values (Fathom-inspired conventions carried across the TraceApps family) so translators get inline context.
+
+### Fixed
+
+- **App icon no longer shows a white halo.** The bundled icon PNGs had ~15px of solid white padding baked into their corners. On tinted browser chrome the halo was visible around the tab favicon; in-app the icon looked framed. Corners now clear cleanly. Icon URLs also cache-busted with the app version so shipped icon fixes actually take effect without users needing to clear their browser cache.
+- **Create Admin form password field no longer crushed** (parity with NT #122). The password input on the Enable User Management form was rendering as a colored sliver because of a flex-layout bug. Password + Confirm now sit symmetrically side-by-side, each with its own eye toggle sharing show/hide state.
 
 ---
 
