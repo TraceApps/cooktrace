@@ -632,25 +632,34 @@
           </p>
           <div class="um-add-form">
             <div class="um-form-row">
-              <input class="input" type="text" bind:value={enableAdminUser} placeholder="Username *" autocomplete="username" />
-              <input class="input" type="text" bind:value={enableAdminName} placeholder="Full name (optional)" />
+              <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminUser} placeholder="Username *" autocomplete="username" />
+              <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminName} placeholder="Full name (optional)" />
             </div>
+            <!-- Symmetric password + confirm row, both wrapped in flex:1
+                 groups with matching eye toggles. Prevents the .input's
+                 width:100% from crushing one side when siblings are
+                 asymmetric (TraceApps/nutritrace#122). -->
             <div class="um-form-row">
-              <div style="display:flex;gap:4px;align-items:center;flex:1">
+              <div style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
                 {#if enableShowPass}
-                  <input class="input" style="flex:1" type="text" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                  <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
                 {:else}
-                  <input class="input" style="flex:1" type="password" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                  <input class="input" style="flex:1;min-width:0" type="password" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
                 {/if}
-                <button class="btn-icon" on:click={() => enableShowPass = !enableShowPass} style="flex-shrink:0">
+                <button class="btn-icon" on:click={() => enableShowPass = !enableShowPass} style="flex-shrink:0" aria-label={enableShowPass ? 'Hide password' : 'Show password'}>
                   <span class="material-symbols-rounded" style="font-size:18px">{enableShowPass ? 'visibility_off' : 'visibility'}</span>
                 </button>
               </div>
-              {#if enableShowPass}
-                <input class="input" type="text" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
-              {:else}
-                <input class="input" type="password" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
-              {/if}
+              <div style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
+                {#if enableShowPass}
+                  <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                {:else}
+                  <input class="input" style="flex:1;min-width:0" type="password" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                {/if}
+                <button class="btn-icon" on:click={() => enableShowPass = !enableShowPass} style="flex-shrink:0" aria-label={enableShowPass ? 'Hide password' : 'Show password'}>
+                  <span class="material-symbols-rounded" style="font-size:18px">{enableShowPass ? 'visibility_off' : 'visibility'}</span>
+                </button>
+              </div>
             </div>
             {#if enableUmError}<p class="um-error">{enableUmError}</p>{/if}
             <button class="btn btn-primary" style="width:100%" on:click={enableUserManagement} disabled={enableUmLoading}>
