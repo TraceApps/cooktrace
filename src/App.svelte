@@ -7,6 +7,7 @@
 
   import BottomNav from './components/layout/BottomNav.svelte';
   import Sidebar   from './components/layout/Sidebar.svelte';
+  import UpdateBanner from './components/UpdateBanner.svelte';
   import TopTimerPill from './components/recipe/TopTimerPill.svelte';
   import { cookModeActive } from './stores/cookMode.js';
   import Toast     from './components/ui/Toast.svelte';
@@ -172,6 +173,20 @@
     }
 
     if (isNative) {
+      // Update-notification tap listener: registered at boot so a
+      // shade-notification tap that cold-starts the app still routes
+      // to Settings for the install action.
+      import('./lib/notifications.js').then(({ registerUpdateTapListener }) => {
+        registerUpdateTapListener(() => {
+          import('svelte-spa-router').then(({ push }) => push('/settings'));
+        });
+      }).catch(() => { /* ignore */ });
+
+      // Clean stale APKs from Directory.Data/updates/ on boot.
+      import('./lib/updates.js').then(({ cleanUpdateCache }) => {
+        cleanUpdateCache();
+      }).catch(() => { /* ignore */ });
+
       import('@capacitor/app').then(({ App }) => {
         let lastBack = 0;
         App.addListener('backButton', ({ canGoBack }) => {
@@ -333,6 +348,11 @@
      follows the user across every page, draggable to any position,
      and renders nothing when no timers are running. -->
 <TopTimerPill />
+
+<!-- In-app update banner (native only). Renders only if the OS-level
+     notification permission is denied — grants suppress the banner and
+     route through a shade notification instead. -->
+{#if !needsLogin}<UpdateBanner />{/if}
 
 {#if showHamburger && $currentUser}
   <header class="app-topbar">

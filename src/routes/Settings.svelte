@@ -5,6 +5,7 @@
   import { _ } from 'svelte-i18n';
   import { AVAILABLE_LOCALES } from '../i18n/index.js';
   import SettingsAuth   from '../components/settings/SettingsAuth.svelte';
+  import SettingsUpdates from '../components/settings/SettingsUpdates.svelte';
   import SettingsBackup from '../components/settings/SettingsBackup.svelte';
   import SettingsServerConnection from '../components/settings/SettingsServerConnection.svelte';
   import SettingsImport from '../components/settings/SettingsImport.svelte';
@@ -200,6 +201,7 @@
     users:         false,
     auth:          false,
     serverconn:    false,
+    updates:       false,
     diagnostics:   false,
     about:         false,
   };
@@ -228,6 +230,7 @@
     users:         ['users','user management','accounts','login','admin','register','invite'],
     auth:          ['authentication','auth','sso','single sign-on','single sign on','oidc','openid','authentik','keycloak','authelia','password login'],
     serverconn:    ['server','connection','sync','connect','disconnect','local mode','offline','standalone','android','native','url','login'],
+    updates:       ['updates','update','upgrade','version','new version','changelog','release','releases','apk','install','download','check for updates','auto-check','channel','stable','dev','dev-latest','beta','github','server update','docker','compose','docker-compose'],
     diagnostics:   ['diagnostics','logs','verbose','console','export','bug','report','troubleshoot','crash'],
     about:         ['about','version','cooktrace','license','source','github','donate','support'],
   };
@@ -940,6 +943,18 @@
     {#if sectionOpen(openSections, settingsQuery, 'kitchens') && sectionVisible(settingsQuery, 'kitchens')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <SettingsKitchens />
+      </div>
+    {/if}
+
+    <!-- ── Updates — in-app version check + APK install (Android). ─────── -->
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'updates')} on:click={() => toggleSection('updates')}>
+      <span class="material-symbols-rounded si">system_update</span>
+      <span>{$_('settings.updates.section')}</span>
+      <span class="material-symbols-rounded chevron" class:rotated={openSections.updates}>expand_more</span>
+    </button>
+    {#if sectionOpen(openSections, settingsQuery, 'updates') && sectionVisible(settingsQuery, 'updates')}
+      <div class="section-body" transition:slide={{ duration: 180 }}>
+        <SettingsUpdates />
       </div>
     {/if}
 
