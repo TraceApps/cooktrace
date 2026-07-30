@@ -1,6 +1,6 @@
 <script>
   import { _ } from 'svelte-i18n';
-  import { setNativeMode, setServerUrl, setAuthToken, resolveAssetUrl, explainConnectError } from '../lib/platform.js';
+  import { setNativeMode, setServerUrl, setAuthToken, resolveAssetUrl, iconUrl, explainConnectError } from '../lib/platform.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { DB } from '../lib/db.js';
 
@@ -155,7 +155,7 @@
   <div class="setup-inner">
     <!-- Logo / branding -->
     <div class="setup-brand">
-      <img src={resolveAssetUrl('/icons/icon-192.png')} alt="CookTrace" class="setup-logo" />
+      <img src={iconUrl('/icons/icon-192.png')} alt="CookTrace" class="setup-logo" />
       <h1 class="setup-title">{$_('native_setup_ct.app_name')}</h1>
       <p class="setup-subtitle">{$_('native_setup_ct.tagline')}</p>
     </div>

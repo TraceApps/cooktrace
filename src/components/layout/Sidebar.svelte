@@ -4,7 +4,7 @@
   import { location, push } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
   import { createEventDispatcher } from 'svelte';
-  import { resolveAssetUrl, isNative } from '../../lib/platform.js';
+  import { resolveAssetUrl, iconUrl, isNative } from '../../lib/platform.js';
   import { currentUser, userMgmtActive, logout } from '../../stores/auth.js';
   import { APP_VERSION } from '../../lib/version.js';
 
@@ -77,7 +77,7 @@
   >
     <!-- App branding -->
     <div class="sidebar-brand">
-      <img class="brand-icon" src={resolveAssetUrl('/icons/logo.png')} alt="CookTrace" />
+      <img class="brand-icon" src={iconUrl('/icons/logo.png')} alt="CookTrace" />
       <div class="brand-text">
         <span class="brand-name">{$_('sidebar_ct.brand')}</span>
         <span class="brand-tagline">Trace Every Recipe — From Pantry to Plate</span>

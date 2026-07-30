@@ -51,7 +51,7 @@
   const OFF_COUNTRY_OPTS = ['World','United States','United Kingdom','Australia','Canada',
     'France','Germany','Spain','Italy','Mexico','Brazil','Japan','China','India'];
   let offShowPass = false;
-  import { isNative, getServerUrl, resolveAssetUrl } from '../lib/platform.js';
+  import { isNative, getServerUrl, resolveAssetUrl, iconUrl } from '../lib/platform.js';
   import { currentUser, userMgmtActive } from '../stores/auth.js';
 
   function set(key, value) { DB.setSetting(key, value); scheduleSave(key, value); }
@@ -1027,7 +1027,7 @@
       <div class="section-body" transition:slide={{ duration: 180 }}>
         <div class="card settings-card">
           <div class="about-hero">
-            <img src={resolveAssetUrl('/icons/logo.png')} alt="CookTrace" class="about-icon" />
+            <img src={iconUrl('/icons/logo.png')} alt="CookTrace" class="about-icon" />
             <div>
               <div class="about-name">{$_('settings_page.about.app_name')}</div>
               <div class="about-version text-3 text-sm">
