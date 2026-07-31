@@ -1,6 +1,7 @@
 <script>
   import { onMount, tick } from 'svelte';
-  import { slide } from 'svelte/transition';
+  import { slide, fly, fade } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
   import { push, querystring } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
   import { AVAILABLE_LOCALES } from '../i18n/index.js';
@@ -445,12 +446,22 @@
 <div class="page-shell">
   <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
     {#if currentSection}
-      <button class="settings-back" on:click={backToIndex} aria-label={$_('common.back')}>
+      <!-- Back button + title use fly + fade so drilling in / out
+           animates instead of the arrow just popping into existence
+           between the hamburger and the title. -->
+      <button class="settings-back"
+              on:click={backToIndex}
+              aria-label={$_('common.back')}
+              in:fly={{ x: -12, duration: 220, easing: cubicOut }}
+              out:fade={{ duration: 140 }}>
         <span class="material-symbols-rounded">arrow_back</span>
       </button>
-      <h1>{SECTION_META[currentSection]?.titleKey ? $_(SECTION_META[currentSection].titleKey) : currentSection}</h1>
+      <h1 in:fly={{ x: 12, duration: 220, easing: cubicOut }}
+          out:fade={{ duration: 140 }}>
+        {SECTION_META[currentSection]?.titleKey ? $_(SECTION_META[currentSection].titleKey) : currentSection}
+      </h1>
     {:else}
-      <h1>{$_('routes.settings.title')}</h1>
+      <h1 in:fade={{ duration: 180 }}>{$_('routes.settings.title')}</h1>
     {/if}
   </header>
 

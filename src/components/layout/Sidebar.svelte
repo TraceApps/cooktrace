@@ -53,6 +53,14 @@
   }
 
   $: activePath = $location.split('?')[0];
+  // Prefix-match so /settings/appearance still highlights Settings,
+  // /manage/tags still highlights Manage, etc. Root '/' is exact-match
+  // only so it doesn't trigger for every nested route.
+  function isTabActive(itemPath) {
+    if (itemPath === activePath) return true;
+    if (itemPath === '/') return false;
+    return activePath.startsWith(itemPath + '/');
+  }
 </script>
 
 {#if open}
@@ -91,12 +99,12 @@
       {#each navItems as item}
         <button
           class="sidebar-item"
-          class:active={activePath === item.path}
+          class:active={isTabActive(item.path)}
           on:click={() => go(item.path)}
         >
           <span class="material-symbols-rounded sidebar-icon">{item.icon}</span>
           <span class="sidebar-label">{item.label}</span>
-          {#if activePath === item.path}
+          {#if isTabActive(item.path)}
             <div class="active-indicator"></div>
           {/if}
         </button>
