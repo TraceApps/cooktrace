@@ -1,7 +1,7 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { slide } from 'svelte/transition';
-  import { push } from 'svelte-spa-router';
+  import { push, querystring } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
   import { AVAILABLE_LOCALES } from '../i18n/index.js';
   import SettingsAuth   from '../components/settings/SettingsAuth.svelte';
@@ -205,8 +205,19 @@
     diagnostics:   false,
     about:         false,
   };
+  // Drill-in navigation replaces the old accordion toggle. On the index
+  // (/settings), tapping a section-toggle button routes to the section's
+  // sub-page (/settings/<slug>) instead of expanding it inline. On a
+  // sub-page tapping the same section behaves as "back to index".
+  //
+  // If the user has an active search query, forward it as ?q=<query> so
+  // the sub-page can auto-scroll to the matching setting on land.
   function toggleSection(key) {
-    openSections = { ...openSections, [key]: !openSections[key] };
+    if (currentSection === key) push('/settings');
+    else {
+      const q = settingsQuery ? `?q=${encodeURIComponent(settingsQuery)}` : '';
+      push(`/settings/${key}${q}`);
+    }
   }
 
   // ── Settings search ────────────────────────────────────────────────────
@@ -235,12 +246,78 @@
     about:         ['about','version','cooktrace','license','source','github','donate','support'],
   };
 
-  function sectionVisible(query, key) {
+  // ── Drill-in navigation ────────────────────────────────────────────────
+  // See NT Settings.svelte for the full pattern. Sub-page mode
+  // (currentSection truthy) hides every OTHER section via sectionVisible
+  // and force-opens the current one via sectionOpen. Index mode keeps
+  // keyword search filtering the toggle list.
+  export let params = {};
+  $: currentSection = params?.section || null;
+
+  const SECTION_META = {
+    appearance:    { titleKey: 'settings.appearance.section',       icon: 'contrast' },
+    regional:      { titleKey: 'settings.regional.section',         icon: 'public' },
+    cooking:       { titleKey: 'settings.cooking.section',          icon: 'restaurant' },
+    nutrition:     { titleKey: 'settings.nutrition.section',        icon: 'science' },
+    ai:            { titleKey: 'settings.ai.section',               icon: 'bolt' },
+    federation:    { titleKey: 'settings.federation.section',       icon: 'link' },
+    foodsources:   { titleKey: 'settings.foodsources.section',      icon: 'restaurant_menu' },
+    notifications: { titleKey: 'settings.notifications.section',    icon: 'notifications' },
+    email:         { titleKey: 'settings.email.section',            icon: 'mail' },
+    backup:        { titleKey: 'settings.backup.section',           icon: 'archive' },
+    import:        { titleKey: 'settings.import.section',           icon: 'import_export' },
+    kitchens:      { titleKey: 'settings.kitchens.section',         icon: 'group' },
+    users:         { titleKey: 'settings.users.section',            icon: 'group' },
+    auth:          { titleKey: 'settings.authentication.section',   icon: 'shield_person' },
+    serverconn:    { titleKey: 'settings.server.section',           icon: 'cloud' },
+    updates:       { titleKey: 'settings.updates.section',          icon: 'system_update' },
+    diagnostics:   { titleKey: 'settings.diagnostics.section',      icon: 'troubleshoot' },
+    about:         { titleKey: 'settings.about.section',            icon: 'info' },
+  };
+
+  $: sectionVisible = (query, key) => {
+    if (currentSection) return key === currentSection;
     if (!query) return true;
     return (SECTION_KEYWORDS[key] || []).some(kw => kw.includes(query));
+  };
+  $: sectionOpen = (_sections, _query, key) => currentSection === key;
+
+  function backToIndex() { push('/settings'); }
+
+  // Force-open the drilled-in section in openSections so any
+  // reactive lazy-load blocks fire the same way accordion open used to.
+  $: if (currentSection && !openSections[currentSection]) {
+    openSections = { ...openSections, [currentSection]: true };
   }
-  function sectionOpen(sections, query, key) {
-    return sections[key] || (!!query && sectionVisible(query, key));
+
+  // Deep-link ?q= scroll: on sub-page mount, scan DOM for the search
+  // query and scroll+highlight the first matching setting.
+  $: _urlQuery = $querystring ? new URLSearchParams($querystring).get('q') : null;
+  let _lastDeepLinkKey = null;
+  $: {
+    const key = `${currentSection || ''}|${_urlQuery || ''}`;
+    if (currentSection && _urlQuery && key !== _lastDeepLinkKey) {
+      _lastDeepLinkKey = key;
+      _scheduleDeepLinkScroll(_urlQuery);
+    }
+  }
+  async function _scheduleDeepLinkScroll(q) {
+    await tick();
+    await new Promise(r => setTimeout(r, 60));
+    const q_norm = q.toLowerCase().trim();
+    if (!q_norm) return;
+    const scope = document.querySelector('.subpage-view');
+    if (!scope) return;
+    const candidates = scope.querySelectorAll('.setting-label, .setting-desc, .sub-label, .setting-row');
+    let hit = null;
+    for (const el of candidates) {
+      if ((el.textContent || '').toLowerCase().includes(q_norm)) { hit = el; break; }
+    }
+    if (!hit) return;
+    const row = hit.closest('.setting-row') || hit;
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.classList.add('deep-link-highlight');
+    setTimeout(() => row.classList.remove('deep-link-highlight'), 2200);
   }
 
   // ── Theme / accent options (mirror NT exactly) ─────────────────────────
@@ -367,21 +444,30 @@
 
 <div class="page-shell">
   <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
-    <h1>{$_('routes.settings.title')}</h1>
+    {#if currentSection}
+      <button class="settings-back" on:click={backToIndex} aria-label={$_('common.back')}>
+        <span class="material-symbols-rounded">arrow_back</span>
+      </button>
+      <h1>{SECTION_META[currentSection]?.titleKey ? $_(SECTION_META[currentSection].titleKey) : currentSection}</h1>
+    {:else}
+      <h1>{$_('routes.settings.title')}</h1>
+    {/if}
   </header>
 
-  <div class="settings-search-bar">
-    <span class="material-symbols-rounded settings-search-icon">search</span>
-    <input class="settings-search-input" type="search" placeholder="Search settings…"
-      bind:value={settingsSearch} />
-    {#if settingsSearch}
-      <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''} title="Clear search">
-        <span class="material-symbols-rounded" style="font-size:18px">close</span>
-      </button>
-    {/if}
-  </div>
+  {#if !currentSection}
+    <div class="settings-search-bar">
+      <span class="material-symbols-rounded settings-search-icon">search</span>
+      <input class="settings-search-input" type="search" placeholder="Search settings…"
+        bind:value={settingsSearch} />
+      {#if settingsSearch}
+        <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''} title="Clear search">
+          <span class="material-symbols-rounded" style="font-size:18px">close</span>
+        </button>
+      {/if}
+    </div>
+  {/if}
 
-  <div class="page-content settings-content">
+  <div class="page-content settings-content" class:subpage-view={!!currentSection}>
 
     <!-- ── Profile hero — identity card at the top of Settings ─────────── -->
     {#if sectionVisible(settingsQuery, 'profile')}
@@ -1235,6 +1321,47 @@
 
 <style>
   .settings-content { display: flex; flex-direction: column; gap: 0; }
+  /* Settings-only override: reduce horizontal page padding on phone
+     widths so cards get ~10-12px more breathing room per side. Rows,
+     labels, drag-lists, and controls all benefit uniformly. Desktop /
+     tablet widths (>= 768px) keep the default padding. */
+  @media (max-width: 767px) {
+    .settings-content { padding-left: 8px; padding-right: 8px; }
+  }
+
+  /* Sub-page view: hide index-only chrome so only the current section's
+     body renders under the back-arrow header. Cheaper than wrapping
+     each of 18 sections in an {#if !currentSection}. */
+  .subpage-view :global(.section-toggle) { display: none; }
+  .subpage-view :global(.settings-group-label) { display: none; }
+  .subpage-view :global(.profile-hero) { display: none; }
+  .subpage-view :global(.section-body) { animation: none !important; }
+
+  /* Back arrow header button — mirrors NT. */
+  .settings-back {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px;
+    margin-right: 8px;
+    border: none; background: transparent; cursor: pointer;
+    color: var(--text-1);
+    border-radius: 50%;
+    transition: background-color 120ms ease;
+  }
+  .settings-back:hover  { background: var(--surface-2); }
+  .settings-back:active { background: var(--surface-3); }
+  .settings-back .material-symbols-rounded { font-size: 24px; }
+
+  /* Deep-link highlight — brief pulse on the target row after a
+     search-driven drill-in scroll. Box-shadow keeps layout stable. */
+  :global(.setting-row.deep-link-highlight) {
+    animation: deep-link-pulse 2s cubic-bezier(.2, .8, .2, 1) both;
+    border-radius: 8px;
+  }
+  @keyframes deep-link-pulse {
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%,  transparent); background-color: transparent; }
+    12%  { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 45%, transparent); background-color: color-mix(in srgb, var(--accent) 14%, transparent); }
+    100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%,  transparent); background-color: transparent; }
+  }
   .hidden { display: none !important; }
 
   /* ── Settings search bar (sticky under header, mirrors NT) ───────────── */
@@ -1352,8 +1479,11 @@
     border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
   }
-  .chevron { font-size: 20px; color: var(--text-3); margin-left: auto; transition: transform var(--dur-base) var(--ease-out); }
-  .chevron.rotated { transform: rotate(180deg); }
+  /* Drill-in indicator: chevron always points right (rotate -90deg turns
+     the down-arrow into a right-arrow). No expanded state on the index
+     anymore since each section drills into its own sub-page. */
+  .chevron { font-size: 20px; color: var(--text-3); margin-left: auto; transform: rotate(-90deg); }
+  .chevron.rotated { transform: rotate(-90deg); }
   .section-body { padding: 12px var(--page-px); display: flex; flex-direction: column; gap: 10px; }
   .sub-label {
     font-size: 11px; font-weight: 700; letter-spacing: 0.06em;

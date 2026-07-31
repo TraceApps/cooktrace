@@ -73,6 +73,7 @@
     '/cookbooks/:id':      CookbookView,
     '/r/:token':           PublicRecipe,
     '/settings':           Settings,
+    '/settings/:section':  Settings,
     '/wizard':             Wizard,
     '/profile':            Profile,
     '/forgot-password':    ForgotPassword,
