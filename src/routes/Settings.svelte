@@ -1,7 +1,6 @@
 <script>
   import { onMount, tick } from 'svelte';
-  import { slide, fly, fade } from 'svelte/transition';
-  import { cubicOut } from 'svelte/easing';
+  import { slide } from 'svelte/transition';
   import { push, querystring } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
   import { AVAILABLE_LOCALES } from '../i18n/index.js';
@@ -446,22 +445,20 @@
 <div class="page-shell">
   <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
     {#if currentSection}
-      <!-- Back button + title use fly + fade so drilling in / out
-           animates instead of the arrow just popping into existence
-           between the hamburger and the title. -->
-      <button class="settings-back"
+      <!-- Back button "peels out" from the left edge of the section
+           title via a CSS keyframe (Svelte transitions don't fire here
+           because svelte-spa-router unmounts + remounts the whole
+           component between /settings and /settings/:section routes). -->
+      <button class="settings-back back-peel-in"
               on:click={backToIndex}
-              aria-label={$_('common.back')}
-              in:fly={{ x: -12, duration: 220, easing: cubicOut }}
-              out:fade={{ duration: 140 }}>
+              aria-label={$_('common.back')}>
         <span class="material-symbols-rounded">arrow_back</span>
       </button>
-      <h1 in:fly={{ x: 12, duration: 220, easing: cubicOut }}
-          out:fade={{ duration: 140 }}>
+      <h1 class="title-slide-in">
         {SECTION_META[currentSection]?.titleKey ? $_(SECTION_META[currentSection].titleKey) : currentSection}
       </h1>
     {:else}
-      <h1 in:fade={{ duration: 180 }}>{$_('routes.settings.title')}</h1>
+      <h1>{$_('routes.settings.title')}</h1>
     {/if}
   </header>
 
@@ -1361,6 +1358,26 @@
   .settings-back:hover  { background: var(--surface-2); }
   .settings-back:active { background: var(--surface-3); }
   .settings-back .material-symbols-rounded { font-size: 24px; }
+
+  /* Back button peel-in — the button appears to unfold from the left
+     edge of the section title. Delayed 80ms so the title appears
+     first, then the arrow reveals. */
+  .back-peel-in {
+    overflow: hidden;
+    transform-origin: left center;
+    animation: back-peel 320ms cubic-bezier(0.34, 1.4, 0.64, 1) 80ms both;
+  }
+  @keyframes back-peel {
+    from { width: 0;    margin-right: 0;  opacity: 0; transform: scale(0.4); }
+    to   { width: 40px; margin-right: 8px; opacity: 1; transform: scale(1);   }
+  }
+  .title-slide-in {
+    animation: title-slide 320ms cubic-bezier(0.34, 1.4, 0.64, 1) 80ms both;
+  }
+  @keyframes title-slide {
+    from { opacity: 0; transform: translateX(-16px); }
+    to   { opacity: 1; transform: translateX(0);      }
+  }
 
   /* Deep-link highlight — brief pulse on the target row after a
      search-driven drill-in scroll. Box-shadow keeps layout stable. */
