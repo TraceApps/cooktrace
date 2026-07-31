@@ -25,7 +25,14 @@ const CACHE_DIR = 'image_cache';
 // the trailing filename only — colliding for OFF image URLs that all end
 // with names like "front_en.4.400.jpg" across different products. Ported
 // from NutriTrace #61 fix (commit 409e9a1). v2 hashes the full URL.
-const CACHE_VERSION = 2;
+// Bumped to 3 on the WebView hostname flip (localhost → app.cooktrace.local).
+// Cached image URLs are pre-generated via Capacitor.convertFileSrc() at
+// download time, which bakes in the WebView's current authority. Old caches
+// stored https://localhost/_capacitor_file_/... URLs; on the new hostname
+// those paths are cross-origin and the WebView refuses to load them.
+// Bumping the version invalidates every cached URL so the next sync
+// re-caches them against the current hostname.
+const CACHE_VERSION = 3;
 
 /**
  * Derive a collision-safe cache filename from a full image URL. The trailing

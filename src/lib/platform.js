@@ -128,7 +128,7 @@ export async function loadImageMap() {
     // Must stay in sync with CACHE_VERSION in image-cache.js. Inlined as a
     // small magic number to avoid creating a cross-file import just for
     // this one constant; only image-cache.js writes it.
-    const IMAGE_CACHE_VERSION = 2;
+    const IMAGE_CACHE_VERSION = 3;
     const vr = await db.query(`SELECT value FROM sync_meta WHERE key = 'image_cache_version'`, []);
     const storedVersion = parseInt(vr?.values?.[0]?.value || '1', 10);
     if (storedVersion !== IMAGE_CACHE_VERSION) { _imageMap = {}; return; }
@@ -162,9 +162,17 @@ export function iconUrl(path) {
   return `${resolved}?v=${encodeURIComponent(v)}`;
 }
 
+// WebView's own origin — historically https://localhost, now
+// https://app.cooktrace.local after the hostname flip for password-
+// manager identity. Resolved once at load time; any absolute URL that
+// begins with this origin is already a bundled asset served from the
+// APK and doesn't need further path resolution.
+const _webviewOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+
 export function resolveAssetUrl(path) {
   if (!path) return path;
-  if (path.startsWith('data:') || path.startsWith('https://localhost')) return path;
+  if (path.startsWith('data:')) return path;
+  if (_webviewOrigin && path.startsWith(_webviewOrigin)) return path;
   // Local-mode images live as file:// URIs in Capacitor's Data dir.
   // The WebView can't load file:// directly for security reasons —
   // Capacitor.convertFileSrc() rewrites them to the WebView-served

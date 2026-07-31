@@ -71,13 +71,20 @@ router.use('/api/sync/push',   express.json({ limit: '25mb' }));
 router.use(express.json({ limit: '1mb' }));
 router.use(cookieParser());
 
-// CORS — allow cross-origin requests from Android app (https://localhost) and same-origin
+// CORS — allow cross-origin requests from the Android app + same-origin.
+// Capacitor WebView origins accepted:
+//   https://localhost              — legacy default (kept for older APKs)
+//   http://localhost               — legacy http scheme
+//   https://app.cooktrace.local    — current app identity (see
+//                                    capacitor.config.ts for why)
+// Same-host origins (PWA served from this instance) always allowed.
 router.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin) {
-    // Allow Capacitor WebView (https://localhost) and same-host origins
     const host = req.headers.host;
-    const isCapacitor = origin === 'https://localhost' || origin === 'http://localhost';
+    const isCapacitor = origin === 'https://localhost'
+      || origin === 'http://localhost'
+      || origin === 'https://app.cooktrace.local';
     const isSameHost = host && origin.includes(host);
     if (isCapacitor || isSameHost) {
       res.setHeader('Access-Control-Allow-Origin', origin);
