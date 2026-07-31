@@ -1,6 +1,6 @@
 {
   "name": "cooktrace",
-  "version": "1.1.0-dev06",
+  "version": "1.1.0-dev09",
   "private": true,
   "type": "module",
   "scripts": {
