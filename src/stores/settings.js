@@ -70,6 +70,9 @@ export const USER_PREFS = new Set([
   'offUsername','offPassword','offUploadCountry',
   // USDA FoodData Central.
   'usdaEnabled','usdaApiKey',
+  // Which source chip the Pantry page opens on. See createSettingStore
+  // for defaults + behavior. Ported from NutriTrace #128.
+  'pantryDefaultSource',
   // Barcode scanner preferences (matches NT key names).
   'barcodeBeep','barcodeFlashlight',
 ]);
@@ -463,6 +466,11 @@ export const offPassword       = createSettingStore('offPassword',       '');
 // USDA FoodData Central — opt-in (requires a free API key).
 export const usdaEnabled = createSettingStore('usdaEnabled', false);
 export const usdaApiKey  = createSettingStore('usdaApiKey',  '');
+
+// Which source chip the Pantry page opens on. Values: 'local' (My Pantry),
+// 'all' (fan-out), 'off' (Open Food Facts), 'usda' (FoodData Central).
+// Default 'local' preserves pre-#128-port behavior. Ported from NT #128.
+export const pantryDefaultSource = createSettingStore('pantryDefaultSource', 'local');
 
 // Barcode scanner — beep on detect (per-user preference), flashlight
 // override (form-factor specific but kept on USER_PREFS to mirror NT).

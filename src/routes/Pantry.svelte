@@ -30,7 +30,7 @@
   } from '../lib/pantry-variants.js';
   import * as OFF from '../lib/off.js';
   import * as USDA from '../lib/usda.js';
-  import { offEnabled, usdaEnabled, usdaApiKey, offSearchLanguage, offSearchCountry } from '../stores/settings.js';
+  import { offEnabled, usdaEnabled, usdaApiKey, offSearchLanguage, offSearchCountry, pantryDefaultSource } from '../stores/settings.js';
   import { offCountryTagToFlag, offCountryTagToName } from '../lib/off-country-flag.js';
   import { portal } from '../lib/portal.js';
   import { slide } from 'svelte/transition';
@@ -115,7 +115,9 @@
   // 'off'   = also query Open Food Facts when there's a query string.
   // 'usda'  = also query USDA when there's a query string.
   // 'all'   = fan-out to pantry + OFF + USDA in parallel, merged view.
-  let searchSource = 'local';
+  // Initial value comes from the pantryDefaultSource user pref (#128
+  // port from NT). Default 'local' preserves prior behavior.
+  let searchSource = pantryDefaultSource.get() || 'local';
   let offResults = [];
   let usdaResults = [];
   let externalLoading = false;

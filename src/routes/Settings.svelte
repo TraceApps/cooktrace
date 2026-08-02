@@ -35,7 +35,7 @@
     dateFormat, timeFormat, language, startPage,
     offEnabled, offSearchLanguage, offSearchCountry, offUploadCountry,
     offUsername, offPassword, barcodeBeep, barcodeFlashlight,
-    usdaEnabled, usdaApiKey,
+    usdaEnabled, usdaApiKey, pantryDefaultSource,
     urlImportEngine, urlImportFallback, autoCreatePantryFromRecipes,
     mixSharedIntoRecipes,
     shoppingGroupBy, shoppingCheckedBehavior,
@@ -49,8 +49,12 @@
     ['pt','Portuguese'],['nl','Dutch'],['pl','Polish'],['ru','Russian'],['ja','Japanese'],
     ['zh','Chinese'],['ar','Arabic'],['ko','Korean'],
   ];
-  const OFF_COUNTRY_OPTS = ['World','United States','United Kingdom','Australia','Canada',
-    'France','Germany','Spain','Italy','Mexico','Brazil','Japan','China','India'];
+  const OFF_COUNTRY_OPTS = ['World',
+    'Argentina','Australia','Austria','Belgium','Brazil','Canada','Chile','China',
+    'Denmark','Finland','France','Germany','India','Ireland','Italy','Japan',
+    'Mexico','Netherlands','New Zealand','Norway','Poland','Portugal','Singapore',
+    'South Africa','South Korea','Spain','Sweden','Switzerland','United Kingdom',
+    'United States'];
   let offShowPass = false;
   import { isNative, getServerUrl, resolveAssetUrl, iconUrl } from '../lib/platform.js';
   import { currentUser, userMgmtActive } from '../stores/auth.js';
@@ -231,7 +235,7 @@
     cooking:       ['cooking','servings','default servings','yield','recipe','recipes','url import','url import engine','scraper','recipe scrapers','recipe-scrapers','enhanced','smart','json-ld','schema.org','parser','auto add ingredients','auto-create pantry','pantry catalog','shopping','shopping list','aisle','aisles','group by','grouping','checked','hide checked','sort','reorder','shared recipes','main list','kitchen recipes','mixed view'],
     nutrition:     ['nutrition','nutrients','nutriments','vitamins','minerals','visible nutriments','fda'],
     federation:    ['federation','nutritrace','nt','linked','share','token','instance','foods','pull foods','import foods','sync foods'],
-    foodsources:   ['food sources','open food facts','off','usda','fooddata central','api key','barcode','scanner','beep','flashlight','search','language','country','contribute'],
+    foodsources:   ['food sources','open food facts','off','usda','fooddata central','api key','barcode','scanner','beep','flashlight','search','language','country','contribute','default source','default search','my pantry','pantry search'],
     ai:            ['ai','trace','assistant','provider','model','custom model','model id','api key','chat','claude','openai','gemini','sonnet','opus','haiku','gpt','gemini 3','base url','artificial intelligence','smart log','smartlog','quick log','voice','dictate','hold to record','mic'],
     notifications: ['notifications','reminders','cook day','thaw','alerts','push','apprise','gotify','ntfy','expiration','expiry','expires','expiring','pantry expiry','digest','weekly summary','shopping nudge'],
     email:         ['email','smtp','mail','password reset','invite','from address','tls','outgoing','send test','test email','recipient','test recipient','connection status','change password','change smtp'],
@@ -875,6 +879,23 @@
     </button>
     {#if sectionOpen(openSections, settingsQuery, 'foodsources') && sectionVisible(settingsQuery, 'foodsources')}
       <div class="section-body" transition:slide={{ duration: 180 }}>
+        <p class="sub-label">{$_('settings_page.pantry_search.section')}</p>
+        <div class="card settings-card">
+          <div class="setting-row">
+            <div>
+              <span class="setting-label">{$_('settings_page.pantry_search.default_source')}</span>
+              <div class="setting-desc">{$_('settings_page.pantry_search.default_source_desc')}</div>
+            </div>
+            <div class="select-wrap" style="width:160px">
+              <select class="select sel-sm" value={$pantryDefaultSource} on:change={e => pantryDefaultSource.set(e.target.value)}>
+                <option value="all">{$_('settings_page.pantry_search.source_all')}</option>
+                <option value="local">{$_('settings_page.pantry_search.source_local')}</option>
+                {#if $offEnabled}<option value="off">OFF</option>{/if}
+                {#if $usdaEnabled}<option value="usda">USDA</option>{/if}
+              </select>
+            </div>
+          </div>
+        </div>
         <p class="sub-label">{$_('settings_page.off.section')}</p>
         <div class="card settings-card">
           <div class="setting-row">

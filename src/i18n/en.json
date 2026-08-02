@@ -784,6 +784,13 @@
       "sink_to_bottom":         "Sink to Bottom",
       "hide":                   "Hide"
     },
+    "pantry_search": {
+      "section":                "Pantry Search",
+      "default_source":         "Default Search Source",
+      "default_source_desc":    "Which source chip the Pantry page opens with. All fans out to every enabled database; My Pantry starts in your local library.",
+      "source_all":             "All",
+      "source_local":           "My Pantry"
+    },
     "off": {
       "section":                "Open Food Facts",
       "enable":                 "Enable Open Food Facts",

@@ -9,6 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Pantry page: configurable default search source.** New setting under **Settings → Food Sources → Pantry Search → Default Search Source** picks which chip the Pantry page opens with (options: All, My Pantry, OFF, USDA, filtered to whatever external sources are enabled). Existing users keep the current default (My Pantry); anyone who prefers all-sources fan-out on every visit can switch to All and it sticks across sessions + devices. Ported from NutriTrace #128.
 - **Pull-to-refresh sync (Android).** In native server mode, swipe down from the top of any page to trigger a manual sync. Matches NutriTrace's behavior for family consistency.
 - **Smart connection banner.** When sync fails, the banner explains what actually went wrong (no network vs cellular-only vs server unreachable vs HTTP error) with a Retry button, instead of a generic "sync error". Structured classification via `describeConnectionIssue` mirrors NT.
 - **Cloud icon in hamburger menu goes red on server disconnect.** Previously only lit up when the OS reported offline; now also triggers on server-side outages and cellular-vs-LAN routing mismatches, matching NT's behavior.
@@ -25,6 +26,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **OFF country filter works again + expanded country list.** The Pantry's Open Food Facts country filter was being passed to search-a-licious with the wrong query shape (`countries_tags_en=<slug>`), so selecting Norway or any non-World option silently had no effect. Fixed by using search-a-licious's native inline Lucene syntax (`q=<text> +countries_tags:"en:<slug>"`). While in there: expanded the picker from 15 → 30 countries, alphabetized, and added Argentina, Austria, Belgium, Chile, Denmark, Finland, Ireland, Netherlands, New Zealand, Norway, Poland, Portugal, Singapore, South Africa, South Korea, Sweden, Switzerland. Same fix ported from NutriTrace's #131 (@JacosVerksted), adapted to search-a-licious.
 - **App icon no longer shows a white halo.** The bundled icon PNGs had ~15px of solid white padding baked into their corners. On tinted browser chrome the halo was visible around the tab favicon; in-app the icon looked framed. Corners now clear cleanly. Icon URLs also cache-busted with the app version so shipped icon fixes actually take effect without users needing to clear their browser cache.
 - **Create Admin form password field no longer crushed** (parity with NT #122). The password input on the Enable User Management form was rendering as a colored sliver because of a flex-layout bug. Password + Confirm now sit symmetrically side-by-side, each with its own eye toggle sharing show/hide state.
 
