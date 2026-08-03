@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Micronutrient units display as `mcg` instead of `µg`** (Vitamin A / Vitamin D / Vitamin K / Folate (B9) / Vitamin B12). Same unit (microgram), consumer-friendlier spelling used by supplement labels, prescriptions, and the FDA. Keeps parity with NutriTrace's #137 fix and avoids the CSS uppercase transform edge case where `µg` case-maps to `Μg` (Greek Capital Mu) and can visually read as `MG`. No data change.
+
 ---
 
 ## [1.1.1] - 2026-08-03

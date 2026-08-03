@@ -56,22 +56,22 @@ export const NUTRIMENTS = [
   { id: 'proteins',            label: 'Protein',             unit: 'g',    category: 'macro',   default: true,  bold: true,  dv: 50,   fdaBlock: 'macros' },
 
   // Vitamins & minerals (Nutrition-Facts label order: D, Ca, Fe, K)
-  { id: 'vitamin-d',           label: 'Vitamin D',           unit: 'µg',   category: 'vitamin', default: false, bold: false, dv: 20,   fdaBlock: 'micros' },
+  { id: 'vitamin-d',           label: 'Vitamin D',           unit: 'mcg',   category: 'vitamin', default: false, bold: false, dv: 20,   fdaBlock: 'micros' },
   { id: 'calcium',             label: 'Calcium',             unit: 'mg',   category: 'mineral', default: false, bold: false, dv: 1300, fdaBlock: 'micros' },
   { id: 'iron',                label: 'Iron',                unit: 'mg',   category: 'mineral', default: false, bold: false, dv: 18,   fdaBlock: 'micros' },
   { id: 'potassium',           label: 'Potassium',           unit: 'mg',   category: 'mineral', default: false, bold: false, dv: 4700, fdaBlock: 'micros' },
 
   // Additional vitamins
-  { id: 'vitamin-a',           label: 'Vitamin A',           unit: 'µg',   category: 'vitamin', default: false, bold: false, dv: 900,  fdaBlock: 'micros' },
+  { id: 'vitamin-a',           label: 'Vitamin A',           unit: 'mcg',   category: 'vitamin', default: false, bold: false, dv: 900,  fdaBlock: 'micros' },
   { id: 'vitamin-c',           label: 'Vitamin C',           unit: 'mg',   category: 'vitamin', default: false, bold: false, dv: 90,   fdaBlock: 'micros' },
   { id: 'vitamin-e',           label: 'Vitamin E',           unit: 'mg',   category: 'vitamin', default: false, bold: false, dv: 15,   fdaBlock: 'micros' },
-  { id: 'vitamin-k',           label: 'Vitamin K',           unit: 'µg',   category: 'vitamin', default: false, bold: false, dv: 120,  fdaBlock: 'micros' },
+  { id: 'vitamin-k',           label: 'Vitamin K',           unit: 'mcg',   category: 'vitamin', default: false, bold: false, dv: 120,  fdaBlock: 'micros' },
   { id: 'b1',                  label: 'Vitamin B1 (Thiamin)',unit: 'mg',   category: 'vitamin', default: false, bold: false, dv: 1.2,  fdaBlock: 'micros' },
   { id: 'b2',                  label: 'Vitamin B2 (Riboflavin)', unit: 'mg', category: 'vitamin', default: false, bold: false, dv: 1.3, fdaBlock: 'micros' },
   { id: 'b3',                  label: 'Vitamin B3 (Niacin)', unit: 'mg',   category: 'vitamin', default: false, bold: false, dv: 16,   fdaBlock: 'micros' },
   { id: 'b6',                  label: 'Vitamin B6',          unit: 'mg',   category: 'vitamin', default: false, bold: false, dv: 1.7,  fdaBlock: 'micros' },
-  { id: 'b9',                  label: 'Folate (B9)',         unit: 'µg',   category: 'vitamin', default: false, bold: false, dv: 400,  fdaBlock: 'micros' },
-  { id: 'b12',                 label: 'Vitamin B12',         unit: 'µg',   category: 'vitamin', default: false, bold: false, dv: 2.4,  fdaBlock: 'micros' },
+  { id: 'b9',                  label: 'Folate (B9)',         unit: 'mcg',   category: 'vitamin', default: false, bold: false, dv: 400,  fdaBlock: 'micros' },
+  { id: 'b12',                 label: 'Vitamin B12',         unit: 'mcg',   category: 'vitamin', default: false, bold: false, dv: 2.4,  fdaBlock: 'micros' },
 
   // Minerals
   { id: 'magnesium',           label: 'Magnesium',           unit: 'mg',   category: 'mineral', default: false, bold: false, dv: 420,  fdaBlock: 'micros' },
