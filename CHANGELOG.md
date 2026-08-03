@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.1.0] - 2026-08-02
+
+> **⚠ Upgrade note.** The Android app identifier change (`app.cooktrace.local`, see "Changed" below) invalidates the WebView's cached auth cookie. Server-connected Android users will need to re-enter their server URL and sign back in once after upgrading; standalone Android users lose their theme / accent / display prefs but keep all recipe, pantry, diary, and shopping data (that lives in local SQLite, unaffected). PWA / browser users are not affected.
+
 ### Added
 
 - **Pantry page: configurable default search source.** New setting under **Settings → Food Sources → Pantry Search → Default Search Source** picks which chip the Pantry page opens with (options: All, My Pantry, OFF, USDA, filtered to whatever external sources are enabled). Existing users keep the current default (My Pantry); anyone who prefers all-sources fan-out on every visit can switch to All and it sticks across sessions + devices. Ported from NutriTrace #128.
