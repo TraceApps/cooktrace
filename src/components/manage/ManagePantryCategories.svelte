@@ -6,6 +6,7 @@
    * (Material Symbols name) instead of a color swatch — pantry rows
    * have always rendered an icon, not a colored pill.
    */
+  import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { NtApi } from '../../lib/api.js';
   import { showError, showSuccess } from '../../stores/toast.js';
@@ -52,7 +53,7 @@
       });
       categories = categories.map(x => x.id === c.id ? updated : x);
       cancelEdit();
-      showSuccess('Saved');
+      showSuccess($_('manage_pantry_cats.toast.saved'));
     } catch (e) { showError(e.message || 'Could not save'); }
   }
 
@@ -123,7 +124,7 @@
       newName = '';
       newIcon = 'kitchen';
       newDefaultAisle = '';
-      showSuccess('Category added');
+      showSuccess($_('manage_pantry_cats.toast.category_added'));
     } catch (e) { showError(e.message || 'Could not add'); }
     finally { creating = false; }
   }
@@ -131,7 +132,7 @@
 
 <div class="mgr">
   <header class="mgr-head">
-    <h2>Pantry Categories</h2>
+    <h2>{$_('manage_pantry_cats.title')}</h2>
     <p class="mgr-desc">Used to group your pantry items into sections (Spices, Produce, etc.) and to filter the Pantry list. The optional Default Aisle labels items added to the shopping list from this category — leave blank to use the category name.</p>
   </header>
 
@@ -158,12 +159,12 @@
           {/if}
           {#if editingId === c.id}
             <div class="edit-form">
-              <input class="input name-input" bind:value={editName} placeholder="Name" />
-              <IconPicker bind:value={editIcon} placeholder="Icon" />
+              <input class="input name-input" bind:value={editName} placeholder={$_('manage_pantry_cats.name_ph')} />
+              <IconPicker bind:value={editIcon} placeholder={$_('manage_pantry_cats.icon_ph')} />
               <input class="input aisle-input" bind:value={editDefaultAisle} placeholder="Default Aisle (optional)" maxlength="40" />
               <div class="row-actions">
-                <button class="btn btn-secondary tiny" on:click={cancelEdit}>Cancel</button>
-                <button class="btn btn-primary tiny" on:click={() => saveEdit(c)} disabled={!editName.trim()}>Save</button>
+                <button class="btn btn-secondary tiny" on:click={cancelEdit}>{$_('manage_pantry_cats.cancel')}</button>
+                <button class="btn btn-primary tiny" on:click={() => saveEdit(c)} disabled={!editName.trim()}>{$_('manage_pantry_cats.save')}</button>
               </div>
             </div>
           {:else}
@@ -198,7 +199,7 @@
   <div class="add-row">
     <input class="input name-input" placeholder="New category name…" bind:value={newName}
       on:keydown={(e) => { if (e.key === 'Enter') create(); }} />
-    <IconPicker bind:value={newIcon} placeholder="Icon" />
+    <IconPicker bind:value={newIcon} placeholder={$_('manage_pantry_cats.icon_ph')} />
     <input class="input aisle-input" bind:value={newDefaultAisle} placeholder="Default Aisle (optional)" maxlength="40" />
     <button class="btn btn-primary" on:click={create} disabled={creating || !newName.trim()}>
       {creating ? 'Adding…' : 'Add'}

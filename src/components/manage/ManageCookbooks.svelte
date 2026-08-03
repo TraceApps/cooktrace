@@ -7,6 +7,7 @@
    * editor is just the catalog manager: name, description, cover URL,
    * delete.
    */
+  import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { NtApi } from '../../lib/api.js';
@@ -82,7 +83,7 @@
       newSmartCategory = '';
       newSmartTags = [];
       newSmartFavoritesOnly = false;
-      showSuccess('Cookbook created');
+      showSuccess($_('manage_cookbooks.toast.cookbook_created'));
     } catch (e) {
       showError(e.message || 'Could not create');
     } finally {
@@ -108,7 +109,7 @@
       });
       cookbooks = cookbooks.map(x => x.id === cb.id ? { ...x, ...updated } : x);
       cancelEdit();
-      showSuccess('Saved');
+      showSuccess($_('manage_cookbooks.toast.saved'));
     } catch (e) { showError(e.message || 'Could not save'); }
   }
 
@@ -126,7 +127,7 @@
       } else {
         const updated = await NtApi.updateCookbook(cb.id, { cover_image_url: url });
         cookbooks = cookbooks.map(x => x.id === cb.id ? { ...x, ...updated } : x);
-        showSuccess('Cover updated');
+        showSuccess($_('manage_cookbooks.toast.cover_updated'));
       }
     } catch (e) {
       showError(e.message || 'Could not upload');
@@ -219,7 +220,7 @@
 
 <div class="mgr">
   <header class="mgr-head">
-    <h2>Cookbooks</h2>
+    <h2>{$_('manage_cookbooks.title')}</h2>
     <p class="mgr-desc">User-curated collections of recipes. A recipe can live in multiple cookbooks. Click a cookbook to edit its contents.</p>
   </header>
 
@@ -253,7 +254,7 @@
                   on:change={(e) => onCoverPicked(cb, e)} />
               </button>
               <div class="edit-form">
-                <input class="input edit-name" bind:value={editName} placeholder="Name" />
+                <input class="input edit-name" bind:value={editName} placeholder={$_('manage_cookbooks.name_ph')} />
                 <input class="input edit-desc" bind:value={editDesc} placeholder="Description (optional)" />
                 <div class="row-actions">
                   {#if editCover}
@@ -261,7 +262,7 @@
                       <span class="material-symbols-rounded">image_not_supported</span>
                     </button>
                   {/if}
-                  <button class="btn btn-secondary tiny" on:click={cancelEdit}>Cancel</button>
+                  <button class="btn btn-secondary tiny" on:click={cancelEdit}>{$_('manage_cookbooks.cancel')}</button>
                   <button class="btn btn-primary tiny" on:click={() => saveEdit(cb)} disabled={!editName.trim() || coverUploading}>
                     {coverUploading ? 'Uploading…' : 'Save'}
                   </button>
@@ -278,7 +279,7 @@
               <div class="meta">
                 <div class="title-row">
                   <button class="title-btn" on:click={() => open(cb)}>{cb.name}</button>
-                  {#if cb.is_smart}<span class="smart-badge" title="Smart cookbook — auto-populated from a filter">Smart</span>{/if}
+                  {#if cb.is_smart}<span class="smart-badge" title="Smart cookbook — auto-populated from a filter">{$_('manage_cookbooks.smart_badge')}</span>{/if}
                 </div>
                 {#if cb.description}<p class="desc">{cb.description}</p>{/if}
                 <span class="count">{cb.recipe_count} {cb.recipe_count === 1 ? 'recipe' : 'recipes'}</span>
@@ -315,7 +316,7 @@
       <input class="input add-desc" placeholder="Description (optional)" bind:value={newDesc} />
       <label class="smart-toggle" title="Auto-populate from a filter instead of hand-picking recipes">
         <input type="checkbox" bind:checked={newSmart} />
-        <span>Smart</span>
+        <span>{$_('manage_cookbooks.smart')}</span>
       </label>
       <button class="btn btn-primary" on:click={create} disabled={creating || !newName.trim()}>
         {creating ? 'Adding…' : 'Add'}
@@ -326,7 +327,7 @@
       <div class="smart-filter">
         <p class="smart-help">Filter is re-evaluated every time someone opens the cookbook, so it stays in sync with your library.</p>
         <div class="filter-row">
-          <span class="filter-label">Category</span>
+          <span class="filter-label">{$_('manage_cookbooks.category')}</span>
           <select class="input" bind:value={newSmartCategory}>
             <option value="">— Any —</option>
             {#each categories as c (c.id)}
@@ -347,7 +348,7 @@
         </div>
         <label class="filter-row check-row">
           <input type="checkbox" bind:checked={newSmartFavoritesOnly} />
-          <span>Favorites Only</span>
+          <span>{$_('manage_cookbooks.favorites_only')}</span>
         </label>
       </div>
     {/if}

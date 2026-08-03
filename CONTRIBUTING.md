@@ -22,6 +22,14 @@ node server/index.js # API on :3001
 - Don't add features beyond what the issue/PR scope demands.
 - See `CLAUDE.md` for project-specific notes.
 
+## Pull requests
+
+- **Target the `dev` branch, not `main`.** All work lands on `dev` first, gets tested there, and is bundled into `main` at release time. PRs opened against `main` will be asked to retarget.
+- Keep changes focused — one concern per PR.
+- Update `CHANGELOG.md` under the unreleased section if your change is user-visible.
+- The Android shell lives in `android/`; if you change web assets the maintainer will run `npx cap sync android` and rebuild the APK.
+- No DCO or CLA required.
+
 ## Translations
 
 ### For translators — adding a new language

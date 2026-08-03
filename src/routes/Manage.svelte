@@ -10,6 +10,7 @@
    * Route param `section` lets deep-links land directly on a section
    * (e.g. /manage/tags from a "Manage tags" link in RecipeEditor).
    */
+  import { _ } from 'svelte-i18n';
   import { push } from 'svelte-spa-router';
   import { pageBanners, bannerStyle } from '../stores/settings.js';
   import { NtApi } from '../lib/api.js';
@@ -92,7 +93,7 @@
 
 <div class="page-shell manage-page">
   <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
-    <h1>Manage</h1>
+    <h1>{$_('manage_ct.title')}</h1>
   </header>
 
   <div class="manage-body">

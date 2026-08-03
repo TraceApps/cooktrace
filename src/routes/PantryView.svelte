@@ -8,6 +8,7 @@
    * actions inline (in-stock toggle, qty +/-) so the user doesn't
    * need to enter Edit just to bump quantity or flip stock.
    */
+  import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { push, pop } from 'svelte-spa-router';
   import { fade } from 'svelte/transition';
@@ -115,7 +116,7 @@
     if (!ok) return;
     try {
       await NtApi.deletePantryItem(item.id);
-      showSuccess('Removed');
+      showSuccess($_('pantry_view_ct.toast.removed'));
       pop();
     } catch (e) {
       showError(e.message || 'Delete failed');
@@ -153,7 +154,7 @@
       <div class="state error">
         <span class="material-symbols-rounded">error</span>
         <p>{loadError}</p>
-        <button class="btn btn-secondary" on:click={load}>Retry</button>
+        <button class="btn btn-secondary" on:click={load}>{$_('pantry_view_ct.retry')}</button>
       </div>
     {:else if item}
       <!-- Identity card: photo, name, brand, category + barcode, in-stock -->
@@ -182,7 +183,7 @@
             {/if}
           </div>
           <div class="stock-row">
-            <span class="stock-label">In Stock</span>
+            <span class="stock-label">{$_('pantry_view_ct.in_stock')}</span>
             <button type="button" class="stock-switch" class:on={item.in_stock}
               on:click={toggleStock} disabled={toggling}
               aria-pressed={item.in_stock} aria-label="Toggle in stock">
@@ -195,12 +196,12 @@
       <!-- Stats: serving size, on-hand qty -->
       <div class="card view-card stats-card">
         <div class="stat">
-          <div class="stat-label">Serving Size</div>
+          <div class="stat-label">{$_('pantry_view_ct.serving_size')}</div>
           <div class="stat-value">
             {#if item.serving_size}
               {item.serving_size} {item.serving_unit || 'g'}
             {:else}
-              <span class="muted">Not set</span>
+              <span class="muted">{$_('pantry_view_ct.not_set')}</span>
             {/if}
           </div>
           {#if item.serving_label}
@@ -208,7 +209,7 @@
           {/if}
         </div>
         <div class="stat">
-          <div class="stat-label">On Hand</div>
+          <div class="stat-label">{$_('pantry_view_ct.on_hand')}</div>
           <div class="stat-value qty-row">
             <button class="qty-btn" on:click={() => bumpQty(-1)} disabled={qtyBusy || (Number(item.quantity) || 0) <= 0} aria-label="Decrease">
               <span class="material-symbols-rounded">remove</span>
@@ -234,7 +235,7 @@
       <!-- Notes -->
       {#if item.notes}
         <div class="card view-card">
-          <div class="card-title">Notes</div>
+          <div class="card-title">{$_('pantry_view_ct.notes')}</div>
           <p class="notes">{item.notes}</p>
         </div>
       {/if}

@@ -11,6 +11,7 @@
    *     Export JSON (no images) and Import JSON (merges).
    */
   import { onMount } from 'svelte';
+  import { _ } from 'svelte-i18n';
   import { slide } from 'svelte/transition';
   import { showSuccess, showError } from '../../stores/toast.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
@@ -211,7 +212,7 @@
         method: 'DELETE', ..._fetchOpts(),
       });
       if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
-      showSuccess('Deleted');
+      showSuccess($_('backup_page.toast.deleted'));
       await loadFullBackups();
     } catch (e) {
       showError(e.message || 'Delete failed');
@@ -233,7 +234,7 @@
       });
       if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
       restoreStatus = { label: 'Reloading…', percent: 100 };
-      showSuccess('Restored — reloading…');
+      showSuccess($_('backup_page.toast.restored_reloading'));
       setTimeout(() => window.location.reload(), 800);
     } catch (e) {
       showError(e.message || 'Restore failed');
@@ -268,7 +269,7 @@
       });
       if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
       restoreStatus = { label: 'Reloading…', percent: 100 };
-      showSuccess('Restored — reloading…');
+      showSuccess($_('backup_page.toast.restored_reloading'));
       setTimeout(() => window.location.reload(), 800);
     } catch (e) {
       showError(e.message || 'Restore failed');
@@ -293,11 +294,11 @@
     try {
       const res = await fetch(apiUrl('/api/data'), { method: 'DELETE', ..._fetchOpts() });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
-      showSuccess('All data cleared');
+      showSuccess($_('backup_page.toast.all_data_cleared'));
       // Reload so every route's local state (recipe lists, pantry,
       // diary, shopping) re-fetches and reflects the empty database.
       setTimeout(() => location.reload(), 800);
-    } catch (e) { showError('Clear failed: ' + (e.message || e)); }
+    } catch (e) { showError($_('backup_page.toast.clear_failed', { values: { msg: e.message || e } })); }
   }
 
   async function clearAllSettings() {
@@ -316,9 +317,9 @@
       keys.forEach(k => localStorage.removeItem(k));
       // Keep wizard from re-running — settings cleared is not a fresh install.
       DB.setSetting('setupComplete', true);
-      showSuccess('All settings cleared');
+      showSuccess($_('backup_page.toast.all_settings_cleared'));
       setTimeout(() => location.reload(), 800);
-    } catch (e) { showError('Clear failed: ' + (e.message || e)); }
+    } catch (e) { showError($_('backup_page.toast.clear_failed', { values: { msg: e.message || e } })); }
   }
 
   async function _confirmClearAllData() {
@@ -374,7 +375,7 @@
           await Filesystem.writeFile({ path: `exports/${fileName}`, data: b64, directory: Directory.Cache, recursive: true });
           const { uri } = await Filesystem.getUri({ path: `exports/${fileName}`, directory: Directory.Cache });
           await Share.share({ title: 'CookTrace Backup', url: uri, dialogTitle: 'Save backup' });
-          showSuccess('Exported');
+          showSuccess($_('backup_page.toast.exported'));
           return;
         } catch (e) {
           // Fall through to <a download> if share path fails.
@@ -388,7 +389,7 @@
       a.download = fileName;
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
-      showSuccess('Exported');
+      showSuccess($_('backup_page.toast.exported'));
     } catch (e) {
       showError(e.message || 'Export failed');
     }
@@ -408,7 +409,7 @@
       const fileName = `cooktrace-backup-${new Date().toISOString().slice(0,10)}.zip`;
       const { shareBlob } = await import('../../lib/shopping-card.js');
       const res = await shareBlob(blob, fileName, 'CookTrace Backup');
-      if (res.downloaded) showSuccess('Backup saved');
+      if (res.downloaded) showSuccess($_('backup_page.toast.backup_saved'));
     } catch (e) {
       showError(e.message || 'Backup failed');
     } finally {
@@ -425,7 +426,7 @@
     try {
       const { importLocalZip } = await import('../../lib/local-backup.js');
       await importLocalZip(file);
-      showSuccess('Restored — reloading');
+      showSuccess($_('backup_page.toast.restored_reloading'));
       setTimeout(() => window.location.reload(), 400);
     } catch (e) {
       showError(e.message || 'Restore failed');
@@ -443,7 +444,7 @@
       if (data?.format === 'cooktrace-local-snapshot' && isNative) {
         const { importLocalSnapshot } = await import('../../lib/local-backup.js');
         await importLocalSnapshot(data);
-        showSuccess('Imported — reloading');
+        showSuccess($_('backup_page.toast.imported_reloading'));
         setTimeout(() => window.location.reload(), 400);
         return;
       }
@@ -456,7 +457,7 @@
           for (const [k, v] of Object.entries(data.settings)) DB.setSetting(k, v);
         }
       }
-      showSuccess('Imported');
+      showSuccess($_('backup_page.toast.imported'));
     } catch (e) {
       showError(e.message || 'Import failed');
     }
@@ -466,7 +467,7 @@
 <div class="backup-body">
   <!-- ── FULL BACKUP ───────────────────────────────────────────────── -->
   {#if showServerSection}
-    <p class="sub-label">Full Backup</p>
+    <p class="sub-label">{$_('backup_page.full_backup')}</p>
     <div class="card settings-card">
       <div style="padding:12px 16px 4px">
         <p class="setting-desc" style="margin:0 0 12px">
@@ -479,33 +480,33 @@
         {#if scheduleCfg}
           <div class="auto-bk">
             <div class="auto-bk-head">
-              <span class="auto-bk-title">Auto Backup</span>
+              <span class="auto-bk-title">{$_('backup_page.auto_backup')}</span>
               {#if scheduleCfg.envLocked}
-                <span class="env-lock-pill" title="Locked by BACKUP_SCHEDULE / BACKUP_TIME / BACKUP_RETENTION env var">Locked by env</span>
+                <span class="env-lock-pill" title={$_('backup_page.env_lock_title')}>{$_('backup_page.env_lock_pill')}</span>
               {/if}
             </div>
             <div class="auto-bk-fields">
               <label class="auto-bk-field">
-                <span class="auto-bk-label">Schedule</span>
+                <span class="auto-bk-label">{$_('backup_page.schedule')}</span>
                 <select class="select sel-sm"
                   bind:value={scheduleCfg.schedule}
                   disabled={scheduleCfg.envLocked || scheduleBusy}
                   on:change={() => saveSchedule({ schedule: scheduleCfg.schedule })}>
                   <option value="off">Off</option>
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
+                  <option value="daily">{$_('backup_page.daily')}</option>
+                  <option value="weekly">{$_('backup_page.weekly')}</option>
+                  <option value="monthly">{$_('backup_page.monthly')}</option>
                 </select>
               </label>
               {#if scheduleCfg.schedule !== 'off'}
                 <label class="auto-bk-field">
-                  <span class="auto-bk-label">Time</span>
+                  <span class="auto-bk-label">{$_('backup_page.time')}</span>
                   <TimePicker value={scheduleCfg.time}
                     disabled={scheduleCfg.envLocked || scheduleBusy}
                     on:change={(e) => saveSchedule({ time: e.detail })} />
                 </label>
                 <label class="auto-bk-field">
-                  <span class="auto-bk-label">Keep Last</span>
+                  <span class="auto-bk-label">{$_('backup_page.keep_last')}</span>
                   <input class="input" type="number" min="1" max="99"
                     bind:value={scheduleCfg.retention}
                     disabled={scheduleCfg.envLocked || scheduleBusy}
@@ -575,9 +576,9 @@
       {#if fullBackups.length > 0}
         <div class="setting-divider"></div>
         <div class="backup-table-header">
-          <span>Name</span>
-          <span>Created</span>
-          <span>Size</span>
+          <span>{$_('backup_page.col_name')}</span>
+          <span>{$_('backup_page.col_created')}</span>
+          <span>{$_('backup_page.col_size')}</span>
           <span></span>
         </div>
         <div class="setting-divider"></div>
@@ -627,28 +628,28 @@
       {#if localScheduleCfg}
         <div class="auto-bk" style="padding:14px 16px 4px">
           <div class="auto-bk-head">
-            <span class="auto-bk-title">Auto Backup</span>
+            <span class="auto-bk-title">{$_('backup_page.auto_backup')}</span>
           </div>
           <div class="auto-bk-fields">
             <label class="auto-bk-field">
-              <span class="auto-bk-label">Schedule</span>
+              <span class="auto-bk-label">{$_('backup_page.schedule')}</span>
               <select class="select sel-sm"
                 value={localScheduleCfg.schedule}
                 on:change={(e) => saveLocalSchedule({ schedule: e.target.value })}>
                 <option value="off">Off</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
+                <option value="daily">{$_('backup_page.daily')}</option>
+                <option value="weekly">{$_('backup_page.weekly')}</option>
+                <option value="monthly">{$_('backup_page.monthly')}</option>
               </select>
             </label>
             {#if localScheduleCfg.schedule !== 'off'}
               <label class="auto-bk-field">
-                <span class="auto-bk-label">Time</span>
+                <span class="auto-bk-label">{$_('backup_page.time')}</span>
                 <TimePicker value={localScheduleCfg.time}
                   on:change={(e) => saveLocalSchedule({ time: e.detail })} />
               </label>
               <label class="auto-bk-field">
-                <span class="auto-bk-label">Keep Last</span>
+                <span class="auto-bk-label">{$_('backup_page.keep_last')}</span>
                 <input class="input" type="number" min="1" max="99"
                   value={localScheduleCfg.retention}
                   on:change={(e) => saveLocalSchedule({ retention: e.target.value })} />
@@ -695,7 +696,7 @@
       <button class="setting-row setting-action" on:click={importLocalZipBackup}>
         <span class="material-symbols-rounded si" style="color:var(--accent)">unarchive</span>
         <div>
-          <span class="setting-label">Restore From ZIP</span>
+          <span class="setting-label">{$_('backup_page.restore_from_zip')}</span>
           <div class="setting-desc">Restores from a previously exported .zip. Replaces every table with the snapshot's data and re-writes images to the app's storage.</div>
         </div>
         <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
@@ -705,12 +706,12 @@
   {/if}
 
   <!-- ── PORTABLE JSON EXPORT ─────────────────────────────────────── -->
-  <p class="sub-label">Portable JSON Export</p>
+  <p class="sub-label">{$_('backup_page.portable_json')}</p>
   <div class="card settings-card">
     <button class="setting-row setting-action" on:click={exportBackup}>
       <span class="material-symbols-rounded si" style="color:var(--accent)">download</span>
       <div>
-        <span class="setting-label">Export JSON</span>
+        <span class="setting-label">{$_('backup_page.export_json')}</span>
         <div class="setting-desc">Lighter format — JSON only, no images. Useful for sharing data between accounts or quick text-based exports.</div>
       </div>
       <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
@@ -719,7 +720,7 @@
     <button class="setting-row setting-action" on:click={importBackup}>
       <span class="material-symbols-rounded si" style="color:var(--accent)">upload</span>
       <div>
-        <span class="setting-label">Import JSON</span>
+        <span class="setting-label">{$_('backup_page.import_json')}</span>
         <div class="setting-desc">Restores from a previously exported JSON file. Merges with existing data — does not erase what's already here.</div>
       </div>
       <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
@@ -728,12 +729,12 @@
   </div>
 
   <!-- ── DANGER ZONE ─────────────────────────────────────────────────── -->
-  <p class="sub-label danger-zone-label">Danger Zone</p>
+  <p class="sub-label danger-zone-label">{$_('backup_page.danger_zone')}</p>
   <div class="card settings-card danger-zone-card">
     <button class="setting-row setting-action" on:click={_confirmClearAllData}>
       <span class="material-symbols-rounded si" style="color:var(--danger);background:color-mix(in srgb,var(--danger) 14%,transparent)">delete_forever</span>
       <div>
-        <span class="setting-label" style="color:var(--danger)">Clear All Data</span>
+        <span class="setting-label" style="color:var(--danger)">{$_('backup_page.clear_all_data')}</span>
         <div class="setting-desc">Permanently deletes all recipes, pantry items, cook diary entries, and shopping lists. Settings and credentials are kept.</div>
       </div>
       <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger);flex-shrink:0">chevron_right</span>
@@ -742,7 +743,7 @@
     <button class="setting-row setting-action" on:click={_confirmClearAllSettings}>
       <span class="material-symbols-rounded si" style="color:var(--danger);background:color-mix(in srgb,var(--danger) 14%,transparent)">manage_history</span>
       <div>
-        <span class="setting-label" style="color:var(--danger)">Clear All Settings</span>
+        <span class="setting-label" style="color:var(--danger)">{$_('backup_page.clear_all_settings')}</span>
         <div class="setting-desc">Resets all preferences, credentials, and API keys to defaults. Recipes, pantry, and other data are kept.</div>
       </div>
       <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger);flex-shrink:0">chevron_right</span>

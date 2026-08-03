@@ -1,4 +1,5 @@
 <script>
+  import { _ } from 'svelte-i18n';
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { fly } from 'svelte/transition';
   import { isNative } from '../../lib/platform.js';
@@ -372,7 +373,7 @@
       const perms = await BarcodeScanner.requestPermissions();
       if (perms.camera !== 'granted') {
         const { showError } = await import('../../stores/toast.js');
-        showError('Camera permission denied');
+        showError($_('barcode_scanner.toast.camera_denied'));
         open = false; scanning = false;
         return;
       }
@@ -395,7 +396,7 @@
     } catch (e) {
       console.error('[BarcodeScanner] Native scan failed:', e);
       const { showError } = await import('../../stores/toast.js');
-      showError('Barcode scan failed: ' + (e?.message || 'Unknown error'));
+      showError($_('barcode_scanner.toast.scan_failed', { values: { reason: e?.message || $_('barcode_scanner.toast.scan_unknown') } }));
       open = false; scanning = false;
     }
   }
@@ -419,7 +420,7 @@
     <div class="scanner-panel" on:click|stopPropagation>
       <!-- Header -->
       <div class="scanner-header">
-        <span class="scanner-title">Scan Barcode</span>
+        <span class="scanner-title">{$_('barcode_scanner.title')}</span>
         <button class="btn-icon" on:click={close} aria-label="Close" title="Close scanner">
           <span class="material-symbols-rounded">close</span>
         </button>
@@ -428,7 +429,7 @@
       <!-- Engine + Camera selects -->
       <div class="scanner-controls">
         <div class="sc-field">
-          <label class="sc-label">Library</label>
+          <label class="sc-label">{$_('barcode_scanner.library')}</label>
           <select class="sc-select" bind:value={selectedEngine} on:change={onEngineChange}>
             <option value="zxing">@zxing/library</option>
             <option value="html5qr">html5-qrcode</option>
@@ -436,7 +437,7 @@
           </select>
         </div>
         <div class="sc-field">
-          <label class="sc-label">Camera</label>
+          <label class="sc-label">{$_('barcode_scanner.camera')}</label>
           <select class="sc-select" bind:value={selectedCamId} on:change={onCamChange}>
             {#if cameras.length === 0}
               <option>Loading…</option>
@@ -494,7 +495,7 @@
           bind:value={manualCode}
           on:keydown={e => e.key === 'Enter' && doManual()}
         />
-        <button class="btn btn-primary" on:click={doManual}>Look Up</button>
+        <button class="btn btn-primary" on:click={doManual}>{$_('barcode_scanner.look_up')}</button>
       </div>
     </div>
   </div>

@@ -1,4 +1,5 @@
 <script>
+  import { _ } from 'svelte-i18n';
   import { aiEnabled, aiProvider, aiApiKey, aiModel, aiBaseUrl, aiAssistantName, aiKeyVerified, smartLogEnabled, traceChefHat, envLocks as envLocksStore } from '../../stores/settings.js';
   import { AI_PROVIDERS, AI_DEFAULT_MODELS, AI_MODELS, AI_MODEL_CUSTOM, callAI, callAIProxy } from '../../lib/aiChat.js';
   import { showError, showSuccess } from '../../stores/toast.js';
@@ -131,7 +132,7 @@
 
   async function testConnection({ silentOk = false } = {}) {
     if (!canTest && !envLocks.ai) {
-      showError('Fill in provider, API key, and model first');
+      showError($_('settings_trace_ct.toast.fill_fields'));
       return;
     }
     testing = true;
@@ -164,7 +165,7 @@
       }
       testStatus = 'ok';
       aiKeyVerified.set(true);
-      if (!silentOk) showSuccess('Trace AI connected — assistant is ready');
+      if (!silentOk) showSuccess($_('settings_trace_ct.toast.connected'));
     } catch (e) {
       testStatus = 'fail';
       aiKeyVerified.set(false);
@@ -189,7 +190,7 @@
   {/if}
   <div class="setting-row">
     <div>
-      <span class="setting-label">Enable Trace Assistant</span>
+      <span class="setting-label">{$_('settings_trace_ct.enable_assistant')}</span>
       <span class="setting-desc">Floating chat button on every page. Uses your own AI provider key — never shared.</span>
     </div>
     <input type="checkbox" class="toggle-cb" checked={_displayedAiEnabled} on:change={e => { if (!envLocks.ai) aiEnabled.set(e.target.checked); }} disabled={envLocks.ai} />
@@ -198,7 +199,7 @@
   {#if _displayedAiEnabled}
     <div class="setting-divider"></div>
     <div class="setting-row">
-      <span class="setting-label">Provider</span>
+      <span class="setting-label">{$_('settings_trace_ct.provider')}</span>
       <div class="select-wrap expand-left" style="width:220px">
         <select class="select sel-sm" value={$aiProvider} on:change={onProviderChange} disabled={envLocks.ai}>
           {#each AI_PROVIDERS as p}
@@ -211,7 +212,7 @@
     {#if $aiProvider === 'custom'}
       <div class="setting-divider"></div>
       <div class="setting-row stack">
-        <span class="setting-label">Base URL <span class="setting-desc">/v1/chat/completions endpoint</span></span>
+        <span class="setting-label">{$_('settings_trace_ct.base_url')} <span class="setting-desc">{$_('settings_trace_ct.base_url_desc')}</span></span>
         <div class="key-row">
           <input class="input" type="url" bind:value={aiBaseUrlDraft}
             placeholder="https://api.example.com/v1"
@@ -225,7 +226,7 @@
 
     <div class="setting-divider"></div>
     <div class="setting-row">
-      <span class="setting-label">Model</span>
+      <span class="setting-label">{$_('settings_trace_ct.model')}</span>
       {#if providerModels.length > 0 && $aiProvider !== 'custom'}
         <div class="select-wrap" style="width:220px">
           <select class="select sel-sm" bind:value={aiModelSelectVal} on:change={_syncModelFromSelect}>
@@ -241,7 +242,7 @@
     {#if aiModelSelectVal === AI_MODEL_CUSTOM && $aiProvider !== 'custom'}
       <div class="setting-divider"></div>
       <div class="setting-row">
-        <span class="setting-label">Custom Model ID</span>
+        <span class="setting-label">{$_('settings_trace_ct.custom_model_id')}</span>
         <input class="input" type="text" style="width:220px"
           placeholder={$aiProvider === 'gemini' ? 'gemini-3.5-flash' : $aiProvider === 'claude' ? 'claude-sonnet-5' : 'gpt-4o'}
           bind:value={aiCustomModelVal} on:input={_syncModelFromSelect} />
@@ -288,15 +289,15 @@
 
     <div class="setting-divider"></div>
     <div class="setting-row stack">
-      <span class="setting-label">Assistant Name</span>
-      <input class="input" type="text" value={$aiAssistantName} placeholder="Trace"
+      <span class="setting-label">{$_('settings_trace_ct.assistant_name')}</span>
+      <input class="input" type="text" value={$aiAssistantName} placeholder={$_('settings_trace_ct.assistant_name_ph')}
         on:change={e => aiAssistantName.set(e.target.value || 'Trace')} />
     </div>
 
     <div class="setting-divider"></div>
     <div class="setting-row">
       <div>
-        <span class="setting-label">Chef Hat</span>
+        <span class="setting-label">{$_('settings_trace_ct.chef_hat')}</span>
         <span class="setting-desc">
           A small flourish for CookTrace — same Trace face, with a chef hat on top everywhere it appears.
         </span>
@@ -313,7 +314,7 @@
     <div class="setting-divider"></div>
     <div class="setting-row">
       <div>
-        <span class="setting-label">Smart Log</span>
+        <span class="setting-label">{$_('settings_trace_ct.smart_log')}</span>
         <span class="setting-desc">
           Hold the Trace button, speak what you cooked / bought / need, and let Trace add it for you. Examples: "I cooked the lasagna," "Add bananas to my shopping list," "I'm out of eggs," "Plan tacos for Friday." Tap-to-dictate (transcript only) still works when Smart Log is off.
         </span>

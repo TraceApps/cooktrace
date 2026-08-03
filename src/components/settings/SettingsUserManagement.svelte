@@ -11,6 +11,7 @@
   import { push } from 'svelte-spa-router';
   import { validatePassword } from '../../lib/validation.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
+  import { envLocks } from '../../stores/settings.js';
 
   // ── User Management state ────────────────────────────────────────────────────
   let umUsers        = [];
@@ -31,6 +32,7 @@
   let enableShowPass = false;
   let enableAdminConf = '';
   let enableAdminName = '';
+  let enableAdminEmail = '';
   let enableUmError   = '';
   let enableUmLoading = false;
 
@@ -78,7 +80,7 @@
     try {
       await NtApi.del(`/api/auth/invites/${token}`);
       await loadPendingInvites();
-      showSuccess('Invite revoked');
+      showSuccess($_('settings_users_ct.toast.invite_revoked'));
     } catch (e) { showError(e.message || 'Could not revoke invite'); }
   }
 
@@ -189,6 +191,10 @@
           username:  enableAdminUser.trim(),
           password:  enableAdminPass,
           full_name: enableAdminName.trim() || undefined,
+          // Only sent when SMTP is env-configured (field only rendered
+          // in that case). Server stores it on the user row so password
+          // reset / admin invites can email them later.
+          email:     enableAdminEmail.trim().toLowerCase() || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -219,7 +225,7 @@
       }
       await loadAuthState();
       showEnableUm = false;
-      enableAdminUser = ''; enableAdminPass = ''; enableAdminConf = ''; enableAdminName = '';
+      enableAdminUser = ''; enableAdminPass = ''; enableAdminConf = ''; enableAdminName = ''; enableAdminEmail = '';
       await loadUsers();
       showSuccess($_('settings.users.toast_um_enabled'));
     } catch(e) { enableUmError = $_('settings.users.err_could_not_reach_server'); }
@@ -381,7 +387,7 @@
 
   async function createInvite() {
     if (!_inviteEmailValid) {
-      showError('Enter a valid email or leave blank to generate a shareable link');
+      showError($_('settings_users_ct.toast.invite_email_or_blank'));
       return;
     }
     inviteLoading = true;
@@ -402,7 +408,7 @@
       inviteEmail  = '';
       await loadPendingInvites();
     } catch {
-      showError('Could not create invite');
+      showError($_('settings_users_ct.toast.cant_create_invite'));
     } finally {
       // Always release the loading state — was leaking on early-returns
       // (validation fails / non-OK response) so the button stayed stuck on
@@ -491,7 +497,7 @@
           </button>
           {#if pendingInvites.length > 0}
             <div class="pending-invites" transition:slide={{ duration: 160 }}>
-              <div class="pending-invites-label">Pending Invites</div>
+              <div class="pending-invites-label">{$_('settings_users_ct.pending_invites')}</div>
               {#each pendingInvites as inv (inv.token)}
                 <div class="pending-invite-row">
                   <div class="pending-invite-info">
@@ -571,7 +577,7 @@
         <div class="setting-divider"></div>
         <div class="setting-row">
           <div>
-            <span class="setting-label">Require Strong Passwords</span>
+            <span class="setting-label">{$_('settings_users_ct.require_strong_passwords')}</span>
             <div class="setting-desc">Reject weak passwords (zxcvbn score below 3) on top of the standard 8-char + mixed-case + number + symbol rules. Affects new sign-ups, invites, and password changes. Existing passwords aren't re-checked.</div>
           </div>
           <Toggle checked={passwordPolicy === 'strong'} on:change={e => savePasswordPolicy(e.detail ? 'strong' : 'standard')} />
@@ -583,13 +589,13 @@
         <div class="setting-divider"></div>
         <div class="setting-row">
           <div>
-            <span class="setting-label">Session Duration</span>
+            <span class="setting-label">{$_('settings_users_ct.session_duration')}</span>
             <div class="setting-desc">How long users stay signed in. Applies to new logins.</div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <div class="select-wrap" style="width:130px">
               <select class="select sel-sm" bind:value={sessionHours}>
-                <option value="0">Never Expires</option>
+                <option value="0">{$_('settings_users_ct.session_never')}</option>
                 <option value="8">8 hours</option>
                 <option value="24">1 day</option>
                 <option value="168">7 days</option>
@@ -608,7 +614,7 @@
         <button class="setting-row setting-action danger" on:click={disableUserManagement}>
           <span class="material-symbols-rounded si" style="color:var(--danger)">no_accounts</span>
           <div>
-            <span class="setting-label" style="color:var(--danger)">Disable User Management</span>
+            <span class="setting-label" style="color:var(--danger)">{$_('settings_users_ct.disable_um')}</span>
             <div class="setting-desc">Removes all user accounts and returns to single-user mode</div>
           </div>
         </button>
@@ -618,7 +624,7 @@
       <button class="setting-row setting-action" on:click={() => { showEnableUm = !showEnableUm; enableUmError = ''; }}>
         <span class="material-symbols-rounded si" style="color:var(--accent)">group_add</span>
         <div>
-          <span class="setting-label">Enable User Management</span>
+          <span class="setting-label">{$_('settings_users_ct.enable_um')}</span>
           <div class="setting-desc">Add multiple user accounts with separate data &amp; settings</div>
         </div>
         <span class="material-symbols-rounded text-3" style="font-size:18px">{showEnableUm ? 'expand_less' : 'expand_more'}</span>
@@ -626,31 +632,52 @@
 
       {#if showEnableUm}
         <div class="section-body" style="padding:0 16px 16px" transition:slide={{ duration: 160 }}>
-          <p class="um-section-label" style="margin-bottom:8px">Create Admin Account</p>
+          <p class="um-section-label" style="margin-bottom:8px">{$_('settings_users_ct.create_admin_account')}</p>
           <p class="text-3 text-sm" style="margin:0 0 12px;line-height:1.5">
             The first account is always admin. All existing food, meal, and diary data on this server will be assigned to it.
           </p>
           <div class="um-add-form">
             <div class="um-form-row">
-              <input class="input" type="text" bind:value={enableAdminUser} placeholder="Username *" autocomplete="username" />
-              <input class="input" type="text" bind:value={enableAdminName} placeholder="Full name (optional)" />
+              <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminUser} placeholder="Username *" autocomplete="username" />
+              <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminName} placeholder="Full name (optional)" />
             </div>
+            <!-- Optional admin email — only shown when SMTP is env-locked
+                 (docker-compose configured), so we know at boot the server
+                 can actually send from it. Stored on the user row for
+                 later password-reset / invite emails. -->
+            {#if $envLocks?.smtp}
+              <div class="um-form-row">
+                <input class="input" style="flex:1;min-width:0" type="email"
+                  bind:value={enableAdminEmail}
+                  placeholder="Email (optional)"
+                  autocomplete="email" />
+              </div>
+            {/if}
+            <!-- Symmetric password + confirm row, both wrapped in flex:1
+                 groups with matching eye toggles. Prevents the .input's
+                 width:100% from crushing one side when siblings are
+                 asymmetric (TraceApps/nutritrace#122). -->
             <div class="um-form-row">
-              <div style="display:flex;gap:4px;align-items:center;flex:1">
+              <div style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
                 {#if enableShowPass}
-                  <input class="input" style="flex:1" type="text" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                  <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
                 {:else}
-                  <input class="input" style="flex:1" type="password" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                  <input class="input" style="flex:1;min-width:0" type="password" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
                 {/if}
-                <button class="btn-icon" on:click={() => enableShowPass = !enableShowPass} style="flex-shrink:0">
+                <button class="btn-icon" on:click={() => enableShowPass = !enableShowPass} style="flex-shrink:0" aria-label={enableShowPass ? 'Hide password' : 'Show password'}>
                   <span class="material-symbols-rounded" style="font-size:18px">{enableShowPass ? 'visibility_off' : 'visibility'}</span>
                 </button>
               </div>
-              {#if enableShowPass}
-                <input class="input" type="text" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
-              {:else}
-                <input class="input" type="password" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
-              {/if}
+              <div style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
+                {#if enableShowPass}
+                  <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                {:else}
+                  <input class="input" style="flex:1;min-width:0" type="password" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                {/if}
+                <button class="btn-icon" on:click={() => enableShowPass = !enableShowPass} style="flex-shrink:0" aria-label={enableShowPass ? 'Hide password' : 'Show password'}>
+                  <span class="material-symbols-rounded" style="font-size:18px">{enableShowPass ? 'visibility_off' : 'visibility'}</span>
+                </button>
+              </div>
             </div>
             {#if enableUmError}<p class="um-error">{enableUmError}</p>{/if}
             <button class="btn btn-primary" style="width:100%" on:click={enableUserManagement} disabled={enableUmLoading}>

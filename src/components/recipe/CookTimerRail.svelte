@@ -12,6 +12,7 @@
    * and lays out cards. CSS makes the layout look right in both
    * contexts via a `compact` prop.
    */
+  import { _ } from 'svelte-i18n';
   import { fade, fly } from 'svelte/transition';
   import { cookTimers, dismissTimer, addOneMinute, formatRemaining } from '../../stores/cookTimers.js';
 
@@ -48,7 +49,7 @@
           {#if !t.done}
             <button class="t-btn" on:click={() => addOneMinute(t.id)} title="+1 min">+1</button>
           {:else}
-            <button class="t-btn" on:click={() => addOneMinute(t.id)} title="Snooze 1 min">Snooze</button>
+            <button class="t-btn" on:click={() => addOneMinute(t.id)} title="Snooze 1 min">{$_('cook_timer_rail.snooze')}</button>
           {/if}
           <button class="t-btn close" on:click={() => dismissTimer(t.id)} aria-label="Dismiss" title="Dismiss">
             <span class="material-symbols-rounded">close</span>

@@ -17,6 +17,7 @@
    * commit, and that directory is deleted on commit, on explicit cancel,
    * and on the TTL sweep if abandoned.
    */
+  import { _ } from 'svelte-i18n';
   import { createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
@@ -252,14 +253,14 @@ ${textPayload.text}
       selected = next;
       showSuccess(`Saved "${aiSaved.name}" via Trace AI`);
     } else {
-      showError('AI did not save a recipe for this row.');
+      showError($_('bulk_import_dialog.toast.no_ai_saved'));
     }
   }
 
   async function commit() {
     if (!scanResult?.cacheUuid) return;
     if (selected.size === 0) {
-      showError('Pick at least one recipe to save.');
+      showError($_('bulk_import_dialog.toast.pick_one_recipe'));
       return;
     }
     phase = 'saving';
@@ -313,7 +314,7 @@ ${textPayload.text}
     in:fade={{ duration: 140 }} out:fade={{ duration: 100 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="head">
-        <h3>Bulk Import</h3>
+        <h3>{$_('bulk_import_dialog.title')}</h3>
         <button class="btn-icon" on:click={close} aria-label="Close" title="Close">
           <span class="material-symbols-rounded">close</span>
         </button>
@@ -333,7 +334,7 @@ ${textPayload.text}
           on:drop={_onDrop}
           on:click={_pickFiles}>
           <span class="material-symbols-rounded">cloud_upload</span>
-          <p class="dz-title">Drop files here or click to pick</p>
+          <p class="dz-title">{$_('bulk_import_dialog.dz_title')}</p>
           <p class="dz-sub">PDF, RTF, TXT, MD, or a ZIP of any of these</p>
         </div>
         <div class="picker-aux">
@@ -348,7 +349,7 @@ ${textPayload.text}
         <input type="file" webkitdirectory directory
           bind:this={_folderInput} on:change={_onFiles} hidden />
         <footer class="actions">
-          <button class="btn btn-secondary" on:click={close}>Cancel</button>
+          <button class="btn btn-secondary" on:click={close}>{$_('bulk_import_dialog.cancel')}</button>
         </footer>
 
       {:else if phase === 'uploading' || phase === 'saving'}
@@ -366,9 +367,9 @@ ${textPayload.text}
             <span class="summary-meta">{selected.size} selected</span>
           </div>
           <div class="summary-actions">
-            <button class="link-btn" on:click={_selectAll}>Select all</button>
-            <button class="link-btn" on:click={_selectClean}>Select clean only</button>
-            <button class="link-btn" on:click={_selectNone}>Clear</button>
+            <button class="link-btn" on:click={_selectAll}>{$_('bulk_import_dialog.select_all')}</button>
+            <button class="link-btn" on:click={_selectClean}>{$_('bulk_import_dialog.select_clean')}</button>
+            <button class="link-btn" on:click={_selectNone}>{$_('bulk_import_dialog.clear')}</button>
           </div>
         </div>
         <div class="rows">
@@ -382,12 +383,12 @@ ${textPayload.text}
                 <div class="row-name">{_displayName(item)}</div>
                 <div class="row-meta">
                   {#if item.aiSavedId}
-                    <span class="confidence-pill high">Saved via AI</span>
+                    <span class="confidence-pill high">{$_('bulk_import_dialog.saved_via_ai')}</span>
                   {:else if item.error}
-                    <span class="confidence-pill low">Skipped</span>
+                    <span class="confidence-pill low">{$_('bulk_import_dialog.skipped')}</span>
                     <span class="row-msg">{item.error}</span>
                   {:else if item.empty}
-                    <span class="confidence-pill low">No text</span>
+                    <span class="confidence-pill low">{$_('bulk_import_dialog.no_text')}</span>
                     <span class="row-msg">{item.hint}</span>
                   {:else}
                     <span class="confidence-pill {_confidenceClass(item.confidence)}">{_confidenceLabel(item.confidence)} ({Math.round(item.confidence * 100)}%)</span>
@@ -414,7 +415,7 @@ ${textPayload.text}
           {/each}
         </div>
         <footer class="actions">
-          <button class="btn btn-secondary" on:click={close}>Cancel</button>
+          <button class="btn btn-secondary" on:click={close}>{$_('bulk_import_dialog.cancel')}</button>
           <button class="btn btn-primary" on:click={commit} disabled={selected.size === 0}>
             <span class="material-symbols-rounded">save</span>
             Save {selected.size || ''} Recipe{selected.size === 1 ? '' : 's'}
@@ -444,8 +445,8 @@ ${textPayload.text}
           <p>{errorMessage}</p>
         </div>
         <footer class="actions">
-          <button class="btn btn-secondary" on:click={close}>Cancel</button>
-          <button class="btn btn-primary" on:click={() => { phase = 'pick'; errorMessage = ''; }}>Try Again</button>
+          <button class="btn btn-secondary" on:click={close}>{$_('bulk_import_dialog.cancel')}</button>
+          <button class="btn btn-primary" on:click={() => { phase = 'pick'; errorMessage = ''; }}>{$_('bulk_import_dialog.try_again')}</button>
         </footer>
       {/if}
     </div>

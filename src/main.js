@@ -2,6 +2,7 @@
 // so the in-app diagnostic-log buffer captures the full app lifecycle.
 import { setAppVersion } from './lib/log-capture.js';
 import { APP_VERSION } from './lib/version.js';
+if (typeof window !== 'undefined') window.__APP_VERSION__ = APP_VERSION;
 setAppVersion(APP_VERSION);
 
 import './styles/tokens.css';

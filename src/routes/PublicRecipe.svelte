@@ -7,6 +7,7 @@
    * checkbox state, no comments, no favorite, no rating writes) and
    * shows just the recipe content + a soft "View on CookTrace" CTA.
    */
+  import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
   import { resolveAssetUrl } from '../lib/platform.js';
@@ -95,7 +96,7 @@
 
         <p class="byline">
           {#if recipe.created_by_full_name || recipe.created_by_username}
-            <span>Shared by <strong>{recipe.created_by_full_name || recipe.created_by_username}</strong></span>
+            <span>{$_('public_recipe_ct.shared_by_prefix')}<strong>{recipe.created_by_full_name || recipe.created_by_username}</strong></span>
           {/if}
           {#if recipe.created_at}
             <span class="dot">·</span>
@@ -103,7 +104,7 @@
           {/if}
           {#if recipe.source_url && domainFromUrl(recipe.source_url)}
             <span class="dot">·</span>
-            <span>From <a href={recipe.source_url} target="_blank" rel="noopener noreferrer">{domainFromUrl(recipe.source_url)}</a></span>
+            <span>{$_('public_recipe_ct.from_prefix')}<a href={recipe.source_url} target="_blank" rel="noopener noreferrer">{domainFromUrl(recipe.source_url)}</a></span>
           {/if}
         </p>
 
@@ -111,41 +112,41 @@
           {#if recipe.prep_minutes}
             <div class="meta-stat">
               <span class="material-symbols-rounded">schedule</span>
-              <span><strong>{formatDuration(recipe.prep_minutes)}</strong> Prep</span>
+              <span><strong>{formatDuration(recipe.prep_minutes)}</strong> {$_('public_recipe_ct.prep')}</span>
             </div>
           {/if}
           {#if recipe.cook_minutes}
             <div class="meta-stat">
               <span class="material-symbols-rounded">local_fire_department</span>
-              <span><strong>{formatDuration(recipe.cook_minutes)}</strong> Cook</span>
+              <span><strong>{formatDuration(recipe.cook_minutes)}</strong> {$_('public_recipe_ct.cook')}</span>
             </div>
           {/if}
           {#if recipe.rest_minutes}
             <div class="meta-stat">
               <span class="material-symbols-rounded">hourglass_top</span>
-              <span><strong>{formatDuration(recipe.rest_minutes)}</strong> Rest</span>
+              <span><strong>{formatDuration(recipe.rest_minutes)}</strong> {$_('public_recipe_ct.rest')}</span>
             </div>
           {/if}
           {#if totalMinutes(recipe) > 0}
             <div class="meta-stat">
               <span class="material-symbols-rounded">timer</span>
-              <span><strong>{formatDuration(totalMinutes(recipe))}</strong> Total</span>
+              <span><strong>{formatDuration(totalMinutes(recipe))}</strong> {$_('public_recipe_ct.total')}</span>
             </div>
           {/if}
           {#if recipe.servings}
             <div class="meta-stat">
               <span class="material-symbols-rounded">restaurant</span>
-              <span><strong>{recipe.servings}</strong> Servings</span>
+              <span><strong>{recipe.servings}</strong> {$_('public_recipe_ct.servings')}</span>
             </div>
           {/if}
         </div>
 
         <div class="layout">
           <section class="col col-left">
-            <h2>Ingredients</h2>
+            <h2>{$_('public_recipe_ct.ingredients')}</h2>
             {#if recipe.servings}
               <div class="scale-row">
-                <span class="scale-label">Scale</span>
+                <span class="scale-label">{$_('public_recipe_ct.scale')}</span>
                 {#each [0.5, 1, 2, 3] as f}
                   <button class="scale-chip" class:active={scale === f} on:click={() => scale = f}>×{f}</button>
                 {/each}
@@ -167,14 +168,14 @@
                 </ul>
               {/each}
             {:else}
-              <p class="empty">No ingredients listed.</p>
+              <p class="empty">{$_('public_recipe_ct.no_ingredients')}</p>
             {/if}
 
             <KitchenGear items={recipe.tools || []} />
           </section>
 
           <section class="col col-mid">
-            <h2>Steps</h2>
+            <h2>{$_('public_recipe_ct.steps')}</h2>
             {#if recipe.steps?.length}
               <ol class="steps">
                 {#each recipe.steps as step, i}
@@ -200,11 +201,11 @@
                 {/each}
               </ol>
             {:else}
-              <p class="empty">No steps yet.</p>
+              <p class="empty">{$_('public_recipe_ct.no_steps')}</p>
             {/if}
 
             {#if recipe.notes}
-              <h2>Notes</h2>
+              <h2>{$_('public_recipe_ct.notes')}</h2>
               <p class="notes">{recipe.notes}</p>
             {/if}
           </section>
@@ -222,7 +223,7 @@
   </main>
 
   <footer class="footer">
-    <p>Powered by <strong>CookTrace</strong>.</p>
+    <p>{@html $_('public_recipe_ct.powered_by_html')}</p>
   </footer>
 </div>
 

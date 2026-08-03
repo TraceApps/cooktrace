@@ -90,7 +90,7 @@
   }
   async function doPasteImport() {
     if (!pasteFile && !pasteText.trim()) {
-      showError('Paste a recipe or pick a file first');
+      showError($_('recipes_page.toast.paste_or_pick'));
       return;
     }
     pasteBusy = true;
@@ -114,7 +114,7 @@
         if (stepCount === 0) {
           showError("Imported — but the source had no cooking steps. Open it to add them manually.");
         } else {
-          showSuccess('Recipe imported');
+          showSuccess($_('recipes_page.toast.recipe_imported'));
         }
         push(`/recipes/${created.id}`);
       }
@@ -414,7 +414,7 @@
       const res = await NtApi.mintRecipeShareToken(shareDialogRecipe.id);
       shareDialogToken = res.share_token;
       recipes = recipes.map(x => x.id === shareDialogRecipe.id ? { ...x, share_token: res.share_token } : x);
-      showSuccess('New link generated');
+      showSuccess($_('recipes_page.toast.new_link_generated'));
     } catch (e) {
       showError(e.message || 'Could not rotate');
     } finally {
@@ -435,7 +435,7 @@
       recipes = recipes.map(x => x.id === shareDialogRecipe.id ? { ...x, share_token: null } : x);
       shareDialogToken = null;
       shareDialogOpen = false;
-      showSuccess('Link revoked');
+      showSuccess($_('recipes_page.toast.link_revoked'));
     } catch (e) {
       showError(e.message || 'Could not revoke');
     }
@@ -446,10 +446,10 @@
     if (navigator.clipboard) {
       try {
         await navigator.clipboard.writeText(url);
-        showSuccess('Copied to clipboard');
-      } catch { showError('Copy failed'); }
+        showSuccess($_('recipes_page.toast.copied'));
+      } catch { showError($_('recipes_page.toast.copy_failed')); }
     } else {
-      showError('Clipboard not available');
+      showError($_('recipes_page.toast.clipboard_unavailable'));
     }
   }
 
@@ -510,16 +510,16 @@
     else if (v === 'duplicate') {
       try {
         const fresh = await NtApi.getRecipe(r.id);
-        const { id: _, created_at, updated_at, last_cooked_at, cook_count, created_by_username, ...rest } = fresh;
+        const { id: _id, created_at, updated_at, last_cooked_at, cook_count, created_by_username, ...rest } = fresh;
         const dup = await NtApi.createRecipe({ ...rest, name: rest.name + ' (copy)', favorite: false, rating: null });
         recipes = [dup, ...recipes];
-        showSuccess('Recipe duplicated');
+        showSuccess($_('recipes_page.toast.recipe_duplicated'));
       } catch (err) { showError(err.message || 'Duplicate failed'); }
     }
     else if (v === 'share') {
       // Client-side PNG share. Long recipes paginate; on native
       // multi-page is stitched into one tall PNG at share time.
-      showSuccess('Preparing share…');
+      showSuccess($_('recipes_page.toast.preparing_share'));
       try {
         const full = await NtApi.getRecipe(r.id);
         const pages = await buildRecipeCardPages(full);
@@ -549,7 +549,7 @@
       try {
         await NtApi.deleteRecipe(r.id);
         recipes = recipes.filter(x => x.id !== r.id);
-        showSuccess('Deleted');
+        showSuccess($_('recipes_page.toast.deleted'));
       } catch (err) { showError(err.message || 'Delete failed'); }
     }
   }
@@ -801,7 +801,7 @@
     <div class="cb-dialog-backdrop" on:click={() => shareDialogOpen = false}>
       <div class="cb-dialog share-dialog" on:click|stopPropagation>
         <header class="cb-dialog-head">
-          <h3>Share Recipe</h3>
+          <h3>{$_('recipes_page.share_recipe')}</h3>
           <button class="btn-icon" on:click={() => shareDialogOpen = false} aria-label="Close">
             <span class="material-symbols-rounded">close</span>
           </button>
@@ -907,7 +907,7 @@
       <div class="cb-dialog share-dialog" on:click|stopPropagation>
         <header class="cb-dialog-head">
           <span class="material-symbols-rounded">share</span>
-          <h3>Share Cookbook</h3>
+          <h3>{$_('recipes_page.share_cookbook')}</h3>
           <button class="cb-close" on:click={closeCookbookShareDialog}
             aria-label="Close">
             <span class="material-symbols-rounded">close</span>
@@ -934,7 +934,7 @@
                       checked={cookbookShareGrants.has(p.user_id)}
                       disabled={cookbookShareBusy}
                       on:change={() => toggleCookbookShareUser(p.user_id)} />
-                    <span>Share</span>
+                    <span>{$_('recipes_page.share')}</span>
                   </label>
                 </li>
               {/each}
@@ -974,7 +974,7 @@
     <div class="cb-dialog-backdrop" on:click={() => !bulkCookbookBusy && (bulkCookbookOpen = false)}>
       <div class="cb-dialog" on:click|stopPropagation>
         <header class="cb-dialog-head">
-          <h3>Add to Cookbook</h3>
+          <h3>{$_('recipes_page.add_to_cookbook')}</h3>
           <button class="btn-icon" on:click={() => bulkCookbookOpen = false} aria-label="Close" disabled={bulkCookbookBusy}>
             <span class="material-symbols-rounded">close</span>
           </button>
@@ -1005,7 +1005,7 @@
           {/if}
         </div>
         <footer class="cb-dialog-actions">
-          <button class="btn btn-secondary" on:click={() => bulkCookbookOpen = false} disabled={bulkCookbookBusy}>Cancel</button>
+          <button class="btn btn-secondary" on:click={() => bulkCookbookOpen = false} disabled={bulkCookbookBusy}>{$_('recipes_page.cancel')}</button>
           <button class="btn btn-primary" on:click={confirmBulkCookbook} disabled={bulkCookbookBusy || bulkCookbookSelected.size === 0}>
             {bulkCookbookBusy ? 'Adding…' : 'Add'}
           </button>
@@ -1018,7 +1018,7 @@
     <div class="cb-dialog-backdrop" on:click={() => cookbookDialogOpen = false}>
       <div class="cb-dialog" on:click|stopPropagation>
         <header class="cb-dialog-head">
-          <h3>Add to Cookbook</h3>
+          <h3>{$_('recipes_page.add_to_cookbook')}</h3>
           <button class="btn-icon" on:click={() => cookbookDialogOpen = false} aria-label="Close">
             <span class="material-symbols-rounded">close</span>
           </button>
@@ -1043,8 +1043,8 @@
           {/if}
         </div>
         <footer class="cb-dialog-actions">
-          <button class="btn btn-secondary" on:click={() => cookbookDialogOpen = false}>Cancel</button>
-          <button class="btn btn-primary" on:click={confirmCookbookDialog}>Save</button>
+          <button class="btn btn-secondary" on:click={() => cookbookDialogOpen = false}>{$_('recipes_page.cancel')}</button>
+          <button class="btn btn-primary" on:click={confirmCookbookDialog}>{$_('recipes_page.save')}</button>
         </footer>
       </div>
     </div>
@@ -1099,14 +1099,14 @@
           <label class="opt-row">
             <input type="checkbox" bind:checked={pasteAddToPantry} />
             <span>
-              <span class="opt-label">Link ingredients to your Pantry</span>
+              <span class="opt-label">{$_('recipes_page.opt_link_pantry')}</span>
               <span class="opt-desc">Matches imported names to your existing Pantry items (case-insensitive) and creates new rows for any that don't exist yet.</span>
             </span>
           </label>
           <label class="opt-row">
             <input type="checkbox" bind:checked={pasteApplyTags} />
             <span>
-              <span class="opt-label">Apply tags from the source</span>
+              <span class="opt-label">{$_('recipes_page.opt_apply_tags')}</span>
             </span>
           </label>
           <label class="opt-row">
@@ -1118,7 +1118,7 @@
           </label>
         </div>
         <footer class="modal-footer">
-          <button class="btn btn-secondary" on:click={() => pasteImportOpen = false}>Cancel</button>
+          <button class="btn btn-secondary" on:click={() => pasteImportOpen = false}>{$_('recipes_page.cancel')}</button>
           <button class="btn btn-primary" on:click={doPasteImport}
             disabled={pasteBusy || (!pasteFile && !pasteText.trim())}>
             {pasteBusy ? 'Importing…' : 'Import'}
@@ -1211,9 +1211,9 @@
         <select class="sort-select" bind:value={$recipesSort} title="Sort recipes">
           <option value="fav-alpha">★ + A→Z</option>
           <option value="alpha">A → Z</option>
-          <option value="recent">Recently Cooked</option>
-          <option value="most">Most Cooked</option>
-          <option value="newest">Newest</option>
+          <option value="recent">{$_('recipes_page.sort_recent')}</option>
+          <option value="most">{$_('recipes_page.sort_most')}</option>
+          <option value="newest">{$_('recipes_page.sort_newest')}</option>
         </select>
       </div>
     </div><!-- /.sticky-controls -->
@@ -1239,14 +1239,14 @@
       <div class="state error" in:fade={{ duration: 120 }}>
         <span class="material-symbols-rounded">error</span>
         <p>{loadError}</p>
-        <button class="btn btn-secondary" on:click={load}>Retry</button>
+        <button class="btn btn-secondary" on:click={load}>{$_('recipes_page.retry')}</button>
       </div>
     {:else if viewMode === 'shared'}
       <!-- Shared with me -->
       {#if sharedRecipes.length === 0}
         <div class="state empty" in:fade={{ duration: 120 }}>
           <span class="material-symbols-rounded empty-icon">group</span>
-          <h2>Nothing Shared with You Yet</h2>
+          <h2>{$_('recipes_page.nothing_shared_yet')}</h2>
           <p>When another user shares a recipe with you it lands here.</p>
         </div>
       {:else}
@@ -1306,9 +1306,9 @@
       {#if cookbooks.length === 0 && sharedCookbooks.length === 0}
         <div class="state empty" in:fade={{ duration: 120 }}>
           <span class="material-symbols-rounded empty-icon">auto_stories</span>
-          <h2>No Cookbooks Yet</h2>
+          <h2>{$_('recipes_page.no_cookbooks_yet')}</h2>
           <p>Group your favorite recipes into cookbooks. Create one in <a href="#/manage/cookbooks" on:click|preventDefault={() => push('/manage/cookbooks')}>Manage &rarr; Cookbooks</a>.</p>
-          <button class="btn btn-primary" on:click={() => push('/manage/cookbooks')}>Create Cookbook</button>
+          <button class="btn btn-primary" on:click={() => push('/manage/cookbooks')}>{$_('recipes_page.create_cookbook')}</button>
         </div>
       {:else}
         <div class="grid cookbook-grid">

@@ -14,6 +14,7 @@
    *   renameFn    — (oldName, newName) => Promise<{ modified }>
    *   deleteFn    — (name) => Promise<{ modified }>
    */
+  import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { showError, showSuccess } from '../../stores/toast.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
@@ -124,8 +125,8 @@
                   }}
                   autofocus />
                 <div class="row-actions">
-                  <button class="btn btn-secondary tiny" on:click={cancelEdit}>Cancel</button>
-                  <button class="btn btn-primary tiny" on:click={() => saveEdit(it)} disabled={!editText.trim()}>Save</button>
+                  <button class="btn btn-secondary tiny" on:click={cancelEdit}>{$_('manage_taxonomy.cancel')}</button>
+                  <button class="btn btn-primary tiny" on:click={() => saveEdit(it)} disabled={!editText.trim()}>{$_('manage_taxonomy.save')}</button>
                 </div>
               </div>
             {:else}

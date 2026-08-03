@@ -70,6 +70,9 @@ export const USER_PREFS = new Set([
   'offUsername','offPassword','offUploadCountry',
   // USDA FoodData Central.
   'usdaEnabled','usdaApiKey',
+  // Which source chip the Pantry page opens on. See createSettingStore
+  // for defaults + behavior. Ported from NutriTrace #128.
+  'pantryDefaultSource',
   // Barcode scanner preferences (matches NT key names).
   'barcodeBeep','barcodeFlashlight',
 ]);
@@ -464,6 +467,11 @@ export const offPassword       = createSettingStore('offPassword',       '');
 export const usdaEnabled = createSettingStore('usdaEnabled', false);
 export const usdaApiKey  = createSettingStore('usdaApiKey',  '');
 
+// Which source chip the Pantry page opens on. Values: 'local' (My Pantry),
+// 'all' (fan-out), 'off' (Open Food Facts), 'usda' (FoodData Central).
+// Default 'local' preserves pre-#128-port behavior. Ported from NT #128.
+export const pantryDefaultSource = createSettingStore('pantryDefaultSource', 'local');
+
 // Barcode scanner — beep on detect (per-user preference), flashlight
 // override (form-factor specific but kept on USER_PREFS to mirror NT).
 export const barcodeBeep       = createSettingStore('barcodeBeep',       true);
@@ -504,7 +512,35 @@ export function applyAccentColor(value) {
   } else {
     document.documentElement.setAttribute('data-accent', value);
   }
+  // Tint the browser-chrome tab bar to match the accent. Chromium
+  // reads <meta name="theme-color"> and paints the address-bar strip
+  // (and the top of the focused tab on Android) with it, so multi-
+  // instance self-hosters can spot which install a tab belongs to at
+  // a glance. Favicon stays the branded CT logo.
+  _applyThemeColor(value);
   accentColor.set(value);
+}
+
+/** Resolve any accent value (named, hex, or fallback) to a hex string.
+ *  Names match ACCENT_COLORS in Settings.svelte's picker; both files
+ *  must stay in sync when accents are added. */
+function _accentToHex(value) {
+  if (typeof value !== 'string') return null;
+  if (/^#[0-9a-fA-F]{6}$/.test(value)) return value;
+  const NAMED = {
+    mint:   '#4FFFB0', blue:  '#4FC3F7', red:    '#FF7070',
+    purple: '#CE93D8', orange:'#FFB547', teal:   '#4DD0E1',
+    pink:   '#F48FB1', yellow:'#FFF176', indigo: '#9FA8DA',
+    lime:   '#C5E1A5', rose:  '#FF80AB', cyan:   '#80DEEA',
+  };
+  return NAMED[value] || null;
+}
+
+function _applyThemeColor(accentValue) {
+  const hex = _accentToHex(accentValue);
+  if (!hex) return;
+  const meta = document.getElementById('theme-color-meta');
+  if (meta) meta.content = hex;
 }
 
 let _lastAppliedAppearance = null;
@@ -517,7 +553,10 @@ export function applyAppearance(value) {
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const dark = value === 'dark' || (value === 'system' && prefersDark);
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  // Re-apply the accent-tinted browser-chrome color; falls back to the
+  // bg-based color only when no accent is loaded yet (early boot).
+  const accentHex = _accentToHex(_lastAppliedAccent);
   const meta = document.getElementById('theme-color-meta');
-  if (meta) meta.content = dark ? '#0A0B0F' : '#F5F7FA';
+  if (meta) meta.content = accentHex || (dark ? '#0A0B0F' : '#F5F7FA');
   appearance.set(value);
 }

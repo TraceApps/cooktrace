@@ -8,6 +8,7 @@
    * Sharing-by-kitchen is exposed in the Recipes share dialog (lives
    * elsewhere); this screen is the management surface.
    */
+  import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { NtApi } from '../../lib/api.js';
   import { showSuccess, showError } from '../../stores/toast.js';
@@ -146,7 +147,7 @@
       await NtApi.deleteKitchen(k.id);
       kitchens = kitchens.filter(x => x.id !== k.id);
       openId = null;
-      showSuccess('Kitchen deleted');
+      showSuccess($_('settings_kitchens_ct.toast.kitchen_deleted'));
     } catch (e) { showError(e.message || 'Could not delete'); }
   }
 
@@ -157,17 +158,17 @@
   {#if !$userMgmtActive}
     <div class="setting-row">
       <div>
-        <span class="setting-label">User Management Required</span>
+        <span class="setting-label">{$_('settings_kitchens_ct.um_required')}</span>
         <span class="setting-desc">Kitchens are a multi-user feature. Enable User Management in Settings → Users to create one.</span>
       </div>
     </div>
   {:else}
     <!-- Create -->
     <div class="setting-row stack">
-      <span class="setting-label">Create a New Kitchen</span>
+      <span class="setting-label">{$_('settings_kitchens_ct.create_new_kitchen')}</span>
       <span class="setting-desc">A Kitchen is a household or shared group of users. Sharing a recipe with the Kitchen sends it to every member at once.</span>
       <div class="create-row">
-        <input class="input" type="text" placeholder="Smith Family Kitchen" bind:value={newName}
+        <input class="input" type="text" placeholder={$_('settings_kitchens_ct.new_name_ph')} bind:value={newName}
           on:keydown={(e) => { if (e.key === 'Enter') createKitchen(); }} />
         <button class="btn btn-primary" on:click={createKitchen} disabled={creating || !newName.trim()}>
           {creating ? 'Creating…' : 'Create'}
@@ -193,7 +194,7 @@
               <span class="kitchen-name">{k.name}</span>
               <span class="kitchen-meta">
                 {k.member_count} {k.member_count === 1 ? 'member' : 'members'}
-                {#if isOwner(k)}<span class="badge">Owner</span>{/if}
+                {#if isOwner(k)}<span class="badge">{$_('settings_kitchens_ct.owner_badge')}</span>{/if}
               </span>
             </span>
             <span class="material-symbols-rounded chev" class:open={openId === k.id}>expand_more</span>
@@ -229,13 +230,13 @@
                   <div class="member-row">
                     <span class="member-name">
                       {m.full_name || m.username}
-                      {#if m.role === 'owner'}<span class="badge">Owner</span>{/if}
+                      {#if m.role === 'owner'}<span class="badge">{$_('settings_kitchens_ct.owner_badge')}</span>{/if}
                       {#if m.user_id === $currentUser?.id}<span class="muted">(you)</span>{/if}
                     </span>
                     {#if isOwner(k) && m.user_id !== $currentUser?.id}
-                      <button class="btn-link danger" on:click={() => removeMember(k.id, m)}>Remove</button>
+                      <button class="btn-link danger" on:click={() => removeMember(k.id, m)}>{$_('settings_kitchens_ct.remove')}</button>
                     {:else if m.user_id === $currentUser?.id && !isOwner(k)}
-                      <button class="btn-link danger" on:click={() => removeMember(k.id, m)}>Leave</button>
+                      <button class="btn-link danger" on:click={() => removeMember(k.id, m)}>{$_('settings_kitchens_ct.leave')}</button>
                     {/if}
                   </div>
                 {/each}
@@ -243,7 +244,7 @@
 
               {#if isOwner(k)}
                 <div class="invite-row">
-                  <input class="input" type="text" placeholder="Username to invite" bind:value={inviteName}
+                  <input class="input" type="text" placeholder={$_('settings_kitchens_ct.invite_username_ph')} bind:value={inviteName}
                     on:keydown={(e) => { if (e.key === 'Enter') invite(k.id); }} />
                   <button class="btn btn-secondary" on:click={() => invite(k.id)}
                     disabled={inviteBusy || !inviteName.trim()}>
@@ -251,7 +252,7 @@
                   </button>
                 </div>
                 <div class="kitchen-actions">
-                  <button class="btn-link danger" on:click={() => deleteKitchen(k)}>Delete Kitchen</button>
+                  <button class="btn-link danger" on:click={() => deleteKitchen(k)}>{$_('settings_kitchens_ct.delete_kitchen')}</button>
                 </div>
               {/if}
             </div>

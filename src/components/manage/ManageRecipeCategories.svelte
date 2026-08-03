@@ -4,6 +4,7 @@
    * Same UX: list rows with rename/recolor inline, plus a create row
    * at the bottom. Now lives in the Manage hub.
    */
+  import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { NtApi } from '../../lib/api.js';
   import { showError, showSuccess } from '../../stores/toast.js';
@@ -44,7 +45,7 @@
       const updated = await NtApi.updateRecipeCategory(c.id, { name, color: editColor });
       categories = categories.map(x => x.id === c.id ? updated : x);
       cancelEdit();
-      showSuccess('Saved');
+      showSuccess($_('manage_recipe_cats.toast.saved'));
     } catch (e) { showError(e.message || 'Could not save'); }
   }
 
@@ -113,7 +114,7 @@
       categories = [...categories, c];
       newName = '';
       newColor = SWATCHES[0];
-      showSuccess('Category added');
+      showSuccess($_('manage_recipe_cats.toast.category_added'));
     } catch (e) { showError(e.message || 'Could not add'); }
     finally { creating = false; }
   }
@@ -121,7 +122,7 @@
 
 <div class="mgr">
   <header class="mgr-head">
-    <h2>Recipe Categories</h2>
+    <h2>{$_('manage_recipe_cats.title')}</h2>
     <p class="mgr-desc">One category per recipe. Used for the badge above each recipe title and for filtering on the Recipes page.</p>
   </header>
 
@@ -148,7 +149,7 @@
           {/if}
           {#if editingId === c.id}
             <div class="edit-form">
-              <input class="input" bind:value={editName} placeholder="Name" />
+              <input class="input" bind:value={editName} placeholder={$_('manage_recipe_cats.name_ph')} />
               <div class="swatches">
                 {#each SWATCHES as sw}
                   <button class="swatch" class:active={editColor === sw}
@@ -161,8 +162,8 @@
                   aria-label="No color" type="button"></button>
               </div>
               <div class="row-actions">
-                <button class="btn btn-secondary tiny" on:click={cancelEdit}>Cancel</button>
-                <button class="btn btn-primary tiny" on:click={() => saveEdit(c)} disabled={!editName.trim()}>Save</button>
+                <button class="btn btn-secondary tiny" on:click={cancelEdit}>{$_('manage_recipe_cats.cancel')}</button>
+                <button class="btn btn-primary tiny" on:click={() => saveEdit(c)} disabled={!editName.trim()}>{$_('manage_recipe_cats.save')}</button>
               </div>
             </div>
           {:else}

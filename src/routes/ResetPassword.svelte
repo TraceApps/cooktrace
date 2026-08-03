@@ -5,7 +5,7 @@
   import { currentUser } from '../stores/auth.js';
   import { loadServerSettings } from '../stores/settings.js';
   import { validatePassword, passwordStrength } from '../lib/validation.js';
-  import { apiUrl, resolveAssetUrl } from '../lib/platform.js';
+  import { apiUrl, resolveAssetUrl, iconUrl } from '../lib/platform.js';
 
   $: pwScore = passwordStrength(password);
 
@@ -63,7 +63,7 @@
 <div class="login-page">
   <div class="login-card card">
     <div class="login-logo">
-      <img src={resolveAssetUrl('/icons/logo.png')} alt="CookTrace" class="logo-img" />
+      <img src={iconUrl('/icons/logo.png')} alt="CookTrace" class="logo-img" />
       <h1 class="login-title">{$_('reset_password.title')}</h1>
     </div>
 

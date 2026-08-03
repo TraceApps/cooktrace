@@ -16,6 +16,7 @@
    * The Use Camera button always takes a single photo and routes to the
    * single-file path.
    */
+  import { _ } from 'svelte-i18n';
   import { createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
   import { showError } from '../../stores/toast.js';
@@ -86,7 +87,7 @@
         return;
       }
       if (!isImage && !isText) {
-        showError('Pick an image, PDF, RTF, TXT, MD, or a ZIP.');
+        showError($_('import_from_file.toast.unsupported'));
         return;
       }
       pickedSingle = f;
@@ -103,7 +104,7 @@
     in:fade={{ duration: 140 }} out:fade={{ duration: 100 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="head">
-        <h3>Import from File</h3>
+        <h3>{$_('import_from_file.title')}</h3>
         <button class="btn-icon" on:click={close} aria-label="Close" title="Close">
           <span class="material-symbols-rounded">close</span>
         </button>
@@ -121,7 +122,7 @@
         on:drop={_onDrop}
         on:click={_pickFiles}>
         <span class="material-symbols-rounded">cloud_upload</span>
-        <p class="dz-title">Drop files here or click to pick</p>
+        <p class="dz-title">{$_('import_from_file.dz_title')}</p>
         <p class="dz-sub">Image, PDF, RTF, TXT, MD, or a ZIP of any of these</p>
       </div>
 
@@ -145,7 +146,7 @@
         bind:this={_cameraInput} on:change={_onFiles} hidden />
 
       <footer class="actions">
-        <button class="btn btn-secondary" on:click={close}>Cancel</button>
+        <button class="btn btn-secondary" on:click={close}>{$_('import_from_file.cancel')}</button>
       </footer>
     </div>
   </div>

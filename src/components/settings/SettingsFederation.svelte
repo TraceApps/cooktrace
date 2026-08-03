@@ -1,4 +1,5 @@
 <script>
+  import { _ } from 'svelte-i18n';
   import {
     ntInstanceUrl, ntInstanceToken, ntFederationEnabled, ntConnectionVerified,
   } from '../../stores/settings.js';
@@ -51,7 +52,7 @@
 
   async function test({ silentOk = false } = {}) {
     if (!canTest) {
-      showError('Enter a URL and access token first');
+      showError($_('settings_federation_ct.toast.url_token_required'));
       return;
     }
     testing = true;
@@ -106,14 +107,14 @@
 
   <div class="setting-row">
     <div>
-      <span class="setting-label">Connect to NutriTrace</span>
+      <span class="setting-label">{$_('settings_federation_ct.connect_to_nt')}</span>
       <span class="setting-desc">Pull ingredient nutrition + log cooked meals to your NutriTrace diary automatically. Enter your NutriTrace URL and a personal access token (Settings → Profile → API Tokens on NutriTrace), then Save to test the connection.</span>
     </div>
   </div>
 
   <div class="setting-divider"></div>
   <div class="setting-row stack">
-    <span class="setting-label">Instance URL</span>
+    <span class="setting-label">{$_('settings_federation_ct.instance_url')}</span>
     <input class="input" type="url" bind:value={urlDraft}
       placeholder="https://nutritrace.example.com"
       on:input={_invalidate} />
@@ -121,15 +122,15 @@
 
   <div class="setting-divider"></div>
   <div class="setting-row stack">
-    <span class="setting-label">Access Token</span>
+    <span class="setting-label">{$_('settings_federation_ct.access_token')}</span>
     <div class="key-row">
       {#if showToken}
         <input class="input" type="text" bind:value={tokenDraft}
-          placeholder="Bearer token from NutriTrace"
+          placeholder={$_('settings_federation_ct.access_token_ph')}
           on:input={_invalidate} />
       {:else}
         <input class="input" type="password" bind:value={tokenDraft}
-          placeholder="Bearer token from NutriTrace"
+          placeholder={$_('settings_federation_ct.access_token_ph')}
           on:input={_invalidate} />
       {/if}
       <button class="key-toggle" on:click={() => showToken = !showToken} aria-label={showToken ? 'Hide' : 'Show'}>

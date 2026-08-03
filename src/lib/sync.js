@@ -26,7 +26,13 @@ let _interval = null;
 const LAST_PULL_KEY = 'last_pull_at';
 
 /** Public store the UI binds against — Settings + the connect dialog
- *  read `online`, `syncing`, `lastSync`, `error` to render their state. */
+ *  read `online`, `syncing`, `lastSync`, `error` to render their state.
+ *  `connectionIssue` carries the structured classification (kind, host,
+ *  connectionType, status) that App.svelte's smart connection banner
+ *  renders via lib/connection-message.js. `showErrorBanner` gates the
+ *  full-height banner vs the compact hamburger cloud badge —
+ *  automatic probes only update the badge; manual retries + explicit
+ *  sync failures opt into the full banner. */
 export const syncState = writable({
   syncing: false,
   phase: '',
@@ -34,6 +40,8 @@ export const syncState = writable({
   lastSync: null,
   error: null,
   online: true,
+  connectionIssue: null,
+  showErrorBanner: false,
 });
 
 export function startNetworkMonitor() {
@@ -42,6 +50,113 @@ export function startNetworkMonitor() {
   window.addEventListener('online', update);
   window.addEventListener('offline', update);
   update();
+}
+
+// ── Server-reachability probe ────────────────────────────────────────────
+// Mirrors NT sync.js. Distinguishes "no network" (airplane / OS reports
+// offline) from "server unreachable" (network fine, host doesn't answer)
+// from "server error" (HTTP 4xx/5xx). Classifier output feeds the smart
+// connection banner in App.svelte via describeConnectionIssue().
+let _lastOfflineAt = 0;
+let _lastOnlineAt = 0;
+let _onlineCheckPromise = null;
+const OFFLINE_RETRY_DELAY_MS = 15000;
+const ONLINE_CHECK_CACHE_MS = 15000;
+
+/** True while the health-check circuit breaker is suppressing redundant requests. */
+export function isServerKnownUnavailable() {
+  return !!_lastOfflineAt && Date.now() - _lastOfflineAt < OFFLINE_RETRY_DELAY_MS;
+}
+
+async function _networkSnapshot() {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return { connected: false, connectionType: 'none' };
+  }
+  try {
+    const { Network } = await import('@capacitor/network');
+    return await Network.getStatus();
+  } catch {
+    return {
+      connected: typeof navigator === 'undefined' ? true : navigator.onLine !== false,
+      connectionType: 'unknown',
+    };
+  }
+}
+
+function _serverHost() {
+  try { return new URL(getServerUrl()).hostname; }
+  catch { return getServerUrl() || 'server'; }
+}
+
+function _connectionIssue({ network, error = null, status = null }) {
+  const noNetwork = !network?.connected || network?.connectionType === 'none';
+  return {
+    kind: noNetwork ? 'no_network' : status ? 'server_error' : 'server_unreachable',
+    host: _serverHost(),
+    connectionType: network?.connectionType || 'unknown',
+    status,
+    detail: error?.message || null,
+    at: new Date().toISOString(),
+  };
+}
+
+function _publishConnectionIssue(issue, showErrorBanner = false) {
+  syncState.update(s => ({
+    ...s,
+    online: false,
+    connectionIssue: issue,
+    // Automatic checks update compact status only. Once explicitly
+    // requested (manual retry, user-initiated sync), detailed feedback
+    // remains until dismissal or a successful connection.
+    ...(showErrorBanner ? { showErrorBanner: true } : {}),
+  }));
+}
+
+async function _probeServer(showErrorBanner = false) {
+  try {
+    const res = await fetch(apiUrl('/api/health'), {
+      headers: _headers(),
+      signal: AbortSignal.timeout(3000),
+    });
+    const online = res.ok;
+    if (!online) {
+      _lastOnlineAt = 0;
+      _lastOfflineAt = Date.now();
+      const network = await _networkSnapshot();
+      const issue = _connectionIssue({ network, status: res.status });
+      console.warn(`[sync] server health check failed: host=${issue.host} network=${issue.connectionType} status=${res.status}`);
+      _publishConnectionIssue(issue, showErrorBanner);
+    } else {
+      _lastOfflineAt = 0;
+      _lastOnlineAt = Date.now();
+      syncState.update(s => ({ ...s, online: true, connectionIssue: null, showErrorBanner: false }));
+    }
+    return online;
+  } catch (error) {
+    _lastOnlineAt = 0;
+    _lastOfflineAt = Date.now();
+    const network = await _networkSnapshot();
+    const issue = _connectionIssue({ network, error });
+    console.warn(`[sync] server unreachable: host=${issue.host} network=${issue.connectionType} error=${error?.message || String(error)}`);
+    _publishConnectionIssue(issue, showErrorBanner);
+    return false;
+  }
+}
+
+export async function checkOnline(force = false, showErrorBanner = false) {
+  if (!force && isServerKnownUnavailable()) return false;
+  if (!force && _lastOnlineAt && Date.now() - _lastOnlineAt < ONLINE_CHECK_CACHE_MS) {
+    return true;
+  }
+  if (!force && _onlineCheckPromise) return _onlineCheckPromise;
+  if (force) return _probeServer(showErrorBanner);
+
+  _onlineCheckPromise = _probeServer(showErrorBanner);
+  try {
+    return await _onlineCheckPromise;
+  } finally {
+    _onlineCheckPromise = null;
+  }
 }
 
 // Try to surface a server-side error body in the thrown message so the
@@ -222,10 +337,19 @@ async function pullChanges() {
  * Concurrent callers share the in-flight promise so a manual "Sync
  * now" tap mid-background round doesn't double-fire.
  */
-export async function fullSync(silentOrOpts = false) {
+export async function fullSync(silentOrOpts = false, forceCheck = false, showFailureBanner = false) {
+  // Backwards-compatible: old callers pass a bool for `silent`; the
+  // pull-to-refresh + Retry banner paths pass all three positional args.
   const silent = typeof silentOrOpts === 'object' ? !!silentOrOpts.silent : !!silentOrOpts;
   if (!_shouldRun()) return { ok: false, reason: 'not-server-mode' };
   if (_syncInFlight) return _syncInFlight;
+  // Server-reachability probe before the heavy pull/push. Skipping this
+  // when the circuit breaker says "known offline" avoids re-triggering
+  // the 3s health-check on every ticked poll. `showFailureBanner` opts
+  // this call into surfacing the full connection banner instead of just
+  // the compact cloud badge.
+  const online = await checkOnline(forceCheck, showFailureBanner);
+  if (!online) return { ok: false, reason: 'offline' };
   syncState.update(s => ({ ...s, syncing: true, phase: 'pull', error: null }));
   _syncInFlight = (async () => {
     try {
@@ -250,12 +374,22 @@ export async function fullSync(silentOrOpts = false) {
       }
       const result = { ok: true, ...push, ...pull };
       const ts = new Date().toISOString();
-      syncState.update(s => ({ ...s, syncing: false, phase: '', progress: '', lastSync: ts, error: null }));
+      // Clear connectionIssue + showErrorBanner + error on success so a
+      // stale banner from a prior 401 / timeout doesn't linger forever
+      // once the underlying issue is resolved.
+      syncState.update(s => ({
+        ...s, syncing: false, phase: '', progress: '',
+        lastSync: ts, error: null, online: true,
+        connectionIssue: null, showErrorBanner: false,
+      }));
       _notify(result);
       return result;
     } catch (e) {
       const err = e.message || String(e);
-      syncState.update(s => ({ ...s, syncing: false, phase: '', error: err }));
+      syncState.update(s => ({
+        ...s, syncing: false, phase: '', error: err,
+        ...(showFailureBanner ? { showErrorBanner: true } : {}),
+      }));
       if (!silent) _notify({ ok: false, error: err });
       return { ok: false, error: err };
     } finally {

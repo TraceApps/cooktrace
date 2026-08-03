@@ -375,7 +375,7 @@
   async function uploadVideoFile(file) {
     if (!file) return;
     if (!/^video\//.test(file.type)) {
-      showError('Pick a video file.');
+      showError($_('recipe_editor_ct.toast.pick_video'));
       return;
     }
     videoUploading = true;
@@ -384,7 +384,7 @@
       const url = res?.url || res?.path || '';
       if (!url) throw new Error('Upload failed');
       videoUrl = url;
-      showSuccess('Video uploaded');
+      showSuccess($_('recipe_editor_ct.toast.video_uploaded'));
     } catch (e) {
       showError(e.message || 'Could not upload video');
     } finally {
@@ -483,9 +483,9 @@
       if (d.nutrition != null) nutrition = d.nutrition;
       _draftRestored = true;
       _draftRestorable = false;
-      showSuccess('Draft restored');
+      showSuccess($_('recipe_editor_ct.toast.draft_restored'));
     } catch (e) {
-      showError('Could not restore draft');
+      showError($_('recipe_editor_ct.toast.cant_restore_draft'));
       _clearDraft();
       _draftRestorable = false;
     }
@@ -761,7 +761,7 @@
 
   async function save() {
     if (!name.trim()) {
-      showError('Name is required');
+      showError($_('recipe_editor_ct.toast.name_required'));
       return;
     }
     saving = true;
@@ -880,8 +880,8 @@
               <span class="material-symbols-rounded">restore</span>
               <span class="draft-msg">Unsaved draft from a previous session — restore?</span>
               <div class="draft-actions">
-                <button class="btn btn-secondary tiny" type="button" on:click={discardDraft}>Discard</button>
-                <button class="btn btn-primary tiny" type="button" on:click={restoreDraft}>Restore</button>
+                <button class="btn btn-secondary tiny" type="button" on:click={discardDraft}>{$_('recipe_editor_ct.discard')}</button>
+                <button class="btn btn-primary tiny" type="button" on:click={restoreDraft}>{$_('recipe_editor_ct.restore')}</button>
               </div>
             </div>
           {/if}
@@ -899,7 +899,7 @@
           <!-- Name + description -->
           <label class="field">
             <span class="field-label">{$_('editor.name_required')}</span>
-            <input class="input" type="text" bind:value={name} placeholder="Banana bread" />
+            <input class="input" type="text" bind:value={name} placeholder={$_('recipe_editor_ct.name_ph')} />
           </label>
 
           <label class="field">
@@ -945,7 +945,7 @@
           </div>
 
           <label class="field">
-            <span class="field-label">Yield <span class="field-hint">(e.g. "12 cookies", "1 loaf")</span></span>
+            <span class="field-label">{$_('recipe_editor_ct.yield')} <span class="field-hint">{$_('recipe_editor_ct.yield_hint')}</span></span>
             <input class="input" type="text" bind:value={yieldText} placeholder="" />
           </label>
 
@@ -956,7 +956,7 @@
           <div class="editor-grid">
           <!-- Ingredients (grouped) -->
           <section class="section editor-col-ing">
-            <h2 class="section-title">Ingredients</h2>
+            <h2 class="section-title">{$_('recipe_editor_ct.ingredients')}</h2>
             <!-- Datalist of known pantry items — populates as you type into
                  the ingredient name field. New names auto-create pantry
                  rows on save (server-side). -->
@@ -1084,7 +1084,7 @@
 
           <!-- Steps -->
           <section class="section editor-col-steps">
-            <h2 class="section-title">Steps</h2>
+            <h2 class="section-title">{$_('recipe_editor_ct.steps')}</h2>
             {#each steps as _, i (i)}
               <div class="step-row"
                 class:dragging={stepDragSource === i}
@@ -1173,7 +1173,7 @@
               on:create={openNewCategoryDialog}
               on:change={(e) => { if (!e.detail) onCategoryClear(); }}
             />
-            <span class="field-hint">One category per recipe. Manage the full list in <a href="#/manage" on:click|preventDefault={() => push('/manage')}>Manage</a>.</span>
+            <span class="field-hint">{@html $_('recipe_editor_ct.category_hint_html')}</span>
           </div>
 
           <div class="field">
@@ -1209,7 +1209,7 @@
           <section class="section">
             <button type="button" class="section-toggle" on:click={() => nutritionOpen = !nutritionOpen}>
               <span class="material-symbols-rounded">{nutritionOpen ? 'expand_less' : 'expand_more'}</span>
-              <span>Nutrition <span class="field-hint">(per serving, optional)</span></span>
+              <span>{$_('recipe_editor_ct.nutrition')} <span class="field-hint">{$_('pantry_editor_ct.icon_hint')}</span></span>
             </button>
             {#if nutritionOpen}
               <p class="field-hint" style="margin: 4px 0 8px;">
@@ -1254,7 +1254,7 @@
                an inline preview of the chosen video. Section hides
                itself in RecipeView when video_url is null. -->
           <div class="field">
-            <span class="field-label">Video Instructions <span class="field-hint">(optional)</span></span>
+            <span class="field-label">{$_('recipe_editor_ct.video_instructions')} <span class="field-hint">{$_('recipe_editor_ct.optional_hint')}</span></span>
             <div class="video-picker">
               <input type="file" accept="video/*" capture="environment"
                 bind:this={_videoCameraInput} on:change={_onVideoFile} hidden />
@@ -1265,14 +1265,14 @@
                 disabled={videoUploading}
                 title="Record with your camera">
                 <span class="material-symbols-rounded">videocam</span>
-                <span>Record</span>
+                <span>{$_('recipe_editor_ct.record')}</span>
               </button>
               <button class="vid-btn" type="button"
                 on:click={() => _videoFileInput?.click()}
                 disabled={videoUploading}
                 title="Upload a video file">
                 <span class="material-symbols-rounded">upload</span>
-                <span>Upload</span>
+                <span>{$_('recipe_editor_ct.upload')}</span>
               </button>
               <div class="vid-url-wrap">
                 <span class="material-symbols-rounded">link</span>
@@ -1287,13 +1287,13 @@
                 {#if videoUrl.startsWith('/uploads/') || videoUrl.startsWith('uploads/')}
                   <video class="video-preview-media" controls preload="metadata"
                     src={resolveAssetUrl(videoUrl)}></video>
-                  <span class="video-hint">Local Upload</span>
+                  <span class="video-hint">{$_('recipe_editor_ct.local_upload')}</span>
                 {:else}
                   <a class="video-link" href={videoUrl} target="_blank" rel="noopener noreferrer">
                     <span class="material-symbols-rounded">open_in_new</span>
                     {videoUrl}
                   </a>
-                  <span class="video-hint">External URL</span>
+                  <span class="video-hint">{$_('recipe_editor_ct.external_url')}</span>
                 {/if}
                 <button class="btn-icon small" type="button" on:click={clearVideo}
                   aria-label="Clear video" title="Clear video">
@@ -1345,7 +1345,7 @@
         {/if}
       </div>
       <div class="cat-modal-actions">
-        <button class="btn btn-secondary" on:click={closePantryPicker}>Cancel</button>
+        <button class="btn btn-secondary" on:click={closePantryPicker}>{$_('recipe_editor_ct.cancel')}</button>
         <button class="btn btn-primary" on:click={confirmPantryPicker}
           disabled={pantryPickerSelected.size === 0}>
           {pantryPickerMode === 'swap' ? 'Link' : `Add ${pantryPickerSelected.size > 0 ? pantryPickerSelected.size : ''}`}
@@ -1358,13 +1358,13 @@
 {#if categoryNewOpen}
   <div class="cat-modal-backdrop" on:click={() => categoryNewOpen = false}>
     <div class="cat-modal" on:click|stopPropagation>
-      <h3 class="cat-modal-title">Create New Category</h3>
+      <h3 class="cat-modal-title">{$_('recipe_editor_ct.cat_modal_title')}</h3>
       <label class="field">
-        <span class="field-label">Name</span>
+        <span class="field-label">{$_('recipe_editor_ct.name')}</span>
         <input class="input" type="text" bind:value={categoryNewName} autofocus />
       </label>
       <label class="field">
-        <span class="field-label">Color</span>
+        <span class="field-label">{$_('recipe_editor_ct.color')}</span>
         <div class="cat-modal-swatches">
           {#each SWATCHES as sw}
             <button class="swatch" class:active={categoryNewColor === sw}
@@ -1378,8 +1378,8 @@
         </div>
       </label>
       <div class="cat-modal-actions">
-        <button class="btn btn-secondary" on:click={() => categoryNewOpen = false}>Cancel</button>
-        <button class="btn btn-primary" on:click={confirmNewCategory} disabled={!categoryNewName.trim()}>Create</button>
+        <button class="btn btn-secondary" on:click={() => categoryNewOpen = false}>{$_('recipe_editor_ct.cancel')}</button>
+        <button class="btn btn-primary" on:click={confirmNewCategory} disabled={!categoryNewName.trim()}>{$_('recipe_editor_ct.create')}</button>
       </div>
     </div>
   </div>
@@ -1395,9 +1395,9 @@
       <h3 class="cat-modal-title">Step {stepPhotoSheetIdx + 1} Photo</h3>
       <ImagePicker bind:value={steps[stepPhotoSheetIdx].imgUrl}
         aspect="16 / 9"
-        placeholder="Add a step photo" />
+        placeholder={$_('recipe_editor_ct.add_step_photo_ph')} />
       <div class="cat-modal-actions">
-        <button class="btn btn-primary" on:click={closeStepPhotoSheet}>Done</button>
+        <button class="btn btn-primary" on:click={closeStepPhotoSheet}>{$_('recipe_editor_ct.done')}</button>
       </div>
     </div>
   </div>

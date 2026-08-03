@@ -6,7 +6,7 @@
   import { push } from 'svelte-spa-router';
   import { slide } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
-  import { apiUrl, isNative, getServerUrl, setAuthToken, resolveAssetUrl } from '../lib/platform.js';
+  import { apiUrl, isNative, getServerUrl, setAuthToken, resolveAssetUrl, iconUrl } from '../lib/platform.js';
 
   import { get } from 'svelte/store';
 
@@ -24,7 +24,7 @@
       const ok = await bio.authenticate('Sign in to CookTrace');
       if (!ok) return;
       const saved = await bio.readSavedToken();
-      if (!saved) { showError('No saved sign-in. Please use your password once first.'); return; }
+      if (!saved) { showError($_('login_ct.toast.no_saved')); return; }
       setAuthToken(saved);
       await loadAuthState();
       // If /me rejected the saved token (expired, JWT_SECRET rotated, backup
@@ -33,7 +33,7 @@
       // right back to Login — looks like biometric "did nothing." Same fix
       // as NT (commit 9d33afb) + LT (commit cb0853b).
       if (!get(currentUser)) {
-        showError('Your saved sign-in expired. Use your password to sign in.');
+        showError($_('login_ct.toast.saved_expired'));
         await bio.clearSavedToken();
         return;
       }
@@ -41,7 +41,7 @@
       push('/');
     } catch (e) {
       console.warn('[login] biometric flow failed:', e);
-      showError('Biometric sign-in failed. Use your password instead.');
+      showError($_('login_ct.toast.biometric_failed'));
     }
   }
 
@@ -166,8 +166,8 @@
 <div class="login-page">
   <div class="login-card card">
     <div class="login-logo">
-      <img src={resolveAssetUrl('/icons/logo.png')} alt="CookTrace" class="logo-img" />
-      <h1 class="login-title">CookTrace</h1>
+      <img src={iconUrl('/icons/logo.png')} alt="CookTrace" class="logo-img" />
+      <h1 class="login-title">{$_('login_ct.app_name')}</h1>
       <p class="text-3 text-sm">{$_('login.subtitle')}</p>
     </div>
 
@@ -213,7 +213,7 @@
           <button class="btn btn-ghost w-full" style="display:flex;align-items:center;justify-content:center;gap:8px"
             on:click={biometricLogin} disabled={loading}>
             <span class="material-symbols-rounded">fingerprint</span>
-            <span>Sign in with Biometric</span>
+            <span>{$_('login_ct.biometric_signin')}</span>
           </button>
         {/if}
 

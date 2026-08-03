@@ -21,7 +21,7 @@ import { deriveSodiumSalt } from './nutriments.js';
 const OFF_BASE = 'https://world.openfoodfacts.org';
 
 // Read the user's saved OFF country-filter preference from localStorage.
-// Returns the OFF tag form (lowercase, dashes for spaces) or null when
+// Returns the OFF countries_tags value (e.g. `en:norway`) or null when
 // 'World' / unset. Store-free so this module doesn't take a settings dep.
 function _getOffSearchCountry() {
   try {
@@ -32,7 +32,8 @@ function _getOffSearchCountry() {
     if (!raw) return null;
     const country = JSON.parse(raw);
     if (!country || country === 'World') return null;
-    return country.toLowerCase().replace(/\s+/g, '-');
+    const slug = country.toLowerCase().replace(/\s+/g, '-');
+    return slug.startsWith('en:') ? slug : `en:${slug}`;
   } catch { return null; }
 }
 
@@ -142,9 +143,13 @@ export async function searchByName(query, page = 1) {
   if (!q) return [];
   try {
     const country = _getOffSearchCountry();
-    const cq = country ? `&countries_tags_en=${encodeURIComponent(country)}` : '';
+    // search-a-licious uses Lucene inline in q=, not a separate filter param.
+    // Format: q=<text> +countries_tags:"en:<slug>"
+    const qWithFilter = country
+      ? `${q} +countries_tags:"${country}"`
+      : q;
     const lc = `&lc=${encodeURIComponent(_getOffSearchLanguage())}`;
-    const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(q)}&json=1&page_size=20&page=${page}${cq}${lc}`;
+    const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(qWithFilter)}&json=1&page_size=20&page=${page}${lc}`;
     const res = await _extFetch(url);
     if (!res.ok) return [];
     const data = await res.json();

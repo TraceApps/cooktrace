@@ -12,6 +12,7 @@
    * pasted-as-is). The parent owns the actual `value` so it can also be
    * replaced/cleared from outside.
    */
+  import { _ } from 'svelte-i18n';
   import { fade, scale } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { createEventDispatcher } from 'svelte';
@@ -101,7 +102,7 @@
       }
     } catch (err) {
       showCamera = false;
-      showError('Camera access denied or unavailable.');
+      showError($_('image_picker_ct.toast.camera_denied'));
     }
   }
   function stopCamera() {
@@ -199,7 +200,7 @@
       in:scale={{ start: 0.94, duration: 220, easing: cubicOut }}
       out:scale={{ start: 0.94, duration: 160 }}>
       <div class="cam-header">
-        <span class="cam-title">Take Photo</span>
+        <span class="cam-title">{$_('image_picker_ct.title')}</span>
         <button class="btn-icon" on:click={stopCamera} aria-label="Close camera">
           <span class="material-symbols-rounded">close</span>
         </button>

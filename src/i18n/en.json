@@ -7,6 +7,22 @@
     "manage":   "Manage",
     "settings": "Settings"
   },
+  "sync": {
+    "retry":            "Retry",
+    "retrying":         "Retrying…",
+    "dismiss_message":  "Dismiss sync message",
+    "error_title":      "Sync failed",
+    "connection": {
+      "server_fallback":  "server",
+      "no_network_title": "No network connection",
+      "cant_reach_title": "Can’t reach {host}",
+      "reconnect":        "Reconnect to the internet.",
+      "server_error":     "The server returned HTTP {status}. Try again shortly.",
+      "mobile_data":      "You’re connected through mobile data. This server may require your home Wi-Fi or VPN.",
+      "check_connection": "Check your Wi-Fi, VPN, or server.",
+      "saved_locally":    "Your changes are saved locally and will sync automatically."
+    }
+  },
   "routes": {
     "recipes":  {
       "title": "Recipes",
@@ -165,6 +181,7 @@
     "import":             { "section": "Import from Another App" },
     "kitchens":           { "section": "Kitchens" },
     "diagnostics":        { "section": "Diagnostics" },
+    "updates":            { "section": "Updates" },
     "about":              { "section": "About" },
     "support_dev":        { "section": "Support Development" },
     "diary":              { "section": "Diary" },
@@ -280,7 +297,7 @@
     "signing_in":           "Signing in…",
     "forgot_password":      "Forgot Password?",
     "locked_out":           "Locked Out?",
-    "sso_sign_in_with":     "Sign in with {provider}",
+    "sso_sign_in_with":     "Sign In with {provider}",
     "sso_or":               "or",
     "no_signin_methods":    "No sign-in methods available. Ask your administrator.",
     "errors": {
@@ -291,7 +308,7 @@
       "explainer":         "If you never set up user accounts intentionally, you can disable user management. <strong>This will delete all user accounts.</strong> Your food &amp; diary data will be kept.",
       "token_prompt":      "Enter the <code>RECOVERY_TOKEN</code> from your server environment:",
       "token_placeholder": "Recovery token",
-      "action":            "Disable user management & reset",
+      "action":            "Disable User Management & Reset",
       "disabling":         "Disabling…",
       "failed":            "Recovery failed",
       "success":           "User management disabled — you are now in single-user mode",
@@ -696,6 +713,890 @@
     "errors": {
       "username_required": "Username is required",
       "failed":            "Failed to create account"
+    }
+  },
+  "settings_page": {
+    "toast": {
+      "copy_failed":            "Copy failed, select the text manually",
+      "no_log_file":            "No log file yet, turn on Diagnostic Mode and reproduce the issue first"
+    },
+    "profile_hero": {
+      "admin_badge":            "Admin",
+      "tap_to_setup":           "Tap to set up your profile"
+    },
+    "group": {
+      "display":                "Display",
+      "integrations":           "Integrations",
+      "admin":                  "Admin"
+    },
+    "appearance": {
+      "theme":                  "Theme",
+      "accent_color":           "Accent Color",
+      "navigation_style":       "Navigation Style",
+      "persistent_sidebar":     "Persistent Sidebar",
+      "persistent_sidebar_desc": "Sidebar stays open and shifts page content instead of overlaying it.",
+      "start_page":             "Start Page",
+      "reduce_motion":          "Reduce Motion",
+      "page_banners":           "Page Banners",
+      "page_banners_desc":      "Header style at the top of every page. Animated is a compact accent-gradient bar with a chosen motion style; Gradient is the same bar, static; Off is a plain glass header.",
+      "banner_animated":        "Animated",
+      "banner_gradient":        "Gradient",
+      "banner_off":             "Off",
+      "animation_style":        "Animation Style",
+      "animation_style_desc":   "Shimmer is a soft white sweep, Drift is a slow hue rotation, Pulse is a gentle breathing, Aurora is a soft accent-tinted cloud-of-light. All honour Reduce Motion.",
+      "anim_shimmer":           "Shimmer",
+      "anim_drift":             "Drift",
+      "anim_pulse":             "Pulse",
+      "anim_aurora":            "Aurora"
+    },
+    "regional": {
+      "language":               "Language",
+      "language_desc":          "UI language. A translation may lag one or two releases behind English; missing strings fall back to English.",
+      "date_format":            "Date Format",
+      "date_natural":           "D MMM YYYY",
+      "time_format":            "Time Format",
+      "measurement_system":     "Measurement System",
+      "imperial":               "Imperial",
+      "metric":                 "Metric",
+      "energy":                 "Energy"
+    },
+    "cooking": {
+      "default_servings":       "Default Servings",
+      "show_shared":            "Show Shared Recipes in My Main List",
+      "url_import_engine":      "URL Import Engine",
+      "url_engine_desc_standard_html": "<strong>Standard</strong> reads the page's schema.org/Recipe data. Free and fast; works on most major recipe sites.",
+      "url_engine_desc_enhanced_html": "<strong>Enhanced</strong> runs recipe-scrapers, which has site-specific extractors for ~300 popular sites and falls back to schema.org on everything else.",
+      "url_engine_desc_smart_html":  "<strong>Smart</strong> hands the page to your Trace AI. Slower and uses your AI quota, but recovers recipes from sites that block scrapers or hide their content in non-standard markup.",
+      "engine_standard":        "Standard",
+      "engine_enhanced":        "Enhanced",
+      "engine_enhanced_server_suffix": " (server required)",
+      "engine_smart":           "Smart",
+      "engine_smart_required_suffix": " (Trace AI required)",
+      "smart_note":             "Smart sends every URL import to your AI, which uses your provider's quota on every paste. Standard or Enhanced are free and handle most sites; consider setting Smart only as a fallback.",
+      "enhanced_fallback":      "Enhanced Fallback",
+      "enhanced_fallback_desc": "When the server is unreachable or recipe-scrapers isn't installed, fall back to this.",
+      "shopping_list":          "Shopping List",
+      "default_grouping":       "Default Grouping",
+      "group_by_aisle":         "By Aisle",
+      "group_by_recipe":        "By Recipe",
+      "group_by_flat":          "Flat",
+      "checked_items":          "Checked Items",
+      "sink_to_bottom":         "Sink to Bottom",
+      "hide":                   "Hide"
+    },
+    "pantry_search": {
+      "section":                "Pantry Search",
+      "default_source":         "Default Search Source",
+      "default_source_desc":    "Which source chip the Pantry page opens with. All fans out to every enabled database; My Pantry starts in your local library.",
+      "source_all":             "All",
+      "source_local":           "My Pantry"
+    },
+    "off": {
+      "section":                "Open Food Facts",
+      "enable":                 "Enable Open Food Facts",
+      "search_language":        "Search Language",
+      "search_country":         "Search Country",
+      "upload_country":         "Upload Country",
+      "auto":                   "Auto",
+      "account_username":       "Account Username",
+      "off_username_ph":        "OFF username",
+      "account_password":       "Account Password",
+      "off_password_ph":        "OFF password"
+    },
+    "usda": {
+      "section":                "USDA FoodData Central",
+      "enable":                 "Enable USDA FoodData",
+      "api_key":                "API Key",
+      "api_key_ph":             "Paste your USDA API key here"
+    },
+    "scanner": {
+      "section":                "Barcode Scanner",
+      "beep_on_scan":           "Beep on Scan"
+    },
+    "diag": {
+      "mode":                   "Diagnostic Mode",
+      "view_logs":              "View Diagnostic Logs",
+      "logs_desc_prefix":       "Recent log lines from the app's console. Useful for bug reports; copy or share into a ",
+      "logs_desc_github":       "GitHub issue",
+      "logs_desc_android":      " On Android with Diagnostic Mode on, you can also share the persisted log file or any captured crash report.",
+      "logs_desc_suffix":       ". Nothing is sent anywhere automatically.",
+      "crash_available":        "Crash report available"
+    },
+    "about": {
+      "app_name":               "CookTrace",
+      "federation_prefix":      "Optional federation with ",
+      "federation_suffix":      " for nutrition tracking",
+      "family_prefix":          "Part of the ",
+      "family_suffix":          " family (with NutriTrace and LiftTrace)",
+      "support_dev":            "Support Development"
+    },
+    "custom_color": {
+      "saturation":             "Saturation",
+      "lightness":              "Lightness",
+      "hex_code":               "Hex Code",
+      "apply":                  "Apply Color"
+    }
+  },
+  "backup_page": {
+    "toast": {
+      "deleted":                "Deleted",
+      "restored_reloading":     "Restored, reloading…",
+      "all_data_cleared":       "All data cleared",
+      "clear_failed":           "Clear failed: {msg}",
+      "all_settings_cleared":   "All settings cleared",
+      "exported":               "Exported",
+      "backup_saved":           "Backup saved",
+      "imported_reloading":     "Imported, reloading",
+      "imported":               "Imported"
+    },
+    "full_backup":              "Full Backup",
+    "auto_backup":              "Auto Backup",
+    "env_lock_pill":            "Locked by env",
+    "env_lock_title":           "Locked by BACKUP_SCHEDULE / BACKUP_TIME / BACKUP_RETENTION env var",
+    "schedule":                 "Schedule",
+    "daily":                    "Daily",
+    "weekly":                   "Weekly",
+    "monthly":                  "Monthly",
+    "time":                     "Time",
+    "keep_last":                "Keep Last",
+    "col_name":                 "Name",
+    "col_created":              "Created",
+    "col_size":                 "Size",
+    "restore_from_zip":         "Restore From ZIP",
+    "portable_json":            "Portable JSON Export",
+    "export_json":              "Export JSON",
+    "import_json":              "Import JSON",
+    "danger_zone":              "Danger Zone",
+    "clear_all_data":           "Clear All Data",
+    "clear_all_settings":       "Clear All Settings"
+  },
+  "settings_import_nt": {
+    "toast": {
+      "pick_pantry_first":       "Pick a pantry item to attach these as variants of.",
+      "name_generic_first":      "Name the new generic item first."
+    },
+    "federation_disabled":       "NutriTrace Federation Disabled",
+    "import_from_nt":            "Import From NutriTrace",
+    "select_all":                "Select All",
+    "select_none":               "Select None",
+    "import_as":                 "Import as",
+    "mode_flat":                 "New Flat Items",
+    "mode_variants_existing":    "Variants of an Existing Pantry Item",
+    "mode_variants_new":         "Variants of a New Generic Item",
+    "mark_in_stock":             "Mark Imported Items as In Stock",
+    "cancel":                    "Cancel",
+    "import_more":               "Import More"
+  },
+  "settings_email_ct": {
+    "toast": {
+      "smtp_host_required":      "SMTP test failed: host required",
+      "invalid_email":           "Enter a valid email address"
+    },
+    "hint":                      "Used for password resets and user invites",
+    "smtp_host":                 "SMTP Host",
+    "port":                      "Port",
+    "username":                  "Email or Username",
+    "username_ph":               "SMTP username or email",
+    "password":                  "Password",
+    "password_ph":               "SMTP password or app password",
+    "from_address":              "From Address",
+    "send_test_email":           "Send Test Email",
+    "cancel":                    "Cancel",
+    "send":                      "Send"
+  },
+  "settings_trace_ct": {
+    "toast": {
+      "fill_fields":             "Fill in provider, API key, and model first",
+      "connected":               "Trace AI connected, assistant is ready"
+    },
+    "enable_assistant":          "Enable Trace Assistant",
+    "provider":                  "Provider",
+    "base_url":                  "Base URL",
+    "base_url_desc":             "/v1/chat/completions endpoint",
+    "model":                     "Model",
+    "custom_model_id":           "Custom Model ID",
+    "assistant_name":            "Assistant Name",
+    "assistant_name_ph":         "Trace",
+    "chef_hat":                  "Chef Hat",
+    "smart_log":                 "Smart Log"
+  },
+  "settings_users_ct": {
+    "toast": {
+      "invite_revoked":          "Invite revoked",
+      "invite_email_or_blank":   "Enter a valid email or leave blank to generate a shareable link",
+      "cant_create_invite":      "Could not create invite"
+    },
+    "pending_invites":           "Pending Invites",
+    "require_strong_passwords":  "Require Strong Passwords",
+    "session_duration":          "Session Duration",
+    "session_never":             "Never Expires",
+    "disable_um":                "Disable User Management",
+    "enable_um":                 "Enable User Management",
+    "create_admin_account":      "Create Admin Account"
+  },
+  "settings_kitchens_ct": {
+    "toast": {
+      "kitchen_deleted":         "Kitchen deleted"
+    },
+    "um_required":               "User Management Required",
+    "create_new_kitchen":        "Create a New Kitchen",
+    "new_name_ph":               "Smith Family Kitchen",
+    "owner_badge":               "Owner",
+    "remove":                    "Remove",
+    "leave":                     "Leave",
+    "invite_username_ph":        "Username to invite",
+    "delete_kitchen":            "Delete Kitchen"
+  },
+  "settings_import_ct": {
+    "import_section":            "Import from Another App",
+    "import_desc_html":          "Drop in a <strong>Mealie</strong> backup zip, <strong>Tandoor</strong> export, or <strong>Paprika</strong> <code>.paprikarecipes</code> archive. We'll scan it, show you everything inside, and let you tick which recipes to import.",
+    "select_all":                "Select All",
+    "select_none":               "Select None",
+    "transfer_images":           "Transfer images from the archive",
+    "keep_tags":                 "Keep tags from the source",
+    "opt_replace":               "Replace with the Imported Version",
+    "opt_force":                 "Allow Duplicates",
+    "cancel":                    "Cancel",
+    "import_another":            "Import Another"
+  },
+  "settings_federation_ct": {
+    "toast": {
+      "url_token_required":      "Enter a URL and access token first"
+    },
+    "connect_to_nt":             "Connect to NutriTrace",
+    "instance_url":              "Instance URL",
+    "access_token":              "Access Token",
+    "access_token_ph":           "Bearer token from NutriTrace"
+  },
+  "settings_nutrition_ct": {
+    "visibility":                "Nutrition Facts Visibility",
+    "defaults":                  "Defaults",
+    "show_all":                  "Show All"
+  },
+  "settings_auth_extra": {
+    "toast": {
+      "issuer_client_required":     "Issuer URL and Client ID are required",
+      "redirect_required":          "At least one redirect URI is required",
+      "cant_reach_server":          "Could not reach server",
+      "provider_deleted":           "Provider deleted",
+      "need_active_provider":       "Add at least one active OIDC provider before disabling password login."
+    },
+    "user_mgmt_required":            "User Management Is Required",
+    "admin_only":                    "Admin Only",
+    "discovery_ok":                  "Discovery OK",
+    "discovery_failed":              "Discovery failed",
+    "provider_type":                 "Provider Type",
+    "display_name":                  "Display Name",
+    "scope":                         "Scope",
+    "token_endpoint_auth_method":    "Token Endpoint Auth Method",
+    "auto_link_desc_html":           "When the IdP says <code>email_verified=true</code> and the email matches an existing CookTrace user, link them silently on first SSO sign-in. Recommended ON for any IdP you trust to verify emails.",
+    "provider_active":               "Provider Active",
+    "admin_group_value_ph":          "CookTraceAdmins",
+    "cancel":                        "Cancel",
+    "allow_password_login":          "Allow Password Login",
+    "env_locked_html":               "<br /><em>Locked by <code>OIDC_ENABLE_EMAIL_PASSWORD_LOGIN</code> environment variable.</em>"
+  },
+  "settings_server_conn": {
+    "toast": {
+      "enter_url":               "Enter your server URL",
+      "enter_credentials":       "Enter your credentials",
+      "sync_failed":             "Sync failed: {reason}",
+      "sync_unknown":            "Unknown error",
+      "connected_reloading":     "Connected, reloading",
+      "synced":                  "Synced",
+      "pushed_all":              "Pushed all data",
+      "logged_out_reloading":    "Logged out, reloading",
+      "disconnected_reloading":  "Disconnected, reloading"
+    },
+    "state_connected":           "Connected",
+    "last_synced":               "Last Synced",
+    "state_local":               "Local Mode",
+    "server_url":                "Server URL",
+    "username":                  "Username",
+    "username_ph":               "Your username",
+    "password":                  "Password",
+    "password_ph":               "Your password",
+    "sync_options":              "Sync Options",
+    "upload_phone_to_server":    "Upload Phone to Server",
+    "download_server_to_phone":  "Download Server to Phone",
+    "merge_both":                "Merge Both",
+    "cancel":                    "Cancel",
+    "continue":                  "Continue"
+  },
+  "settings_notifications": {
+    "toast": {
+      "test_sent":                 "Test sent, check your push service.",
+      "not_supported":             "This browser does not support notifications.",
+      "permission_granted":        "Notification permission granted.",
+      "permission_denied":         "Permission denied. Enable it in browser settings."
+    },
+    "device_notifications":        "Device Notifications",
+    "enable_on_device":            "Enable on This Device",
+    "browser_permission":          "Browser Permission",
+    "push_service":                "Push Service",
+    "service":                     "Service",
+    "svc_none":                    "None",
+    "svc_apprise":                 "Apprise",
+    "svc_gotify":                  "Gotify",
+    "apprise_url":                 "Apprise URL",
+    "gotify_url":                  "Gotify URL",
+    "app_token":                   "App Token",
+    "topic":                       "Topic",
+    "send_test":                   "Send Test",
+    "reminders":                   "Reminders",
+    "thaw_alert":                  "Thaw Alert",
+    "shopping_nudge":              "Shopping List Nudge",
+    "comment_replies":             "Comment Replies",
+    "expiration_digest":           "Expiration Digest",
+    "warn_days_ahead":             "Warn Me This Many Days Ahead",
+    "delivery_time":               "Delivery Time",
+    "weekly_summary_email":        "Weekly Summary Email",
+    "note":                        "Note"
+  },
+  "import_url_dialog": {
+    "toast": {
+      "recipe_imported":         "Recipe imported",
+      "url_batch_limit":         "Up to 100 URLs per batch. Split into smaller batches.",
+      "pick_one_url":            "Pick at least one URL to save."
+    },
+    "title":                     "Import from URL",
+    "link_to_pantry":            "Link Ingredients to Pantry",
+    "apply_tags":                "Apply Tags from Source",
+    "import_source_category":    "Import Source Category",
+    "cancel":                    "Cancel",
+    "select_all":                "Select All",
+    "clear":                     "Clear",
+    "failed":                    "Failed",
+    "try_again":                 "Try Again"
+  },
+  "bulk_import_dialog": {
+    "toast": {
+      "no_ai_saved":             "AI did not save a recipe for this row.",
+      "pick_one_recipe":         "Pick at least one recipe to save."
+    },
+    "title":                     "Bulk Import",
+    "dz_title":                  "Drop files here or click to pick",
+    "cancel":                    "Cancel",
+    "select_all":                "Select All",
+    "select_clean":              "Select Clean Only",
+    "clear":                     "Clear",
+    "saved_via_ai":              "Saved via AI",
+    "skipped":                   "Skipped",
+    "no_text":                   "No text",
+    "try_again":                 "Try Again"
+  },
+  "file_import_dialog": {
+    "toast": {
+      "unsupported_file":        "Pick an image, PDF, RTF, TXT, or MD file."
+    },
+    "title":                     "Import from File",
+    "pick_a_file":               "Pick a File",
+    "use_camera":                "Use Camera",
+    "camera_sub":                "Snap a cookbook page",
+    "cancel":                    "Cancel",
+    "done":                      "Done",
+    "try_again":                 "Try Again"
+  },
+  "cookbook_import_dialog": {
+    "toast": {
+      "pick_pdf":                "Pick a PDF file."
+    },
+    "title":                     "Import Cookbook",
+    "close":                     "Close",
+    "pick_cookbook_pdf":         "Pick a Cookbook PDF",
+    "cancel":                    "Cancel",
+    "try_again":                 "Try Again"
+  },
+  "recipe_comments": {
+    "toast": {
+      "comment_updated":         "Comment updated"
+    },
+    "title":                     "Comments",
+    "cancel":                    "Cancel",
+    "save":                      "Save"
+  },
+  "cook_log_dialog": {
+    "date":                      "Date",
+    "meal":                      "Meal",
+    "optional":                  "(optional)",
+    "notes":                     "Notes",
+    "notes_hint":                "(how did it turn out?)",
+    "cancel":                    "Cancel"
+  },
+  "import_from_file": {
+    "toast": {
+      "unsupported":             "Pick an image, PDF, RTF, TXT, MD, or a ZIP."
+    },
+    "title":                     "Import from File",
+    "dz_title":                  "Drop files here or click to pick",
+    "cancel":                    "Cancel"
+  },
+  "nutrition_facts": {
+    "title":                     "Nutrition Facts",
+    "serving_size":              "Serving Size",
+    "amount_per_serving":        "Amount Per Serving"
+  },
+  "recipes_page": {
+    "toast": {
+      "paste_or_pick":           "Paste a recipe or pick a file first",
+      "recipe_imported":         "Recipe imported",
+      "new_link_generated":      "New link generated",
+      "link_revoked":            "Link revoked",
+      "copied":                  "Copied to clipboard",
+      "copy_failed":             "Copy failed",
+      "clipboard_unavailable":   "Clipboard not available",
+      "recipe_duplicated":       "Recipe duplicated",
+      "preparing_share":         "Preparing share…",
+      "deleted":                 "Deleted"
+    },
+    "share_recipe":              "Share Recipe",
+    "share_cookbook":            "Share Cookbook",
+    "share":                     "Share",
+    "add_to_cookbook":           "Add to Cookbook",
+    "cancel":                    "Cancel",
+    "save":                      "Save",
+    "opt_link_pantry":           "Link ingredients to your Pantry",
+    "opt_apply_tags":            "Apply tags from the source",
+    "sort_recent":               "Recently Cooked",
+    "sort_most":                 "Most Cooked",
+    "sort_newest":               "Newest",
+    "retry":                     "Retry",
+    "nothing_shared_yet":        "Nothing Shared with You Yet",
+    "no_cookbooks_yet":          "No Cookbooks Yet",
+    "create_cookbook":           "Create Cookbook"
+  },
+  "recipe_editor_ct": {
+    "toast": {
+      "pick_video":              "Pick a video file.",
+      "video_uploaded":          "Video uploaded",
+      "draft_restored":          "Draft restored",
+      "cant_restore_draft":      "Could not restore draft",
+      "name_required":           "Name is required"
+    },
+    "discard":                   "Discard",
+    "restore":                   "Restore",
+    "name_ph":                   "Banana bread",
+    "yield":                     "Yield",
+    "yield_hint":                "(e.g. \"12 cookies\", \"1 loaf\")",
+    "ingredients":               "Ingredients",
+    "steps":                     "Steps",
+    "category_hint_html":        "One category per recipe. Manage the full list in <a href=\"#/manage\">Manage</a>.",
+    "nutrition":                 "Nutrition",
+    "nutrition_hint":            "(per serving, optional)",
+    "video_instructions":        "Video Instructions",
+    "optional_hint":             "(optional)",
+    "record":                    "Record",
+    "upload":                    "Upload",
+    "local_upload":              "Local Upload",
+    "external_url":              "External URL",
+    "cancel":                    "Cancel",
+    "cat_modal_title":           "Create New Category",
+    "name":                      "Name",
+    "color":                     "Color",
+    "create":                    "Create",
+    "add_step_photo_ph":         "Add a step photo",
+    "done":                      "Done"
+  },
+  "recipe_view_ct": {
+    "toast": {
+      "recipe_deleted":          "Recipe deleted",
+      "preparing_share":         "Preparing share…",
+      "link_copied":             "Link copied",
+      "share_unsupported":       "Sharing not supported on this browser",
+      "diary_updated":           "Diary entry updated",
+      "logged_cooked":           "Logged, cooked it!"
+    },
+    "shared_chip":               "Shared",
+    "retry":                     "Retry",
+    "serves":                    "Serves",
+    "yield":                     "Yield",
+    "tags":                      "Tags",
+    "step":                      "Step",
+    "notes":                     "Notes",
+    "cancel":                    "Cancel"
+  },
+  "cookbook_view_ct": {
+    "toast": {
+      "cookbook_deleted":        "Cookbook deleted"
+    },
+    "shared_chip":               "Shared",
+    "retry":                     "Retry",
+    "smart_badge":               "Smart",
+    "favorites_filter":          "Favorites",
+    "add_recipes":               "Add Recipes",
+    "move_or_copy":              "Move or Copy",
+    "copy_label_html":           "Copy <small>(keep here too)</small>",
+    "move_label_html":           "Move <small>(remove from here)</small>",
+    "cancel":                    "Cancel"
+  },
+  "public_recipe_ct": {
+    "shared_by_prefix":          "Shared by ",
+    "from_prefix":               "From ",
+    "prep":                      "Prep",
+    "cook":                      "Cook",
+    "rest":                      "Rest",
+    "total":                     "Total",
+    "servings":                  "Servings",
+    "ingredients":               "Ingredients",
+    "scale":                     "Scale",
+    "no_ingredients":            "No ingredients listed.",
+    "steps":                     "Steps",
+    "no_steps":                  "No steps yet.",
+    "notes":                     "Notes",
+    "powered_by_html":           "Powered by <strong>CookTrace</strong>."
+  },
+  "barcode_scanner": {
+    "toast": {
+      "camera_denied":           "Camera permission denied",
+      "scan_failed":             "Barcode scan failed: {reason}",
+      "scan_unknown":            "Unknown error"
+    },
+    "title":                     "Scan Barcode",
+    "library":                   "Library",
+    "camera":                    "Camera",
+    "look_up":                   "Look Up"
+  },
+  "time_picker_ct": {
+    "hour":                      "Hour",
+    "minute":                    "Minute",
+    "cancel":                    "Cancel",
+    "set_time":                  "Set Time"
+  },
+  "cook_heatmap": {
+    "title":                     "Cook Activity",
+    "less":                      "Less",
+    "more":                      "More"
+  },
+  "image_picker_ct": {
+    "toast": {
+      "camera_denied":           "Camera access denied or unavailable."
+    },
+    "title":                     "Take Photo"
+  },
+  "icon_picker_ct": {
+    "summary":                   "Use a different Material Symbol",
+    "clear":                     "Clear"
+  },
+  "top_timer_pill": {
+    "done":                      "Done"
+  },
+  "cook_timer_rail": {
+    "snooze":                    "Snooze"
+  },
+  "sidebar_ct": {
+    "brand":                     "CookTrace"
+  },
+  "trace_ai_ct": {
+    "toast": {
+      "voice_unsupported":       "Voice input not supported in this browser",
+      "configure_ai":            "Configure Trace AI in Settings to use hold-to-talk",
+      "enable_smart_log":        "Enable Smart Log in Settings, Trace AI, to use hold-to-talk",
+      "voice_needs_https":       "Voice needs HTTPS. Plain HTTP blocks the mic, set up TLS or use the public domain.",
+      "voice_cancelled":         "Voice cancelled",
+      "trace_disabled":          "Trace is disabled. Enable it in Settings, Trace.",
+      "voice_unsupported_full":  "Voice input not supported in this browser. Try Chrome on desktop or mobile Safari/Chrome.",
+      "voice_needs_https_smart": "Voice needs HTTPS. Smart Log won't work over plain HTTP, set up TLS or use the public domain.",
+      "mic_denied":              "Microphone permission denied",
+      "pick_image":              "Pick an image file."
+    }
+  },
+  "manage_cookbooks": {
+    "toast": {
+      "cookbook_created":        "Cookbook created",
+      "saved":                   "Saved",
+      "cover_updated":           "Cover updated"
+    },
+    "title":                     "Cookbooks",
+    "name_ph":                   "Name",
+    "cancel":                    "Cancel",
+    "smart_badge":               "Smart",
+    "smart":                     "Smart",
+    "category":                  "Category",
+    "favorites_only":            "Favorites Only"
+  },
+  "manage_units": {
+    "toast": {
+      "unit_added":              "Custom unit added",
+      "saved":                   "Saved",
+      "builtins_restored":       "All built-ins restored"
+    },
+    "title":                     "Units",
+    "restore_all":               "Restore All",
+    "custom_group":              "Custom",
+    "cancel":                    "Cancel",
+    "save":                      "Save",
+    "custom_badge":              "Custom"
+  },
+  "manage_pantry_cats": {
+    "toast": {
+      "saved":                   "Saved",
+      "category_added":          "Category added"
+    },
+    "title":                     "Pantry Categories",
+    "name_ph":                   "Name",
+    "icon_ph":                   "Icon",
+    "cancel":                    "Cancel",
+    "save":                      "Save"
+  },
+  "manage_recipe_cats": {
+    "toast": {
+      "saved":                   "Saved",
+      "category_added":          "Category added"
+    },
+    "title":                     "Recipe Categories",
+    "name_ph":                   "Name",
+    "cancel":                    "Cancel",
+    "save":                      "Save"
+  },
+  "manage_taxonomy": {
+    "cancel":                    "Cancel",
+    "save":                      "Save"
+  },
+  "profile_ct": {
+    "toast": {
+      "biometric_cancelled":     "Biometric verification was canceled or failed."
+    },
+    "biometric_signin":          "Sign In with Biometric"
+  },
+  "manage_ct": {
+    "title":                     "Manage"
+  },
+  "cookdiary_page": {
+    "toast": {
+      "pick_recipe":             "Pick a recipe",
+      "planned":                 "Planned",
+      "marked_cooked":           "Marked cooked",
+      "removed":                 "Removed"
+    },
+    "this_week":                 "This Week",
+    "current_streak":            "Current Streak",
+    "longest_streak":            "Longest Streak",
+    "this_month":                "This Month",
+    "view_list":                 "List",
+    "view_month":                "Month",
+    "view_photos":               "Photos",
+    "retry":                     "Retry",
+    "planned_tag":               "Planned",
+    "no_photos":                 "No Photos Yet",
+    "plan_a_cook":               "Plan a Cook",
+    "date":                      "Date",
+    "meal":                      "Meal",
+    "optional":                  "(optional)",
+    "recipe":                    "Recipe",
+    "cancel":                    "Cancel",
+    "filter_by_recipe":          "Filter by Recipe",
+    "clear":                     "Clear",
+    "done":                      "Done"
+  },
+  "wizard_ct": {
+    "welcome":                   "Welcome to CookTrace",
+    "get_started":               "Get Started",
+    "name_ph":                   "Your name",
+    "back":                      "Back",
+    "next":                      "Next",
+    "create_admin":              "Create Your Admin Account",
+    "enable_user_accounts":      "Enable User Accounts",
+    "admin_account":             "Admin Account",
+    "nickname":                  "Nickname",
+    "optional_ph":               "Optional",
+    "full_name":                 "Full Name",
+    "email":                     "Email",
+    "continue":                  "Continue",
+    "cooking_preferences":       "Cooking Preferences",
+    "measurement_system":        "Measurement System",
+    "default_servings":          "Default Servings",
+    "dietary_preferences":       "Dietary Preferences",
+    "open_cooktrace":            "Open CookTrace"
+  },
+  "shopping_page": {
+    "toast": {
+      "cleared":                 "Cleared",
+      "add_items":               "Add some items first",
+      "preparing_share":         "Preparing share…",
+      "saved_image":             "Saved image",
+      "copied":                  "Copied to clipboard",
+      "nothing_planned":         "Nothing planned in that range",
+      "already_in_pantry":       "Everything's already in your pantry"
+    },
+    "retry":                     "Retry",
+    "edit_item":                 "Edit Item",
+    "name":                      "Name",
+    "quantity":                  "Quantity",
+    "unit":                      "Unit",
+    "cancel":                    "Cancel",
+    "save":                      "Save",
+    "add_from_recipe":           "Add from Recipe",
+    "add_from_planned":          "Add from Planned Cooks",
+    "from":                      "From"
+  },
+  "native_setup_ct": {
+    "toast": {
+      "enter_url":               "Enter your server URL",
+      "enter_credentials":       "Enter your credentials",
+      "connected_to_server":     "Connected to server",
+      "cant_open_signin":        "Could not open sign-in browser"
+    },
+    "app_name":                  "CookTrace",
+    "tagline":                   "Trace Every Bite",
+    "use_locally":               "Use Locally",
+    "connect_to_server":         "Connect to Server",
+    "server_url":                "Server URL",
+    "username":                  "Username",
+    "username_ph":               "Your username",
+    "password":                  "Password",
+    "password_ph":               "Your password"
+  },
+  "login_ct": {
+    "toast": {
+      "no_saved":                "No saved sign-in. Please use your password once first.",
+      "saved_expired":           "Your saved sign-in expired. Use your password to sign in.",
+      "biometric_failed":        "Biometric sign-in failed. Use your password instead."
+    },
+    "app_name":                  "CookTrace",
+    "biometric_signin":          "Sign In with Biometric"
+  },
+  "pantry_editor_ct": {
+    "toast": {
+      "enter_barcode":           "Enter a barcode first",
+      "not_found_off":           "Not found on Open Food Facts",
+      "add_barcode":             "Add a barcode first",
+      "add_name":                "Add a name first",
+      "name_required":           "Name is required",
+      "saved":                   "Saved",
+      "added_to_pantry":         "Added to pantry",
+      "removed":                 "Removed"
+    },
+    "photo":                     "Photo",
+    "basic_info":                "Basic Info",
+    "brand":                     "Brand",
+    "serving_size":              "Serving Size",
+    "unit":                      "Unit",
+    "barcode":                   "Barcode",
+    "optional_ph":               "Optional",
+    "inventory":                 "Inventory",
+    "on_hand":                   "On Hand",
+    "category":                  "Category",
+    "notes":                     "Notes",
+    "nutrition":                 "Nutrition",
+    "danger_zone":               "Danger Zone",
+    "cat_modal_title":           "Create New Pantry Category",
+    "name":                      "Name",
+    "icon_name":                 "Icon Name",
+    "icon_hint":                 "(Material Symbols)",
+    "cancel":                    "Cancel",
+    "create":                    "Create"
+  },
+  "pantry_page": {
+    "toast": {
+      "removed":                 "Removed"
+    },
+    "variant_banner_title":      "Pantry Now Supports Product Variants",
+    "sort_updated":              "Last Updated",
+    "sort_usage":                "Most Used",
+    "retry":                     "Retry",
+    "no_results_all":            "No Results in Any Source",
+    "reset_filter":              "Reset Filter",
+    "off_quality":               "OFF Quality",
+    "usda_data_type":            "USDA Data Type",
+    "reset":                     "Reset"
+  },
+  "pantry_view_ct": {
+    "toast": {
+      "removed":                 "Removed"
+    },
+    "retry":                     "Retry",
+    "in_stock":                  "In Stock",
+    "serving_size":              "Serving Size",
+    "not_set":                   "Not set",
+    "on_hand":                   "On Hand",
+    "notes":                     "Notes"
+  },
+  "pantry_sheet_extra": {
+    "toast": {
+      "cant_read_label":         "Could not read the label. Try a clearer photo.",
+      "nutrition_extracted":     "Nutrition extracted from label",
+      "scan_failed":             "Scan failed: {reason}",
+      "scan_unknown":            "unknown error",
+      "brand_or_name_required":  "Add a brand or override name to tell this variant apart.",
+      "added_variant":           "Added variant {name}",
+      "linked_as_variant":       "Linked as a variant",
+      "enter_barcode":           "Enter a barcode first",
+      "not_found_off":           "Not found on Open Food Facts",
+      "add_barcode":             "Add a barcode first",
+      "add_name":                "Add a name first",
+      "name_required":           "Name is required",
+      "added_to_pantry":         "Added to pantry",
+      "saved":                   "Saved"
+    },
+    "retry":                     "Retry",
+    "add_a_photo":               "Add a Photo",
+    "name_ph":                   "Iodized Salt",
+    "brand_ph":                  "Morton",
+    "serving_size":              "Serving Size",
+    "not_set":                   "Not set",
+    "nutrition":                 "Nutrition",
+    "per_serving":               "per serving",
+    "recipe_nutrition_source":   "Recipe Nutrition Source",
+    "add_a_variant":             "Add a Variant",
+    "attach_as_variant":         "Attach as variant",
+    "cancel":                    "Cancel",
+    "done":                      "Done",
+    "name":                      "Name",
+    "cat_new_name_ph":           "Baking",
+    "cat_field_hint_html":       "Browse names at <a href=\"https://fonts.google.com/icons\" target=\"_blank\" rel=\"noopener\">Material Symbols</a>. The picker page (Manage → Pantry Categories) has an icon search.",
+    "create":                    "Create",
+    "keep_standalone":           "Keep as Standalone Items",
+    "remove_variants_too":       "Remove the Variants Too"
+  },
+  "updates": {
+    "current_version":       "Current Version",
+    "channel": {
+      "label":  "Update Channel",
+      "stable": "Stable",
+      "dev":    "Dev",
+      "help":   "Stable tracks tagged releases. Dev is the rolling development build; expect bugs."
+    },
+    "auto_check":            "Automatically Check for Updates",
+    "auto_check_desc":       "Once per day when you open the app.",
+    "last_checked":          "Last Checked",
+    "last_checked_never":    "Never",
+    "check_now":             "Check Now",
+    "checking":              "Checking…",
+    "check_failed":          "Update check failed. Try again in a moment.",
+    "up_to_date":            "You're on the Latest Version",
+    "available_headline":    "{version} Is Available",
+    "released":              "Released {when}",
+    "release_notes_heading": "What's New",
+    "no_release_notes":      "No release notes were published for this build.",
+    "view_on_github":        "View on GitHub",
+    "download_install":      "Download & Install",
+    "downloading":           "Downloading… {percent}%",
+    "install_starting":      "Opening installer…",
+    "install_failed":        "Install failed. Try again.",
+    "skip_this_version":     "Skip This Version",
+    "no_apk_asset":          "This release has no APK asset attached.",
+    "banner_cta":            "Tap to view what's new and install.",
+    "banner_view":           "View",
+    "storage": {
+      "heading":     "Cached Update APKs",
+      "empty":       "No cached APKs. Cleanup passes ran successfully.",
+      "clear_now":   "Clear Now",
+      "clearing":    "Clearing…",
+      "cleared":     "Cache cleared."
+    },
+    "server": {
+      "heading":          "Server",
+      "headline":         "Server update {latest} available",
+      "behind_desc":      "Update available: {latest}",
+      "current_desc":     "You're on the latest release",
+      "versions":         "Server is on {current}. Latest release: {latest}.",
+      "available_chip":   "Update Available",
+      "instructions":     "To update the server, run on the host machine:",
+      "copy_command":     "Copy Command",
+      "copied":           "Copied to clipboard.",
+      "copy_failed":      "Copy failed. Copy the command manually.",
+      "view_notes":       "View Release Notes",
+      "channel_note":     "To switch server channels, change your docker-compose.yml image tag (:latest, :1.0, :1, :dev) and re-run docker-compose pull && docker-compose up -d."
     }
   }
 }

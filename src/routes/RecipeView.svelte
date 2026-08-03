@@ -398,7 +398,7 @@
     if (!ok) return;
     try {
       await NtApi.deleteRecipe(recipe.id);
-      showSuccess('Recipe deleted');
+      showSuccess($_('recipe_view_ct.toast.recipe_deleted'));
       push('/recipes');
     } catch (e) {
       showError(e.message || 'Delete failed');
@@ -434,7 +434,7 @@
     else if (v === 'link') await shareAsLink();
   }
   async function shareAsCard() {
-    showSuccess('Preparing share…');
+    showSuccess($_('recipe_view_ct.toast.preparing_share'));
     try {
       const pages = await buildRecipeCardPages(recipe);
       const safe = (recipe.name || 'recipe').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'recipe';
@@ -472,9 +472,9 @@
       }
       if (navigator.clipboard) {
         await navigator.clipboard.writeText(url);
-        showSuccess('Link copied');
+        showSuccess($_('recipe_view_ct.toast.link_copied'));
       } else {
-        showError('Sharing not supported on this browser');
+        showError($_('recipe_view_ct.toast.share_unsupported'));
       }
     } catch (e) {
       showError(e.message || 'Could not share');
@@ -491,10 +491,10 @@
     try {
       if (editingCook) {
         await NtApi.updateCook(recipe.id, editingCook.id, e.detail);
-        showSuccess('Diary entry updated');
+        showSuccess($_('recipe_view_ct.toast.diary_updated'));
       } else {
         recipe = await NtApi.markCooked(recipe.id, e.detail);
-        showSuccess('Logged — cooked it!');
+        showSuccess($_('recipe_view_ct.toast.logged_cooked'));
         // "I made this" is the natural end of a cook session — clear
         // checks + drop out of cook mode so the next visit is fresh.
         if (cookMode) endCookMode();
@@ -684,7 +684,7 @@
                the header body below. -->
           <span class="shared-chip" title="Shared with you — read only">
             <span class="material-symbols-rounded">lock</span>
-            <span class="shared-chip-label">Shared</span>
+            <span class="shared-chip-label">{$_('recipe_view_ct.shared_chip')}</span>
           </span>
         {/if}
         <button class="btn-icon" on:click={openShareSheet} aria-label="Share" title="Share">
@@ -714,7 +714,7 @@
       <div class="state error">
         <span class="material-symbols-rounded">error</span>
         <p>{loadError}</p>
-        <button class="btn btn-secondary" on:click={load}>Retry</button>
+        <button class="btn btn-secondary" on:click={load}>{$_('recipe_view_ct.retry')}</button>
       </div>
     {:else if recipe}
       <div class="body">
@@ -844,13 +844,13 @@
           {#if recipe.servings}
             <div class="meta-stat">
               <span class="material-symbols-rounded meta-icon">restaurant</span>
-              <div class="meta-text"><span class="meta-label">Serves</span><span class="meta-value">{recipe.servings}</span></div>
+              <div class="meta-text"><span class="meta-label">{$_('recipe_view_ct.serves')}</span><span class="meta-value">{recipe.servings}</span></div>
             </div>
           {/if}
           {#if recipe.yield_text}
             <div class="meta-stat">
               <span class="material-symbols-rounded meta-icon">scale</span>
-              <div class="meta-text"><span class="meta-label">Yield</span><span class="meta-value">{recipe.yield_text}</span></div>
+              <div class="meta-text"><span class="meta-label">{$_('recipe_view_ct.yield')}</span><span class="meta-value">{recipe.yield_text}</span></div>
             </div>
           {/if}
         </div>
@@ -860,7 +860,7 @@
         {#if recipe.tags?.length}
           <div class="chips-stack">
             <div class="chip-row">
-              <span class="chip-label">Tags</span>
+              <span class="chip-label">{$_('recipe_view_ct.tags')}</span>
               {#each recipe.tags as tag}
                 <span class="chip">{tag}</span>
               {/each}
@@ -1043,7 +1043,7 @@
                       <span class="material-symbols-rounded badge-check">check</span>
                     {:else}
                       <span class="badge-num">
-                        <span class="badge-num-label">Step</span>
+                        <span class="badge-num-label">{$_('recipe_view_ct.step')}</span>
                         <span class="badge-num-value">{i + 1}</span>
                       </span>
                     {/if}
@@ -1116,7 +1116,7 @@
           <section class="section">
             <h2 class="section-title">
               <span class="material-symbols-rounded section-icon">sticky_note_2</span>
-              <span class="section-title-text">Notes</span>
+              <span class="section-title-text">{$_('recipe_view_ct.notes')}</span>
             </h2>
             <!-- Notes can contain a sanitized subset of HTML (bold,
                  italic, bullets, numbered lists) emitted by the
@@ -1171,7 +1171,7 @@
                 </ul>
               {/if}
               <div class="recompute-actions">
-                <button class="btn btn-secondary tiny" on:click={() => recomputeResult = null}>Cancel</button>
+                <button class="btn btn-secondary tiny" on:click={() => recomputeResult = null}>{$_('recipe_view_ct.cancel')}</button>
                 <button class="btn btn-primary tiny" on:click={applyRecompute}>
                   <span class="material-symbols-rounded">save</span>
                   Save This Calculation

@@ -19,6 +19,7 @@
    * single-page Photo Import for now. Native AI-vision PDF support is
    * a follow-up.
    */
+  import { _ } from 'svelte-i18n';
   import { createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
@@ -70,7 +71,7 @@
     if (!f) return;
     const isPdf = (f.type || '').toLowerCase() === 'application/pdf' || /\.pdf$/i.test(f.name || '');
     if (!isPdf) {
-      showError('Pick a PDF file.');
+      showError($_('cookbook_import_dialog.toast.pick_pdf'));
       return;
     }
     pdfFile = f;
@@ -260,7 +261,7 @@ Rules:
     in:fade={{ duration: 140 }} out:fade={{ duration: 100 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="head">
-        <h3>Import Cookbook</h3>
+        <h3>{$_('cookbook_import_dialog.title')}</h3>
         <button class="btn-icon" on:click={close} aria-label="Close" title="Close">
           <span class="material-symbols-rounded">close</span>
         </button>
@@ -276,7 +277,7 @@ Rules:
           {/if}
         </div>
         <footer class="actions">
-          <button class="btn btn-secondary" on:click={close}>Close</button>
+          <button class="btn btn-secondary" on:click={close}>{$_('cookbook_import_dialog.close')}</button>
         </footer>
 
       {:else if phase === 'pick'}
@@ -301,14 +302,14 @@ Rules:
         {:else}
           <button class="picker" on:click={_pickFile}>
             <span class="material-symbols-rounded">menu_book</span>
-            <span>Pick a Cookbook PDF</span>
+            <span>{$_('cookbook_import_dialog.pick_cookbook_pdf')}</span>
             <span class="picker-sub">Multi-recipe PDF document</span>
           </button>
         {/if}
         <input type="file" accept="application/pdf,.pdf"
           bind:this={_fileInput} on:change={_onFile} hidden />
         <footer class="actions">
-          <button class="btn btn-secondary" on:click={close}>Cancel</button>
+          <button class="btn btn-secondary" on:click={close}>{$_('cookbook_import_dialog.cancel')}</button>
           <button class="btn btn-primary" on:click={prepare} disabled={!pdfFile}>
             <span class="material-symbols-rounded">arrow_forward</span>
             Next
@@ -343,7 +344,7 @@ Rules:
           </p>
         {/if}
         <footer class="actions">
-          <button class="btn btn-secondary" on:click={close}>Cancel</button>
+          <button class="btn btn-secondary" on:click={close}>{$_('cookbook_import_dialog.cancel')}</button>
           <button class="btn btn-primary" on:click={extractRecipes}>
             <span class="material-symbols-rounded">auto_awesome</span>
             Extract Recipes
@@ -380,8 +381,8 @@ Rules:
           <p>{errorMessage}</p>
         </div>
         <footer class="actions">
-          <button class="btn btn-secondary" on:click={close}>Cancel</button>
-          <button class="btn btn-primary" on:click={() => { phase = 'pick'; errorMessage = ''; }}>Try Again</button>
+          <button class="btn btn-secondary" on:click={close}>{$_('cookbook_import_dialog.cancel')}</button>
+          <button class="btn btn-primary" on:click={() => { phase = 'pick'; errorMessage = ''; }}>{$_('cookbook_import_dialog.try_again')}</button>
         </footer>
       {/if}
     </div>

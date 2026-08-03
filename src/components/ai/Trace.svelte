@@ -166,19 +166,19 @@
       _holdTimer = null;
       if (_hasDragged) return; // user started dragging — abort
       if (!_speechSupported) {
-        showError('Voice input not supported in this browser');
+        showError($_('trace_ai_ct.toast.voice_unsupported'));
         return;
       }
       if (!$aiEnabled || (!$aiKeyVerified && !aiEnvLocked)) {
-        showError('Configure Trace AI in Settings to use hold-to-talk');
+        showError($_('trace_ai_ct.toast.configure_ai'));
         return;
       }
       if (!$smartLogEnabled) {
-        showError('Enable Smart Log in Settings → Trace AI to use hold-to-talk');
+        showError($_('trace_ai_ct.toast.enable_smart_log'));
         return;
       }
       if (!isNative && typeof window !== 'undefined' && !window.isSecureContext) {
-        showError('Voice needs HTTPS. Plain HTTP blocks the mic — set up TLS or use the public domain.');
+        showError($_('trace_ai_ct.toast.voice_needs_https'));
         return;
       }
       _fabRecording = true;
@@ -247,7 +247,7 @@
           // Surface a tiny toast so the user knows the cancel actually
           // landed; otherwise a successful cancel looks identical to a
           // failed recording.
-          showError('Voice cancelled');
+          showError($_('trace_ai_ct.toast.voice_cancelled'));
         }
       }
     }
@@ -684,7 +684,7 @@ When you write to the user's data, summarise what you did briefly and concretely
     const text = input.trim();
     if ((!text && !attachedImage) || busy) return;
     if (!$aiEnabled) {
-      showError('Trace is disabled. Enable it in Settings → Trace.');
+      showError($_('trace_ai_ct.toast.trace_disabled'));
       return;
     }
     input = '';
@@ -771,7 +771,7 @@ When you write to the user's data, summarise what you did briefly and concretely
 
   function _toggleVoice() {
     if (!_speechSupported) {
-      showError('Voice input not supported in this browser. Try Chrome on desktop or mobile Safari/Chrome.');
+      showError($_('trace_ai_ct.toast.voice_unsupported_full'));
       return;
     }
     if (recording) { _stopVoice(); return; }
@@ -835,7 +835,7 @@ When you write to the user's data, summarise what you did briefly and concretely
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
       recording = false; _fabRecording = false; _smartLogActive = false;
-      showError('Voice input not supported in this browser');
+      showError($_('trace_ai_ct.toast.voice_unsupported'));
       return;
     }
     try {
@@ -861,9 +861,9 @@ When you write to the user's data, summarise what you did briefly and concretely
           // (LAN dev, INSECURE_COOKIES installs) silently denies the
           // mic with this error. Surface it explicitly.
           if (typeof window !== 'undefined' && !window.isSecureContext) {
-            showError('Voice needs HTTPS. Smart Log won\'t work over plain HTTP — set up TLS or use the public domain.');
+            showError($_('trace_ai_ct.toast.voice_needs_https_smart'));
           } else {
-            showError('Microphone permission denied');
+            showError($_('trace_ai_ct.toast.mic_denied'));
           }
         } else if (e.error !== 'aborted') {
           showError(`Voice error: ${e.error || 'unknown'}`);
@@ -895,7 +895,7 @@ When you write to the user's data, summarise what you did briefly and concretely
   function _onImagePicked(e) {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (!/^image\//.test(f.type)) { showError('Pick an image file.'); return; }
+    if (!/^image\//.test(f.type)) { showError($_('trace_ai_ct.toast.pick_image')); return; }
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result;
