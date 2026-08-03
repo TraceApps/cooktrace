@@ -1,47 +1,67 @@
 # Contributing to CookTrace
 
-Pre-1.0 — the foundation is still being laid out. Issue/PR triage may be
-slow until Phase 1 (Recipes) ships. Bug reports are welcome on the public
-repo; feature suggestions tracked in [FUTURE.md](FUTURE.md).
+Thanks for your interest in CookTrace.
 
-## Local dev
+## Reporting bugs
 
-```bash
-git clone https://github.com/traceapps/cooktrace.git
-cd cooktrace
-npm install
-npm run dev          # Vite dev server on :5173
-node server/index.js # API on :3001
-```
+- Open an issue at [github.com/traceapps/cooktrace/issues](https://github.com/traceapps/cooktrace/issues).
+- Include your version (Settings → About), what you expected, and what you saw.
+- For sync issues, include whether you're on PWA or native Android, and your server version.
+- Don't paste server logs publicly without redacting; `LOG_LEVEL=debug` includes auth tokens that happened to be in flight and (on Android) device identifiers used for native sync.
 
-## Style
+## Suggesting features
 
-- Match the surrounding code. The codebase inherits NutriTrace conventions
-  almost entirely.
-- No comments unless the WHY is non-obvious.
-- Don't add features beyond what the issue/PR scope demands.
-- See `CLAUDE.md` for project-specific notes.
+- Open an issue describing the use case before writing code; it helps avoid building something that won't get merged.
+- Check [ROADMAP.md](ROADMAP.md) first; the feature may already be planned or intentionally deferred.
 
 ## Pull requests
 
 - **Target the `dev` branch, not `main`.** All work lands on `dev` first, gets tested there, and is bundled into `main` at release time. PRs opened against `main` will be asked to retarget.
-- Keep changes focused — one concern per PR.
+- Keep changes focused, one concern per PR.
+- Match the existing code style (Svelte 5 in compat mode, no runes, no TypeScript).
+- For server changes, ensure all SQL is parameterized and every new route has appropriate `requireAuth` / `requireAdmin` middleware.
 - Update `CHANGELOG.md` under the unreleased section if your change is user-visible.
 - The Android shell lives in `android/`; if you change web assets the maintainer will run `npx cap sync android` and rebuild the APK.
 - No DCO or CLA required.
 
 ## Translations
 
-### For translators — adding a new language
+CookTrace uses [svelte-i18n](https://github.com/kaisermann/svelte-i18n) with one JSON file per locale in `src/i18n/`. The English file at `src/i18n/en.json` is the source of truth. Adding a new language is straightforward and you do not need to touch any other code.
 
-1. Copy `src/i18n/en.json` to `src/i18n/<your-locale>.json` (e.g. `fr.json`, `de.json`, `pt-BR.json`) and translate the values. Leave the keys untouched. HTML / Markdown inside values (`<strong>`, `<br>`, etc.) stays as-is.
-2. Register the locale in `src/i18n/index.js`. Add a `register('<locale>', () => import('./<locale>.json'));` line, and append an `{ code: '<locale>', label: '<Language name in its own language>' }` entry to `AVAILABLE_LOCALES`. Without this step the JSON sits in the repo but the language picker in Settings cannot surface it.
-3. Run `npm run i18n:check` and confirm 100% key coverage with no missing or orphaned entries.
-4. Open a PR. Translations are merged with the contributor's authorship preserved on the JSON file.
+### Adding a new language
+
+1. Copy `src/i18n/en.json` to `src/i18n/<code>.json` where `<code>` is the BCP-47 short code (`fr`, `de`, `nl`, `es`, `pt`, `ja`, etc.).
+2. Translate the values. Leave the keys exactly as they are. Keep `{placeholder}` tokens and any HTML tags (`<strong>`, `<code>`, `<br>`) intact and in the right grammatical position for your language.
+3. In `src/i18n/index.js`, register the new locale and add it to `AVAILABLE_LOCALES`:
+   ```js
+   register('fr', () => import('./fr.json'));
+   // ...
+   export const AVAILABLE_LOCALES = [
+     { code: 'en', label: 'English' },
+     { code: 'fr', label: 'Français' },
+   ];
+   ```
+   The label is what shows in the Settings → Regional & Units → Language picker. Use the language's native name (e.g. `Français` not `French`).
+4. Run `npm run i18n:check` to confirm no keys are missing or orphaned.
+5. Open a PR.
+
+### Updating an existing language
+
+If new keys land in `en.json` between releases, your locale file will report them as "missing" in `npm run i18n:check`. The app will fall back to English for those strings until you translate them. There is no urgency; translate at your own pace.
+
+The English source text may also change occasionally without renaming the key. There is no automatic stale-translation detection, so a quick diff of `en.json` against the version you originally translated from is the most reliable way to catch these.
+
+### Translation guidance
+
+- **Domain conventions matter.** For cooking terminology, use the words home cooks actually use in your country, not literal translations. Cup / tbsp / tsp map to different local volumes; grams and millilitres are unambiguous. Recipe categories (main, side, dessert, drink) may have culturally-established equivalents; prefer those.
+- **Volume vs weight.** Some languages / cuisines strongly prefer one over the other. If your locale users cook by weight, don't force volume translations.
+- **Match the tone.** CookTrace's English copy is informal and direct ("Log a cook", "Plan tacos for Friday"). Try to keep that register rather than translating to a more formal style.
+- **Length awareness.** Some buttons are tight on small screens. If your translation is significantly longer than the English, test on a phone-sized viewport.
+- **Do not translate proper nouns or product names.** `CookTrace`, `Trace` (the AI assistant), `Open Food Facts`, `OFF`, `USDA`, `Mealie`, `Paprika`, `Tandoor`, `Kitchen`, `Cookbook` stay as-is.
 
 ### For code contributors — instrumenting new strings
 
-Every user-facing string added to the app should be extracted into `en.json` and rendered through `svelte-i18n`'s `$_()` helper. Hardcoded English literals in templates are the reason translation coverage lags the codebase — please prevent them at PR time rather than retrofit them later.
+Every user-facing string added to the app should be extracted into `en.json` and rendered through `svelte-i18n`'s `$_()` helper. Hardcoded English literals in templates are the reason translation coverage lags the codebase; please prevent them at PR time rather than retrofit them later.
 
 The pattern:
 
@@ -51,7 +71,7 @@ The pattern:
 </script>
 
 <h1>{$_('routes.recipes.title')}</h1>
-<input placeholder={$_('routes.recipes.search_placeholder')} />
+<input placeholder={$_('routes.pantry.search_placeholder')} />
 ```
 
 Then in `src/i18n/en.json`:
@@ -59,8 +79,10 @@ Then in `src/i18n/en.json`:
 ```json
 "routes": {
   "recipes": {
-    "title": "Recipes",
-    "search_placeholder": "Search recipes…"
+    "title": "Recipes"
+  },
+  "pantry": {
+    "search_placeholder": "Search pantry…"
   }
 }
 ```
@@ -68,8 +90,8 @@ Then in `src/i18n/en.json`:
 Guidelines:
 
 - **Group by area**, not by page. `settings.notifications.section` is better than `settings_notifications_section`.
-- **Only add English** in your PR. Do not machine-translate or hand-translate into other languages you don't natively speak — that misrepresents contributor work. The `en.json` addition is enough; translators fill in their locale files in follow-up PRs. `svelte-i18n`'s `fallbackLocale: 'en'` renders English until a translation lands.
-- **Skip developer-facing strings** — error stacks, log messages, JSON payload keys, class names. Only pull out what a user reads on screen.
+- **Only add English** in your PR. Do not machine-translate or hand-translate into other languages you don't natively speak; that misrepresents contributor work. The `en.json` addition is enough; translators fill in their locale files in follow-up PRs. `svelte-i18n`'s `fallbackLocale: 'en'` renders English until a translation lands.
+- **Skip developer-facing strings.** Error stacks, log messages, JSON payload keys, class names. Only pull out what a user reads on screen.
 - **Interpolation** uses `{$_('key', { values: { name: user.name } })}` and `{name}` in the JSON value. Prefer this over string concatenation so translators can reorder words.
 - **Run `npm run i18n:check`** before opening the PR. It flags orphaned keys and missing translations across every locale file, catching typos and stale entries.
 
@@ -79,9 +101,16 @@ If you're adding a section that has a lot of copy, group all the new keys under 
 
 Do not add translations for locales you don't natively speak, and do not merge machine-translated content into a contributor's locale file. If a section can't be translated at code-write time (nobody on the PR speaks the language), extract to `en.json`, open a follow-up "Translations wanted" issue linking the new keys, and let a native speaker fill them in. `svelte-i18n`'s English fallback keeps the app fully functional in the meantime.
 
-## Brand cohesion
+### What's translatable today vs not
 
-CookTrace, NutriTrace, and LiftTrace share design language and the
-`Trace` AI assistant persona. Keep `TraceFace.svelte` identical across
-all three repos. If you change the assistant tone or the navigation
-chrome here, mirror to LiftTrace + NutriTrace in the same PR cycle.
+The full client-side string surface is extracted as of v1.1.0: navigation, all Settings sections, Recipes, Pantry, Cook Diary, Shopping, Cookbooks, Kitchens, Manage, the wizard, auth flow, the Trace AI assistant, action sheets, toasts, dialog copy. Any new user-facing string added to the app is expected to land as a key in `en.json` in the same commit (see instrumenting guidance above); hardcoded English literals get flagged in review. `npm run i18n:check` runs against every locale file to catch missing translations and orphaned keys.
+
+Server-side strings (email subject lines, push notification bodies, AI system prompts) are not currently translatable and stay English.
+
+## Screenshots
+
+README screenshots live in `docs/screenshots/` (numbered prefix for sort order). If your PR meaningfully changes the UI shown in any of them, please replace the affected screenshot at the same dimensions and theme (dark) so the README stays accurate.
+
+## License
+
+By contributing you agree that your contribution is licensed under [AGPL-3.0](LICENSE), the same license as the rest of the server and PWA code.
