@@ -9,6 +9,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.1.1] - 2026-08-03
+
+### Fixed
+
+- **Server-connection banner no longer covers the phone's notification bar.** The red "server unreachable" banner sat edge-to-edge at viewport top:0, which on Android slid it up over the status bar / clock / hamburger. Now floats as a rounded card below the status bar and the app's compact header, matching NutriTrace.
+
+---
+
 ## [1.1.0] - 2026-08-02
 
 > **⚠ Upgrade note.** The Android app identifier change (`app.cooktrace.local`, see "Changed" below) invalidates the WebView's cached auth cookie. Server-connected Android users will need to re-enter their server URL and sign back in once after upgrading; standalone Android users lose their theme / accent / display prefs but keep all recipe, pantry, diary, and shopping data (that lives in local SQLite, unaffected). PWA / browser users are not affected.
