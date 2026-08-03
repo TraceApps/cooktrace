@@ -50,6 +50,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.1.1] - 2026-08-03
+
+### Fixed
+
+- **Server-connection banner no longer covers the phone's notification bar.** The red "server unreachable" banner sat edge-to-edge at viewport top:0, which on Android slid it up over the status bar / clock / hamburger. Now floats as a rounded card below the status bar and the app's compact header, matching NutriTrace.
+
+---
+
+## [1.1.0] - 2026-08-02
+
+> **⚠ Upgrade note.** The Android app identifier change (`app.cooktrace.local`, see "Changed" below) invalidates the WebView's cached auth cookie. Server-connected Android users will need to re-enter their server URL and sign back in once after upgrading; standalone Android users lose their theme / accent / display prefs but keep all recipe, pantry, diary, and shopping data (that lives in local SQLite, unaffected). PWA / browser users are not affected.
+
+### Added
+
+- **Pantry page: configurable default search source.** New setting under **Settings → Food Sources → Pantry Search → Default Search Source** picks which chip the Pantry page opens with (options: All, My Pantry, OFF, USDA, filtered to whatever external sources are enabled). Existing users keep the current default (My Pantry); anyone who prefers all-sources fan-out on every visit can switch to All and it sticks across sessions + devices. Ported from NutriTrace #128.
+- **Pull-to-refresh sync (Android).** In native server mode, swipe down from the top of any page to trigger a manual sync. Matches NutriTrace's behavior for family consistency.
+- **Smart connection banner.** When sync fails, the banner explains what actually went wrong (no network vs cellular-only vs server unreachable vs HTTP error) with a Retry button, instead of a generic "sync error". Structured classification via `describeConnectionIssue` mirrors NT.
+- **Cloud icon in hamburger menu goes red on server disconnect.** Previously only lit up when the OS reported offline; now also triggers on server-side outages and cellular-vs-LAN routing mismatches, matching NT's behavior.
+- **Optional email on the "Create Admin Account" form.** Shows up only when SMTP is configured via environment variables (`SMTP_HOST`/`SMTP_USER`/etc. in docker-compose), so we know the server can actually reach that address at that point. Stored on the admin's user record for password-reset and invite emails later.
+- **In-app updates.** New Settings → Updates panel checks GitHub Releases for a newer version and, on Android, downloads the signed APK and hands off to the system installer via FileProvider. One primary button drives the whole flow (Check Now → Download & Install → Downloading X%). Skip This Version link when an update's available. Collapsible "What's new" panel below the button renders the release notes inline (markdown) with a "View on GitHub" link. Silent shade notification when the OS notification permission is granted; top-of-app banner as fallback when permission's denied. Opt-in Stable or Dev channels. Same shared TraceApps signing key means Android upgrades in place with no reinstall.
+- **Accent-tinted browser chrome.** The browser tab bar / address strip now picks up your current accent color via `<meta name="theme-color">`. Running CookTrace alongside NutriTrace / LiftTrace? Pick a distinct accent per install and the tabs read as visually different at a glance. Favicon stays the branded CookTrace mark.
+
+### Changed
+
+- **Bitwarden / password managers now show a real app identifier instead of "localhost" (Android).** The Android app used to serve its WebView from `https://localhost/`, so autofill entries saved through Bitwarden / 1Password / etc. showed up as "localhost" — indistinguishable from any other localhost app. CookTrace now identifies itself as `app.cooktrace.local`, which reads clearly in autofill dialogs and in your saved-credentials list. **One-time upgrade cost:** the origin change orphans locally cached web-only state, so on first launch after upgrading you'll need to re-enter your server URL + log in again (server-connected users), and your theme / accent / display prefs will reset to defaults (standalone users). **Your recipe, pantry, and shopping data is unaffected** — that lives in a local SQLite database that's separate from the WebView.
+- **SMTP "Username" field relabeled to "Email or Username".** Most SMTP providers want the full email as the username; label change removes the guesswork.
+
+- **Full i18n retrofit across the app.** Every hardcoded UI string has been extracted into `src/i18n/en.json` and reads via `svelte-i18n`. Covers Settings (main page + Backup, Notifications, ServerConnection, Auth, ImportFromNT, Email, Trace, UserManagement, Kitchens, Import, Federation, Nutrition), Pantry (PantryItemSheet + PantryEditor + Pantry + PantryView), Recipes (Recipes + RecipeEditor + RecipeView + CookbookView + PublicRecipe + import/comment/cook dialogs + NutritionFacts), core routes (CookDiary, Shopping, NativeSetup, Login, Wizard, Profile, Manage), manage tables (Cookbooks, Units, Pantry/Recipe Categories, Taxonomy), Trace AI, and shared UI (BarcodeScanner, TimePicker, CookHeatmap, ImagePicker, IconPicker, timer pills, Sidebar). ~460 new keys added, Weblate-ready. Chicago-style title case for labels/buttons/headings, sentence case for body prose / errors / placeholders / toasts. Uses paired `<key>_desc` sibling keys and column-aligned values (Fathom-inspired conventions carried across the TraceApps family) so translators get inline context.
+
+### Fixed
+
+- **OFF country filter works again + expanded country list.** The Pantry's Open Food Facts country filter was being passed to search-a-licious with the wrong query shape (`countries_tags_en=<slug>`), so selecting Norway or any non-World option silently had no effect. Fixed by using search-a-licious's native inline Lucene syntax (`q=<text> +countries_tags:"en:<slug>"`). While in there: expanded the picker from 15 → 30 countries, alphabetized, and added Argentina, Austria, Belgium, Chile, Denmark, Finland, Ireland, Netherlands, New Zealand, Norway, Poland, Portugal, Singapore, South Africa, South Korea, Sweden, Switzerland. Same fix ported from NutriTrace's #131 (@JacosVerksted), adapted to search-a-licious.
+- **App icon no longer shows a white halo.** The bundled icon PNGs had ~15px of solid white padding baked into their corners. On tinted browser chrome the halo was visible around the tab favicon; in-app the icon looked framed. Corners now clear cleanly. Icon URLs also cache-busted with the app version so shipped icon fixes actually take effect without users needing to clear their browser cache.
+- **Create Admin form password field no longer crushed** (parity with NT #122). The password input on the Enable User Management form was rendering as a colored sliver because of a flex-layout bug. Password + Confirm now sit symmetrically side-by-side, each with its own eye toggle sharing show/hide state.
+
+---
+
 ## [1.0.3] - 2026-07-28
 
 ### Fixed
