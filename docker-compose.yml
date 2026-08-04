@@ -3,7 +3,7 @@ services:
     image: ghcr.io/traceapps/cooktrace:latest
     container_name: cooktrace
     ports:
-      - "3004:3001"
+      - "3001:3001"
     volumes:
       - ${DATA_DB_PATH}:/data/db
       - ${DATA_UPLOADS_PATH}:/data/uploads

@@ -88,7 +88,7 @@ services:
     image: ghcr.io/traceapps/cooktrace:latest
     container_name: cooktrace
     ports:
-      - "3004:3001"
+      - "3001:3001"
     volumes:
       - ./data/db:/data/db
       - ./data/uploads:/data/uploads
@@ -109,7 +109,7 @@ Generate the JWT secret with `openssl rand -base64 48`, then:
 docker compose up -d
 ```
 
-Open `http://localhost:3004` and a first-run wizard walks you through enabling user management and creating an admin account.
+Open `http://localhost:3001` and a first-run wizard walks you through enabling user management and creating an admin account.
 
 Full walkthrough (env-file layout, reverse proxy, LAN-HTTP notes) at [docs/getting-started/compose](https://traceapps.github.io/docs/getting-started/compose/). Pre-release testers can grab the rolling `dev-latest` APK; occasional milestone builds also get numbered `-devNN` pre-releases. See [DEPLOY.md](DEPLOY.md) for details.
 
