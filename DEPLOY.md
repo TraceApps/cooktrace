@@ -8,7 +8,7 @@ cd cooktrace
 cp .env.example .env
 # Edit .env, at minimum set JWT_SECRET to a long random value
 docker compose up -d
-# Open http://localhost:3000
+# Open http://localhost:3004
 ```
 
 ## Image tags
@@ -93,7 +93,8 @@ Optional integrations:
 ## Reverse proxy
 
 CookTrace listens on port 3001 inside the container, exposed on host port
-3000 by default. Front with Caddy / Nginx / Traefik on 443.
+3004 by default (chosen to sit alongside LiftTrace's 3002 and NutriTrace's
+3000 without host-port collision). Front with Caddy / Nginx / Traefik on 443.
 
 If hosting at a subpath (e.g. `https://example.com/cooktrace/`), set
 `BASE_URL=/cooktrace` in the environment.
