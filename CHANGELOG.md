@@ -9,6 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **Open Food Facts barcode lookup moved to the current v3 endpoint.** OFF officially deprecated the v0 and v2 product endpoints in favor of `/api/v3/`. Product schema is unchanged (all the same fields), only the envelope status shape differs (v3 returns `"success"` vs v0/v2's `1`). CookTrace now accepts both so mirror hits and live v3 hits are treated the same. Text search continues on search-a-licious (already current-canonical). Parallel to NutriTrace's #133 migration; both apps are now on the two endpoints OFF actively recommends.
 - **Micronutrient units display as `mcg` instead of `µg`** (Vitamin A / Vitamin D / Vitamin K / Folate (B9) / Vitamin B12). Same unit (microgram), consumer-friendlier spelling used by supplement labels, prescriptions, and the FDA. Keeps parity with NutriTrace's #137 fix and avoids the CSS uppercase transform edge case where `µg` case-maps to `Μg` (Greek Capital Mu) and can visually read as `MG`. No data change.
 
 ---
