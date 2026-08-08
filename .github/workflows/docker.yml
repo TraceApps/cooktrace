@@ -46,9 +46,11 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Only two tags are published, mirrored to both registries:
-      #   push to main (or semver tag on main) → :latest
-      #   push to dev                          → :dev
+      # Only two image tags are published, mirrored to both registries:
+      #   push to main → :latest
+      #   push to dev  → :dev
+      # (semver git tags no longer trigger this workflow; see the top-of-file
+      # trigger comment for why.)
       # Same tag set exists at both ghcr.io/traceapps/cooktrace
       # (primary) and traceapps/cooktrace on Docker Hub (mirror).
       #
