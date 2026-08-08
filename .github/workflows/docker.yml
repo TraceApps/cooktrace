@@ -2,8 +2,13 @@ name: Build & Push
 
 on:
   push:
+    # Semver tags intentionally omitted. Merging to main already fires this
+    # workflow and publishes :latest to both registries; a tag push would
+    # fire it again with no matching tag rule (branches-only metadata),
+    # producing a spurious failure. Historical versions live on the GitHub
+    # Releases page with signed APKs; Docker consumers pin :latest or use
+    # manifest digests.
     branches: [ main, dev ]
-    tags: [ 'v*.*.*' ]
   workflow_dispatch:
 
 jobs:
