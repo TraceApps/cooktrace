@@ -8,13 +8,20 @@ cd cooktrace
 cp .env.example .env
 # Edit .env, at minimum set JWT_SECRET to a long random value
 docker compose up -d
-# Open http://localhost:3000
+# Open http://localhost:3003
 ```
 
 ## Image tags
 
-Every release publishes a multi-arch (linux/amd64 + linux/arm64) image
-under several tags so you can pin to whatever risk level fits:
+Every release publishes a multi-arch (linux/amd64 + linux/arm64) image to
+**two registries** with an identical tag set. GHCR is primary; Docker Hub
+is a discoverability mirror. Both are first-class; pick whichever fits.
+
+- **`ghcr.io/traceapps/cooktrace`** (primary)
+- **`traceapps/cooktrace`** on [Docker Hub](https://hub.docker.com/r/traceapps/cooktrace) (mirror)
+
+Pin to whatever risk level fits (examples below use GHCR; swap the prefix
+for Docker Hub if preferred):
 
 | Tag | Updates when | Use case |
 |-----|--------------|----------|
@@ -25,7 +32,8 @@ under several tags so you can pin to whatever risk level fits:
 | `ghcr.io/traceapps/cooktrace:dev` | Every push to `dev` branch | Leading edge, not for production |
 
 Legacy `1.0.0-rc.N` tags from before the semver switch remain published
-indefinitely; anyone pinned to a specific rc release is unaffected.
+indefinitely on GHCR; anyone pinned to a specific rc release is unaffected.
+Docker Hub mirroring started post-1.0, so it only carries stable-era tags.
 
 ## Testing pre-release builds
 
@@ -85,7 +93,9 @@ Optional integrations:
 ## Reverse proxy
 
 CookTrace listens on port 3001 inside the container, exposed on host port
-3000 by default. Front with Caddy / Nginx / Traefik on 443.
+3003 by default (family host-port sequence is NutriTrace 3001, LiftTrace
+3002, CookTrace 3003, all avoiding the common `:3000` default). Front with
+Caddy / Nginx / Traefik on 443.
 
 If hosting at a subpath (e.g. `https://example.com/cooktrace/`), set
 `BASE_URL=/cooktrace` in the environment.

@@ -41,7 +41,7 @@ export const AI_DEFAULT_MODELS = {
 export const AI_MODEL_CUSTOM = '__custom__';
 
 export const AI_MODELS = {
-  claude:  ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-4-8', AI_MODEL_CUSTOM],
+  claude:  ['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-4-8', 'claude-opus-5', 'claude-fable-5', AI_MODEL_CUSTOM],
   openai:  ['gpt-4o-mini', 'gpt-4o', AI_MODEL_CUSTOM],
   gemini:  ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro', AI_MODEL_CUSTOM],
   custom:  [],

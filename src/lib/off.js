@@ -122,11 +122,18 @@ export async function lookupBarcode(barcode) {
   if (!code) return null;
   try {
     const lc = _getOffSearchLanguage();
-    const url = `${OFF_BASE}/api/v0/product/${encodeURIComponent(code)}.json?lc=${encodeURIComponent(lc)}`;
+    // v3 is the current canonical product endpoint. v0/v2 still work
+    // (both deprecated per OFF's docs) but new integrations should target
+    // v3. Product schema is unchanged between versions; only the envelope
+    // status shape differs: v3 returns { status: "success" }, v0/v2 and
+    // the local OFF mirror return { status: 1 } — accept both so a mirror
+    // hit and a live v3 hit are treated the same. Parallel to NutriTrace
+    // #133 migration.
+    const url = `${OFF_BASE}/api/v3/product/${encodeURIComponent(code)}?lc=${encodeURIComponent(lc)}`;
     const res = await _extFetch(url);
     if (!res.ok) return null;
     const data = await res.json();
-    if (data.status !== 1) return null;
+    if (data.status !== 1 && data.status !== 'success') return null;
     return _mapOFFProduct(data.product);
   } catch (e) {
     console.warn('[off] barcode lookup failed:', e);

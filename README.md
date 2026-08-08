@@ -14,7 +14,8 @@ No accounts, no telemetry, no cloud sync unless you opt in.</p>
   <a href="https://github.com/traceapps/cooktrace/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/traceapps/cooktrace?label=release&color=blue"></a>
   <a href="https://github.com/traceapps/cooktrace/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/traceapps/cooktrace/total?label=downloads&color=blue"></a>
   <a href="https://traceapps.github.io/docs/cooktrace/"><img alt="Documentation" src="https://img.shields.io/badge/docs-traceapps.github.io-4A90E2?logo=readthedocs&logoColor=white"></a>
-  <a href="https://github.com/traceapps/cooktrace/pkgs/container/cooktrace"><img alt="Docker image" src="https://img.shields.io/badge/docker-ghcr.io%2Ftraceapps%2Fcooktrace-2496ED?logo=docker&logoColor=white"></a>
+  <a href="https://github.com/traceapps/cooktrace/pkgs/container/cooktrace"><img alt="GHCR" src="https://img.shields.io/badge/ghcr.io-traceapps%2Fcooktrace-2496ED?logo=docker&logoColor=white"></a>
+  <a href="https://hub.docker.com/r/traceapps/cooktrace"><img alt="Docker Hub pulls" src="https://img.shields.io/docker/pulls/traceapps/cooktrace?logo=docker&logoColor=white&label=docker%20pulls"></a>
   <a href="https://github.com/traceapps/cooktrace/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/traceapps/cooktrace?style=flat"></a>
 </p>
 
@@ -77,6 +78,8 @@ Third app in the Trace family alongside [NutriTrace](https://github.com/traceapp
 
 ## Install
 
+Published to two registries with identical tag sets: `ghcr.io/traceapps/cooktrace` (primary) and `traceapps/cooktrace` on [Docker Hub](https://hub.docker.com/r/traceapps/cooktrace) (mirror). The snippet below uses GHCR; swap in `traceapps/cooktrace:latest` if that suits your setup.
+
 Minimal `docker-compose.yml`:
 
 ```yaml
@@ -85,7 +88,7 @@ services:
     image: ghcr.io/traceapps/cooktrace:latest
     container_name: cooktrace
     ports:
-      - "3000:3001"
+      - "3003:3001"
     volumes:
       - ./data/db:/data/db
       - ./data/uploads:/data/uploads
@@ -106,7 +109,7 @@ Generate the JWT secret with `openssl rand -base64 48`, then:
 docker compose up -d
 ```
 
-Open `http://localhost:3000` and a first-run wizard walks you through enabling user management and creating an admin account.
+Open `http://localhost:3003` and a first-run wizard walks you through enabling user management and creating an admin account.
 
 Full walkthrough (env-file layout, reverse proxy, LAN-HTTP notes) at [docs/getting-started/compose](https://traceapps.github.io/docs/getting-started/compose/). Pre-release testers can grab the rolling `dev-latest` APK; occasional milestone builds also get numbered `-devNN` pre-releases. See [DEPLOY.md](DEPLOY.md) for details.
 
