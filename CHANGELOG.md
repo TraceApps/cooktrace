@@ -7,10 +7,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.1.2] - 2026-08-05
+
+### Added
+
+- **Docker Hub mirror.** Images now publish to both `ghcr.io/traceapps/cooktrace` (primary) and `traceapps/cooktrace` on [Docker Hub](https://hub.docker.com/r/traceapps/cooktrace). Identical multi-arch tag set on both registries; workflow simplified to publish only `:latest` (main pushes) and `:dev` (dev pushes) — semver family tags and per-commit `:sha-*` tags are intentionally not emitted (historical versions live on the Releases page).
+- **AI provider model picker: Claude Opus 5 and Claude Fable 5** now selectable under Settings → Trace → Model (alongside the existing Claude Opus 4.8 option). Opus 5 is the current Opus flagship; Fable 5 is Anthropic's most capable widely released model.
+
 ### Changed
 
 - **Open Food Facts barcode lookup moved to the current v3 endpoint.** OFF officially deprecated the v0 and v2 product endpoints in favor of `/api/v3/`. Product schema is unchanged (all the same fields), only the envelope status shape differs (v3 returns `"success"` vs v0/v2's `1`). CookTrace now accepts both so mirror hits and live v3 hits are treated the same. Text search continues on search-a-licious (already current-canonical). Parallel to NutriTrace's #133 migration; both apps are now on the two endpoints OFF actively recommends.
 - **Micronutrient units display as `mcg` instead of `µg`** (Vitamin A / Vitamin D / Vitamin K / Folate (B9) / Vitamin B12). Same unit (microgram), consumer-friendlier spelling used by supplement labels, prescriptions, and the FDA. Keeps parity with NutriTrace's #137 fix and avoids the CSS uppercase transform edge case where `µg` case-maps to `Μg` (Greek Capital Mu) and can visually read as `MG`. No data change.
+- **Default host port in the reference `docker-compose.yml` bumped from `3000` to `3003`.** Family sequence is now NutriTrace `3001`, LiftTrace `3002`, CookTrace `3003`, all off the very-common `:3000`. **Existing installs are not affected** — the container-side port is unchanged (still `3001` internally), so any existing compose file's `3000:3001` mapping keeps working. Only new copy-paste installs get the new default.
+
+### Fixed
+
+- **Silent ntfy push-notification failure for every user with ntfy configured.** `fetch()` requires HTTP header values to be Latin-1 (ByteString); the hardcoded `CookTrace — ` prefix contained a U+2014 em-dash and silently threw `Cannot convert argument to a ByteString` on every ntfy send since v1.1.0, dropping all notifications for anyone using ntfy. Added `_encodeHeaderValue()` which RFC 2047-encodes the Title header when non-Latin-1 characters are present; ntfy decodes this format natively per their [docs](https://docs.ntfy.sh/publish/#e-mail-style-headers). Titles arrive intact (em-dash + emoji preserved) instead of dropping the entire notification. Credit: @clifmo (PR #35).
+
+### Security
+
+- **undici** bumped 7.19.0 → 7.29.0 — closes [GHSA-9m3f-h34x-vv7c](https://github.com/advisories/GHSA-9m3f-h34x-vv7c) (cross-user info disclosure + parse-time crash via degenerate private cache directives, HIGH) plus four MEDIUM CVEs (retry-interceptor response desync, cookie attribute injection, Cache-Control directive info disclosure via whitespace, CRLF injection via blob-type).
+- **fast-uri** bumped 3.0.1 → 3.1.5 — closes [GHSA-7p8r-x3mc-p8w7](https://github.com/advisories/GHSA-7p8r-x3mc-p8w7) (host confusion via backslash authority introducer, HIGH).
+- **nanoid** bumped to 3.3.17 — closes [GHSA-2v37-7h3g-55p8](https://github.com/advisories/GHSA-2v37-7h3g-55p8) (infinite loop when custom generator size is zero, HIGH).
 
 ---
 
