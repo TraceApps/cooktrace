@@ -577,7 +577,12 @@
         <div class="photo-grid">
           {#each photoTiles as t (`${t.entry.id}:${t.index}`)}
             <button class="photo-tile" on:click={() => openLightbox(t.entry, t.index)} title={`${t.entry.recipe_name || 'Recipe'} · ${shortDate(t.entry.date)}`}>
-              <img src={resolveAssetUrl(t.url)} alt={t.entry.recipe_name || 'Cook photo'} loading="lazy" />
+              <img
+                src={resolveAssetUrl(t.url)}
+                alt={t.entry.recipe_name || 'Cook photo'}
+                loading="lazy"
+                on:error={(e) => e.currentTarget.parentElement?.classList.add('photo-missing')}
+              />
               <div class="photo-overlay">
                 <span class="photo-name">{t.entry.recipe_name || 'Recipe'}</span>
                 <span class="photo-date">{shortDate(t.entry.date)}</span>
@@ -720,7 +725,12 @@
         <span class="material-symbols-rounded">close</span>
       </button>
       <div class="lightbox-img-wrap">
-        <img class="lightbox-img" src={resolveAssetUrl(lightboxPhoto)} alt={lightboxEntry.recipe_name || 'Cook photo'} />
+        <img
+          class="lightbox-img"
+          src={resolveAssetUrl(lightboxPhoto)}
+          alt={lightboxEntry.recipe_name || 'Cook photo'}
+          on:error={(e) => e.currentTarget.parentElement?.classList.add('photo-missing')}
+        />
         {#if lightboxPhotos.length > 1}
           <button class="lightbox-nav prev" on:click={lightboxPrev} aria-label="Previous photo">
             <span class="material-symbols-rounded">chevron_left</span>
@@ -1241,6 +1251,25 @@
     object-fit: cover;
     display: block;
   }
+  /* Broken-image placeholder — set by <img on:error> on tiles whose
+     underlying file couldn't be loaded (stale phone-local URL from
+     another install, missing server upload). Preserves the tile size
+     so the grid layout stays intact and shows a subtle icon instead
+     of the browser's broken-image glyph. */
+  .photo-tile.photo-missing img { display: none; }
+  .photo-tile.photo-missing::before {
+    content: 'broken_image';
+    font-family: 'Material Symbols Rounded';
+    font-size: 40px;
+    color: var(--text-muted);
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-2);
+    opacity: 0.55;
+  }
   .photo-overlay {
     position: absolute;
     inset: auto 0 0 0;
@@ -1341,6 +1370,17 @@
   }
   .lightbox-close:hover { background: rgba(0,0,0,0.75); color: #fff; }
   .lightbox-img-wrap { position: relative; background: #000; }
+  .lightbox-img-wrap.photo-missing .lightbox-img { display: none; }
+  .lightbox-img-wrap.photo-missing::before {
+    content: 'broken_image';
+    font-family: 'Material Symbols Rounded';
+    font-size: 72px;
+    color: rgba(255,255,255,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+  }
   .lightbox-img {
     width: 100%;
     max-height: 60vh;
