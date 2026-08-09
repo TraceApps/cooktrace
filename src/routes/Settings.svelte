@@ -265,7 +265,7 @@
     nutrition:     { titleKey: 'settings.nutrition.section',        icon: 'science' },
     ai:            { titleKey: 'settings.ai.section',               icon: 'bolt' },
     federation:    { titleKey: 'settings.federation.section',       icon: 'link' },
-    foodsources:   { titleKey: 'settings.foodsources.section',      icon: 'restaurant_menu' },
+    foodsources:   { titleKey: 'settings.connected_services.section', icon: 'restaurant_menu' },
     notifications: { titleKey: 'settings.notifications.section',    icon: 'notifications' },
     email:         { titleKey: 'settings.email.section',            icon: 'mail' },
     backup:        { titleKey: 'settings.backup.section',           icon: 'archive' },
