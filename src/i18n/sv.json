@@ -148,7 +148,6 @@
     },
     "email": { "section": "E-post (SMTP)" },
     "backup": { "section": "Säkerhetskopiering och återställning" },
-    "nutritionImport": { "section": "Importera från en annan app" },
     "server": { "section": "Serveranslutning" },
     "diagnostics": { "section": "Diagnostik" },
     "about": { "section": "Om" }
