@@ -9,6 +9,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.1.3] - 2026-08-08
+
+### Fixed
+
+- **Phone-taken cook diary photos now sync across every device.** Photos attached from the phone used to save to Capacitor's private filesystem and store a `_capacitor_file_` URL that only worked on the exact device (and install) that took the picture — every other device saw a broken image. Uploads now go server-first in native connected mode, storing a portable `/uploads/<file>` URL that every device can render. Offline photo-taking still works — the photo saves locally when there's no network, and gets promoted to a portable server URL on the next successful sync. Existing broken entries auto-heal on the next sync too: if the underlying file still exists on any connected device, it re-uploads and rewrites the URL; if the file is gone from all installs, the URL clears and a subtle placeholder shows in the photos view instead of a broken-image glyph.
+- **Pull-to-refresh no longer triggers mid-page.** The top-of-scroll check missed pages that used a nested scroll container (recipe view, editor pages), causing a downward swipe anywhere on those pages to fire a sync. Now walks up from the touched element to find the actual scrolling container and only fires when THAT container is at the top.
+- **Settings sidebar duplicate labels + i18n key deduplication.** The Food Sources sidebar label was rendering twice, and the Settings i18n file had a small number of duplicate `settings.*` stubs.
+
+### Changed
+
+- **AI model picker refreshed.** Added Google **Gemini 3.x** and OpenAI **GPT-5.6** to the model presets. (Claude Opus 5 and Claude Fable 5 were already added in v1.1.2.)
+
+### Internal
+
+- Ported LiftTrace's i18n CI check (duplicate-key + unresolved-code-reference detection).
+- Docker workflow: dropped the semver-tag trigger that was firing a spurious failed run on every release tag push.
+
+---
+
 ## [1.1.2] - 2026-08-05
 
 ### Added
