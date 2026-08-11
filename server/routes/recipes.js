@@ -18,6 +18,7 @@ import { aiExtractRecipe } from '../lib/recipe-ai-fallback.js';
 import { scrapeWithRecipeScrapers, isRecipeScrapersAvailable } from '../lib/recipe-scrapers-bridge.js';
 import { importRecipeFromText, importPaprikaArchive, scanRecipeZip, scanLoadedZip, loadRecipeZip, readImageFromLoadedZip, readZipImageBytes, mealieEventImagePaths } from '../lib/recipe-importers.js';
 import { extractText, detectFileType } from '../lib/text-extractors.js';
+import { guardNestedRecipeFields } from '../lib/recipe-guards.js';
 import { parseRecipeText, HIGH_CONFIDENCE_THRESHOLD } from '../lib/heuristic-recipe-parser.js';
 import JSZip from 'jszip';
 import path from 'node:path';
@@ -639,6 +640,19 @@ router.put('/:id', wrap((req, res) => {
   const data = _toStorage(body);
   if (!data.name) return res.status(400).json({ error: 'Name is required' });
 
+  // Option E guard (2026-08-11): if any of the nested JSON fields
+  // (ingredients / steps / tags / tools / nutrition) is empty on the
+  // incoming request BUT non-empty on the server row, preserve the
+  // server value. This closes the wipe class: a stale mobile client
+  // whose cached recipe was truncated can no longer blow away the
+  // server's real ingredients/steps just by saving. Genuine empties
+  // are exceptionally rare in the UI (users delete the recipe, not
+  // clear its steps) so the tradeoff is right. See
+  // project_traceapps_diary_merge_port for the audit trail; if a
+  // real workflow later needs to send a legitimate empty for one of
+  // these fields, promote CT to full Option C (per-uuid merge).
+  const guarded = guardNestedRecipeFields({ existing, incoming: data });
+
   db.prepare(
     `UPDATE recipes SET
        name = ?, description = ?, img_url = ?, servings = ?, yield_text = ?,
@@ -650,7 +664,7 @@ router.put('/:id', wrap((req, res) => {
   ).run(
     data.name, data.description, data.img_url, data.servings, data.yield_text,
     data.prep_minutes, data.cook_minutes, data.total_minutes, data.rest_minutes, data.rating, data.favorite,
-    data.ingredients, data.steps, data.tags, data.tools, data.nutrition,
+    guarded.ingredients, guarded.steps, guarded.tags, guarded.tools, guarded.nutrition,
     data.source_url, data.notes, data.visibility, data.category_id, data.video_url,
     id,
   );
