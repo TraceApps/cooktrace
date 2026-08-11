@@ -431,9 +431,33 @@ const SERVER_ONLY_METHODS = new Set([
   'get', 'post', 'put', 'patch', 'del',
 ]);
 
+// Smart uploadImage for native connected mode. Tries the server first so
+// the returned URL is a portable /uploads/<file> path that every device
+// can render. Falls back to the native local-file path when the server
+// upload fails (offline, transient network error, server down) — the
+// diary/recipe/pantry entry can still save with a local URL, and the
+// sync engine's stale-photo pass (sync.js → _reconcileLocalPhotoUrls)
+// picks it up on the next successful sync, uploads it, and rewrites
+// the URL in-place.
+async function _uploadImageConnected(file) {
+  try {
+    return await _CtApiHttp.uploadImage(file);
+  } catch (e) {
+    console.warn('[upload] server POST failed, saving locally for sync retry:', e?.message);
+    return await CtApiNative.uploadImage(file);
+  }
+}
+
 // Dynamic proxy — picks the right impl per call based on platform mode.
 export const NtApi = new Proxy({}, {
   get(_, prop) {
+    // Special-case uploadImage in native connected mode: server-first
+    // with local fallback so photos land at portable /uploads/<file>
+    // URLs that other devices can render, without breaking offline
+    // photo-taking.
+    if (prop === 'uploadImage' && isNative && getServerUrl()) {
+      return _uploadImageConnected;
+    }
     let impl;
     if (!isNative)                                             impl = _CtApiHttp;
     else if (!getServerUrl())                                  impl = CtApiNative;

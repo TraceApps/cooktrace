@@ -101,8 +101,20 @@
   function _startPullSync(event) {
     if (!_syncModeActive || _pullRefreshing || sidebarOpen || showNativeSetup) return;
     if (event.target?.closest?.('[role="dialog"], .sheet-backdrop, .sidebar-panel, .sidebar-backdrop, .bottom-nav')) return;
-    const scroller = document.querySelector('.page-transition');
-    if (scroller && scroller.scrollTop > 0) return;
+    // Walk up from the touch target to the nearest scrolling ancestor.
+    // Handles both editor pages (their own `.page-shell.editor-page`
+    // becomes the scroller because it's position: fixed + overflow-y: auto)
+    // AND list pages (scrolling bubbles to `.page-transition`). A single
+    // gate covers any future scroll container without needing an allowlist.
+    let el = event.target;
+    while (el && el !== document.body) {
+      const s = getComputedStyle(el);
+      if ((s.overflowY === 'auto' || s.overflowY === 'scroll') && el.scrollHeight > el.clientHeight) {
+        if (el.scrollTop > 0) return;
+        break;
+      }
+      el = el.parentElement;
+    }
     _pullStartX = event.touches[0].clientX;
     _pullStartY = event.touches[0].clientY;
     _pullTracking = true;

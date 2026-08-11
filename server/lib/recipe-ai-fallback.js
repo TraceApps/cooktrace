@@ -168,9 +168,9 @@ async function _callProvider(cfg, systemPrompt, userText) {
 function _defaultModel(provider) {
   return ({
     claude: 'claude-haiku-4-5-20251001',
-    openai: 'gpt-4o-mini',
-    gemini: 'gemini-2.0-flash',
-    custom: 'gpt-4o-mini',
+    openai: 'gpt-5.6-luna',
+    gemini: 'gemini-3.6-flash',
+    custom: 'gpt-5.6-luna',
   })[provider] || '';
 }
 

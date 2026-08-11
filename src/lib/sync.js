@@ -223,6 +223,183 @@ function _notify(payload) {
   catch {}
 }
 
+// ── Local-photo URL reconciliation ─────────────────────────────────────
+// Phone-uploaded photos stored under Capacitor's private Filesystem end
+// up in server-tracked entities as URLs like
+// https://<webview-host>/_capacitor_file_/data/.../uploads/img_xxx.jpg.
+// These are non-portable — they point at THIS install's private storage
+// only. Other devices see them as broken images, and a reinstall of the
+// same device loses them too. This pass walks recipes / pantry / cook
+// diary entries, and for every _capacitor_file_ URL it finds:
+//   - if the local file exists → POST to /api/upload, rewrite the URL
+//     to the returned /uploads/<file> path, mark the entity dirty so
+//     the following push syncs the fix out.
+//   - if the local file is gone → clear the URL (portable placeholder).
+//
+// Idempotent; runs between pull and push on every sync, so entries
+// take at most one sync cycle to converge.
+function _isLocalCapacitorUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  return url.includes('_capacitor_file_');
+}
+function _capacitorUrlToFileUri(url) {
+  // Reverse of Capacitor.convertFileSrc: strips the WebView origin +
+  // "_capacitor_file_" segment to recover the original file:// URI.
+  // Handles both https://localhost/_capacitor_file_/... and the newer
+  // https://app.cooktrace.local/_capacitor_file_/... shape.
+  const marker = '/_capacitor_file_';
+  const idx = url.indexOf(marker);
+  if (idx < 0) return null;
+  return 'file://' + url.slice(idx + marker.length);
+}
+async function _fileExistsAtUri(fileUri) {
+  try {
+    const { Filesystem } = await import('@capacitor/filesystem');
+    await Filesystem.stat({ path: fileUri });
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function _readFileAsBlob(fileUri) {
+  try {
+    const { Filesystem } = await import('@capacitor/filesystem');
+    const res = await Filesystem.readFile({ path: fileUri });
+    const base64 = res.data;
+    if (!base64) return null;
+    // base64 → binary blob. Guess a MIME from the extension; server
+    // magic-byte detection re-verifies for images.
+    const extMatch = fileUri.match(/\.([a-z0-9]+)$/i);
+    const ext = (extMatch?.[1] || 'jpg').toLowerCase();
+    const mime = ext === 'png' ? 'image/png'
+      : ext === 'webp' ? 'image/webp'
+      : ext === 'gif' ? 'image/gif'
+      : 'image/jpeg';
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
+  } catch {
+    return null;
+  }
+}
+async function _uploadFromFileUri(fileUri) {
+  const blob = await _readFileAsBlob(fileUri);
+  if (!blob) return null;
+  const nameMatch = fileUri.match(/[^/]+$/);
+  const name = nameMatch ? nameMatch[0] : 'photo.jpg';
+  const file = new File([blob], name, { type: blob.type });
+  // Hit /api/upload directly (bypassing NtApi.uploadImage's local
+  // fallback — we don't want the fallback here because the whole
+  // point is to promote a local URL to a portable server one; a
+  // fallback would just re-write the same local URL).
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const headers = {};
+    const token = getAuthToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(apiUrl('/api/upload'), {
+      method: 'POST', headers, credentials: 'include', body: form,
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => ({}));
+    return data?.url || null;
+  } catch {
+    return null;
+  }
+}
+async function _reconcileLocalPhotoUrls(onProgress) {
+  const { getDb } = await import('./db-native.js');
+  const db = await getDb();
+  // Collect candidates from the tables that carry user photos. Field
+  // names differ per table (photo_url + photos JSON on cook_diary,
+  // img_url on recipes, photo_url on pantry_items).
+  const jobs = [];
+  async function scan(sql, params, mapper) {
+    try {
+      const r = await db.query(sql, params);
+      for (const row of r?.values || []) jobs.push(...mapper(row));
+    } catch (e) {
+      console.warn('[reconcile] scan failed:', sql, e?.message);
+    }
+  }
+  await scan(
+    'SELECT id, photo_url, photos FROM cook_diary WHERE (photo_url IS NOT NULL AND photo_url != "") OR (photos IS NOT NULL AND photos != "")',
+    [],
+    row => {
+      const out = [];
+      if (_isLocalCapacitorUrl(row.photo_url)) {
+        out.push({ table: 'cook_diary', id: row.id, field: 'photo_url', url: row.photo_url });
+      }
+      if (row.photos) {
+        let arr = [];
+        try { arr = JSON.parse(row.photos); } catch {}
+        if (Array.isArray(arr)) {
+          arr.forEach((u, idx) => {
+            if (_isLocalCapacitorUrl(u)) out.push({ table: 'cook_diary', id: row.id, field: 'photos', arrayIndex: idx, url: u });
+          });
+        }
+      }
+      return out;
+    }
+  );
+  await scan(
+    'SELECT id, img_url FROM recipes WHERE img_url IS NOT NULL AND img_url != ""',
+    [],
+    row => (_isLocalCapacitorUrl(row.img_url) ? [{ table: 'recipes', id: row.id, field: 'img_url', url: row.img_url }] : [])
+  );
+  await scan(
+    'SELECT id, img_url FROM pantry_items WHERE img_url IS NOT NULL AND img_url != ""',
+    [],
+    row => (_isLocalCapacitorUrl(row.img_url) ? [{ table: 'pantry_items', id: row.id, field: 'img_url', url: row.img_url }] : [])
+  );
+  if (jobs.length === 0) return { total: 0, uploaded: 0, cleared: 0 };
+  let uploaded = 0;
+  let cleared = 0;
+  for (let i = 0; i < jobs.length; i++) {
+    const j = jobs[i];
+    const fileUri = _capacitorUrlToFileUri(j.url);
+    let newUrl = null;
+    if (fileUri && await _fileExistsAtUri(fileUri)) {
+      newUrl = await _uploadFromFileUri(fileUri);
+      if (newUrl) uploaded++;
+    } else {
+      // File missing — clear the URL so renderers show placeholder
+      // instead of broken image.
+      newUrl = '';
+      cleared++;
+    }
+    if (newUrl === null) continue; // upload attempt failed; leave as-is, retry next sync
+    try {
+      if (j.field === 'photos') {
+        // Rewrite one element inside the JSON array, then persist.
+        const r = await db.query('SELECT photos FROM cook_diary WHERE id = ?', [j.id]);
+        let arr = [];
+        try { arr = JSON.parse(r?.values?.[0]?.photos || '[]'); } catch {}
+        if (Array.isArray(arr) && arr[j.arrayIndex] === j.url) {
+          if (newUrl) arr[j.arrayIndex] = newUrl;
+          else arr.splice(j.arrayIndex, 1);
+          await db.run(
+            `UPDATE cook_diary SET photos = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), sync_status = 'pending' WHERE id = ?`,
+            [JSON.stringify(arr), j.id]
+          );
+        }
+      } else {
+        await db.run(
+          `UPDATE ${j.table} SET ${j.field} = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), sync_status = 'pending' WHERE id = ?`,
+          [newUrl, j.id]
+        );
+      }
+    } catch (e) {
+      console.warn('[reconcile] db update failed:', j.table, j.id, e?.message);
+    }
+    if (onProgress) onProgress(i + 1, jobs.length);
+  }
+  console.info(`[reconcile] ${uploaded} uploaded, ${cleared} cleared, ${jobs.length} total`);
+  return { total: jobs.length, uploaded, cleared };
+}
+
 async function pushChanges() {
   const pending = await dbGetPendingChanges();
   const settings = await dbGetPendingSettingsForPush();
@@ -354,6 +531,26 @@ export async function fullSync(silentOrOpts = false, forceCheck = false, showFai
   _syncInFlight = (async () => {
     try {
       const pull = await pullChanges();
+      // Between pull and push: reconcile any phone-local photo URLs
+      // (Capacitor's https://<host>/_capacitor_file_/... scheme) that
+      // ended up in server-tracked entities. These are always non-
+      // portable — they point at a file inside THIS install's private
+      // Filesystem. If the file still exists on disk, re-upload to
+      // /api/upload and rewrite the URL to a portable /uploads/... one.
+      // If it doesn't (fresh install syncing entries from another
+      // device, uninstall-reinstall), clear the URL so downstream
+      // renderers show the placeholder instead of a broken image.
+      // Runs before push so the rewritten URLs sync out in the same
+      // pass.
+      try {
+        await _reconcileLocalPhotoUrls((done, total) => {
+          if (total > 0) {
+            syncState.update(s => ({ ...s, phase: 'photos', progress: `Uploading local photos… ${done}/${total}` }));
+          }
+        });
+      } catch (e) {
+        console.warn('[sync] local-photo reconcile failed:', e?.message);
+      }
       syncState.update(s => ({ ...s, phase: 'push' }));
       const push = await pushChanges();
       // After the data pull, walk the server's image URLs and download

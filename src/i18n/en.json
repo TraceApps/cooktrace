@@ -177,7 +177,7 @@
     "federation":         { "section": "NutriTrace Federation" },
     "server_connection":  { "section": "Server Connection" },
     "email":              { "section": "Email (SMTP)" },
-    "backup":             { "section": "Backup & Data" },
+    "backup":             { "section": "Backup & Restore" },
     "import":             { "section": "Import from Another App" },
     "kitchens":           { "section": "Kitchens" },
     "diagnostics":        { "section": "Diagnostics" },
@@ -280,12 +280,7 @@
       "err_could_not_reset_password": "Could not reset password",
       "err_could_not_reach_server": "Could not reach server"
     },
-    "email":              { "section": "Email (SMTP)" },
-    "backup":             { "section": "Backup & Restore" },
-    "nutritionImport":    { "section": "Import from Another App" },
-    "server":             { "section": "Server Connection" },
-    "diagnostics":        { "section": "Diagnostics" },
-    "about":              { "section": "About" }
+    "server":             { "section": "Server Connection" }
   },
   "login": {
     "subtitle":             "Sign in to your account",
