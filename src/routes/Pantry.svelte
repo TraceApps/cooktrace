@@ -329,12 +329,16 @@
   // 'All' chip or via multi-mode which flips searchSource to 'all').
   // Pantry match uses matchesSearch() so brand-variant search works too
   // (mirrors what the local pantry render already does).
+  // Flatten into the shape the render expects (fields on top-level, source
+  // tag as `_source`). Wrapping as {source, item} broke every field access
+  // in the all-mode row template — rows showed only the source badge with
+  // no name / brand / barcode / thumbnail.
   $: _allModeItems = searchSource !== 'all' ? [] : [
     ...(_isSourceActive('local')
-      ? (items || []).filter(f => query.trim() ? matchesSearch(f, query, buildVariantsByParent(items)) : false).map(item => ({ source: 'local', item }))
+      ? (items || []).filter(f => query.trim() ? matchesSearch(f, query, buildVariantsByParent(items)) : false).map(f => ({ ...f, _source: 'local' }))
       : []),
-    ...(_isSourceActive('off')  ? offVisible.map(item  => ({ source: 'off',  item })) : []),
-    ...(_isSourceActive('usda') ? usdaVisible.map(item => ({ source: 'usda', item })) : []),
+    ...(_isSourceActive('off')  ? offVisible.map(f  => ({ ...f, _source: 'off'  })) : []),
+    ...(_isSourceActive('usda') ? usdaVisible.map(f => ({ ...f, _source: 'usda' })) : []),
   ];
   function pickExternalResult(r) {
     // Open the sheet in create mode with the external-search result as
@@ -989,6 +993,12 @@
         <p>{$_('routes.pantry.empty_desc')}</p>
         <button class="btn btn-primary" on:click={startCreate}>{$_('routes.pantry.add_item')}</button>
       </div>
+    {:else if searchSource !== 'local' && query.trim()}
+      <!-- Pantry list intentionally hidden: OFF / USDA / All source chip
+           with an active query is a filter-to-external, not "pantry PLUS
+           external". The external-results block below renders the chosen
+           source(s). Users get the pantry-first view back by picking the
+           Pantry (local) chip or clearing the query. -->
     {:else if filtered.length === 0}
       {#if searchSource === 'local'}
         <div class="state empty">
