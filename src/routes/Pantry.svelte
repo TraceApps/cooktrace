@@ -2052,7 +2052,11 @@
   }
   .item:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
   .item:active { background: var(--surface-2); }
-  .item:not(.in-stock) { opacity: 0.6; }
+  /* .in-stock only applies to local pantry rows — external OFF/USDA search
+     results share the .item class but never get .in-stock (they aren't in
+     your pantry), so exclude .ext-item to keep search results at full
+     opacity instead of reading as "out of stock". */
+  .item:not(.in-stock):not(.ext-item) { opacity: 0.6; }
   .item-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .cat-pill {
     display: inline-flex; align-items: center; gap: 3px;
