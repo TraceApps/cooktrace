@@ -1505,52 +1505,71 @@
   .source-chip, .source-chip-caret {
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   }
+  /* Split-chip architecture:
+     - .source-chip-wrap owns the entire pill's border, background,
+       hover state, and active state. Both children draw inside it.
+     - .source-chip-split (label + optional dot) and .source-chip-caret
+       (chevron) have zero border/background so hover on either half
+       lights up the whole pill.
+     - A subtle .source-chip-caret::before divider marks the split
+       without introducing per-child hover targets.
+     - Solid state (not per-layered): removed the earlier per-child
+       .active + :has() combo that produced half-lit pills when a
+       hover landed on only one child. */
   .source-chip-wrap {
     display: inline-flex; align-items: stretch; gap: 0;
+    background: var(--surface-2);
+    color: var(--text-2);
+    border: 1px solid var(--border);
     border-radius: var(--radius-full, 99px);
     overflow: hidden;
-  }
-  .source-chip-split {
-    border-top-right-radius: 0; border-bottom-right-radius: 0;
-    border-right: none; padding-right: 8px;
-    display: inline-flex; align-items: center; gap: 5px;
-  }
-  .source-chip-caret {
-    background: var(--surface-2); color: var(--text-2);
-    border: 1px solid var(--border);
-    border-top-left-radius: 0; border-bottom-left-radius: 0;
-    border-top-right-radius: var(--radius-full, 99px);
-    border-bottom-right-radius: var(--radius-full, 99px);
-    padding: 0 6px 0 4px;
-    display: inline-flex; align-items: center;
     cursor: pointer;
     transition: all var(--dur-fast);
+  }
+  .source-chip-wrap:hover { border-color: var(--accent); color: var(--text-1); }
+  .source-chip-wrap:has(.active) {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  /* Children: pure content areas, no borders/backgrounds. */
+  .source-chip-wrap .source-chip-split,
+  .source-chip-wrap .source-chip-caret {
+    background: transparent;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    transition: none;
+  }
+  .source-chip-split {
+    padding: 5px 8px 5px 14px;
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 600;
+  }
+  .source-chip-caret {
+    padding: 0 6px 0 4px;
+    display: inline-flex; align-items: center;
+    position: relative;
+  }
+  /* Divider between the two halves — subtle vertical line, not a
+     border on either child (which would make hover/active per-half). */
+  .source-chip-caret::before {
+    content: '';
+    width: 1px;
+    align-self: stretch;
+    background: var(--border);
+    margin-right: 4px;
+    opacity: 0.6;
+  }
+  .source-chip-wrap:has(.active) .source-chip-caret::before {
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
   }
   .source-chip-caret .material-symbols-rounded {
     font-size: 16px;
     transition: transform var(--dur-fast);
   }
   .source-chip-caret.open .material-symbols-rounded { transform: rotate(180deg); }
-  .source-chip-caret:hover { border-color: var(--accent); color: var(--text-1); }
-  .source-chip-caret.active {
-    background: var(--accent-dim); color: var(--accent);
-    border-color: color-mix(in srgb, var(--accent) 30%, transparent);
-  }
-  /* Belt-and-suspenders: when either half of a split chip is active,
-     let the wrap own the active look so the pill reads as one unit
-     regardless of which child holds the class. Uses :has() (supported
-     on Chrome 105+ / current Android WebView). Falls back to the
-     per-child styles above on older engines. */
-  .source-chip-wrap:has(.active) {
-    background: var(--accent-dim);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
-  }
-  .source-chip-wrap:has(.active) .source-chip-split,
-  .source-chip-wrap:has(.active) .source-chip-caret {
-    background: transparent;
-    border-color: transparent;
-    color: var(--accent);
-  }
   .tier-active-dot {
     width: 6px; height: 6px; border-radius: 50%;
     background: var(--accent, #4caf50);
