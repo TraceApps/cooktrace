@@ -949,16 +949,23 @@
               <option value="usage">{$_('pantry_page.sort_usage')}</option>
             </select>
           </label>
-          <div class="view-toggle" role="group" aria-label="View mode">
-            <button class="seg seg-icon" class:active={$pantryView === 'grid'}
-              on:click={() => pantryView.set('grid')} title="Grid view" aria-pressed={$pantryView === 'grid'}>
-              <span class="material-symbols-rounded" style="font-size:16px">grid_view</span>
-            </button>
-            <button class="seg seg-icon" class:active={$pantryView === 'list'}
-              on:click={() => pantryView.set('list')} title="List view" aria-pressed={$pantryView === 'list'}>
-              <span class="material-symbols-rounded" style="font-size:16px">view_list</span>
-            </button>
-          </div>
+          <!-- Grid vs list only applies to the local pantry render. External
+               OFF / USDA / All source chips use a single-column search-
+               result layout that doesn't respond to this toggle, so hide
+               it when the pantry list itself is hidden (source != local
+               with an active query). -->
+          {#if searchSource === 'local' || !query.trim()}
+            <div class="view-toggle" role="group" aria-label="View mode">
+              <button class="seg seg-icon" class:active={$pantryView === 'grid'}
+                on:click={() => pantryView.set('grid')} title="Grid view" aria-pressed={$pantryView === 'grid'}>
+                <span class="material-symbols-rounded" style="font-size:16px">grid_view</span>
+              </button>
+              <button class="seg seg-icon" class:active={$pantryView === 'list'}
+                on:click={() => pantryView.set('list')} title="List view" aria-pressed={$pantryView === 'list'}>
+                <span class="material-symbols-rounded" style="font-size:16px">view_list</span>
+              </button>
+            </div>
+          {/if}
         </div>
       </div>
     {/if}
@@ -1528,6 +1535,21 @@
   .source-chip-caret.active {
     background: var(--accent-dim); color: var(--accent);
     border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  /* Belt-and-suspenders: when either half of a split chip is active,
+     let the wrap own the active look so the pill reads as one unit
+     regardless of which child holds the class. Uses :has() (supported
+     on Chrome 105+ / current Android WebView). Falls back to the
+     per-child styles above on older engines. */
+  .source-chip-wrap:has(.active) {
+    background: var(--accent-dim);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  .source-chip-wrap:has(.active) .source-chip-split,
+  .source-chip-wrap:has(.active) .source-chip-caret {
+    background: transparent;
+    border-color: transparent;
+    color: var(--accent);
   }
   .tier-active-dot {
     width: 6px; height: 6px; border-radius: 50%;
