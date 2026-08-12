@@ -1525,6 +1525,14 @@
     overflow: hidden;
     cursor: pointer;
     transition: all var(--dur-fast);
+    /* Set the shared type on the wrap so children inherit consistently.
+       Don't put `font: inherit` on the children — it's a shorthand that
+       resets size/weight/family together, which reads as unset browser
+       defaults and makes the split pills render larger than the
+       non-split .source-chip pills. */
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
   }
   .source-chip-wrap:hover { border-color: var(--accent); color: var(--text-1); }
   .source-chip-wrap:has(.active) {
@@ -1532,20 +1540,20 @@
     color: var(--accent);
     border-color: color-mix(in srgb, var(--accent) 30%, transparent);
   }
-  /* Children: pure content areas, no borders/backgrounds. */
+  /* Children: pure content areas, no borders/backgrounds. Inherit font
+     from the wrap (see the note there) — do NOT set `font: inherit`,
+     which is a shorthand and would clobber the intended size/weight. */
   .source-chip-wrap .source-chip-split,
   .source-chip-wrap .source-chip-caret {
     background: transparent;
     border: none;
     color: inherit;
     cursor: pointer;
-    font: inherit;
     transition: none;
   }
   .source-chip-split {
     padding: 5px 8px 5px 14px;
     display: inline-flex; align-items: center; gap: 5px;
-    font-size: 12px; font-weight: 600;
   }
   .source-chip-caret {
     padding: 0 6px 0 4px;
