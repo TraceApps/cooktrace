@@ -563,12 +563,39 @@
       buckets.get(slug).push(it);
     }
     const ordered = [];
+    const emitted = new Set();
     for (const cat of pantryCategories) {
       const arr = buckets.get(cat.slug);
-      if (arr && arr.length) ordered.push({ key: cat.slug, label: cat.name, icon: cat.icon || 'kitchen', items: arr });
+      if (arr && arr.length) {
+        ordered.push({ key: cat.slug, label: cat.name, icon: cat.icon || 'kitchen', items: arr });
+        emitted.add(cat.slug);
+      }
     }
-    const unc = buckets.get('__uncategorized__');
-    if (unc && unc.length) ordered.push({ key: '__uncategorized__', label: 'Uncategorized', icon: 'help', items: unc });
+    // Fallback bucket: any item whose category slug doesn't match a known
+    // pantryCategories entry (renamed/deleted category, cross-locale slug
+    // mismatch, imported data referencing a foreign catalog) would
+    // otherwise get silently dropped from the output when this grouping
+    // path runs (sort=name + no filter + no query). Land them under
+    // Uncategorized so items are never invisible. Fixes #41 where items
+    // with Chinese category names disappeared on A-Z sort because their
+    // slug didn't match anything in the current pantry-categories catalog.
+    const unc = buckets.get('__uncategorized__') || [];
+    const orphaned = [];
+    for (const [slug, arr] of buckets) {
+      if (slug === '__uncategorized__' || emitted.has(slug)) continue;
+      orphaned.push(...arr);
+      if (typeof console !== 'undefined') {
+        console.warn(`[pantry] item slug "${slug}" not in pantryCategories catalog; grouping under Uncategorized (${arr.length} item${arr.length === 1 ? '' : 's'})`);
+      }
+    }
+    if (unc.length || orphaned.length) {
+      ordered.push({
+        key: '__uncategorized__',
+        label: 'Uncategorized',
+        icon: 'help',
+        items: [...unc, ...orphaned],
+      });
+    }
     return ordered;
   })();
 
