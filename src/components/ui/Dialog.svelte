@@ -63,7 +63,7 @@
     /* Above Sheet (200) so a confirm-dialog raised from inside an open
        sheet (e.g. Delete on a Pantry item) is actually visible. The
        prior 150 caused the confirm to render under the sheet. */
-    z-index: 300;
+    z-index: 600; /* above floating overlays that can trigger confirms: Trace panel (450) */
     display: flex;
     align-items: center;
     justify-content: center;

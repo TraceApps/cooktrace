@@ -126,6 +126,9 @@
     "ask_placeholder":     "Ask {name}…",
     "listening":           "Listening…",
     "clear_conversation":  "Clear conversation",
+    "clear_confirm_title":   "Clear this conversation?",
+    "clear_confirm_message": "Messages in this conversation will be deleted. This can't be undone.",
+    "clear_confirm_ok":      "Clear",
     "attach_image":        "Attach image"
   },
   "editor": {

@@ -28,6 +28,7 @@
   // so flipping it in Settings updates every avatar immediately.
   $: Mascot = $traceChefHat ? TraceFaceChef : TraceFace;
   import { showError, showSuccess } from '../../stores/toast.js';
+  import { confirmDialog } from '../../stores/confirmDialog.js';
   import { portal } from '../../lib/portal.js';
   import { NtApi } from '../../lib/api.js';
   import { isNative } from '../../lib/platform.js';
@@ -960,7 +961,13 @@ When you write to the user's data, summarise what you did briefly and concretely
     if (isNaN(d.getTime())) return _fmtTime();
     return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
   }
-  function clearChat() {
+  async function clearChat() {
+    if (!await confirmDialog({
+      title: $_('trace.clear_confirm_title'),
+      message: $_('trace.clear_confirm_message'),
+      confirmText: $_('trace.clear_confirm_ok'),
+      dangerous: true,
+    })) return;
     messages = [];
     // Wipe server-side history too so the cleared state survives a
     // reload + travels across other browsers / devices.

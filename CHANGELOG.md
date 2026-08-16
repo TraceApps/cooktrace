@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Clearing the Trace chat now asks for confirmation.** A single tap on the header button previously wiped the entire conversation with no way back. Ports the same guard LiftTrace added in [TraceApps/lifttrace#50](https://github.com/TraceApps/lifttrace/pull/50) so behavior stays uniform across the three Trace apps. Also fixes a z-index bug where the confirm dialog opened behind the Trace panel.
+
 ---
 
 ## [1.1.4-dev01] - 2026-08-16 (pre-release)
