@@ -9,6 +9,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.1.4-dev01] - 2026-08-16 (pre-release)
+
+First dev pre-release of the 1.1.4 patch. Bug fixes and pantry UI polish
+from the last two weeks plus a server-side recipe-write safety guard.
+
+### Fixed
+
+- **Pantry items no longer disappear when sorted A-Z** if their category slug doesn't match a current pantry-categories catalog entry ([#41](https://github.com/TraceApps/cooktrace/issues/41), thanks @xiaojwus). The grouping code silently dropped orphaned buckets; they now fall into Uncategorized so nothing is invisible. Trigger isn't specific to Chinese category names, but non-ASCII category slugs are one common way to hit slug drift between item and catalog.
+- **Variant Create button** enables when only an override name is typed (previously required a brand or the click did nothing). Button label now reflects which name will actually be created.
+- **"All" mode search results** render with full name, brand, barcode, and thumbnail. Previously showed only the source label with blank content due to a field-shape mismatch in the merged list.
+- **External OFF / USDA search results** render at full opacity. The out-of-stock signal for local pantry rows was leaking to external rows.
+- **Split-chip pills (OFF, USDA)** light up as one unit on hover and active state instead of just the half the cursor is over; text sizes match the non-split chips.
+- **Recipe save no longer wipes `ingredients` / `steps` / `tags` / `tools`** from a stale mobile client. Server-side empty-guards refuse an incoming empty value on a field that already has content. Legitimate deletes still work via the per-item delete flows.
+
+### Changed
+
+- **Pantry source-chip (OFF / USDA / All) is now a filter, not an append.** With an active query, picking one of these hides the local pantry list and shows only that source's external results. Local pantry stays visible when the Pantry chip is picked or when the query is empty.
+- **Grid / list view toggle** hides when the pantry list itself is hidden (external source chip with active query). The toggle has nothing to act on in that state.
+
+### Security
+
+- No new dependencies. `npm audit` reports 0 vulnerabilities.
+
+---
+
 ## [1.1.3] - 2026-08-08
 
 ### Fixed
