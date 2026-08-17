@@ -7,9 +7,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.1.4-dev02] - 2026-08-16 (pre-release)
+
+Second dev pre-release of the 1.1.4 patch. Six findings from the code
+review of dev01: two silent data-loss guards on the recipe write path,
+a sync photo reconcile that took multiple cycles to converge, and a
+Trace confirmation dialog with UI polish.
+
 ### Fixed
 
 - **Clearing the Trace chat now asks for confirmation.** A single tap on the header button previously wiped the entire conversation with no way back. Ports the same guard LiftTrace added in [TraceApps/lifttrace#50](https://github.com/TraceApps/lifttrace/pull/50) so behavior stays uniform across the three Trace apps. Also fixes a z-index bug where the confirm dialog opened behind the Trace panel.
+- **Recipe save from a client sending flat-shape ingredients no longer silently reverts.** The server-side empty-guard required every ingredient element to expose an `.items` field (grouped shape). Any client sending the legacy flat shape (`[{name, quantity, unit}, ...]`) — older builds, AI generators, some importers — was misclassified as empty, so the caller's non-empty ingredients were silently dropped in favor of the server's prior JSON. Now distinguishes by whether the element carries an own `items` field.
+- **Removing all tags from a recipe no longer silently reverts.** The tag chip UI's "remove all" edit sent `tags: []`, but the empty-guard treated that as "don't overwrite server tags", so on next refresh the tags reappeared. Tags removed from the guard list entirely — small blast radius (flat string array), common UI action, wrong tradeoff to preserve.
+- **Cook-diary rows with multiple broken phone-local photos now converge in one sync cycle** instead of one cycle per photo. Prior implementation processed each broken photo as its own job and spliced the array during iteration, silently shifting later jobs' cached array indexes so only the first got rewritten each pass.
+- **Missing-photo placeholder in the diary photos view no longer breaks silently if the tile markup gains a wrapper.** The `on:error` handler now uses `closest('.photo-tile')` / `closest('.lightbox-img-wrap')` instead of `parentElement`, so future DOM changes can't silently regress the fallback.
+
+### Changed
+
+- **Photo-reconcile SQL string literals switched to single quotes** (SQL standard) so the reconcile pass doesn't silently fail on any future `@capacitor-community/sqlite` build that disables `SQLITE_DQS_DML` (the SQLite team's own recommended default). The queries previously used SQLite's legacy double-quoted-string tolerance, which was silently OK today but would break on a strict-mode upgrade.
+- **Pantry orphan-slug console warning no longer spams the console.** The warn sat inside a reactive block that re-runs on every keystroke; users with orphan-slug items previously saw it 3× per typed word. Deduped via a module-scope Set so each unique orphan slug logs at most once per page load.
+
+### Security
+
+- No new dependencies. `npm audit` reports 0 vulnerabilities.
 
 ---
 
