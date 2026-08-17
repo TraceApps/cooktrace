@@ -102,6 +102,10 @@
   let headerH = 0;
   let stockFilter = 'all'; // 'all' | 'in' | 'out' | 'expiring'
   let categoryFilter = 'all'; // 'all' | <category slug> | 'uncategorized'
+  // Track orphaned category slugs already warned about this page load
+  // so the reactive groupedSections block doesn't spam duplicates on
+  // every re-render (search keystrokes, filter clicks, sort changes).
+  const _warnedOrphanSlugs = new Set();
   // Sort key — applies after the category/stock filters. Defaults to
   // 'name' to preserve the existing alphabetical-by-name behaviour.
   let sortKey = 'name';      // 'name' | 'updated' | 'usage'
@@ -584,7 +588,14 @@
     for (const [slug, arr] of buckets) {
       if (slug === '__uncategorized__' || emitted.has(slug)) continue;
       orphaned.push(...arr);
-      if (typeof console !== 'undefined') {
+      // Dedupe warns: this branch sits inside a reactive block that
+      // re-runs on every keystroke / filter change; without the Set
+      // gate a user with 3 orphan-slug items would see the warning
+      // spam the console tens of times per typed word, drowning out
+      // real diagnostics. Log each unique orphan slug once per page
+      // lifetime instead.
+      if (!_warnedOrphanSlugs.has(slug)) {
+        _warnedOrphanSlugs.add(slug);
         console.warn(`[pantry] item slug "${slug}" not in pantryCategories catalog; grouping under Uncategorized (${arr.length} item${arr.length === 1 ? '' : 's'})`);
       }
     }

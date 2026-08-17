@@ -581,7 +581,7 @@
                 src={resolveAssetUrl(t.url)}
                 alt={t.entry.recipe_name || 'Cook photo'}
                 loading="lazy"
-                on:error={(e) => e.currentTarget.parentElement?.classList.add('photo-missing')}
+                on:error={(e) => e.currentTarget?.closest('.photo-tile')?.classList.add('photo-missing')}
               />
               <div class="photo-overlay">
                 <span class="photo-name">{t.entry.recipe_name || 'Recipe'}</span>
@@ -729,7 +729,7 @@
           class="lightbox-img"
           src={resolveAssetUrl(lightboxPhoto)}
           alt={lightboxEntry.recipe_name || 'Cook photo'}
-          on:error={(e) => e.currentTarget.parentElement?.classList.add('photo-missing')}
+          on:error={(e) => e.currentTarget?.closest('.lightbox-img-wrap')?.classList.add('photo-missing')}
         />
         {#if lightboxPhotos.length > 1}
           <button class="lightbox-nav prev" on:click={lightboxPrev} aria-label="Previous photo">
