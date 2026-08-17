@@ -55,7 +55,11 @@ test('guardNestedRecipeFields: incoming empty + server has content → server wi
   const out = guardNestedRecipeFields({ existing, incoming });
   assert.equal(out.ingredients, existing.ingredients, 'ingredients preserved');
   assert.equal(out.steps,       existing.steps,       'steps preserved');
-  assert.equal(out.tags,        existing.tags,        'tags preserved');
+  // Tags are deliberately NOT guarded — user's "clear all tags" edit
+  // should apply. Different from other nested fields: tags are a small
+  // flat string array, blast radius of a stale-client wipe is small,
+  // and the guard would silently revert a common UI action.
+  assert.equal(out.tags,        incoming.tags,        'tags cleared (not guarded)');
   assert.equal(out.tools,       existing.tools,       'tools preserved');
   assert.equal(out.nutrition,   existing.nutrition,   'nutrition preserved');
 });
@@ -101,7 +105,7 @@ test('guardNestedRecipeFields: mixed — some incoming empty, others non-empty',
   const out = guardNestedRecipeFields({ existing, incoming });
   assert.equal(out.ingredients, existing.ingredients);
   assert.equal(out.steps,       incoming.steps);
-  assert.equal(out.tags,        existing.tags);
+  assert.equal(out.tags,        incoming.tags, 'tags cleared (not guarded)');
   assert.equal(out.tools,       incoming.tools);
   assert.equal(out.nutrition,   incoming.nutrition);
 });
@@ -140,7 +144,37 @@ test('regression: stale mobile client whose recipe cache lost ingredients cannot
   const out = guardNestedRecipeFields({ existing, incoming });
   assert.equal(out.ingredients, existing.ingredients, 'ingredients survived stale wipe attempt');
   assert.equal(out.steps,       existing.steps,       'steps survived');
-  assert.equal(out.tags,        existing.tags,        'tags survived');
+  // Tags: intentional carve-out. Small blast radius, common clear
+  // action in the UI, so we accept the stale-client wipe risk for
+  // this specific field. If a user reports lost tags from a stale
+  // sync, promote tags back into CHECKS.
+  assert.equal(out.tags,        incoming.tags,        'tags cleared (not in guard list)');
   assert.equal(out.tools,       existing.tools,       'tools survived');
   assert.equal(out.nutrition,   existing.nutrition,   'nutrition survived');
+});
+
+test('guardNestedRecipeFields: flat-shape ingredients are NOT treated as empty (finding #1)', () => {
+  // Regression from code review: any element with a non-empty `.name`
+  // (flat shape OR grouped heading) is content and must NOT trigger
+  // the empty-guard. Prior implementation required `.items` on every
+  // element and silently classified flat-shape ingredients as empty,
+  // dropping non-empty updates from any client sending the legacy
+  // flat shape (older builds, AI generators).
+  const existing = {
+    ingredients: JSON.stringify([{ name: '', items: [{ name: 'onion' }] }]),
+    steps:       JSON.stringify([{ text: 'chop' }]),
+    tools:       JSON.stringify(['knife']),
+    nutrition:   JSON.stringify({}),
+  };
+  const incoming = {
+    ingredients: JSON.stringify([
+      { name: 'garlic', quantity: '2',   unit: 'clove' },
+      { name: 'tomato', quantity: '400', unit: 'g'     },
+    ]),
+    steps:       JSON.stringify([{ text: 'sauté' }]),
+    tools:       JSON.stringify(['pan']),
+    nutrition:   JSON.stringify({ calories: 180 }),
+  };
+  const out = guardNestedRecipeFields({ existing, incoming });
+  assert.equal(out.ingredients, incoming.ingredients, 'flat-shape ingredients wrote through');
 });

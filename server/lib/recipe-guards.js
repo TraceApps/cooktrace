@@ -30,9 +30,28 @@ export function isEmptyForGuard(value, kind) {
   if (Array.isArray(value)) {
     if (value.length === 0) return true;
     if (kind === 'ingredients') {
-      // Grouped ingredients: [{ name?, items: [...] }, ...]. Consider
-      // empty if every group has no items.
-      return value.every(g => !g || !Array.isArray(g.items) || g.items.length === 0);
+      // Ingredients can arrive in either shape:
+      //   - grouped: [{ name?, items: [...] }, ...] — element with an
+      //     explicit `items` field is a section; empty when its items
+      //     array is empty (this is the "no content" placeholder
+      //     _toStorage sometimes emits).
+      //   - flat legacy: [{ name, quantity, unit }, ...] — no `items`
+      //     field; the element itself IS an ingredient. It's empty
+      //     only when none of its content fields are populated.
+      // Distinguish by whether `items` is an own property, not by
+      // presence-of-name — a group heading with an empty items array
+      // is still empty, and prior versions of this guard silently
+      // classified the flat shape as empty, dropping non-empty updates
+      // from clients that used it (older builds, AI generators).
+      return value.every(g => {
+        if (!g) return true;
+        if ('items' in g) {
+          return !Array.isArray(g.items) || g.items.length === 0;
+        }
+        return !['name', 'quantity', 'qty', 'unit', 'notes'].some(
+          k => g[k] != null && String(g[k]).trim() !== ''
+        );
+      });
     }
     return false;
   }
@@ -56,10 +75,17 @@ export function isEmptyForGuard(value, kind) {
  */
 export function guardNestedRecipeFields({ existing, incoming }) {
   const out = { ...incoming };
+  // Tags intentionally NOT guarded: "remove all tags" is a common,
+  // cheap edit via the chip UI and the guard would silently revert it
+  // (client sends `tags: []`, guard sees non-empty server tags,
+  // preserves server → user's clear looks like a bug on next refresh).
+  // Tags are also a small flat string array, so the wipe-by-stale-
+  // client risk that motivates guarding ingredients/steps/tools/
+  // nutrition doesn't apply here — losing tags is annoying, not
+  // destructive.
   const CHECKS = [
     { field: 'ingredients', kind: 'ingredients' },
     { field: 'steps',       kind: 'array'       },
-    { field: 'tags',        kind: 'array'       },
     { field: 'tools',       kind: 'array'       },
     { field: 'nutrition',   kind: 'object'      },
   ];
