@@ -325,7 +325,7 @@ async function _reconcileLocalPhotoUrls(onProgress) {
     }
   }
   await scan(
-    'SELECT id, photo_url, photos FROM cook_diary WHERE (photo_url IS NOT NULL AND photo_url != "") OR (photos IS NOT NULL AND photos != "")',
+    `SELECT id, photo_url, photos FROM cook_diary WHERE (photo_url IS NOT NULL AND photo_url != '') OR (photos IS NOT NULL AND photos != '')`,
     [],
     row => {
       const out = [];
@@ -345,56 +345,93 @@ async function _reconcileLocalPhotoUrls(onProgress) {
     }
   );
   await scan(
-    'SELECT id, img_url FROM recipes WHERE img_url IS NOT NULL AND img_url != ""',
+    `SELECT id, img_url FROM recipes WHERE img_url IS NOT NULL AND img_url != ''`,
     [],
     row => (_isLocalCapacitorUrl(row.img_url) ? [{ table: 'recipes', id: row.id, field: 'img_url', url: row.img_url }] : [])
   );
   await scan(
-    'SELECT id, img_url FROM pantry_items WHERE img_url IS NOT NULL AND img_url != ""',
+    `SELECT id, img_url FROM pantry_items WHERE img_url IS NOT NULL AND img_url != ''`,
     [],
     row => (_isLocalCapacitorUrl(row.img_url) ? [{ table: 'pantry_items', id: row.id, field: 'img_url', url: row.img_url }] : [])
   );
   if (jobs.length === 0) return { total: 0, uploaded: 0, cleared: 0 };
   let uploaded = 0;
   let cleared = 0;
-  for (let i = 0; i < jobs.length; i++) {
-    const j = jobs[i];
-    const fileUri = _capacitorUrlToFileUri(j.url);
-    let newUrl = null;
-    if (fileUri && await _fileExistsAtUri(fileUri)) {
-      newUrl = await _uploadFromFileUri(fileUri);
-      if (newUrl) uploaded++;
+  let progressDone = 0;
+  // Batch photos-array jobs by row so multiple broken elements in the
+  // same cook_diary.photos array are processed in a single read+write
+  // instead of one job at a time. The prior per-job splice mutated
+  // .photos while later jobs still held stale arrayIndex values that
+  // pointed at the shifted (or vanished) element, so a row with N
+  // broken photos took N sync cycles to converge.
+  const scalarJobs = [];
+  const photoJobsByRowId = new Map(); // id → [job, job, ...]
+  for (const j of jobs) {
+    if (j.field === 'photos') {
+      const list = photoJobsByRowId.get(j.id) || [];
+      list.push(j);
+      photoJobsByRowId.set(j.id, list);
     } else {
-      // File missing — clear the URL so renderers show placeholder
-      // instead of broken image.
-      newUrl = '';
-      cleared++;
+      scalarJobs.push(j);
     }
-    if (newUrl === null) continue; // upload attempt failed; leave as-is, retry next sync
+  }
+  async function _resolveUrl(url) {
+    const fileUri = _capacitorUrlToFileUri(url);
+    if (fileUri && await _fileExistsAtUri(fileUri)) {
+      const uploaded_ = await _uploadFromFileUri(fileUri);
+      if (uploaded_) return { status: 'uploaded', url: uploaded_ };
+      return { status: 'retry' }; // upload attempt failed; try again next sync
+    }
+    return { status: 'cleared' };
+  }
+  // Scalar fields (recipes.img_url, pantry_items.img_url, cook_diary.photo_url).
+  for (const j of scalarJobs) {
+    const r = await _resolveUrl(j.url);
+    if (r.status === 'retry') { progressDone++; if (onProgress) onProgress(progressDone, jobs.length); continue; }
+    const newUrl = r.status === 'uploaded' ? r.url : '';
+    if (r.status === 'uploaded') uploaded++; else cleared++;
     try {
-      if (j.field === 'photos') {
-        // Rewrite one element inside the JSON array, then persist.
-        const r = await db.query('SELECT photos FROM cook_diary WHERE id = ?', [j.id]);
-        let arr = [];
-        try { arr = JSON.parse(r?.values?.[0]?.photos || '[]'); } catch {}
-        if (Array.isArray(arr) && arr[j.arrayIndex] === j.url) {
-          if (newUrl) arr[j.arrayIndex] = newUrl;
-          else arr.splice(j.arrayIndex, 1);
-          await db.run(
-            `UPDATE cook_diary SET photos = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), sync_status = 'pending' WHERE id = ?`,
-            [JSON.stringify(arr), j.id]
-          );
-        }
-      } else {
-        await db.run(
-          `UPDATE ${j.table} SET ${j.field} = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), sync_status = 'pending' WHERE id = ?`,
-          [newUrl, j.id]
-        );
-      }
+      await db.run(
+        `UPDATE ${j.table} SET ${j.field} = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), sync_status = 'pending' WHERE id = ?`,
+        [newUrl, j.id]
+      );
     } catch (e) {
       console.warn('[reconcile] db update failed:', j.table, j.id, e?.message);
     }
-    if (onProgress) onProgress(i + 1, jobs.length);
+    progressDone++;
+    if (onProgress) onProgress(progressDone, jobs.length);
+  }
+  // cook_diary.photos: one pass per row. Read the current array once,
+  // rewrite/remove every stale element in memory, write back once.
+  for (const [rowId, rowJobs] of photoJobsByRowId) {
+    let arr = [];
+    try {
+      const r = await db.query('SELECT photos FROM cook_diary WHERE id = ?', [rowId]);
+      arr = JSON.parse(r?.values?.[0]?.photos || '[]');
+      if (!Array.isArray(arr)) arr = [];
+    } catch { arr = []; }
+    let dirty = false;
+    for (const j of rowJobs) {
+      const currentIdx = arr.indexOf(j.url); // re-find by value, not by stale cached index
+      if (currentIdx === -1) { progressDone++; if (onProgress) onProgress(progressDone, jobs.length); continue; }
+      const r = await _resolveUrl(j.url);
+      if (r.status === 'retry') { progressDone++; if (onProgress) onProgress(progressDone, jobs.length); continue; }
+      if (r.status === 'uploaded') { arr[currentIdx] = r.url; uploaded++; dirty = true; }
+      else { arr[currentIdx] = null; cleared++; dirty = true; } // mark for compaction below
+      progressDone++;
+      if (onProgress) onProgress(progressDone, jobs.length);
+    }
+    if (dirty) {
+      const finalArr = arr.filter(u => u != null);
+      try {
+        await db.run(
+          `UPDATE cook_diary SET photos = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), sync_status = 'pending' WHERE id = ?`,
+          [JSON.stringify(finalArr), rowId]
+        );
+      } catch (e) {
+        console.warn('[reconcile] db update failed: cook_diary', rowId, e?.message);
+      }
+    }
   }
   console.info(`[reconcile] ${uploaded} uploaded, ${cleared} cleared, ${jobs.length} total`);
   return { total: jobs.length, uploaded, cleared };
