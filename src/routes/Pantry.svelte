@@ -400,10 +400,20 @@
   // Items match a category by either:
   //   - new `category_id` (resolved against pantryCategories on the server) OR
   //   - legacy `category` slug (kept in sync on every write).
-  // `categoryFilter` holds a slug, so we compare against `i.category` first
-  // and fall back to the resolved slug from pantryCategories[item.category_id].
+  // Historically `item.category` was a slug string on both client writes and
+  // server response, but the server hydrate (pantry.js) now spreads the raw
+  // row AND then overwrites `.category` with a resolved category OBJECT
+  // ({id, name, slug, icon, color}). Any item that has been round-tripped
+  // through a server fetch carries the object shape; freshly-created client
+  // items still carry the string slug. Handle both shapes here so grouping,
+  // filtering, and the orphan-slug guard work regardless of origin. Fixes
+  // the regression where every pantry item landed under Uncategorized
+  // because Map.get(objectKey) never matched the pantryCategories string
+  // slugs (#41 follow-up from @xiaojwus).
   function _itemSlug(item) {
-    if (item?.category) return item.category;
+    const cat = item?.category;
+    if (typeof cat === 'string' && cat) return cat;
+    if (cat && typeof cat === 'object' && typeof cat.slug === 'string' && cat.slug) return cat.slug;
     if (item?.category_id) {
       const c = pantryCategories.find(x => x.id === item.category_id);
       return c?.slug || null;
