@@ -36,8 +36,23 @@
       return new Set(Array.isArray(arr) ? arr.map(String) : []);
     } catch { return new Set(); }
   })();
-  function toggleCollapsed(key) {
+  // Session-only set of fully-checked groups the user has manually
+  // reopened. Fully-checked groups default to collapsed (see
+  // isCollapsed derivation in the template) so as you sweep through
+  // the store the wall condenses down to what's left. If a user
+  // wants to peek at a done group, click it → this set remembers
+  // that intent for the rest of the session. Unchecking any item in
+  // the group takes it out of the all-checked bucket so the manual
+  // collapse state (collapsed Set) takes over naturally.
+  let expandedComplete = new Set();
+  function toggleCollapsed(key, allChecked) {
     const k = String(key);
+    if (allChecked) {
+      const next = new Set(expandedComplete);
+      if (next.has(k)) next.delete(k); else next.add(k);
+      expandedComplete = next;
+      return;
+    }
     const next = new Set(collapsed);
     if (next.has(k)) next.delete(k); else next.add(k);
     collapsed = next;
@@ -628,6 +643,15 @@
           {/if}
         </div>
       </div>
+      <!-- Thin accent-tinted progress bar at the bottom of the sticky
+           toolbar. Grows as items get checked, visible on every
+           viewport, satisfying and always in view. -->
+      <div class="shopping-progress" role="progressbar"
+        aria-valuemin="0" aria-valuemax={items.length} aria-valuenow={checkedCount}
+        aria-label="Shopping progress">
+        <div class="shopping-progress-fill"
+          style="width: {items.length > 0 ? (checkedCount / items.length) * 100 : 0}%"></div>
+      </div>
     {/if}
     </div>
 
@@ -656,16 +680,16 @@
            sections. Each group becomes a self-contained card. -->
       <div class="groups-grid">
       {#each grouped as g (g.key)}
-        {@const isCollapsed = collapsed.has(g.key)}
         {@const rows = dndOverride.get(g.key) ?? g.rows}
         {@const realRows = rows.filter(r => !r?.isDndShadowItem)}
         {@const allChecked = realRows.length > 0 && realRows.every(r => r.checked)}
         {@const checkedCt = realRows.filter(r => r.checked).length}
-        <section class="group" class:collapsed={isCollapsed}>
+        {@const isCollapsed = (allChecked && !expandedComplete.has(g.key)) || collapsed.has(g.key)}
+        <section class="group" class:collapsed={isCollapsed} class:done={allChecked}>
           {#if g.title != null}
             <header class="group-head">
               <button class="group-toggle" type="button"
-                on:click={() => toggleCollapsed(g.key)}
+                on:click={() => toggleCollapsed(g.key, allChecked)}
                 aria-expanded={!isCollapsed}
                 title={isCollapsed ? 'Expand section' : 'Collapse section'}>
                 <span class="material-symbols-rounded chev" class:rotated={!isCollapsed}>chevron_right</span>
@@ -690,9 +714,10 @@
               {/if}
               <button class="group-action" type="button"
                 on:click|stopPropagation={() => toggleGroupChecked(g, !allChecked)}
-                title={allChecked ? 'Uncheck all in this group' : 'Check all in this group'}>
+                title={allChecked ? 'Uncheck all in this group' : 'Check all in this group'}
+                aria-label={allChecked ? 'Uncheck all in this group' : 'Check all in this group'}>
                 <span class="material-symbols-rounded">{allChecked ? 'check_box' : 'select_all'}</span>
-                {allChecked ? 'Uncheck All' : 'Check All'}
+                <span class="ga-label">{allChecked ? 'Uncheck All' : 'Check All'}</span>
               </button>
               <button class="group-action danger" type="button"
                 on:click|stopPropagation={() => clearGroup(g)}
@@ -1056,7 +1081,7 @@
   @media (min-width: 1200px) {
     .groups-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
       gap: 20px;
       align-items: start;
     }
@@ -1071,6 +1096,39 @@
       border-radius: var(--radius-lg);
       padding: 10px 12px;
     }
+    /* Card-level compaction: hide the "Check All / Uncheck All" text
+       label so the group title has room. The icon + title's a11y
+       label + tooltip keep the action reachable. */
+    .group .group-action .ga-label { display: none; }
+    .group .group-action { padding: 6px; }
+  }
+
+  /* Completed-group tint: when every item in a card is checked, the
+     card fades slightly to signal "you're done here". Combined with
+     auto-collapse (see script) this makes the wall condense as you
+     sweep through the store. */
+  .group.done .group-title-text { color: var(--text-3); }
+  @media (min-width: 1200px) {
+    .group.done {
+      background: color-mix(in srgb, var(--accent) 6%, var(--surface-1));
+      border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
+    }
+  }
+
+  /* Sticky-toolbar progress bar. Thin accent line that animates as
+     items get checked. Always in view on every viewport. */
+  .shopping-progress {
+    height: 3px;
+    background: var(--surface-2);
+    border-radius: 999px;
+    margin: 4px 0 8px;
+    overflow: hidden;
+  }
+  .shopping-progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 999px;
+    transition: width 240ms cubic-bezier(0.32, 0.72, 0, 1);
   }
   .group-head {
     display: flex;
