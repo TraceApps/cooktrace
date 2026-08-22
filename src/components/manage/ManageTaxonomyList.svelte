@@ -31,12 +31,35 @@
   let editingName = null;
   let editText = '';
   let filter = '';
+  // Sort order + "unused only" toggle. Persisted per-list-title so
+  // Tags and Kitchen Gear remember independently.
+  const _sortKey = `manage:sort:${title || 'list'}`;
+  const _unusedKey = `manage:unused:${title || 'list'}`;
+  let sortMode = 'name'; // 'name' | 'most' | 'least'
+  let unusedOnly = false;
+  if (typeof localStorage !== 'undefined') {
+    const s = localStorage.getItem(_sortKey);
+    if (s === 'name' || s === 'most' || s === 'least') sortMode = s;
+    unusedOnly = localStorage.getItem(_unusedKey) === '1';
+  }
+  $: if (typeof localStorage !== 'undefined') localStorage.setItem(_sortKey, sortMode);
+  $: if (typeof localStorage !== 'undefined') localStorage.setItem(_unusedKey, unusedOnly ? '1' : '0');
 
-  $: filtered = filter.trim()
-    ? items.filter(i => i.name.toLowerCase().includes(filter.trim().toLowerCase()))
-    : items;
+  $: filtered = (() => {
+    let out = items;
+    if (unusedOnly) out = out.filter(i => (i.count || 0) === 0);
+    if (filter.trim()) {
+      const q = filter.trim().toLowerCase();
+      out = out.filter(i => i.name.toLowerCase().includes(q));
+    }
+    if (sortMode === 'most')  out = [...out].sort((a, b) => (b.count || 0) - (a.count || 0) || a.name.localeCompare(b.name));
+    if (sortMode === 'least') out = [...out].sort((a, b) => (a.count || 0) - (b.count || 0) || a.name.localeCompare(b.name));
+    if (sortMode === 'name')  out = [...out].sort((a, b) => a.name.localeCompare(b.name));
+    return out;
+  })();
   $: total = items.length;
   $: usedTotal = items.reduce((s, i) => s + (i.count || 0), 0);
+  $: unusedCount = items.reduce((s, i) => s + ((i.count || 0) === 0 ? 1 : 0), 0);
 
   async function load() {
     loading = true;
@@ -103,7 +126,25 @@
   {:else}
     <div class="meta-row">
       <span class="meta">{total} {total === 1 ? 'item' : 'items'}</span>
-      <span class="meta">{usedTotal} {usedTotal === 1 ? 'use' : 'uses'} across recipes</span>
+      <span class="meta accent-meta">{usedTotal} {usedTotal === 1 ? 'use' : 'uses'} across recipes</span>
+      {#if unusedCount > 0}
+        <button type="button" class="unused-chip" class:active={unusedOnly}
+          on:click={() => unusedOnly = !unusedOnly}
+          title={unusedOnly ? 'Show all items' : 'Show only items no recipe uses'}>
+          <span class="material-symbols-rounded">filter_alt</span>
+          {unusedCount} unused
+        </button>
+      {/if}
+      {#if items.length > 1}
+        <div class="sort-wrap">
+          <label class="sort-label" for="sort-{title}">Sort</label>
+          <select id="sort-{title}" class="sort-select" bind:value={sortMode}>
+            <option value="name">A-Z</option>
+            <option value="most">Most used</option>
+            <option value="least">Least used</option>
+          </select>
+        </div>
+      {/if}
     </div>
     {#if items.length > 0}
       <input class="input filter" type="search" placeholder="Filter…" bind:value={filter} />
@@ -155,13 +196,58 @@
 
   .meta-row {
     display: flex; gap: 16px;
+    align-items: center;
     padding: 8px 12px;
     background: var(--surface-2);
     border-radius: var(--radius-md);
     font-size: 12px;
     color: var(--text-3);
+    flex-wrap: wrap;
   }
   .meta { font-weight: 600; }
+  .accent-meta { color: var(--accent); }
+
+  /* Unused-only quick-filter chip. Active state paints in accent so
+     it's obvious the list is filtered down to a subset. */
+  .unused-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-3);
+    padding: 3px 10px 3px 6px;
+    border-radius: 999px;
+    font: inherit; font-weight: 600;
+    cursor: pointer;
+    transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+  }
+  .unused-chip:hover { background: var(--surface-1); color: var(--text-1); }
+  .unused-chip.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .unused-chip .material-symbols-rounded { font-size: 14px; }
+
+  /* Sort dropdown pushed to the right of the meta-row. */
+  .sort-wrap {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .sort-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--text-3);
+  }
+  .sort-select {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 3px 8px;
+    color: var(--text-1);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .sort-select:focus { outline: 2px solid var(--accent-dim); border-color: var(--accent); }
 
   .filter { width: 100%; box-sizing: border-box; }
   .empty { color: var(--text-3); font-size: 13px; margin: 0; }
