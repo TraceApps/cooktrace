@@ -231,7 +231,12 @@ router.get('/users/list', requireAuth, wrap((req, res) => {
   const cfg = db.prepare("SELECT value FROM app_config WHERE key = 'sharing_enabled'").get();
   if (cfg?.value !== 'true' && cfg?.value !== '1') return res.json([]);
   const peers = db.prepare('SELECT id, full_name, username FROM users WHERE id != ? ORDER BY full_name, username').all(req.user.id);
-  res.json(peers.map(u => ({ id: u.id, name: u.full_name || u.username })));
+  // Username is included so the client can autocomplete-invite (Kitchen
+  // invite endpoint expects username, not display name). Only reaches
+  // authenticated users on a sharing-enabled instance, and any joined
+  // Kitchen member already surfaces their username in the member list,
+  // so this doesn't leak anything new.
+  res.json(peers.map(u => ({ id: u.id, name: u.full_name || u.username, username: u.username })));
 }));
 
 // ── Admin: list users ──────────────────────────────────────────────────────
