@@ -75,6 +75,8 @@ export const USER_PREFS = new Set([
   'pantryDefaultSource',
   // Barcode scanner preferences (matches NT key names).
   'barcodeBeep','barcodeFlashlight',
+  // Hours between automatic update checks: 1, 4, 12, 24, or 0 for manual only.
+  'updateCheckInterval',
 ]);
 
 export const DEVICE_PREFS = new Set([
@@ -483,6 +485,11 @@ export const pantryDefaultSource = createSettingStore('pantryDefaultSource', 'lo
 // override (form-factor specific but kept on USER_PREFS to mirror NT).
 export const barcodeBeep       = createSettingStore('barcodeBeep',       true);
 export const barcodeFlashlight = createSettingStore('barcodeFlashlight', false);
+
+// Hours between automatic update checks. 0 = manual only (Settings →
+// Updates → Check now is the only way). Also gates the visibility-change
+// re-check trigger in App.svelte. Mirrors NT's #updates-cadence-settable.
+export const updateCheckInterval = createSettingStore('updateCheckInterval', 4);
 
 // Local-mode scheduled backup. Per-device localStorage (no server in
 // local mode). Tick runs JS-side via local-backup-scheduler.js while the
