@@ -655,6 +655,38 @@
     _writeUrl();
   }
 
+  // Shared-view filter state. Independent category chip so it can be
+  // scoped to just the categories the shared recipes actually use
+  // (asking a user to filter Shared by 30 of their own categories,
+  // none of which apply, would be noise). Search + sort reuse the
+  // recipes-tab state so switching tabs preserves them.
+  let sharedCategorySlug = '';
+  $: sharedCategories = (() => {
+    const seen = new Map();
+    for (const r of sharedRecipes) {
+      const c = r.category;
+      if (c && c.slug && !seen.has(c.slug)) seen.set(c.slug, c);
+    }
+    return [...seen.values()];
+  })();
+  $: filteredShared = (() => {
+    const q = query.trim().toLowerCase();
+    let list = sharedRecipes;
+    if (sharedCategorySlug) {
+      list = list.filter(r => r.category && r.category.slug === sharedCategorySlug);
+    }
+    if (q) {
+      list = list.filter(r =>
+        (r.name || '').toLowerCase().includes(q) ||
+        (r.description || '').toLowerCase().includes(q) ||
+        (r.tags || []).some(t => t.toLowerCase().includes(q)) ||
+        (r.category?.name || '').toLowerCase().includes(q) ||
+        (r.shared_by || '').toLowerCase().includes(q)
+      );
+    }
+    return _applySort([...list], $recipesSort);
+  })();
+
   $: filtered = (() => {
     const q = query.trim().toLowerCase();
     // Optional mix-in: when the user has "Show Shared Recipes in My
@@ -1250,8 +1282,58 @@
           <p>When another user shares a recipe with you it lands here.</p>
         </div>
       {:else}
+        <!-- Search + category chips + sort for the shared view. Same
+             shell as the recipes-tab controls, scoped to the categories
+             actually present in sharedRecipes so the chip row stays
+             short. Query + sort reuse the recipes-tab state. -->
+        <div class="sticky-controls">
+          <div class="search-row">
+            <span class="material-symbols-rounded search-icon">search</span>
+            <input
+              class="search"
+              type="search"
+              placeholder="Search shared recipes…"
+              bind:value={query}
+            />
+          </div>
+          <div class="filter-row">
+            {#if sharedCategories.length > 0}
+              <div class="cat-filter" role="radiogroup" aria-label="Filter shared recipes">
+                <button class="cat-chip"
+                  class:active={!sharedCategorySlug}
+                  on:click={() => sharedCategorySlug = ''}
+                  aria-pressed={!sharedCategorySlug}
+                >All</button>
+                {#each sharedCategories as c (c.slug)}
+                  {@const isActive = sharedCategorySlug === c.slug}
+                  <button class="cat-chip"
+                    class:active={isActive}
+                    style={c.color ? `--cat-color:${c.color}` : ''}
+                    on:click={() => sharedCategorySlug = isActive ? '' : c.slug}
+                    aria-pressed={isActive}
+                  >{c.name}</button>
+                {/each}
+              </div>
+            {/if}
+            <select class="sort-select" bind:value={$recipesSort} title="Sort recipes">
+              <option value="fav-alpha">★ + A→Z</option>
+              <option value="alpha">A → Z</option>
+              <option value="recent">{$_('recipes_page.sort_recent')}</option>
+              <option value="most">{$_('recipes_page.sort_most')}</option>
+              <option value="newest">{$_('recipes_page.sort_newest')}</option>
+            </select>
+          </div>
+        </div>
+
+        {#if filteredShared.length === 0}
+          <div class="state empty" in:fade={{ duration: 120 }}>
+            <span class="material-symbols-rounded empty-icon">search_off</span>
+            <h2>No shared recipes match</h2>
+            <p>Try clearing the search or picking a different category.</p>
+          </div>
+        {:else}
         <div class="grid">
-          {#each sharedRecipes as r (r.id)}
+          {#each filteredShared as r (r.id)}
             <button class="card recipe-card"
               on:click={() => push(`/recipes/${r.id}`)}>
               <div class="card-image">
@@ -1298,6 +1380,7 @@
             </button>
           {/each}
         </div>
+        {/if}
       {/if}
     {:else if viewMode === 'cookbooks'}
       <!-- Cookbooks tab: your cookbooks first, then cookbooks others
