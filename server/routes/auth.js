@@ -279,6 +279,39 @@ router.put('/users/:id/password', requireAuth, requireAdmin, wrap((req, res) => 
   res.json({ ok: true });
 }));
 
+// ── Admin: patch another user's profile (name / email) ────────────────────
+// Username is intentionally NOT editable here — it's the stable identifier
+// kitchens invite by and sharing grants reference. Password is a separate
+// endpoint (see /users/:id/password); role is a separate endpoint
+// (see /users/:id/role).
+router.patch('/users/:id', requireAuth, requireAdmin, wrap((req, res) => {
+  const id = parseInt(req.params.id);
+  const target = db.prepare('SELECT id, full_name, email FROM users WHERE id = ?').get(id);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const patch = {};
+  if ('full_name' in body) {
+    const v = (body.full_name || '').toString().trim();
+    patch.full_name = v || null;
+  }
+  if ('email' in body) {
+    const raw = (body.email || '').toString().trim().toLowerCase();
+    if (raw) {
+      // Simple format check — must contain @ and at least one dot after it.
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) return res.status(400).json({ error: 'Invalid email address' });
+      const dup = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(raw, id);
+      if (dup) return res.status(409).json({ error: 'That email is already in use' });
+    }
+    patch.email = raw || null;
+  }
+  if (Object.keys(patch).length === 0) return res.json({ ok: true });
+  const sets = Object.keys(patch).map(k => `${k} = ?`).join(', ');
+  const vals = Object.values(patch);
+  db.prepare(`UPDATE users SET ${sets} WHERE id = ?`).run(...vals, id);
+  const updated = db.prepare('SELECT id, username, full_name, email, role, created_at FROM users WHERE id = ?').get(id);
+  res.json({ ok: true, user: updated });
+}));
+
 // ── Admin: change another user's role (user | admin) ──────────────────────
 router.put('/users/:id/role', requireAuth, requireAdmin, wrap((req, res) => {
   const id = parseInt(req.params.id);
