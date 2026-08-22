@@ -228,14 +228,16 @@ router.put('/password', requireAuth, wrap((req, res) => {
 // Only exposed when sharing is enabled — otherwise instance-wide user enumeration
 // is unnecessary and leaks membership to every account.
 router.get('/users/list', requireAuth, wrap((req, res) => {
-  const cfg = db.prepare("SELECT value FROM app_config WHERE key = 'sharing_enabled'").get();
-  if (cfg?.value !== 'true' && cfg?.value !== '1') return res.json([]);
+  // Available when EITHER recipe sharing OR multi-user mode is on.
+  // Kitchens (invite-a-member) only makes sense in multi-user mode
+  // and needs this list for autocomplete, so gating on sharing_enabled
+  // alone left the Kitchen invite picker empty on instances that use
+  // multi-user without recipe sharing. Any Kitchen already exposes
+  // its members' usernames in the member list, so no new leakage.
+  // Single-user instances (no user management) still get [] since
+  // there are no peers to list.
+  if (!userMgmtActive()) return res.json([]);
   const peers = db.prepare('SELECT id, full_name, username FROM users WHERE id != ? ORDER BY full_name, username').all(req.user.id);
-  // Username is included so the client can autocomplete-invite (Kitchen
-  // invite endpoint expects username, not display name). Only reaches
-  // authenticated users on a sharing-enabled instance, and any joined
-  // Kitchen member already surfaces their username in the member list,
-  // so this doesn't leak anything new.
   res.json(peers.map(u => ({ id: u.id, name: u.full_name || u.username, username: u.username })));
 }));
 

@@ -38,7 +38,13 @@
   let peers = [];
   async function loadPeers() {
     try { peers = await NtApi.getUsersList(); }
-    catch { peers = []; }
+    catch (e) {
+      // Non-fatal — the Combobox falls back to freeform-invite. Log
+      // instead of silent swallow so a 401/403/500 doesn't look like
+      // "no other users" to the user.
+      console.warn('[kitchens] getUsersList failed', e);
+      peers = [];
+    }
   }
 
   async function load() {
