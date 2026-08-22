@@ -978,6 +978,8 @@
     overflow-x: auto;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    /* Opt back in to horizontal touch (body sets pan-y for iOS lock). */
+    touch-action: pan-x;
   }
   .group-chips::-webkit-scrollbar { display: none; }
   .group-chips button {

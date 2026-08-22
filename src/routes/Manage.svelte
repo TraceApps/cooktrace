@@ -201,6 +201,8 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     padding-bottom: 4px;
+    /* Opt back in to horizontal touch (body sets pan-y for iOS lock). */
+    touch-action: pan-x;
   }
   /* Sliding pill that animates between rail items. Sized + positioned
      by JS-measured CSS vars (--rail-x/y/w/h). Spring transition for

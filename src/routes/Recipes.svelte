@@ -1216,7 +1216,7 @@
       </div>
     {/if}
 
-    {#if viewMode === 'recipes' && recipes.length > 0}
+    {#if viewMode === 'recipes' && (recipes.length > 0 || ($mixSharedIntoRecipes && sharedRecipes.length > 0))}
     <div class="sticky-controls">
       <div class="search-row">
         <span class="material-symbols-rounded search-icon">search</span>
@@ -1785,6 +1785,7 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     padding-bottom: 2px;
+    touch-action: pan-x;
   }
   .cat-filter::-webkit-scrollbar { display: none; }
   .cat-chip {

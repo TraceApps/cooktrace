@@ -2168,6 +2168,7 @@
     overflow-x: auto;
     flex-wrap: nowrap;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
   }
   .category-chips::-webkit-scrollbar { display: none; }
   .category-chips .seg { flex-shrink: 0; }

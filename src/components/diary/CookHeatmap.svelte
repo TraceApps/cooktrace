@@ -215,6 +215,7 @@
     overflow-y: hidden;
     margin: 0 -4px;
     padding: 0 4px;
+    touch-action: pan-x;
   }
   .hm-scroll::-webkit-scrollbar { height: 6px; }
   .hm-scroll::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 4px; }
