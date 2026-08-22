@@ -173,6 +173,24 @@
     border-top: 1px solid var(--border);
   }
   .row:first-child { border-top: none; }
+
+  /* Wide screens — collapse the single-column stack into a responsive
+     card grid so we don't waste the horizontal real estate. Each row
+     turns into a compact self-contained card. */
+  @media (min-width: 1200px) {
+    .row-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 4px 24px;
+    }
+    .row, .row:first-child {
+      border-top: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      background: var(--surface-1);
+    }
+  }
   .row-name { flex: 1; color: var(--text-1); font-weight: 600; font-size: 14px; }
   .row-count {
     font-size: 12px; color: var(--text-3);
