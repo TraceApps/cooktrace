@@ -155,23 +155,34 @@
   .manage-page { padding-bottom: 24px; }
 
   /* Two-column body. Stacks on mobile so the rail becomes a horizontal
-     chip-row at the top. */
+     chip-row at the top. No outer max-width cap: on wide monitors the
+     two-pane should fill the viewport (same principle Settings and
+     Diary follow) instead of stranding hundreds of pixels of dead
+     space to the left and right. */
   .manage-body {
     display: flex;
     flex-direction: column;
     gap: 16px;
     padding: 16px var(--page-px) 24px;
-    max-width: 1280px;
-    margin: 0 auto;
     box-sizing: border-box;
     width: 100%;
   }
   @media (min-width: 880px) {
     .manage-body {
       display: grid;
-      grid-template-columns: 280px 1fr;
+      grid-template-columns: 280px minmax(0, 1fr);
       gap: 24px;
       align-items: flex-start;
+    }
+  }
+  /* Ultrawide (>=1440px): give the rail a touch more room so long
+     descriptions ("Tools used in recipes, pots, pans, spatulas…")
+     don't wrap as aggressively. Right pane keeps minmax(0,1fr) so
+     it soaks up the rest of the viewport. */
+  @media (min-width: 1440px) {
+    .manage-body {
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 28px;
     }
   }
 
