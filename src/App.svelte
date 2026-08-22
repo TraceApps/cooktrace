@@ -625,6 +625,11 @@
     right: 0;
     bottom: 0;
     overflow-y: auto;
+    /* Clip any horizontal overflow so iOS can't grab it as a
+       pannable region. Sits on the real scroll container so a stray
+       wide element on any page (Recipes was the reported culprit)
+       never lets the whole view drift left/right. */
+    overflow-x: hidden;
     transition: left 0.25s ease;
   }
   :global(.bottom-nav) {

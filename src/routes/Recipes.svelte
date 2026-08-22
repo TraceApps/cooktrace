@@ -1671,7 +1671,13 @@
     border-radius: var(--radius-md);
     padding: 4px;
     margin: 0 0 16px;
-    width: fit-content;
+    /* Was width:fit-content which let the intrinsic sum of three
+       flex:1 buttons (icon + label + count pill) push past narrow
+       viewports on iOS, giving the whole page a horizontal drag
+       hatch. Cap at 100% + max-content so on desktop it still hugs
+       its content but on mobile it can't exceed the container. */
+    max-width: 100%;
+    width: max-content;
   }
   .vt-pill {
     position: absolute;
@@ -1697,7 +1703,8 @@
     border-radius: var(--radius-sm);
     display: inline-flex; align-items: center; gap: 6px;
     transition: color var(--dur-fast);
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
     justify-content: center;
     white-space: nowrap;
   }
