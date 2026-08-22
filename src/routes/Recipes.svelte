@@ -693,7 +693,15 @@
     // Main List" on, append the /shared-with-me collection to the
     // owned recipes. Cards keep their existing shared_by badge + the
     // new via-kitchen chip so ownership is still visually clear.
-    let list = $mixSharedIntoRecipes ? [...recipes, ...sharedRecipes] : recipes;
+    // Dedup on id so a recipe that ended up in both buckets (edge
+    // case: shared to a kitchen the current user also owns via)
+    // renders once with owned-precedence.
+    let list = recipes;
+    if ($mixSharedIntoRecipes && sharedRecipes.length > 0) {
+      const seen = new Set(recipes.map(r => r.id));
+      const extras = sharedRecipes.filter(r => !seen.has(r.id));
+      list = [...recipes, ...extras];
+    }
     if (favoritesOnly) list = list.filter(r => r.favorite);
     if (activeCategorySlug) {
       list = list.filter(r => r.category && r.category.slug === activeCategorySlug);
@@ -755,8 +763,14 @@
         NtApi.getRecipes(),
         NtApi.getRecipeCategories().catch(() => []),
         NtApi.getCookbooks().catch(() => []),
-        NtApi.getRecipesSharedWithMe().catch(() => []),
-        NtApi.getCookbooksSharedWithMe().catch(() => []),
+        NtApi.getRecipesSharedWithMe().catch(e => {
+          console.warn('[recipes] getRecipesSharedWithMe failed', e);
+          return [];
+        }),
+        NtApi.getCookbooksSharedWithMe().catch(e => {
+          console.warn('[recipes] getCookbooksSharedWithMe failed', e);
+          return [];
+        }),
       ]);
       recipes = recipesRes;
       categories = catsRes || [];
@@ -1454,7 +1468,7 @@
           {/each}
         </div>
       {/if}
-    {:else if recipes.length === 0}
+    {:else if recipes.length === 0 && !($mixSharedIntoRecipes && sharedRecipes.length > 0)}
       <div class="state empty" in:fade={{ duration: 120 }}>
         <span class="material-symbols-rounded empty-icon">menu_book</span>
         <h2>{$_('routes.recipes.empty_title')}</h2>
