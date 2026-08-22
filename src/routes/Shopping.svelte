@@ -554,6 +554,10 @@
   </header>
 
   <div class="page-content">
+    <!-- Sticky toolbar: group chips + quick-add + status row all pin
+         below the page-header on wide screens so users can add items
+         and see "N remaining" without scrolling back to the top. -->
+    <div class="shopping-toolbar">
     <!-- Group-mode chip row. Persisted per-user via the settings
          store so the choice sticks across sessions and devices. -->
     <div class="group-chips" role="tablist" aria-label={$_('routes.shopping.group_by_label')}>
@@ -625,6 +629,7 @@
         </div>
       </div>
     {/if}
+    </div>
 
     {#if loading}
       <div class="state"><span class="material-symbols-rounded spin">progress_activity</span></div>
@@ -645,6 +650,11 @@
         </button>
       </div>
     {:else}
+      <!-- Groups grid: single column on narrow, auto-fill masonry-
+           style grid on wide viewports so users see the whole shopping
+           trip at a glance instead of scrolling through 8 stacked
+           sections. Each group becomes a self-contained card. -->
+      <div class="groups-grid">
       {#each grouped as g (g.key)}
         {@const isCollapsed = collapsed.has(g.key)}
         {@const rows = dndOverride.get(g.key) ?? g.rows}
@@ -742,6 +752,7 @@
           {/if}
         </section>
       {/each}
+      </div>
     {/if}
   </div>
 </div>
@@ -1024,7 +1035,43 @@
   .spin { font-size: 32px; animation: spin 1.2s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* Sticky toolbar: on wide viewports the group chips + quick-add +
+     status-row pin below the page-header so adding items and seeing
+     "N remaining" stays reachable no matter how far you scroll. */
+  .shopping-toolbar {
+    position: sticky;
+    top: calc(var(--page-top, var(--safe-top)) + 56px + var(--hamburger-row, 0px));
+    z-index: 15;
+    background: var(--bg);
+    padding-top: 8px;
+    margin: -8px 0 4px;
+  }
+
+  /* Groups grid: single column on mobile (current behavior). At
+     >=1200px collapse the stacked sections into an auto-fill grid so
+     the full shopping list fits in view. Each group turns into a
+     self-contained card. align-items:start prevents cells stretching
+     to the tallest sibling's height. */
+  .groups-grid { display: block; }
+  @media (min-width: 1200px) {
+    .groups-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 20px;
+      align-items: start;
+    }
+  }
+
   .group { margin-bottom: 16px; }
+  @media (min-width: 1200px) {
+    .group {
+      margin: 0;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 10px 12px;
+    }
+  }
   .group-head {
     display: flex;
     align-items: center;
