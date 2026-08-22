@@ -13,7 +13,7 @@
   import Toast     from './components/ui/Toast.svelte';
   import ConfirmDialogMount from './components/ui/ConfirmDialogMount.svelte';
   import { DB }    from './lib/db.js';
-  import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent, language, pageBanners, bannerStyle, bannerAnimation } from './stores/settings.js';
+  import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent, language, pageBanners, bannerStyle, bannerAnimation, forceMobileLayout } from './stores/settings.js';
   import { _, locale } from 'svelte-i18n';
   import { currentUser, userMgmtActive, setupRequired, loadAuthState, handleOidcCallback } from './stores/auth.js';
   import { needsNativeSetup, isNative, getNativeMode, getServerUrl, apiUrl } from './lib/platform.js';
@@ -266,6 +266,14 @@
 
   $: applyAccentColor($accentColor);
   $: applyAppearance($appearance);
+
+  // Force-mobile layout: gates every desktop @media rule via the
+  // :global(html:not(.force-mobile-layout)) prefix in Settings. When
+  // on, wide viewports still get the mobile pattern (single-column
+  // drill-in settings, no rail).
+  $: if (typeof document !== 'undefined') {
+    document.documentElement.classList.toggle('force-mobile-layout', !!$forceMobileLayout);
+  }
 
   $: if (typeof document !== 'undefined') {
     document.documentElement.classList.toggle('no-animations', !!$disableAnimations);

@@ -79,6 +79,7 @@ export const USER_PREFS = new Set([
 
 export const DEVICE_PREFS = new Set([
   'appearance','navStyle','sidebarPersistent','disableAnimations',
+  'forceMobileLayout',     // per-device layout opt-out (mirrors NT/LT)
   'biometricLoginEnabled', // Android-only, per-device biometric unlock for sign-in
 ]);
 
@@ -294,6 +295,12 @@ export const navStyle          = createSettingStore('navStyle',          'both')
 export const sidebarPersistent = createSettingStore('sidebarPersistent', false);
 export const disableAnimations = createSettingStore('disableAnimations', false);
 export const biometricLoginEnabled = createSettingStore('biometricLoginEnabled', false);
+// Force-mobile layout: keep the mobile single-column pattern even on
+// wide viewports. Gates every desktop @media rule via the
+// :global(html:not(.force-mobile-layout)) prefix in Settings. Off by
+// default; the App.svelte reactive toggles the .force-mobile-layout
+// class on <html> so any future desktop-only layout can opt in.
+export const forceMobileLayout = createSettingStore('forceMobileLayout', false);
 
 // ── User prefs (server-synced) ─────────────────────────────────────────────
 export const language    = createSettingStore('language',    'en');

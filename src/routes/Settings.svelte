@@ -1,221 +1,63 @@
 <script>
-  import { onMount, tick } from 'svelte';
-  import { slide } from 'svelte/transition';
+  // Thin router shell (mirrors NutriTrace / LiftTrace). Section bodies
+  // live in components/settings/*.svelte and are dispatched to via
+  // <svelte:component> when the URL is /settings/<slug>. The /settings
+  // index just renders the section-toggle rows + group labels + profile
+  // hero + search bar.
+  //
+  // History note: this file used to own every section's state, template,
+  // and CSS inline. The extracted per-section files are the source of
+  // truth now; this shell only holds cross-section chrome (header,
+  // sticky search, drill-in nav, deep-link scroll, custom color-picker
+  // Sheet) and the shared CSS descendants need via :global.
+
+  import { onMount, tick, afterUpdate, onDestroy } from 'svelte';
   import { push, querystring } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
-  import { AVAILABLE_LOCALES } from '../i18n/index.js';
-  import SettingsAuth   from '../components/settings/SettingsAuth.svelte';
-  import SettingsUpdates from '../components/settings/SettingsUpdates.svelte';
-  import SettingsBackup from '../components/settings/SettingsBackup.svelte';
-  import SettingsServerConnection from '../components/settings/SettingsServerConnection.svelte';
-  import SettingsImport from '../components/settings/SettingsImport.svelte';
-  import SettingsTrace  from '../components/settings/SettingsTrace.svelte';
-  import SettingsNotifications from '../components/settings/SettingsNotifications.svelte';
-  import SettingsNutrition from '../components/settings/SettingsNutrition.svelte';
-  import SettingsEmail from '../components/settings/SettingsEmail.svelte';
-  import SettingsFederation from '../components/settings/SettingsFederation.svelte';
-  import SettingsImportFromNT from '../components/settings/SettingsImportFromNT.svelte';
-  import SettingsKitchens from '../components/settings/SettingsKitchens.svelte';
-  import SettingsUserManagement from '../components/settings/SettingsUserManagement.svelte';
-  import Sheet from '../components/ui/Sheet.svelte';
-  import Toggle from '../components/settings/Toggle.svelte';
-  import { APP_VERSION } from '../lib/version.js';
-  import {
-    isVerboseLogging, setVerboseLogging,
-    getLogBufferText, clearLogBuffer,
-    getLogFileUri, getLastCrashFileUri,
-    hasCrashReport, clearCrashReport,
-  } from '../lib/log-capture.js';
-  import { showError } from '../stores/toast.js';
-  import { DB } from '../lib/db.js';
-  import { applyAppearance, applyAccentColor, scheduleSave } from '../stores/settings.js';
-  import {
-    appearance, accentColor, navStyle, sidebarPersistent, disableAnimations,
-    pageBanners, bannerStyle, bannerAnimation, measurementSystem, defaultServings, energyUnit,
-    dateFormat, timeFormat, language, startPage,
-    offEnabled, offSearchLanguage, offSearchCountry, offUploadCountry,
-    offUsername, offPassword, barcodeBeep, barcodeFlashlight,
-    usdaEnabled, usdaApiKey, pantryDefaultSource,
-    urlImportEngine, urlImportFallback, autoCreatePantryFromRecipes,
-    mixSharedIntoRecipes,
-    shoppingGroupBy, shoppingCheckedBehavior,
-    aiEnabled, aiKeyVerified,
-  } from '../stores/settings.js';
-  $: enhancedAvailable = !isNative || !!getServerUrl(); // recipe-scrapers needs the server
-  $: smartAvailable    = $aiEnabled && $aiKeyVerified;
+  import { slide, fade } from 'svelte/transition';
 
-  const OFF_LANGUAGE_OPTS = [
-    ['en','English'],['fr','French'],['de','German'],['es','Spanish'],['it','Italian'],
-    ['pt','Portuguese'],['nl','Dutch'],['pl','Polish'],['ru','Russian'],['ja','Japanese'],
-    ['zh','Chinese'],['ar','Arabic'],['ko','Korean'],
-  ];
-  const OFF_COUNTRY_OPTS = ['World',
-    'Argentina','Australia','Austria','Belgium','Brazil','Canada','Chile','China',
-    'Denmark','Finland','France','Germany','India','Ireland','Italy','Japan',
-    'Mexico','Netherlands','New Zealand','Norway','Poland','Portugal','Singapore',
-    'South Africa','South Korea','Spain','Sweden','Switzerland','United Kingdom',
-    'United States'];
-  let offShowPass = false;
-  import { isNative, getServerUrl, resolveAssetUrl, iconUrl } from '../lib/platform.js';
   import { currentUser, userMgmtActive } from '../stores/auth.js';
+  import { isNative, getServerUrl, resolveAssetUrl } from '../lib/platform.js';
+  import {
+    bannerStyle, disableAnimations, accentColor, appearance,
+  } from '../stores/settings.js';
+  import { applyAccentColor } from '../stores/settings.js';
+  import { colorPickerOpen } from '../stores/color-picker.js';
 
-  function set(key, value) { DB.setSetting(key, value); scheduleSave(key, value); }
+  // Per-section pages — one component per slug, dispatched by
+  // SECTION_COMPONENTS below.
+  import SettingsAppearance      from '../components/settings/SettingsAppearance.svelte';
+  import SettingsRegional        from '../components/settings/SettingsRegional.svelte';
+  import SettingsCooking         from '../components/settings/SettingsCooking.svelte';
+  import SettingsNutrition       from '../components/settings/SettingsNutrition.svelte';
+  import SettingsTrace           from '../components/settings/SettingsTrace.svelte';
+  import SettingsFederation      from '../components/settings/SettingsFederation.svelte';
+  import SettingsImportFromNT    from '../components/settings/SettingsImportFromNT.svelte';
+  import SettingsFoodSources     from '../components/settings/SettingsFoodSources.svelte';
+  import SettingsServerConnection from '../components/settings/SettingsServerConnection.svelte';
+  import SettingsNotifications   from '../components/settings/SettingsNotifications.svelte';
+  import SettingsBackup          from '../components/settings/SettingsBackup.svelte';
+  import SettingsImport          from '../components/settings/SettingsImport.svelte';
+  import SettingsKitchens        from '../components/settings/SettingsKitchens.svelte';
+  import SettingsUpdates         from '../components/settings/SettingsUpdates.svelte';
+  import SettingsDiagnostics     from '../components/settings/SettingsDiagnostics.svelte';
+  import SettingsUserManagement  from '../components/settings/SettingsUserManagement.svelte';
+  import SettingsAuth            from '../components/settings/SettingsAuth.svelte';
+  import SettingsEmail           from '../components/settings/SettingsEmail.svelte';
+  import SettingsAbout           from '../components/settings/SettingsAbout.svelte';
+  import Profile                 from './Profile.svelte';
+  import Sheet                   from '../components/ui/Sheet.svelte';
 
-  // ── Diagnostics: in-app log capture ────────────────────────────────────
-  // Mirrors NutriTrace's Diagnostics section. Verbose mode flips a flag in
-  // localStorage that the logger reads; the buffer + crash files come from
-  // log-capture.js, which is imported first in main.js so console.* and
-  // window error events are intercepted before any other module runs.
-  let _logsSheet = false;
-  let _logsText = '';
-  let _logsCopied = false;
-  let _verboseLogging = isVerboseLogging();
-  let _hasCrashReport = false;
+  // ── Route param → current section ──────────────────────────────────────
+  // svelte-spa-router route `/settings/:section` → params.section.
+  // `/settings` (no param) → currentSection = null → index view.
+  export let params = {};
+  $: currentSection = params?.section || null;
 
-  function _openLogsSheet() {
-    _logsText = getLogBufferText() || '(no log lines captured yet)';
-    _logsCopied = false;
-    _hasCrashReport = hasCrashReport();
-    _logsSheet = true;
-  }
-  async function _copyLogs() {
-    try {
-      await navigator.clipboard.writeText(_logsText);
-      _logsCopied = true;
-      setTimeout(() => _logsCopied = false, 2000);
-    } catch {
-      showError($_('settings_page.toast.copy_failed'));
-    }
-  }
-  async function _shareLogs() {
-    try {
-      if (isNative) {
-        const { Share } = await import('@capacitor/share');
-        await Share.share({
-          title: 'CookTrace diagnostic logs',
-          text: _logsText,
-          dialogTitle: 'Share CookTrace logs',
-        });
-      } else if (typeof navigator !== 'undefined' && navigator.share) {
-        await navigator.share({ title: 'CookTrace diagnostic logs', text: _logsText });
-      } else {
-        await _copyLogs();
-      }
-    } catch {
-      // User cancelled — silent.
-    }
-  }
-  // Share a file from Directory.Data via the Android share intent. Direct
-  // file:// URIs into private app data fail silently on Android target SDK
-  // 24+: the receiving app gets the intent but can't read the URI, so it
-  // falls back to the share intent's text field and saves THAT as the file
-  // contents (the title-only file bug). Fix: copy the source file into
-  // Directory.Cache first; Capacitor's auto-generated FileProvider XML
-  // whitelists the cache directory and translates the file URI into a
-  // content:// URI the receiving app can actually read. Ported from
-  // NutriTrace #60 fix (commit a69c661).
-  async function _shareFileViaCache({ srcPath, cacheBasename, title, text, dialogTitle }) {
-    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
-    const src = await Filesystem.readFile({ path: srcPath, directory: Directory.Data, encoding: Encoding.UTF8 });
-    const cachePath = `${cacheBasename}-${Date.now()}.txt`;
-    await Filesystem.writeFile({ path: cachePath, data: src.data, directory: Directory.Cache, encoding: Encoding.UTF8 });
-    const { uri } = await Filesystem.getUri({ path: cachePath, directory: Directory.Cache });
-    const { Share } = await import('@capacitor/share');
-    await Share.share({ title, text, url: uri, dialogTitle });
-  }
-  async function _shareLogFile() {
-    try {
-      const f = await getLogFileUri();
-      if (!f) { showError($_('settings_page.toast.no_log_file')); return; }
-      await _shareFileViaCache({
-        srcPath: f.path,
-        cacheBasename: 'cooktrace-log',
-        title: 'CookTrace diagnostic logs',
-        text: 'CookTrace log file',
-        dialogTitle: 'Share CookTrace log file',
-      });
-    } catch { /* user cancelled */ }
-  }
-  async function _shareCrashReport() {
-    try {
-      const f = await getLastCrashFileUri();
-      if (!f) { _hasCrashReport = false; return; }
-      await _shareFileViaCache({
-        srcPath: f.path,
-        cacheBasename: 'cooktrace-crash',
-        title: 'CookTrace crash report',
-        text: 'CookTrace crash report',
-        dialogTitle: 'Share CookTrace crash report',
-      });
-    } catch { /* user cancelled */ }
-  }
-  function _clearCrashReport() {
-    clearCrashReport();
-    _hasCrashReport = false;
-  }
-  function _clearLogs() {
-    clearLogBuffer();
-    _logsText = '(cleared)';
-  }
-  function _toggleVerbose(on) {
-    _verboseLogging = on;
-    setVerboseLogging(on);
-  }
-
-  let appConfig = null;
-
-  // Track viewport width reactively so the persistent-sidebar toggle
-  // hides on phones (and reappears if the user rotates a tablet to
-  // landscape, etc.). Threshold matches App.svelte's
-  // _persistentAllowed (768px = standard tablet).
-  let _viewportW = typeof window !== 'undefined' ? window.innerWidth : 1024;
-  if (typeof window !== 'undefined') {
-    window.addEventListener('resize', () => { _viewportW = window.innerWidth; });
-  }
-  $: _persistentAllowed = _viewportW >= 768;
-  let envLocks = { ai: false, smtp: false };
-
-  onMount(async () => {
-    try {
-      const res = await fetch('/api/app-config', { credentials: 'include' });
-      if (res.ok) {
-        appConfig = await res.json();
-        envLocks = appConfig?.envLocks || envLocks;
-      }
-    } catch {}
-  });
-
-  // True when running as a standalone phone app (no remote server connected).
-  $: isNativeLocal = isNative && !getServerUrl();
-
-  // ── Collapsible section state ──────────────────────────────────────────
-  let openSections = {
-    appearance:    false,
-    regional:      false,
-    cooking:       false,
-    nutrition:     false,
-    ai:            false,
-    federation:    false,
-    foodsources:   false,
-    notifications: false,
-    email:         false,
-    backup:        false,
-    import:        false,
-    kitchens:      false,
-    users:         false,
-    auth:          false,
-    serverconn:    false,
-    updates:       false,
-    diagnostics:   false,
-    about:         false,
-  };
-  // Drill-in navigation replaces the old accordion toggle. On the index
-  // (/settings), tapping a section-toggle button routes to the section's
-  // sub-page (/settings/<slug>) instead of expanding it inline. On a
-  // sub-page tapping the same section behaves as "back to index".
-  //
-  // If the user has an active search query, forward it as ?q=<query> so
-  // the sub-page can auto-scroll to the matching setting on land.
+  // ── Drill-in navigation ────────────────────────────────────────────────
+  // Tapping a section row on the index routes to /settings/<slug>. If the
+  // user has an active search query, forward it as ?q=<query> so the
+  // sub-page can auto-scroll to the matching setting on land.
   function toggleSection(key) {
     if (currentSection === key) push('/settings');
     else {
@@ -223,14 +65,138 @@
       push(`/settings/${key}${q}`);
     }
   }
+  // Reverse the peel-in animation on tap: swap the back button + title
+  // into their -out classes so the reversed CSS keyframe plays, then
+  // navigate after the animation completes. Guards against double-tap
+  // starting a second exit while the first is still playing.
+  let _leaving = false;
+  async function backToIndex() {
+    if (_leaving) return;
+    _leaving = true;
+    await new Promise(r => setTimeout(r, 240));
+    push('/settings');
+  }
 
   // ── Settings search ────────────────────────────────────────────────────
   let settingsSearch = '';
   $: settingsQuery = settingsSearch.toLowerCase().trim();
 
+  // On mobile / narrow, typing into the search bar while on a
+  // sub-page auto-navigates back to the index with the query so
+  // filtering shows the matching sections. On desktop the search
+  // filters the always-visible left rail in place — no navigation
+  // needed. Threshold matches the two-pane shell (1024px).
+  function _onSearchInput() {
+    if (!currentSection) return;
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia('(min-width: 1024px)').matches) return;
+    if (!settingsQuery) return;
+    push(`/settings?q=${encodeURIComponent(settingsQuery)}`);
+  }
+
+  // Desktop welcome-hero: profile is expandable inline instead of
+  // routing away. Chevron rotates + body slides in/out. Default
+  // expanded so the welcome pane is immediately useful.
+  let _profileHeroExpanded = true;
+  function _toggleProfileHero() {
+    _profileHeroExpanded = !_profileHeroExpanded;
+  }
+  // When the user navigates to /settings/profile from the rail
+  // (from any other section), auto-expand so the profile editor is
+  // visible on land.
+  $: if (currentSection === 'profile') _profileHeroExpanded = true;
+
+  // Rail active-pill: the moving highlight that slides between rail
+  // items on section change. Absolutely positioned inside the rail;
+  // we measure the active button's offsetTop/offsetHeight and drive
+  // CSS transform + height. First measurement is applied without a
+  // transition (via _pillReady flag) so it doesn't jump from 0 on
+  // initial mount.
+  let _railEl;
+  let _pillY = 0;
+  let _pillH = 0;
+  let _pillVisible = false;
+  let _pillReady = false;
+  let _pillRO;
+  function _measurePill() {
+    if (!_railEl) return;
+    const btn = _railEl.querySelector('.section-toggle.active');
+    if (!btn) { _pillVisible = false; return; }
+    const y = btn.offsetTop;
+    const h = btn.offsetHeight;
+    if (_pillVisible && y === _pillY && h === _pillH) return;
+    _pillY = y;
+    _pillH = h;
+    _pillVisible = true;
+    if (!_pillReady) requestAnimationFrame(() => { _pillReady = true; });
+  }
+  afterUpdate(_measurePill);
+  onMount(() => {
+    if (typeof ResizeObserver === 'undefined' || !_railEl) return;
+    _pillRO = new ResizeObserver(_measurePill);
+    _pillRO.observe(_railEl);
+  });
+  onDestroy(() => { _pillRO?.disconnect(); });
+
+  // Section metadata — slug → title i18n key + icon. Used by the
+  // sub-page header to show the section name.
+  const SECTION_META = {
+    appearance:    { titleKey: 'settings.appearance.section',        icon: 'contrast' },
+    regional:      { titleKey: 'settings.regional.section',          icon: 'public' },
+    cooking:       { titleKey: 'settings.cooking.section',           icon: 'restaurant' },
+    nutrition:     { titleKey: 'settings.nutrition.section',         icon: 'science' },
+    ai:            { titleKey: 'settings.ai.section',                icon: 'bolt' },
+    federation:    { titleKey: 'settings.federation.section',        icon: 'link' },
+    foodsources:   { titleKey: 'settings.connected_services.section',icon: 'restaurant_menu' },
+    notifications: { titleKey: 'settings.notifications.section',     icon: 'notifications' },
+    email:         { titleKey: 'settings.email.section',             icon: 'mail' },
+    backup:        { titleKey: 'settings.backup.section',            icon: 'archive' },
+    import:        { titleKey: 'settings.import.section',            icon: 'import_export' },
+    kitchens:      { titleKey: 'settings.kitchens.section',          icon: 'group' },
+    users:         { titleKey: 'settings.users.section',             icon: 'group' },
+    auth:          { titleKey: 'settings.authentication.section',    icon: 'shield_person' },
+    serverconn:    { titleKey: 'settings.server.section',            icon: 'cloud' },
+    updates:       { titleKey: 'settings.updates.section',           icon: 'system_update' },
+    diagnostics:   { titleKey: 'settings.diagnostics.section',       icon: 'troubleshoot' },
+    about:         { titleKey: 'settings.about.section',             icon: 'info' },
+    profile:       { titleKey: 'profile.title',                      icon: 'person' },
+  };
+
+  // Slug → per-section component. Drives the <svelte:component>
+  // dispatch in the sub-page view. `ai` + `email` receive envLocks via
+  // a per-slug wrapper below (see markup) instead of prop-drilling to
+  // every child.
+  const SECTION_COMPONENTS = {
+    appearance:    SettingsAppearance,
+    regional:      SettingsRegional,
+    cooking:       SettingsCooking,
+    nutrition:     SettingsNutrition,
+    ai:            SettingsTrace,
+    // federation is a two-component render (federation + import-from-NT)
+    // — handled as a special case in the markup below.
+    federation:    SettingsFederation,
+    foodsources:   SettingsFoodSources,
+    notifications: SettingsNotifications,
+    email:         SettingsEmail,
+    backup:        SettingsBackup,
+    import:        SettingsImport,
+    kitchens:      SettingsKitchens,
+    users:         SettingsUserManagement,
+    auth:          SettingsAuth,
+    serverconn:    SettingsServerConnection,
+    updates:       SettingsUpdates,
+    diagnostics:   SettingsDiagnostics,
+    about:         SettingsAbout,
+    profile:       Profile,
+  };
+
+  // Keyword index for the settings search bar. Adding new keywords here
+  // (rather than in the extracted sections) keeps the search results
+  // reachable even when the section body isn't mounted — the search
+  // runs on the index, before drill-in.
   const SECTION_KEYWORDS = {
     profile:       ['profile','my profile','account','name','avatar','log out','logout','sign out','password','change password'],
-    appearance:    ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','reduce motion','banner','page banner'],
+    appearance:    ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','reduce motion','banner','page banner','force mobile','mobile layout','mobile view','phone layout','narrow layout'],
     regional:      ['regional','language','translation','locale','date','time','12h','24h','units','energy','kcal','kj','calories','kilojoules','imperial','metric','measurement system'],
     cooking:       ['cooking','servings','default servings','yield','recipe','recipes','url import','url import engine','scraper','recipe scrapers','recipe-scrapers','enhanced','smart','json-ld','schema.org','parser','auto add ingredients','auto-create pantry','pantry catalog','shopping','shopping list','aisle','aisles','group by','grouping','checked','hide checked','sort','reorder','shared recipes','main list','kitchen recipes','mixed view'],
     nutrition:     ['nutrition','nutrients','nutriments','vitamins','minerals','visible nutriments','fda'],
@@ -250,62 +216,39 @@
     about:         ['about','version','cooktrace','license','source','github','donate','support'],
   };
 
-  // ── Drill-in navigation ────────────────────────────────────────────────
-  // See NT Settings.svelte for the full pattern. Sub-page mode
-  // (currentSection truthy) hides every OTHER section via sectionVisible
-  // and force-opens the current one via sectionOpen. Index mode keeps
-  // keyword search filtering the toggle list.
-  export let params = {};
-  $: currentSection = params?.section || null;
-
-  const SECTION_META = {
-    appearance:    { titleKey: 'settings.appearance.section',       icon: 'contrast' },
-    regional:      { titleKey: 'settings.regional.section',         icon: 'public' },
-    cooking:       { titleKey: 'settings.cooking.section',          icon: 'restaurant' },
-    nutrition:     { titleKey: 'settings.nutrition.section',        icon: 'science' },
-    ai:            { titleKey: 'settings.ai.section',               icon: 'bolt' },
-    federation:    { titleKey: 'settings.federation.section',       icon: 'link' },
-    foodsources:   { titleKey: 'settings.connected_services.section', icon: 'restaurant_menu' },
-    notifications: { titleKey: 'settings.notifications.section',    icon: 'notifications' },
-    email:         { titleKey: 'settings.email.section',            icon: 'mail' },
-    backup:        { titleKey: 'settings.backup.section',           icon: 'archive' },
-    import:        { titleKey: 'settings.import.section',           icon: 'import_export' },
-    kitchens:      { titleKey: 'settings.kitchens.section',         icon: 'group' },
-    users:         { titleKey: 'settings.users.section',            icon: 'group' },
-    auth:          { titleKey: 'settings.authentication.section',   icon: 'shield_person' },
-    serverconn:    { titleKey: 'settings.server.section',           icon: 'cloud' },
-    updates:       { titleKey: 'settings.updates.section',          icon: 'system_update' },
-    diagnostics:   { titleKey: 'settings.diagnostics.section',      icon: 'troubleshoot' },
-    about:         { titleKey: 'settings.about.section',            icon: 'info' },
-  };
-
+  // Visibility predicate for section-toggle rows. Only filters when
+  // there's an active search query; presence of currentSection no
+  // longer collapses the list (desktop rail needs every section
+  // visible so users can jump between them). Never hides the section
+  // the user is currently on so a mid-typing search that doesn't
+  // match doesn't make the rail feel like it lost the user's place.
   $: sectionVisible = (query, key) => {
-    if (currentSection) return key === currentSection;
     if (!query) return true;
+    if (key === currentSection) return true;
     return (SECTION_KEYWORDS[key] || []).some(kw => kw.includes(query));
   };
-  $: sectionOpen = (_sections, _query, key) => currentSection === key;
+  // Rail "no matches" placeholder — set to true when the query is
+  // non-empty AND every section keyword-map entry fails to match.
+  $: _railNoMatches = !!settingsQuery &&
+    !Object.keys(SECTION_KEYWORDS).some(k => sectionVisible(settingsQuery, k));
 
-  // Reverse the peel-in animation on tap: swap the back button + title
-  // into their -out classes so the reversed CSS keyframe plays, then
-  // navigate after the animation completes.
-  let _leaving = false;
-  async function backToIndex() {
-    if (_leaving) return;
-    _leaving = true;
-    await new Promise(r => setTimeout(r, 240));
-    push('/settings');
-  }
+  // Admin group + Server Connection index row visibility. `isNativeLocal`
+  // is native standalone (no server bound). Not reactive on
+  // getServerUrl() — that value doesn't flip without a full reload.
+  $: isNativeLocal = isNative && !getServerUrl();
+  // Show admin group when there's a real server with users to manage.
+  $: showAdminGroup = !isNativeLocal && (!$userMgmtActive || $currentUser?.role === 'admin');
 
-  // Force-open the drilled-in section in openSections so any
-  // reactive lazy-load blocks fire the same way accordion open used to.
-  $: if (currentSection && !openSections[currentSection]) {
-    openSections = { ...openSections, [currentSection]: true };
-  }
-
-  // Deep-link ?q= scroll: on sub-page mount, scan DOM for the search
-  // query and scroll+highlight the first matching setting.
+  // ── Deep-link search scroll ────────────────────────────────────────────
+  // When the user searches on the main page then drills into a section,
+  // the query travels along as ?q=<term>. On sub-page mount we scan the
+  // rendered section body for the first row whose label OR description
+  // text contains that term, scroll it into view, and briefly highlight
+  // it. Turns "type 'aisle' → tap Cooking" into a single-tap jump to
+  // the Default Grouping row.
   $: _urlQuery = $querystring ? new URLSearchParams($querystring).get('q') : null;
+
+  // Fire the scroll exactly once per (section, query) landing.
   let _lastDeepLinkKey = null;
   $: {
     const key = `${currentSection || ''}|${_urlQuery || ''}`;
@@ -314,6 +257,7 @@
       _scheduleDeepLinkScroll(_urlQuery);
     }
   }
+
   async function _scheduleDeepLinkScroll(q) {
     await tick();
     await new Promise(r => setTimeout(r, 60));
@@ -321,7 +265,9 @@
     if (!q_norm) return;
     const scope = document.querySelector('.subpage-view');
     if (!scope) return;
-    const candidates = scope.querySelectorAll('.setting-label, .setting-desc, .sub-label, .setting-row');
+    const candidates = scope.querySelectorAll(
+      '.setting-label, .setting-desc, .sub-label, .setting-row'
+    );
     let hit = null;
     for (const el of candidates) {
       if ((el.textContent || '').toLowerCase().includes(q_norm)) { hit = el; break; }
@@ -333,49 +279,43 @@
     setTimeout(() => row.classList.remove('deep-link-highlight'), 2200);
   }
 
-  // ── Theme / accent options (mirror NT exactly) ─────────────────────────
-  const APPEARANCE_OPTS = [
-    { value: 'system', label: 'System Default' },
-    { value: 'dark',   label: 'Dark'           },
-    { value: 'light',  label: 'Light'          },
-  ];
-  const NAV_STYLE_OPTS = [
-    { value: 'bottom',  label: 'Bottom Tab Bar' },
-    { value: 'sidebar', label: 'Side Panel'     },
-    { value: 'both',    label: 'Both'           },
-  ];
-  const START_PAGE_OPTS = [
-    { value: '/',         label: 'Recipes'  },
-    { value: '/pantry',   label: 'Pantry'   },
-    { value: '/diary',    label: 'Diary'    },
-    { value: '/shopping', label: 'Shopping' },
-    { value: '/settings', label: 'Settings' },
-  ];
-  // Same 12 colors NT ships, paired light/dark variants.
-  const ACCENT_COLORS = [
-    { value: 'mint',   label: 'Mint',   dark: '#4FFFB0', light: '#00C47A' },
-    { value: 'blue',   label: 'Blue',   dark: '#4FC3F7', light: '#0277BD' },
-    { value: 'red',    label: 'Red',    dark: '#FF7070', light: '#D93025' },
-    { value: 'purple', label: 'Purple', dark: '#CE93D8', light: '#8E24AA' },
-    { value: 'orange', label: 'Orange', dark: '#FFB547', light: '#E65100' },
-    { value: 'teal',   label: 'Teal',   dark: '#4DD0E1', light: '#00838F' },
-    { value: 'pink',   label: 'Pink',   dark: '#F48FB1', light: '#C2185B' },
-    { value: 'yellow', label: 'Yellow', dark: '#FFF176', light: '#F9A825' },
-    { value: 'indigo', label: 'Indigo', dark: '#9FA8DA', light: '#3949AB' },
-    { value: 'lime',   label: 'Lime',   dark: '#C5E1A5', light: '#558B2F' },
-    { value: 'rose',   label: 'Rose',   dark: '#FF80AB', light: '#E91E63' },
-    { value: 'cyan',   label: 'Cyan',   dark: '#80DEEA', light: '#0097A7' },
-  ];
+  // ── Env-lock one-shot fetch ────────────────────────────────────────────
+  // Kept as a local so we can pass it to the AI + Email children (the
+  // only ones that read it). Not lifted to a shared store to avoid an
+  // otherwise-unnecessary settings-store expansion — the store refactor
+  // isn't required for the two-pane port.
+  let envLocks = { ai: false, smtp: false };
 
-  // Determine dark vs light to pick the right swatch shade.
-  $: isDark = $appearance === 'dark' || ($appearance === 'system' && (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches));
+  onMount(async () => {
+    try {
+      const res = await fetch('/api/app-config', { credentials: 'include' });
+      if (res.ok) {
+        const appConfig = await res.json();
+        envLocks = appConfig?.envLocks || envLocks;
+      }
+    } catch {}
+  });
 
-  // ── Custom color picker (HSL + RGB + Hex) — mirrors NT ─────────────────
+  // ── Custom color picker (HSL + RGB + Hex) — Sheet lives at shell
+  // level so any child can trigger it (SettingsAppearance's Custom
+  // swatch does, via `openColorPicker()` in the color-picker store).
   let customColorHex = /^#[0-9a-fA-F]{6}$/.test($accentColor) ? $accentColor : '#4FFFB0';
   let customHexInput = customColorHex;
-  let showColorSheet = false;
   let cpHue = 160, cpSat = 100, cpLgt = 50;
   let cpR = 79, cpG = 255, cpB = 176;
+
+  // When the shared store flips to `true`, seed the sliders from the
+  // currently-applied accent so the picker opens on the user's actual
+  // color instead of the last one they left the sheet at.
+  $: if ($colorPickerOpen) _seedFromCurrentAccent();
+
+  function _seedFromCurrentAccent() {
+    const cur = /^#[0-9a-fA-F]{6}$/.test($accentColor) ? $accentColor : '#4FFFB0';
+    customColorHex = cur;
+    customHexInput = cur;
+    [cpHue, cpSat, cpLgt] = _hexToHsl(cur);
+    _syncRgbFromHex(cur);
+  }
 
   function _hslToHex(h, s, l) {
     s /= 100; l /= 100;
@@ -409,14 +349,6 @@
     cpG = parseInt(hex.slice(3,5),16);
     cpB = parseInt(hex.slice(5,7),16);
   }
-  function openColorSheet() {
-    const cur = /^#[0-9a-fA-F]{6}$/.test($accentColor) ? $accentColor : '#4FFFB0';
-    customColorHex = cur;
-    customHexInput = cur;
-    [cpHue, cpSat, cpLgt] = _hexToHsl(cur);
-    _syncRgbFromHex(cur);
-    showColorSheet = true;
-  }
   function cpUpdateFromSliders() {
     customColorHex = _hslToHex(cpHue, cpSat, cpLgt);
     customHexInput = customColorHex;
@@ -444,856 +376,326 @@
   }
   function applyCustomColor() {
     if (/^#[0-9a-fA-F]{6}$/.test(customHexInput)) applyAccentColor(customHexInput);
-    showColorSheet = false;
+    colorPickerOpen.set(false);
   }
 
-  // Show admin group when there's a real server with users to manage.
-  // - native-local standalone: hidden (no server)
-  // - single-user mode: shown to the synthetic local admin so they can flip
-  //   on user management
-  // - multi-user mode: shown only to admins
-  $: showAdminGroup = !isNativeLocal && (!$userMgmtActive || $currentUser?.role === 'admin');
+  // TODO: Onboarding shortcut cards for the desktop welcome hero — NT
+  // renders a state-gated "Get Set Up" grid (Server / Goals / Wellness
+  // / Appearance). CookTrace doesn't have equivalent state gates ready
+  // yet; add when the surface exists.
 </script>
 
-<div class="page-shell">
-  <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
-    {#if currentSection}
-      <!-- Back button "peels out" from the left edge of the section
-           title via a CSS keyframe (Svelte transitions don't fire here
-           because svelte-spa-router unmounts + remounts the whole
-           component between /settings and /settings/:section routes). -->
-      <button class="settings-back"
-              class:back-peel-in={!_leaving}
-              class:back-peel-out={_leaving}
-              on:click={backToIndex}
-              aria-label={$_('common.back')}>
-        <span class="material-symbols-rounded">arrow_back</span>
-      </button>
-      <h1 class:title-slide-in={!_leaving}
-          class:title-slide-out={_leaving}>
-        {SECTION_META[currentSection]?.titleKey ? $_(SECTION_META[currentSection].titleKey) : currentSection}
-      </h1>
-    {:else}
-      <h1>{$_('routes.settings.title')}</h1>
-    {/if}
-  </header>
+<!-- Settings section-list snippet. Defined at the top level so it's
+     usable from BOTH render sites: (a) the mobile index (below the
+     profile hero, as a single stacked column), and (b) the desktop
+     left rail (two-pane shell at ≥1024px). Same markup + same
+     handlers; visual density is context-styled via the parent class
+     (.settings-nav-rail vs .settings-mobile-index). -->
+{#snippet sectionButtons()}
+  <!-- Profile always sits at the top — it's the account-level entry
+       and gets a matching hero card in the welcome pane. -->
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'profile')} class:active={currentSection === 'profile'} aria-current={currentSection === 'profile' ? 'page' : undefined} on:click={() => toggleSection('profile')}>
+    <span class="material-symbols-rounded si">person</span>
+    <span>{$_('profile.title')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
 
-  {#if !currentSection}
+  <p class="settings-group-label">{$_('settings_page.group.display')}</p>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'appearance')} class:active={currentSection === 'appearance'} aria-current={currentSection === 'appearance' ? 'page' : undefined} on:click={() => toggleSection('appearance')}>
+    <span class="material-symbols-rounded si">contrast</span>
+    <span>{$_('settings.appearance.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'regional')} class:active={currentSection === 'regional'} aria-current={currentSection === 'regional' ? 'page' : undefined} on:click={() => toggleSection('regional')}>
+    <span class="material-symbols-rounded si">language</span>
+    <span>{$_('settings.regional.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'cooking')} class:active={currentSection === 'cooking'} aria-current={currentSection === 'cooking' ? 'page' : undefined} on:click={() => toggleSection('cooking')}>
+    <span class="material-symbols-rounded si">soup_kitchen</span>
+    <span>{$_('settings.cooking.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+
+  <p class="settings-group-label">Data &amp; Tracking</p>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'nutrition')} class:active={currentSection === 'nutrition'} aria-current={currentSection === 'nutrition' ? 'page' : undefined} on:click={() => toggleSection('nutrition')}>
+    <span class="material-symbols-rounded si">nutrition</span>
+    <span>{$_('settings.nutrition.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+
+  <p class="settings-group-label">{$_('settings_page.group.integrations')}</p>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'ai')} class:active={currentSection === 'ai'} aria-current={currentSection === 'ai' ? 'page' : undefined} on:click={() => toggleSection('ai')}>
+    <span class="material-symbols-rounded si">smart_toy</span>
+    <span>{$_('settings.ai.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'federation')} class:active={currentSection === 'federation'} aria-current={currentSection === 'federation' ? 'page' : undefined} on:click={() => toggleSection('federation')}>
+    <span class="material-symbols-rounded si">hub</span>
+    <span>{$_('settings.federation.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'foodsources')} class:active={currentSection === 'foodsources'} aria-current={currentSection === 'foodsources' ? 'page' : undefined} on:click={() => toggleSection('foodsources')}>
+    <span class="material-symbols-rounded si">qr_code_scanner</span>
+    <span>{$_('settings.connected_services.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+
+  <p class="settings-group-label">App</p>
+  {#if isNative}
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'serverconn')} class:active={currentSection === 'serverconn'} aria-current={currentSection === 'serverconn' ? 'page' : undefined} on:click={() => toggleSection('serverconn')}>
+      <span class="material-symbols-rounded si">cloud_sync</span>
+      <span>{$_('settings.server_connection.section')}</span>
+      <span class="material-symbols-rounded chevron">expand_more</span>
+    </button>
+  {/if}
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'notifications')} class:active={currentSection === 'notifications'} aria-current={currentSection === 'notifications' ? 'page' : undefined} on:click={() => toggleSection('notifications')}>
+    <span class="material-symbols-rounded si">notifications</span>
+    <span>{$_('settings.notifications.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'backup')} class:active={currentSection === 'backup'} aria-current={currentSection === 'backup' ? 'page' : undefined} on:click={() => toggleSection('backup')}>
+    <span class="material-symbols-rounded si">backup</span>
+    <span>{$_('settings.backup.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'import')} class:active={currentSection === 'import'} aria-current={currentSection === 'import' ? 'page' : undefined} on:click={() => toggleSection('import')}>
+    <span class="material-symbols-rounded si">download</span>
+    <span>{$_('settings.import.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'kitchens')} class:active={currentSection === 'kitchens'} aria-current={currentSection === 'kitchens' ? 'page' : undefined} on:click={() => toggleSection('kitchens')}>
+    <span class="material-symbols-rounded si">cooking</span>
+    <span>{$_('settings.kitchens.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'updates')} class:active={currentSection === 'updates'} aria-current={currentSection === 'updates' ? 'page' : undefined} on:click={() => toggleSection('updates')}>
+    <span class="material-symbols-rounded si">system_update</span>
+    <span>{$_('settings.updates.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'diagnostics')} class:active={currentSection === 'diagnostics'} aria-current={currentSection === 'diagnostics' ? 'page' : undefined} on:click={() => toggleSection('diagnostics')}>
+    <span class="material-symbols-rounded si">troubleshoot</span>
+    <span>{$_('settings.diagnostics.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+
+  {#if showAdminGroup}
+    <p class="settings-group-label">{$_('settings_page.group.admin')}</p>
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'users')} class:active={currentSection === 'users'} aria-current={currentSection === 'users' ? 'page' : undefined} on:click={() => toggleSection('users')}>
+      <span class="material-symbols-rounded si">group</span>
+      <span>{$_('settings.users.section')}</span>
+      <span class="material-symbols-rounded chevron">expand_more</span>
+    </button>
+    {#if $userMgmtActive && $currentUser?.role === 'admin'}
+      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'auth')} class:active={currentSection === 'auth'} aria-current={currentSection === 'auth' ? 'page' : undefined} on:click={() => toggleSection('auth')}>
+        <span class="material-symbols-rounded si">vpn_key</span>
+        <span>{$_('settings.authentication.section')}</span>
+        <span class="material-symbols-rounded chevron">expand_more</span>
+      </button>
+    {/if}
+    {#if !$userMgmtActive || $currentUser?.role === 'admin'}
+      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'email')} class:active={currentSection === 'email'} aria-current={currentSection === 'email' ? 'page' : undefined} on:click={() => toggleSection('email')}>
+        <span class="material-symbols-rounded si">mail</span>
+        <span>{$_('settings.email.section')}</span>
+        <span class="material-symbols-rounded chevron">expand_more</span>
+      </button>
+    {/if}
+  {/if}
+
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'about')} class:active={currentSection === 'about'} aria-current={currentSection === 'about' ? 'page' : undefined} on:click={() => toggleSection('about')}>
+    <span class="material-symbols-rounded si">info</span>
+    <span>{$_('settings.about.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+{/snippet}
+
+<div class="page-shell">
+  <!-- Header + search bar share one sticky container so the search
+       row stays flush with the header in BOTH compact and banner-on
+       modes. Pinning them together as one unit removes the whole
+       class of header-height vs sub-bar-top mismatch bugs. -->
+  <div class="settings-sticky-top">
+    <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
+      {#if currentSection}
+        <button class="settings-back"
+                class:back-peel-in={!_leaving}
+                class:back-peel-out={_leaving}
+                on:click={backToIndex}
+                aria-label={$_('common.back')}>
+          <span class="material-symbols-rounded">arrow_back</span>
+        </button>
+        <h1 class:title-slide-in={!_leaving}
+            class:title-slide-out={_leaving}>
+          {SECTION_META[currentSection]?.titleKey ? $_(SECTION_META[currentSection].titleKey) : currentSection}
+        </h1>
+      {:else}
+        <h1>{$_('routes.settings.title')}</h1>
+      {/if}
+    </header>
+
+    <!-- Search bar renders on every settings view (index AND sub-pages).
+         On sub-pages, typing filters the left rail (desktop) or drops
+         back to the index with the query active (mobile). -->
     <div class="settings-search-bar">
       <span class="material-symbols-rounded settings-search-icon">search</span>
       <input class="settings-search-input" type="search" placeholder="Search settings…"
-        bind:value={settingsSearch} />
+        bind:value={settingsSearch}
+        on:input={_onSearchInput} />
       {#if settingsSearch}
         <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''} title="Clear search">
           <span class="material-symbols-rounded" style="font-size:18px">close</span>
         </button>
       {/if}
     </div>
-  {/if}
+  </div>
 
   <div class="page-content settings-content" class:subpage-view={!!currentSection}>
 
-    <!-- ── Profile hero — identity card at the top of Settings ─────────── -->
-    {#if sectionVisible(settingsQuery, 'profile')}
-    {@const _u = $currentUser || {}}
-    {@const _full = (_u.full_name || '').trim()}
-    {@const _displayName = (_full && _full !== 'Local User' ? _full : '') || (_u.username || '').trim() || 'My Profile'}
-    {@const _hasName = _displayName !== 'My Profile'}
-    {@const _initial = (_displayName[0] || '?').toUpperCase()}
-    <button class="profile-hero" on:click={() => push('/profile')}>
-      <div class="profile-hero-avatar">
-        {#if _u.avatar_url}
-          <img src={resolveAssetUrl(_u.avatar_url)} alt="" />
-        {:else if _hasName}
-          <span class="profile-hero-initial">{_initial}</span>
-        {:else}
-          <span class="material-symbols-rounded">person</span>
-        {/if}
-      </div>
-      <div class="profile-hero-info">
-        <span class="profile-hero-name">{_displayName}</span>
-        {#if _hasName && _u.role === 'admin' && $userMgmtActive}
-          <span class="profile-hero-role">{$_('settings_page.profile_hero.admin_badge')}</span>
-        {:else if !_hasName}
-          <span class="profile-hero-sub">{$_('settings_page.profile_hero.tap_to_setup')}</span>
-        {/if}
-      </div>
-      <span class="material-symbols-rounded profile-hero-chev">chevron_right</span>
-    </button>
-    {/if}
+    <div class="settings-two-pane">
 
-    <p class="settings-group-label">{$_('settings_page.group.display')}</p>
-
-    <!-- ── Appearance ──────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'appearance')} on:click={() => toggleSection('appearance')}>
-      <span class="material-symbols-rounded si">contrast</span>
-      <span>{$_('settings.appearance.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.appearance}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'appearance') && sectionVisible(settingsQuery, 'appearance')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <div class="card settings-card">
-          <div class="setting-row">
-            <span class="setting-label">{$_('settings_page.appearance.theme')}</span>
-            <div class="select-wrap" style="width:160px">
-              <select class="select sel-sm" value={$appearance} on:change={e => applyAppearance(e.target.value)}>
-                {#each APPEARANCE_OPTS as o}<option value={o.value}>{o.label}</option>{/each}
-              </select>
-            </div>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:10px">
-            <span class="setting-label">{$_('settings_page.appearance.accent_color')}</span>
-            <div class="accent-swatches">
-              {#each ACCENT_COLORS as c}
-                <button
-                  class="accent-swatch"
-                  class:active={$accentColor === c.value}
-                  style="background:{isDark ? c.dark : c.light}"
-                  title={c.label}
-                  on:click={() => applyAccentColor(c.value)}
-                >
-                  {#if $accentColor === c.value}
-                    <span class="material-symbols-rounded" style="font-size:16px;color:rgba(255,255,255,0.95);text-shadow:0 1px 3px rgba(0,0,0,0.4)">check</span>
-                  {/if}
-                </button>
-              {/each}
-              <button class="accent-swatch accent-swatch-custom" class:active={/^#[0-9a-fA-F]{6}$/.test($accentColor)}
-                title="Custom color" style={/^#[0-9a-fA-F]{6}$/.test($accentColor) ? "background:"+$accentColor : ""}
-                on:click={openColorSheet}>
-                <span class="material-symbols-rounded" style="font-size:16px;color:rgba(255,255,255,0.9);text-shadow:0 0 3px rgba(0,0,0,0.5)">colorize</span>
-              </button>
-            </div>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <span class="setting-label">{$_('settings_page.appearance.navigation_style')}</span>
-            <div class="select-wrap" style="width:160px">
-              <select class="select sel-sm" value={$navStyle} on:change={e => navStyle.set(e.target.value)}>
-                {#each NAV_STYLE_OPTS as o}<option value={o.value}>{o.label}</option>{/each}
-              </select>
-            </div>
-          </div>
-          {#if ($navStyle === 'sidebar' || $navStyle === 'both') && _persistentAllowed}
-            <div class="setting-divider"></div>
-            <div class="setting-row">
-              <div>
-                <span class="setting-label">{$_('settings_page.appearance.persistent_sidebar')}</span>
-                <div class="setting-desc">Sidebar stays open and shifts page content instead of overlaying it.</div>
-              </div>
-              <input type="checkbox" class="toggle-cb" checked={$sidebarPersistent} on:change={e => sidebarPersistent.set(e.target.checked)} />
-            </div>
-          {/if}
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <span class="setting-label">{$_('settings_page.appearance.start_page')}</span>
-            <div class="select-wrap" style="width:160px">
-              <select class="select sel-sm" value={$startPage} on:change={e => startPage.set(e.target.value)}>
-                {#each START_PAGE_OPTS as o}<option value={o.value}>{o.label}</option>{/each}
-              </select>
-            </div>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <span class="setting-label">{$_('settings_page.appearance.reduce_motion')}</span>
-            <input type="checkbox" class="toggle-cb" checked={$disableAnimations} on:change={e => disableAnimations.set(e.target.checked)} />
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">{$_('settings_page.appearance.page_banners')}</span>
-              <div class="setting-desc">Header style at the top of every page. Animated is a compact accent-gradient bar with a chosen motion style; Gradient is the same bar, static; Off is a plain glass header.</div>
-            </div>
-            <div class="select-wrap" style="width:130px">
-              <select class="select sel-sm" value={$bannerStyle} on:change={e => bannerStyle.set(e.currentTarget.value)}>
-                <option value="animated">{$_('settings_page.appearance.banner_animated')}</option>
-                <option value="gradient">{$_('settings_page.appearance.banner_gradient')}</option>
-                <option value="off">Off</option>
-              </select>
-            </div>
-          </div>
-          {#if $bannerStyle === 'animated'}
-            <div class="setting-row">
-              <div>
-                <span class="setting-label">{$_('settings_page.appearance.animation_style')}</span>
-                <div class="setting-desc">Shimmer is a soft white sweep, Drift is a slow hue rotation, Pulse is a gentle breathing, Aurora is a soft accent-tinted cloud-of-light. All honour Reduce Motion.</div>
-              </div>
-              <div class="select-wrap" style="width:130px">
-                <select class="select sel-sm" value={$bannerAnimation} on:change={e => bannerAnimation.set(e.currentTarget.value)}>
-                  <option value="shimmer">{$_('settings_page.appearance.anim_shimmer')}</option>
-                  <option value="drift">{$_('settings_page.appearance.anim_drift')}</option>
-                  <option value="pulse">{$_('settings_page.appearance.anim_pulse')}</option>
-                  <option value="aurora">{$_('settings_page.appearance.anim_aurora')}</option>
-                </select>
-              </div>
-            </div>
-          {/if}
-        </div>
-      </div>
-    {/if}
-
-    <!-- ── Regional & Units ─────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'regional')} on:click={() => toggleSection('regional')}>
-      <span class="material-symbols-rounded si">language</span>
-      <span>{$_('settings.regional.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.regional}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'regional') && sectionVisible(settingsQuery, 'regional')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <div class="card settings-card">
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">{$_('settings_page.regional.language')}</span>
-              <div class="setting-desc">UI language. A translation may lag one or two releases behind English; missing strings fall back to English.</div>
-            </div>
-            <div class="select-wrap" style="width:160px">
-              <select class="select sel-sm" value={$language} on:change={e => language.set(e.target.value)}>
-                {#each AVAILABLE_LOCALES as loc}
-                  <option value={loc.code}>{loc.label}</option>
-                {/each}
-              </select>
-            </div>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <span class="setting-label">{$_('settings_page.regional.date_format')}</span>
-            <div class="select-wrap" style="width:160px">
-              <select class="select sel-sm" value={$dateFormat} on:change={e => dateFormat.set(e.target.value)}>
-                <option value="ISO">YYYY-MM-DD</option>
-                <option value="US">MM/DD/YYYY</option>
-                <option value="EU">DD/MM/YYYY</option>
-                <option value="natural">{$_('settings_page.regional.date_natural')}</option>
-              </select>
-            </div>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <span class="setting-label">{$_('settings_page.regional.time_format')}</span>
-            <div class="select-wrap" style="width:160px">
-              <select class="select sel-sm" value={$timeFormat} on:change={e => timeFormat.set(e.target.value)}>
-                <option value="12h">12-hour (AM/PM)</option>
-                <option value="24h">24-hour</option>
-              </select>
-            </div>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">{$_('settings_page.regional.measurement_system')}</span>
-              <div class="setting-desc">Imperial uses cups, oz, lb, °F. Metric uses ml, g, kg, °C.</div>
-            </div>
-            <div class="select-wrap" style="width:130px">
-              <select class="select sel-sm" value={$measurementSystem} on:change={e => measurementSystem.set(e.target.value)}>
-                <option value="imperial">{$_('settings_page.regional.imperial')}</option>
-                <option value="metric">{$_('settings_page.regional.metric')}</option>
-              </select>
-            </div>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">{$_('settings_page.regional.energy')}</span>
-              <div class="setting-desc">Most countries (US / UK / EU / Canada) use kilocalories; Australia and New Zealand use kilojoules. Independent from your measurement-system choice.</div>
-            </div>
-            <div class="select-wrap" style="width:160px">
-              <select class="select sel-sm" value={$energyUnit} on:change={e => energyUnit.set(e.target.value)}>
-                <option value="kcal">Calories (kcal)</option>
-                <option value="kJ">Kilojoules (kJ)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-    {/if}
-
-    <!-- ── Cooking ─────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'cooking')} on:click={() => toggleSection('cooking')}>
-      <span class="material-symbols-rounded si">soup_kitchen</span>
-      <span>{$_('settings.cooking.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.cooking}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'cooking') && sectionVisible(settingsQuery, 'cooking')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <div class="card settings-card">
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">{$_('settings_page.cooking.default_servings')}</span>
-              <div class="setting-desc">Used when a new recipe doesn't specify how many it makes.</div>
-            </div>
-            <input type="number" min="1" max="20" class="input num" value={$defaultServings}
-              on:change={(e) => defaultServings.set(parseInt(e.target.value, 10) || 2)} />
-          </div>
-
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">Auto-Add Ingredients to Pantry</span>
-              <div class="setting-desc">When saving a recipe, automatically create Pantry rows for ingredient names that aren't linked yet. Off by default; turn on if you want your Pantry catalog to grow as you add or edit recipes. Manual links via the Pantry Link picker always work regardless.</div>
-            </div>
-            <input type="checkbox" class="toggle-cb" checked={$autoCreatePantryFromRecipes}
-              on:change={e => autoCreatePantryFromRecipes.set(e.target.checked)} />
-          </div>
-
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">{$_('settings_page.cooking.show_shared')}</span>
-              <div class="setting-desc">When on, recipes shared with you (via a Kitchen or a direct grant) appear alongside your own on the Recipes tab. Each shared card keeps a "Shared by" badge plus a mint Kitchen chip so you can tell what's yours at a glance. Off by default; the Shared segment stays available either way.</div>
-            </div>
-            <input type="checkbox" class="toggle-cb" checked={$mixSharedIntoRecipes}
-              on:change={e => mixSharedIntoRecipes.set(e.target.checked)} />
-          </div>
-
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">{$_('settings_page.cooking.url_import_engine')}</span>
-              <div class="setting-desc">
-                {@html $_('settings_page.cooking.url_engine_desc_standard_html')}
-                {@html $_('settings_page.cooking.url_engine_desc_enhanced_html')}
-                {@html $_('settings_page.cooking.url_engine_desc_smart_html')}
-              </div>
-            </div>
-            <div class="select-wrap" style="width:170px">
-              <select class="select sel-sm" value={$urlImportEngine || 'standard'}
-                on:change={e => urlImportEngine.set(e.target.value)}>
-                <option value="standard">{$_('settings_page.cooking.engine_standard')}</option>
-                <option value="enhanced" disabled={!enhancedAvailable}>
-                  {$_('settings_page.cooking.engine_enhanced')}{!enhancedAvailable ? $_('settings_page.cooking.engine_enhanced_server_suffix') : ''}
-                </option>
-                <option value="smart" disabled={!smartAvailable}>
-                  {$_('settings_page.cooking.engine_smart')}{!smartAvailable ? $_('settings_page.cooking.engine_smart_required_suffix') : ''}
-                </option>
-              </select>
-            </div>
-          </div>
-
-          {#if ($urlImportEngine || 'standard') === 'smart'}
-            <div class="setting-note">
-              <span class="material-symbols-rounded">info</span>
-              <span>{$_('settings_page.cooking.smart_note')}</span>
-            </div>
-          {/if}
-
-          {#if ($urlImportEngine || 'standard') === 'enhanced'}
-            <div class="setting-divider"></div>
-            <div class="setting-row">
-              <div>
-                <span class="setting-label">{$_('settings_page.cooking.enhanced_fallback')}</span>
-                <div class="setting-desc">{$_('settings_page.cooking.enhanced_fallback_desc')}</div>
-              </div>
-              <div class="select-wrap" style="width:170px">
-                <select class="select sel-sm" value={$urlImportFallback || 'standard'}
-                  on:change={e => urlImportFallback.set(e.target.value)}>
-                  <option value="standard">{$_('settings_page.cooking.engine_standard')}</option>
-                  <option value="smart" disabled={!smartAvailable}>
-                    {$_('settings_page.cooking.engine_smart')}{!smartAvailable ? $_('settings_page.cooking.engine_smart_required_suffix') : ''}
-                  </option>
-                </select>
-              </div>
-            </div>
-          {/if}
-
-          <div class="setting-divider"></div>
-          <div class="setting-subhead">{$_('settings_page.cooking.shopping_list')}</div>
-
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">{$_('settings_page.cooking.default_grouping')}</span>
-              <div class="setting-desc">How the shopping list is grouped when it opens. By Aisle uses the per-item aisle (auto-populated from the linked pantry item's category); By Recipe keeps items with the recipe that added them; Flat is one uninterrupted list.</div>
-            </div>
-            <div class="select-wrap" style="width:170px">
-              <select class="select sel-sm" value={$shoppingGroupBy || 'aisle'}
-                on:change={e => shoppingGroupBy.set(e.target.value)}>
-                <option value="aisle">{$_('settings_page.cooking.group_by_aisle')}</option>
-                <option value="recipe">{$_('settings_page.cooking.group_by_recipe')}</option>
-                <option value="flat">{$_('settings_page.cooking.group_by_flat')}</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="setting-divider"></div>
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">{$_('settings_page.cooking.checked_items')}</span>
-              <div class="setting-desc">What happens to items after you check them off. Sink to bottom keeps them visible so you can uncheck by mistake; Hide removes them from view with a one-tap "Show Checked" toggle if you need them back.</div>
-            </div>
-            <div class="select-wrap" style="width:170px">
-              <select class="select sel-sm" value={$shoppingCheckedBehavior || 'bottom'}
-                on:change={e => shoppingCheckedBehavior.set(e.target.value)}>
-                <option value="bottom">{$_('settings_page.cooking.sink_to_bottom')}</option>
-                <option value="hide">{$_('settings_page.cooking.hide')}</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-    {/if}
-
-    <p class="settings-group-label">Data &amp; Tracking</p>
-
-    <!-- ── Nutrition ───────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'nutrition')} on:click={() => toggleSection('nutrition')}>
-      <span class="material-symbols-rounded si">nutrition</span>
-      <span>{$_('settings.nutrition.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.nutrition}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'nutrition') && sectionVisible(settingsQuery, 'nutrition')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <SettingsNutrition />
-      </div>
-    {/if}
-
-    <p class="settings-group-label">{$_('settings_page.group.integrations')}</p>
-
-    <!-- ── AI Assistant ────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'ai')} on:click={() => toggleSection('ai')}>
-      <span class="material-symbols-rounded si">smart_toy</span>
-      <span>{$_('settings.ai.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.ai}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'ai') && sectionVisible(settingsQuery, 'ai')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <SettingsTrace {envLocks} />
-      </div>
-    {/if}
-
-    <!-- ── NutriTrace federation ───────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'federation')} on:click={() => toggleSection('federation')}>
-      <span class="material-symbols-rounded si">hub</span>
-      <span>{$_('settings.federation.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.federation}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'federation') && sectionVisible(settingsQuery, 'federation')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <SettingsFederation />
-        <SettingsImportFromNT />
-      </div>
-    {/if}
-
-    <!-- ── Food sources (Open Food Facts + barcode scanner) ───────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'foodsources')} on:click={() => toggleSection('foodsources')}>
-      <span class="material-symbols-rounded si">qr_code_scanner</span>
-      <span>{$_('settings.connected_services.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.foodsources}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'foodsources') && sectionVisible(settingsQuery, 'foodsources')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <p class="sub-label">{$_('settings_page.pantry_search.section')}</p>
-        <div class="card settings-card">
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">{$_('settings_page.pantry_search.default_source')}</span>
-              <div class="setting-desc">{$_('settings_page.pantry_search.default_source_desc')}</div>
-            </div>
-            <div class="select-wrap" style="width:160px">
-              <select class="select sel-sm" value={$pantryDefaultSource} on:change={e => pantryDefaultSource.set(e.target.value)}>
-                <option value="all">{$_('settings_page.pantry_search.source_all')}</option>
-                <option value="local">{$_('settings_page.pantry_search.source_local')}</option>
-                {#if $offEnabled}<option value="off">OFF</option>{/if}
-                {#if $usdaEnabled}<option value="usda">USDA</option>{/if}
-              </select>
-            </div>
-          </div>
-        </div>
-        <p class="sub-label">{$_('settings_page.off.section')}</p>
-        <div class="card settings-card">
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">{$_('settings_page.off.enable')}</span>
-              <div class="setting-desc">
-                Look up barcodes against the global crowd-sourced food database. No account needed for lookups; one is only required to upload edits via Share to OFF.
-              </div>
-            </div>
-            <input type="checkbox" class="toggle-cb" checked={$offEnabled} on:change={e => offEnabled.set(e.target.checked)} />
-          </div>
-          {#if $offEnabled}
-            <div class="setting-divider"></div>
-            <div class="setting-row">
-              <span class="setting-label">{$_('settings_page.off.search_language')}</span>
-              <div class="select-wrap" style="width:120px">
-                <select class="select sel-sm" value={$offSearchLanguage} on:change={e => offSearchLanguage.set(e.target.value)}>
-                  {#each OFF_LANGUAGE_OPTS as [v,l]}<option value={v}>{l}</option>{/each}
-                </select>
-              </div>
-            </div>
-            <div class="setting-divider"></div>
-            <div class="setting-row">
-              <span class="setting-label">{$_('settings_page.off.search_country')}</span>
-              <div class="select-wrap" style="width:150px">
-                <select class="select sel-sm" value={$offSearchCountry} on:change={e => offSearchCountry.set(e.target.value)}>
-                  {#each OFF_COUNTRY_OPTS as c}<option value={c}>{c}</option>{/each}
-                </select>
-              </div>
-            </div>
-            <div class="setting-divider"></div>
-            <div class="setting-row">
-              <span class="setting-label">{$_('settings_page.off.upload_country')}</span>
-              <div class="select-wrap" style="width:150px">
-                <select class="select sel-sm" value={$offUploadCountry} on:change={e => offUploadCountry.set(e.target.value)}>
-                  <option value="Auto">{$_('settings_page.off.auto')}</option>
-                  {#each OFF_COUNTRY_OPTS.filter(c => c !== 'World') as c}<option value={c}>{c}</option>{/each}
-                </select>
-              </div>
-            </div>
-            <div class="setting-divider"></div>
-            <div class="form-block">
-              <label class="form-label">{$_('settings_page.off.account_username')}</label>
-              <p class="hint">Optional — only needed to upload edits.
-                <a href="https://world.openfoodfacts.org/cgi/user.pl" target="_blank" rel="noopener" class="link">Create an OFF account →</a>
-              </p>
-              <input class="input" type="text" placeholder={$_('settings_page.off.off_username_ph')} value={$offUsername}
-                on:change={e => offUsername.set(e.target.value)} />
-              <label class="form-label">{$_('settings_page.off.account_password')}</label>
-              <div style="display:flex;gap:8px;align-items:center">
-                {#if offShowPass}
-                  <input class="input" type="text" style="flex:1" placeholder={$_('settings_page.off.off_password_ph')}
-                    value={$offPassword} on:change={e => offPassword.set(e.target.value)} />
-                {:else}
-                  <input class="input" type="password" style="flex:1" placeholder={$_('settings_page.off.off_password_ph')}
-                    value={$offPassword} on:change={e => offPassword.set(e.target.value)} />
-                {/if}
-                <button class="btn-icon" on:click={() => offShowPass = !offShowPass}
-                  title={offShowPass ? 'Hide' : 'Show'} aria-label="Toggle password visibility">
-                  <span class="material-symbols-rounded">{offShowPass ? 'visibility_off' : 'visibility'}</span>
-                </button>
-              </div>
-            </div>
-          {/if}
-        </div>
-
-        <p class="sub-label">{$_('settings_page.usda.section')}</p>
-        <div class="card settings-card">
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">{$_('settings_page.usda.enable')}</span>
-              <div class="setting-desc">
-                Search the USDA nutrition database when adding pantry items.
-                <a href="https://fdc.nal.usda.gov/api-key-signup" target="_blank" rel="noopener" class="link">Get a free API key →</a>
-              </div>
-            </div>
-            <input type="checkbox" class="toggle-cb" checked={$usdaEnabled} on:change={e => usdaEnabled.set(e.target.checked)} />
-          </div>
-          {#if $usdaEnabled}
-            <div class="setting-divider"></div>
-            <div class="form-block">
-              <label class="form-label">{$_('settings_page.usda.api_key')}</label>
-              <input class="input" type="text" placeholder={$_('settings_page.usda.api_key_ph')}
-                value={$usdaApiKey} on:change={e => usdaApiKey.set(e.target.value)} />
-            </div>
-          {/if}
-        </div>
-
-        <p class="sub-label">{$_('settings_page.scanner.section')}</p>
-        <div class="card settings-card">
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">{$_('settings_page.scanner.beep_on_scan')}</span>
-              <div class="setting-desc">Short audio confirmation when a barcode is recognized.</div>
-            </div>
-            <input type="checkbox" class="toggle-cb" checked={$barcodeBeep} on:change={e => barcodeBeep.set(e.target.checked)} />
-          </div>
-          {#if !isNative}
-            <div class="setting-divider"></div>
-            <div class="setting-row">
-              <div>
-                <span class="setting-label">Auto-Enable Flashlight</span>
-                <div class="setting-desc">Turn on the rear-camera flashlight automatically when the scanner opens (web only — native uses the OS camera UI's own controls).</div>
-              </div>
-              <input type="checkbox" class="toggle-cb" checked={$barcodeFlashlight} on:change={e => barcodeFlashlight.set(e.target.checked)} />
-            </div>
-          {/if}
-        </div>
-      </div>
-    {/if}
-
-    <p class="settings-group-label">App</p>
-
-    <!-- ── Server Connection (native only — manages connection to a
-         CookTrace server). PWA users have no "server connection"
-         concept; their Log Out lives in My Profile. -->
-    {#if isNative}
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'serverconn')} on:click={() => toggleSection('serverconn')}>
-      <span class="material-symbols-rounded si">cloud_sync</span>
-      <span>{$_('settings.server_connection.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.serverconn}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'serverconn') && sectionVisible(settingsQuery, 'serverconn')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <SettingsServerConnection />
-      </div>
-    {/if}
-    {/if}
-
-    <!-- ── Notifications ───────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'notifications')} on:click={() => toggleSection('notifications')}>
-      <span class="material-symbols-rounded si">notifications</span>
-      <span>{$_('settings.notifications.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.notifications}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'notifications') && sectionVisible(settingsQuery, 'notifications')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <SettingsNotifications />
-      </div>
-    {/if}
-
-    <!-- ── Backup & Restore ────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'backup')} on:click={() => toggleSection('backup')}>
-      <span class="material-symbols-rounded si">backup</span>
-      <span>{$_('settings.backup.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.backup}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'backup') && sectionVisible(settingsQuery, 'backup')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <SettingsBackup />
-      </div>
-    {/if}
-
-    <!-- ── Import from Another App (Mealie / Tandoor / Paprika bulk) ──── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'import')} on:click={() => toggleSection('import')}>
-      <span class="material-symbols-rounded si">download</span>
-      <span>{$_('settings.import.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.import}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'import') && sectionVisible(settingsQuery, 'import')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <SettingsImport />
-      </div>
-    {/if}
-
-    <!-- ── Kitchens (multi-user soft groups for sharing) ──────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'kitchens')} on:click={() => toggleSection('kitchens')}>
-      <span class="material-symbols-rounded si">cooking</span>
-      <span>{$_('settings.kitchens.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.kitchens}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'kitchens') && sectionVisible(settingsQuery, 'kitchens')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <SettingsKitchens />
-      </div>
-    {/if}
-
-    <!-- ── Updates — in-app version check + APK install (Android). ─────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'updates')} on:click={() => toggleSection('updates')}>
-      <span class="material-symbols-rounded si">system_update</span>
-      <span>{$_('settings.updates.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.updates}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'updates') && sectionVisible(settingsQuery, 'updates')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <SettingsUpdates />
-      </div>
-    {/if}
-
-    <!-- ── Diagnostics ─────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'diagnostics')} on:click={() => toggleSection('diagnostics')}>
-      <span class="material-symbols-rounded si">troubleshoot</span>
-      <span>{$_('settings.diagnostics.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.diagnostics}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'diagnostics') && sectionVisible(settingsQuery, 'diagnostics')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <div class="card settings-card">
-          <div class="setting-row">
-            <div>
-              <span class="setting-label">{$_('settings_page.diag.mode')}</span>
-              <div class="setting-desc">Enables detailed app-internal logs (sync, settings, notifications){isNative ? ' and writes them to a daily log file on disk so they survive crashes and reloads.' : ' and verbose console output.'} Off by default; turn on while reproducing a bug, then export below.</div>
-            </div>
-            <Toggle checked={_verboseLogging} on:change={e => _toggleVerbose(e.detail)} />
-          </div>
-          <div class="setting-divider"></div>
-          <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px">
-            <span class="setting-label">{$_('settings_page.diag.view_logs')}</span>
-            <p class="setting-desc" style="line-height:1.5">
-              {$_('settings_page.diag.logs_desc_prefix')}<a href="https://github.com/traceapps/cooktrace/issues" target="_blank" rel="noopener" class="about-link">{$_('settings_page.diag.logs_desc_github')}</a>.{isNative ? $_('settings_page.diag.logs_desc_android') : ''}{$_('settings_page.diag.logs_desc_suffix')}
-            </p>
-            <button class="btn btn-secondary" style="height:40px;font-size:13px" on:click={_openLogsSheet}>
-              <span class="material-symbols-rounded" style="font-size:16px">terminal</span>
-              View logs{hasCrashReport() ? ' · crash report available' : ''}
+      <!-- Left rail (desktop only, ≥1024px). Always shows the full
+           section list so users can jump between sections without
+           going back to the index. Hidden on mobile via CSS. -->
+      <aside class="settings-nav-rail" bind:this={_railEl}>
+        <!-- Sliding highlight pill (desktop rail). Mirrors LiftTrace. -->
+        <div class="rail-active-pill"
+             class:visible={_pillVisible}
+             class:ready={_pillReady && !$disableAnimations}
+             style="transform: translateY({_pillY}px); height: {_pillH}px;"
+             aria-hidden="true"></div>
+        {@render sectionButtons()}
+        {#if _railNoMatches}
+          <div class="settings-nav-empty">
+            <span class="material-symbols-rounded">search_off</span>
+            <p>No sections match "{settingsSearch}"</p>
+            <button type="button" class="settings-nav-clear"
+              on:click={() => settingsSearch = ''}>
+              Clear search
             </button>
           </div>
-        </div>
-      </div>
-    {/if}
+        {/if}
+      </aside>
 
-    <!-- ── Admin group (server-side users / auth — only meaningful when
-         there's a real server with user management to administer). -->
-    {#if showAdminGroup}
-    <p class="settings-group-label">{$_('settings_page.group.admin')}</p>
+      <!-- Right pane -->
+      <div class="settings-pane">
+        {#if currentSection && currentSection !== 'profile'}
+          {#key currentSection}
+            <div class="settings-pane-fade"
+              in:fade={{ duration: $disableAnimations ? 0 : 140 }}>
+              {#if currentSection === 'ai'}
+                <SettingsTrace {envLocks} />
+              {:else if currentSection === 'email'}
+                <SettingsEmail {envLocks} />
+              {:else if currentSection === 'federation'}
+                <!-- Federation drills-in show BOTH the federation
+                     connection card and the Import-from-NT card. -->
+                <div class="section-body">
+                  <SettingsFederation />
+                  <SettingsImportFromNT />
+                </div>
+              {:else}
+                <svelte:component this={SECTION_COMPONENTS[currentSection]} />
+              {/if}
+            </div>
+          {/key}
+        {:else}
+          <!-- Mobile index: profile hero + full section list. When
+               currentSection === 'profile', mobile drills straight
+               into the Profile editor (no hero + list — that would
+               be a wasted extra tap on phone). -->
+          <div class="settings-mobile-index">
+            {#if currentSection === 'profile'}
+              <Profile />
+            {:else}
+              {#if sectionVisible(settingsQuery, 'profile')}
+                {@const _u = $currentUser || {}}
+                {@const _full = (_u.full_name || '').trim()}
+                {@const _displayName = (_full && _full !== 'Local User' ? _full : '') || (_u.username || '').trim() || 'My Profile'}
+                {@const _hasName = _displayName !== 'My Profile'}
+                {@const _initial = (_displayName[0] || '?').toUpperCase()}
+                <button class="profile-hero" on:click={() => push('/profile')}>
+                  <div class="profile-hero-avatar">
+                    {#if _u.avatar_url}
+                      <img src={resolveAssetUrl(_u.avatar_url)} alt="" />
+                    {:else if _hasName}
+                      <span class="profile-hero-initial">{_initial}</span>
+                    {:else}
+                      <span class="material-symbols-rounded">person</span>
+                    {/if}
+                  </div>
+                  <div class="profile-hero-info">
+                    <span class="profile-hero-name">{_displayName}</span>
+                    {#if _hasName && _u.role === 'admin' && $userMgmtActive}
+                      <span class="profile-hero-role">{$_('settings_page.profile_hero.admin_badge')}</span>
+                    {:else if !_hasName}
+                      <span class="profile-hero-sub">{$_('settings_page.profile_hero.tap_to_setup')}</span>
+                    {/if}
+                  </div>
+                  <span class="material-symbols-rounded profile-hero-chev">chevron_right</span>
+                </button>
+              {/if}
 
-    <!-- ── Users ─────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'users')} on:click={() => toggleSection('users')}>
-      <span class="material-symbols-rounded si">group</span>
-      <span>{$_('settings.users.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.users}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'users') && sectionVisible(settingsQuery, 'users')}
-      <SettingsUserManagement />
-    {/if}
+              {@render sectionButtons()}
+              <div style="height:24px"></div>
+            {/if}
+          </div>
 
-    <!-- ── Authentication (OIDC SSO + password-login toggle) ──────────── -->
-    {#if $userMgmtActive && $currentUser?.role === 'admin'}
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'auth')} on:click={() => toggleSection('auth')}>
-      <span class="material-symbols-rounded si">vpn_key</span>
-      <span>{$_('settings.authentication.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.auth}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'auth') && sectionVisible(settingsQuery, 'auth')}
-      <SettingsAuth />
-    {/if}
-    {/if}
+          <!-- Desktop hero: profile card + optional inline editor. The
+               rail already shows the section list on desktop, so we
+               don't repeat it here — just a warm entry point. -->
+          <div class="settings-desktop-hero">
+            {#if sectionVisible(settingsQuery, 'profile')}
+              {@const _u = $currentUser || {}}
+              {@const _full = (_u.full_name || '').trim()}
+              {@const _displayName = (_full && _full !== 'Local User' ? _full : '') || (_u.username || '').trim() || 'My Profile'}
+              {@const _hasName = _displayName !== 'My Profile'}
+              {@const _initial = (_displayName[0] || '?').toUpperCase()}
+              <button class="profile-hero profile-hero-expander" on:click={_toggleProfileHero}
+                aria-expanded={_profileHeroExpanded}>
+                <div class="profile-hero-avatar">
+                  {#if _u.avatar_url}
+                    <img src={resolveAssetUrl(_u.avatar_url)} alt="" />
+                  {:else if _hasName}
+                    <span class="profile-hero-initial">{_initial}</span>
+                  {:else}
+                    <span class="material-symbols-rounded">person</span>
+                  {/if}
+                </div>
+                <div class="profile-hero-info">
+                  <span class="profile-hero-name">{_displayName}</span>
+                  {#if _hasName && _u.role === 'admin' && $userMgmtActive}
+                    <span class="profile-hero-role">{$_('settings_page.profile_hero.admin_badge')}</span>
+                  {:else if !_hasName}
+                    <span class="profile-hero-sub">{$_('settings_page.profile_hero.tap_to_setup')}</span>
+                  {/if}
+                </div>
+                <span class="material-symbols-rounded profile-hero-chev profile-hero-chev-toggle"
+                  class:profile-hero-chev-open={_profileHeroExpanded}>expand_more</span>
+              </button>
+            {/if}
 
-    <!-- ── Email (SMTP, admin only). Matches LiftTrace / NutriTrace by
-         living last in the Admin group, after Users + Authentication. -->
-    {#if !$userMgmtActive || $currentUser?.role === 'admin'}
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'email')} on:click={() => toggleSection('email')}>
-      <span class="material-symbols-rounded si">mail</span>
-      <span>{$_('settings.email.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.email}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'email') && sectionVisible(settingsQuery, 'email')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <SettingsEmail {envLocks} />
-      </div>
-    {/if}
-    {/if}
-    {/if}
-
-    <!-- ── About ──────────────────────────────────────────────────────── -->
-    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'about')} on:click={() => toggleSection('about')}>
-      <span class="material-symbols-rounded si">info</span>
-      <span>{$_('settings.about.section')}</span>
-      <span class="material-symbols-rounded chevron" class:rotated={openSections.about}>expand_more</span>
-    </button>
-    {#if sectionOpen(openSections, settingsQuery, 'about') && sectionVisible(settingsQuery, 'about')}
-      <div class="section-body" transition:slide={{ duration: 180 }}>
-        <div class="card settings-card">
-          <div class="about-hero">
-            <img src={iconUrl('/icons/logo.png')} alt="CookTrace" class="about-icon" />
-            <div>
-              <div class="about-name">{$_('settings_page.about.app_name')}</div>
-              <div class="about-version text-3 text-sm">
-                {APP_VERSION}
-                <span class="platform-tag">{isNative ? 'Android' : 'PWA'}</span>
+            {#if _profileHeroExpanded}
+              <div class="profile-hero-body"
+                transition:slide={{ duration: $disableAnimations ? 0 : 220 }}>
+                <Profile />
               </div>
-            </div>
+            {/if}
           </div>
-          <div class="setting-divider"></div>
-          <div class="about-desc">
-            Trace Every Recipe — From Pantry to Plate. CookTrace keeps your
-            recipes, pantry, cook diary, and shopping list together in one place,
-            with optional federation to NutriTrace for nutrition tracking. Your data
-            lives on your server, not in the cloud.
-          </div>
-          <div class="setting-divider"></div>
-          <div class="about-row">
-            <span class="material-symbols-rounded about-feat-icon">database</span>
-            <span>Self-hosted — your data, your server</span>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="about-row">
-            <span class="material-symbols-rounded about-feat-icon">phone_android</span>
-            <span>Native Android app with offline support, plus a PWA for any browser</span>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="about-row">
-            <span class="material-symbols-rounded about-feat-icon">lock</span>
-            <span>No tracking, no ads, no third-party analytics</span>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="about-row">
-            <span class="material-symbols-rounded about-feat-icon">hub</span>
-            <span>{$_('settings_page.about.federation_prefix')}<a href="https://github.com/traceapps/nutritrace" target="_blank" rel="noopener" class="about-link">NutriTrace</a>{$_('settings_page.about.federation_suffix')}</span>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="about-row">
-            <span class="material-symbols-rounded about-feat-icon">code</span>
-            <span>{$_('settings_page.about.family_prefix')}<a href="https://github.com/traceapps" target="_blank" rel="noopener" class="about-link">TraceApps</a>{$_('settings_page.about.family_suffix')}</span>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="about-row" style="flex-direction:column;align-items:flex-start;gap:8px">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span class="material-symbols-rounded about-feat-icon">volunteer_activism</span>
-              <span>{$_('settings_page.about.support_dev')}</span>
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;padding-left:30px">
-              <a href="https://ko-fi.com/traceapps" target="_blank" rel="noopener" class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px">
-                <span class="material-symbols-rounded" style="font-size:14px">coffee</span> Ko-fi
-              </a>
-            </div>
-            <div class="setting-desc" style="padding-left:30px;font-size:11px">CookTrace is free to self-host. Donations are appreciated but never required.</div>
-          </div>
-          <div class="setting-divider"></div>
-          <div class="about-desc" style="font-size:11px;color:var(--text-3);line-height:1.5">
-            CookTrace is not medical or dietary software. Recipe nutrition values are
-            estimates based on user-entered data and may contain inaccuracies. Always
-            consult a healthcare professional for medical or dietary advice. Use at
-            your own discretion.
-          </div>
-        </div>
+        {/if}
       </div>
-    {/if}
 
-    <div style="height:24px"></div>
+    </div>
+
   </div>
 </div>
 
-<!-- Diagnostic logs viewer -->
-<Sheet bind:open={_logsSheet} title="Diagnostic Logs">
-  <div style="padding:0 4px 8px">
-    <p class="setting-desc" style="line-height:1.5;margin-bottom:10px">
-      Recent log lines (capped at 500 normally, 1000 in verbose mode). Header shows app version + platform so the recipient knows what they're looking at.
-    </p>
-    <textarea readonly style="width:100%;height:280px;font-family:monospace;font-size:11px;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm,6px);background:var(--surface-2);color:var(--text-1);resize:vertical;white-space:pre">{_logsText}</textarea>
-    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-      <button class="btn btn-primary" style="flex:1;min-width:120px;height:40px;font-size:13px" on:click={_copyLogs}>
-        {#if _logsCopied}
-          <span class="material-symbols-rounded" style="font-size:16px">check</span> Copied
-        {:else}
-          <span class="material-symbols-rounded" style="font-size:16px">content_copy</span> Copy
-        {/if}
-      </button>
-      <button class="btn btn-secondary" style="flex:1;min-width:120px;height:40px;font-size:13px" on:click={_shareLogs}>
-        <span class="material-symbols-rounded" style="font-size:16px">share</span> Share Text
-      </button>
-      <button class="btn btn-secondary" style="flex:1;min-width:120px;height:40px;font-size:13px" on:click={_clearLogs}>
-        <span class="material-symbols-rounded" style="font-size:16px">delete</span> Clear
-      </button>
-    </div>
-    {#if isNative && _verboseLogging}
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button class="btn btn-secondary" style="flex:1;height:40px;font-size:13px" on:click={_shareLogFile}>
-          <span class="material-symbols-rounded" style="font-size:16px">description</span> Share Log File
-        </button>
-      </div>
-      <p class="setting-desc" style="margin-top:6px;font-size:11px">
-        Today's persisted log on disk (rotates daily, last 7 days kept). Better for long sessions or after a crash; the in-memory buffer above resets every reload.
-      </p>
-    {/if}
-    {#if isNative && _hasCrashReport}
-      <div style="margin-top:14px;padding:10px;background:color-mix(in srgb,var(--danger) 8%, transparent);border-left:3px solid var(--danger);border-radius:var(--radius-sm,6px)">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger)">warning</span>
-          <strong style="color:var(--danger);font-size:14px">{$_('settings_page.diag.crash_available')}</strong>
-        </div>
-        <p class="setting-desc" style="margin:0 0 8px;font-size:12px">
-          The app captured an uncaught error. Share the report to help track it down, then dismiss it.
-        </p>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-secondary" style="flex:1;height:36px;font-size:12px" on:click={_shareCrashReport}>
-            <span class="material-symbols-rounded" style="font-size:14px">share</span> Share Crash Report
-          </button>
-          <button class="btn btn-secondary" style="flex:1;height:36px;font-size:12px" on:click={_clearCrashReport}>
-            Dismiss
-          </button>
-        </div>
-      </div>
-    {/if}
-  </div>
-</Sheet>
-
-<!-- Custom color picker sheet — exact NT pattern (Hue / Saturation / Lightness sliders + RGB inputs + Hex). -->
-<Sheet bind:open={showColorSheet} title="Custom Color">
+<!-- Custom color picker sheet — exact NT pattern (Hue / Saturation /
+     Lightness sliders + RGB inputs + Hex). Kept at the shell level so
+     SettingsAppearance's Custom swatch (which calls openColorPicker()
+     from the shared store) can trigger it without needing the sliders
+     re-mounted per section. -->
+<Sheet bind:open={$colorPickerOpen} title="Custom Color">
   <div class="cp-body">
     <!-- Live preview -->
     <div class="cp-preview" style="background:{customColorHex}">
@@ -1363,22 +765,25 @@
 <style>
   .settings-content { display: flex; flex-direction: column; gap: 0; }
   /* Settings-only override: reduce horizontal page padding on phone
-     widths so cards get ~10-12px more breathing room per side. Rows,
-     labels, drag-lists, and controls all benefit uniformly. Desktop /
-     tablet widths (>= 768px) keep the default padding. */
+     widths so cards get ~10-12px more breathing room per side. Desktop
+     / tablet widths (>= 768px) keep the default padding. */
   @media (max-width: 767px) {
     .settings-content { padding-left: 8px; padding-right: 8px; }
   }
+  .hidden { display: none !important; }
 
-  /* Sub-page view: hide index-only chrome so only the current section's
-     body renders under the back-arrow header. Cheaper than wrapping
-     each of 18 sections in an {#if !currentSection}. */
-  .subpage-view :global(.section-toggle) { display: none; }
-  .subpage-view :global(.settings-group-label) { display: none; }
-  .subpage-view :global(.profile-hero) { display: none; }
+  /* Sub-page view: hide the mobile index chrome (section-toggle rows,
+     group labels, profile hero) so only the current section's body
+     renders under the back-arrow header. Scoped to the mobile index
+     only — on desktop the rail legitimately renders these rows even
+     when a sub-section is active, so a blanket :global hide would
+     nuke the rail. */
+  .subpage-view .settings-mobile-index :global(.section-toggle) { display: none; }
+  .subpage-view .settings-mobile-index :global(.settings-group-label) { display: none; }
+  .subpage-view .settings-mobile-index :global(.profile-hero) { display: none; }
   .subpage-view :global(.section-body) { animation: none !important; }
 
-  /* Back arrow header button — mirrors NT. */
+  /* Back arrow — icon-only button, sits before the section title. */
   .settings-back {
     display: inline-flex; align-items: center; justify-content: center;
     width: 40px; height: 40px;
@@ -1439,16 +844,20 @@
     12%  { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 45%, transparent); background-color: color-mix(in srgb, var(--accent) 14%, transparent); }
     100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%,  transparent); background-color: transparent; }
   }
-  .hidden { display: none !important; }
 
-  /* ── Settings search bar (sticky under header, mirrors NT) ───────────── */
-  .settings-search-bar {
+  /* Sticky header + search bar — one wrapper so the two elements
+     stay flush regardless of banner mode. Nested .page-header
+     becomes static so it doesn't double-stick. */
+  .settings-sticky-top {
     position: sticky;
-    /* page-top + 10 (top inset) + var(--hamburger-row) + 40 (h1) + 12 (pad-bot)
-       = 62 + hamburger-row. Persistent-sidebar mode sets --hamburger-row to 0
-       so the search bar pins flush against the (shorter) header. */
-    top: calc(var(--page-top, var(--safe-top)) + 62px + var(--hamburger-row, 0px));
+    top: 0;
     z-index: 20;
+    background: var(--bg);
+  }
+  .settings-sticky-top :global(.page-header) {
+    position: static;
+  }
+  .settings-search-bar {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1458,11 +867,6 @@
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border-bottom: 1px solid var(--border);
   }
-  /* Stale rule for the retired .has-banner layout — kept here as an
-     empty placeholder so the comment block above doesn't reference a
-     deleted selector. All three banner modes now use the compact
-     header height, so the search bar's `top` calc above already
-     covers every case. */
   .settings-search-icon { font-size: 20px; color: var(--text-3); flex-shrink: 0; }
   .settings-search-input {
     flex: 1;
@@ -1477,9 +881,10 @@
   .settings-search-input:focus { border-color: var(--accent); }
   .settings-search-clear { color: var(--text-3); }
 
-  /* ── Profile hero — identity card at the top of Settings ─────────────── */
+  /* Profile hero — identity card at the top of Settings. */
   .profile-hero {
     display: flex; align-items: center; gap: 14px;
+    width: 100%;
     margin: 4px var(--page-px) 14px;
     padding: 14px 16px;
     background: var(--surface-2);
@@ -1517,18 +922,7 @@
   .profile-hero-sub { font-size: 13px; color: var(--text-3); }
   .profile-hero-chev { color: var(--text-3); flex-shrink: 0; }
 
-  /* ── Group label ─────────────────────────────────────────────────────── */
-  .settings-group-label {
-    padding: 20px var(--page-px) 4px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-3);
-    margin: 0;
-  }
-
-  /* ── Section toggles & body (mirrors NT) ─────────────────────────────── */
+  /* Section-toggle button — shared by mobile index + desktop rail. */
   .section-toggle {
     display: flex;
     align-items: center;
@@ -1556,198 +950,248 @@
     border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
   }
-  /* Drill-in indicator: chevron always points right (rotate -90deg turns
-     the down-arrow into a right-arrow). No expanded state on the index
-     anymore since each section drills into its own sub-page. */
+  .settings-group-label {
+    padding: 20px var(--page-px) 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin: 0;
+  }
+  /* Drill-in indicator: chevron always points right. */
   .chevron { font-size: 20px; color: var(--text-3); margin-left: auto; transform: rotate(-90deg); }
-  .chevron.rotated { transform: rotate(-90deg); }
-  .section-body { padding: 12px var(--page-px); display: flex; flex-direction: column; gap: 10px; }
-  .sub-label {
-    font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
-    text-transform: uppercase; color: var(--text-3);
-    padding: 4px 2px 2px; margin: 0;
-  }
-  .form-block { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 8px; }
-  .form-block .form-label {
-    font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
-    text-transform: uppercase; color: var(--text-3);
-    margin-top: 4px;
-  }
-  .form-block .hint { font-size: 12px; color: var(--text-3); margin: 0 0 4px; line-height: 1.4; }
-  .form-block .link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
-  .form-block .input {
-    background: var(--surface-2); border: 1px solid var(--border);
-    border-radius: var(--radius-sm); padding: 9px 12px;
-    color: var(--text-1); font-size: 14px;
-    width: 100%; box-sizing: border-box;
-  }
-  .form-block .input:focus { outline: 2px solid var(--accent-dim); border-color: var(--accent); }
 
-  /* ── Card + setting rows ─────────────────────────────────────────────── */
-  .card.settings-card {
+  /* Shared section-body wrapper — every extracted section renders
+     into a `.section-body` (see NT). :global so descendants inherit. */
+  :global(.section-body) { padding: 12px var(--page-px); display: flex; flex-direction: column; gap: 10px; }
+
+  /* Shared card + row primitives — every extracted section renders
+     into a `.card.settings-card` containing `.setting-row`s. Style
+     lives here so descendants inherit via :global. */
+  :global(.settings-card) {
     background: var(--surface-1);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     overflow: hidden;
-  }
-  .setting-row {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+  }
+  :global(.setting-row) {
+    display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
-    padding: 14px 16px;
+    padding: 13px 16px;
+    min-height: 50px;
   }
-  .setting-row > div:first-child { flex: 1; min-width: 0; }
-  .setting-label { font-size: 14px; color: var(--text-1); display: block; }
-  .setting-desc { font-size: 12px; color: var(--text-3); margin-top: 4px; line-height: 1.4; display: block; }
-  .setting-note {
-    display: flex;
-    gap: 8px;
-    align-items: flex-start;
-    margin: 10px 0 0;
-    padding: 10px 12px;
-    background: color-mix(in srgb, var(--accent) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-    border-radius: var(--radius-sm);
-    font-size: 12px;
-    line-height: 1.45;
-    color: var(--text-2);
+  :global(.setting-row > *) { flex-shrink: 0; }
+  :global(.setting-row > div), :global(.setting-row > span.setting-label) {
+    flex: 1 1 0; min-width: 0;
   }
-  .setting-note :global(.material-symbols-rounded) {
-    font-size: 18px;
-    color: var(--accent);
-    flex-shrink: 0;
-    margin-top: 1px;
+  :global(.setting-row > .select-wrap),
+  :global(.setting-row > .seg-group),
+  :global(.setting-row > .env-lock-pill),
+  :global(.setting-row > .sr-control) {
+    flex: 0 0 auto;
   }
-  .setting-divider { height: 1px; background: var(--border); margin: 0 16px; }
-  .setting-subhead {
-    padding: 12px 16px 4px;
+  /* Column-direction rows reset — children should take natural height. */
+  :global(.setting-row[style*="flex-direction:column"] > div),
+  :global(.setting-row[style*="flex-direction: column"] > div),
+  :global(.setting-row[style*="flex-direction:column"] > span.setting-label),
+  :global(.setting-row[style*="flex-direction: column"] > span.setting-label) {
+    flex: 0 0 auto;
+    min-width: auto;
+  }
+  :global(.setting-label), :global(.setting-desc) { word-break: break-word; overflow-wrap: anywhere; }
+  :global(.setting-label) { font-size: 14px; color: var(--text-1); display: block; }
+  :global(.setting-desc)  { font-size: 12px; color: var(--text-3); margin-top: 4px; line-height: 1.4; display: block; }
+  :global(.setting-divider) { height: 1px; background: var(--border); margin: 0 16px; }
+
+  :global(.sub-label) {
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-3);
+    padding: 4px 2px 2px;
   }
 
-  /* ── Select dropdown ─────────────────────────────────────────────────── */
-  .select-wrap {
-    position: relative;
-    display: inline-block;
+  /* Grouped-card heading + subtitle (used by Phase B sub-pages in NT,
+     kept as :global for future CT sub-page migrations). */
+  :global(.settings-group-heading) {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin: 20px 4px 4px;
   }
-  .select-wrap::after {
-    content: '';
-    position: absolute;
-    right: 10px; top: 50%;
-    transform: translateY(-25%) rotate(45deg);
-    width: 7px; height: 7px;
-    border-right: 2px solid var(--text-3);
-    border-bottom: 2px solid var(--text-3);
-    pointer-events: none;
+  :global(.settings-group-heading:first-child) { margin-top: 4px; }
+  :global(.settings-group-sub) {
+    font-size: 12px;
+    color: var(--text-3);
+    line-height: 1.4;
+    margin: 0 4px 10px;
+    max-width: 640px;
   }
-  .select {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 7px 28px 7px 10px;
-    color: var(--text-1);
-    font-size: 13px;
-    width: 100%;
-    appearance: none;
-    -webkit-appearance: none;
-    cursor: pointer;
-  }
-  .select:focus { outline: 2px solid var(--accent-dim); border-color: var(--accent); }
-  .sel-sm { height: 36px; font-size: 13px; }
+  :global(.sel-sm) { height: 36px; font-size: 13px; width: 100%; max-width: 100%; }
 
-  /* ── Toggle checkbox ─────────────────────────────────────────────────── */
-  .toggle-cb {
-    width: 40px; height: 24px;
-    appearance: none;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 99px;
-    position: relative;
-    cursor: pointer;
-    transition: background var(--dur-fast);
+  /* Chips + env-lock banner + seg-control + spin — parity with NT for
+     shared descendant styling. */
+  :global(.env-lock-banner) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    color: var(--text-2);
+    margin-bottom: 4px;
   }
-  .toggle-cb::after {
-    content: '';
-    position: absolute;
-    top: 1px; left: 1px;
-    width: 20px; height: 20px;
-    background: var(--text-3);
-    border-radius: 50%;
-    transition: transform var(--dur-base) var(--ease-spring), background var(--dur-fast);
-  }
-  .toggle-cb:checked { background: var(--accent-dim); border-color: var(--accent); }
-  .toggle-cb:checked::after { background: var(--accent); transform: translateX(16px); }
+  :global(.env-lock-banner .material-symbols-rounded) { font-size: 16px; color: var(--accent); flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  :global(.spin) { animation: spin 1s linear infinite; display: inline-block; }
 
-  /* ── Number input ────────────────────────────────────────────────────── */
-  .input.num {
-    width: 80px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 6px 10px;
-    color: var(--text-1);
-    text-align: right;
-    font-size: 13px;
+  /* Two-pane base (mobile default). */
+  .settings-two-pane { display: block; }
+  .settings-nav-rail,
+  .settings-desktop-hero { display: none; }
+  .settings-mobile-index { display: block; }
+
+  @media (min-width: 1024px) {
+    :global(html:not(.force-mobile-layout)) .settings-two-pane {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      position: sticky;
+      isolation: isolate;
+      top: calc(var(--page-top, var(--safe-top)) + 130px + var(--hamburger-row, 0px));
+      max-height: calc(100vh
+        - var(--page-top, var(--safe-top))
+        - 150px
+        - var(--hamburger-row, 0px)
+        - var(--nav-h, 0px)
+        - var(--safe-bottom, 0px));
+      overflow-y: auto;
+      padding: 10px 8px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle) {
+      background: transparent;
+      border: none;
+      min-height: 36px;
+      padding: 8px 10px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      gap: 10px;
+      position: relative;
+      z-index: 1;
+      transition: color 160ms ease;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle:hover) {
+      background: var(--surface-2);
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle.active) {
+      background: transparent;
+      color: var(--accent);
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .rail-active-pill {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 0;
+      border-radius: var(--radius-md);
+      background: var(--accent-dim);
+      pointer-events: none;
+      opacity: 0;
+      z-index: 0;
+      will-change: transform, height;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .rail-active-pill.visible {
+      opacity: 1;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .rail-active-pill.ready {
+      transition:
+        transform 320ms cubic-bezier(0.32, 0.72, 0, 1),
+        height 260ms cubic-bezier(0.32, 0.72, 0, 1),
+        opacity 180ms ease;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle:focus-visible) {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+      background: var(--surface-2);
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle .si) {
+      width: 24px;
+      height: 24px;
+      font-size: 18px;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle .chevron) { display: none; }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.settings-group-label) {
+      margin: 12px 4px 4px;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.settings-group-label:first-child) {
+      margin-top: 2px;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .settings-nav-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 24px 12px;
+      text-align: center;
+      color: var(--text-3);
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .settings-nav-empty :global(.material-symbols-rounded) {
+      font-size: 28px;
+      opacity: 0.7;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .settings-nav-empty p {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .settings-nav-clear {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    :global(html:not(.force-mobile-layout)) .settings-nav-rail .settings-nav-clear:hover {
+      background: var(--surface-2);
+      color: var(--text-1);
+    }
+
+    /* Desktop-only vs mobile-only content in the pane. */
+    :global(html:not(.force-mobile-layout)) .settings-mobile-index { display: none; }
+    :global(html:not(.force-mobile-layout)) .settings-desktop-hero { display: block; }
   }
 
-  /* ── Accent swatches (mirror NT) ──────────────────────────────────────── */
-  .accent-swatches { display: flex; gap: 10px; flex-wrap: wrap; padding: 0 16px 14px; }
-  .accent-swatch {
-    width: 38px; height: 38px;
-    border-radius: 50%;
-    border: 3px solid transparent;
-    cursor: pointer;
-    transition: transform 0.15s, border-color 0.15s;
-    outline: none;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .accent-swatch.active { border-color: var(--text-1); transform: scale(1.15); }
-  .accent-swatch:hover { transform: scale(1.08); }
-  .accent-swatch-custom {
-    background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
-    position: relative; overflow: hidden;
-  }
-
-  /* ── About hero ──────────────────────────────────────────────────────── */
-  .about-hero {
-    display: flex; align-items: center; gap: 14px;
-    padding: 16px;
-  }
-  .about-icon {
-    width: 56px; height: 56px; border-radius: 12px;
-    flex-shrink: 0; object-fit: contain;
-  }
-  .about-name { font-size: 18px; font-weight: 700; color: var(--text-1); }
-  .about-version { font-size: 12px; color: var(--text-3); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
-  .platform-tag {
-    font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
-    padding: 2px 6px; border-radius: var(--radius-sm);
-    background: var(--accent-dim); color: var(--accent);
-  }
-  .about-desc {
-    font-size: 13px; color: var(--text-2); line-height: 1.6;
-    padding: 14px 16px;
-  }
-  .about-row {
-    display: flex; align-items: center; gap: 8px;
-    padding: 12px 16px;
-    font-size: 13px; color: var(--text-2);
-  }
-  .about-feat-icon {
-    font-size: 18px; color: var(--accent);
-    width: 22px; height: 22px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
-  .about-link {
-    color: var(--accent);
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
+  /* Desktop welcome hero: profile card is expandable inline. */
+  .profile-hero-expander { cursor: pointer; }
+  .profile-hero-chev-toggle { transition: transform 160ms ease; }
+  .profile-hero-chev-open { transform: rotate(180deg); }
+  .profile-hero-body { margin-top: 12px; }
 
   /* ── Custom color picker sheet (mirror NT) ──────────────────────────── */
   .cp-body { display: flex; flex-direction: column; gap: 18px; padding-top: 4px; }
