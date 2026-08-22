@@ -678,13 +678,14 @@
            style grid on wide viewports so users see the whole shopping
            trip at a glance instead of scrolling through 8 stacked
            sections. Each group becomes a self-contained card. -->
-      <div class="groups-grid">
+      <div class="groups-grid" class:flat-mode={$shoppingGroupBy === 'flat'}>
       {#each grouped as g (g.key)}
         {@const rows = dndOverride.get(g.key) ?? g.rows}
         {@const realRows = rows.filter(r => !r?.isDndShadowItem)}
         {@const allChecked = realRows.length > 0 && realRows.every(r => r.checked)}
         {@const checkedCt = realRows.filter(r => r.checked).length}
-        {@const isCollapsed = (allChecked && !expandedComplete.has(g.key)) || collapsed.has(g.key)}
+        {@const hasHead = g.title != null}
+        {@const isCollapsed = hasHead && ((allChecked && !expandedComplete.has(g.key)) || collapsed.has(g.key))}
         <section class="group" class:collapsed={isCollapsed} class:done={allChecked}>
           {#if g.title != null}
             <header class="group-head">
@@ -1078,8 +1079,11 @@
      self-contained card. align-items:start prevents cells stretching
      to the tallest sibling's height. */
   .groups-grid { display: block; }
+  /* Flat mode is a single group with no title — skip the card/grid
+     treatment so it renders as one continuous list, same as it did
+     before the wide-screen polish. */
   @media (min-width: 1200px) {
-    .groups-grid {
+    .groups-grid:not(.flat-mode) {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
       gap: 20px;
@@ -1089,7 +1093,7 @@
 
   .group { margin-bottom: 16px; }
   @media (min-width: 1200px) {
-    .group {
+    .groups-grid:not(.flat-mode) .group {
       margin: 0;
       background: var(--surface-1);
       border: 1px solid var(--border);
@@ -1099,17 +1103,17 @@
     /* Card-level compaction: hide the "Check All / Uncheck All" text
        label so the group title has room. The icon + title's a11y
        label + tooltip keep the action reachable. */
-    .group .group-action .ga-label { display: none; }
-    .group .group-action { padding: 6px; }
+    .groups-grid:not(.flat-mode) .group .group-action .ga-label { display: none; }
+    .groups-grid:not(.flat-mode) .group .group-action { padding: 6px; }
   }
 
   /* Completed-group tint: when every item in a card is checked, the
      card fades slightly to signal "you're done here". Combined with
      auto-collapse (see script) this makes the wall condense as you
      sweep through the store. */
-  .group.done .group-title-text { color: var(--text-3); }
+  .groups-grid:not(.flat-mode) .group.done .group-title-text { color: var(--text-3); }
   @media (min-width: 1200px) {
-    .group.done {
+    .groups-grid:not(.flat-mode) .group.done {
       background: color-mix(in srgb, var(--accent) 6%, var(--surface-1));
       border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
     }
