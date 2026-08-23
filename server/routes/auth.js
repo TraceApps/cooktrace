@@ -7,6 +7,7 @@ import { signToken, sessionMaxAge, userMgmtActive, requireAuth, requireAdmin } f
 import { listProviders as oidcListProviders, publicProvider as oidcPublicProvider, isPasswordLoginEnabled, listUserLinks } from '../lib/oidc.js';
 import { sendPasswordReset, sendInvite, isEmailConfigured } from '../email.js';
 import { estimate as estimatePasswordStrength, STRONG_MIN_SCORE } from '../lib/password-strength.js';
+import { claimAnonymousData, purgeUnreferencedUserData, purgeUserRows } from '../lib/claim-anonymous-data.js';
 
 const router = Router();
 
@@ -175,13 +176,7 @@ router.post('/register', wrap((req, res) => {
   // First user: claim any pre-existing rows that were inserted before user_mgmt
   // existed (user_id IS NULL). Stays scoped to CookTrace's own tables.
   if (isFirst) {
-    db.prepare('UPDATE recipes      SET user_id = ? WHERE user_id IS NULL').run(user.id);
-    db.prepare('UPDATE pantry_items SET user_id = ? WHERE user_id IS NULL').run(user.id);
-    db.prepare('UPDATE cook_diary   SET user_id = ? WHERE user_id IS NULL').run(user.id);
-    db.prepare('UPDATE shopping_list SET user_id = ? WHERE user_id IS NULL').run(user.id);
-    // Clear single_user_mode flag if a prior DELETE /management or
-    // POST /recover set it. Re-enabling user management implicitly here.
-    db.prepare(`DELETE FROM app_config WHERE key = 'single_user_mode'`).run();
+    claimAnonymousData(user.id);
     res.cookie('ct_token', signToken(user), COOKIE_OPTS);
   }
 
@@ -257,6 +252,8 @@ router.delete('/me', requireAuth, wrap((req, res) => {
     return res.status(400).json({ error: 'Cannot delete the only admin account. Transfer admin to another user first.' });
   }
   // CASCADE handles foods, meals, diary, settings, wellness_data, ai_chat_history, etc.
+  // Tables with no FK to users(id) do not cascade — clear this user's rows.
+  purgeUserRows(userId);
   db.prepare('DELETE FROM users WHERE id = ?').run(userId);
   res.clearCookie('ct_token');
   res.json({ ok: true });
@@ -266,6 +263,8 @@ router.delete('/me', requireAuth, wrap((req, res) => {
 router.delete('/users/:id', requireAuth, requireAdmin, wrap((req, res) => {
   const id = parseInt(req.params.id);
   if (id === req.user.id) return res.status(400).json({ error: 'Cannot delete yourself' });
+  // Tables with no FK to users(id) do not cascade — clear this user's rows.
+  purgeUserRows(id);
   db.prepare('DELETE FROM users WHERE id = ?').run(id);
   res.json({ ok: true });
 }));
@@ -335,6 +334,8 @@ router.put('/users/:id/role', requireAuth, requireAdmin, wrap((req, res) => {
 // ── Admin: disable user management (delete all users) ─────────────────────
 router.delete('/management', requireAuth, requireAdmin, wrap((req, res) => {
   db.prepare('DELETE FROM users').run();
+  // Tables without an FK to users(id) survive the cascade — clear them too.
+  purgeUnreferencedUserData();
   // Persist intent: this was an explicit disable, not a fresh install.
   // /status uses this to keep setup_required=false so the client doesn't
   // re-route to the wizard on every load. Cleared by the next /register.
@@ -358,6 +359,8 @@ router.post('/recover', rateLimitLogin, wrap((req, res) => {
     return res.status(403).json({ error: 'Invalid recovery token.' });
   }
   db.prepare('DELETE FROM users').run();
+  // Tables without an FK to users(id) survive the cascade — clear them too.
+  purgeUnreferencedUserData();
   // Same single_user_mode flag as DELETE /management — recovery is an
   // intentional disable, not a fresh install.
   db.prepare(`INSERT INTO app_config (key, value) VALUES ('single_user_mode', '1')

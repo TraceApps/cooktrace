@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Enabling user management no longer strands data written in single-user mode** ([TraceApps/docs#2](https://github.com/TraceApps/docs/issues/2)). An instance running with no accounts writes every row under a placeholder owner. Registering the first account only re-parented recipes, pantry, cook diary and the shopping list, so cookbooks, recipe and pantry categories, custom and disabled units, and Trace chat history became invisible to the new admin. All of them are now claimed, in one transaction. The same handover runs whether the first account is created with a password or by the first OIDC sign-in; both paths now share one implementation instead of keeping separate copies that drifted.
+- **Data left behind in single-user mode is adopted on upgrade.** Instances that already enabled user management on an earlier build had their unowned rows stranded for good. Startup now adopts them, once, when exactly one account exists. Zero accounts is ordinary single-user mode and is left alone; two or more is reported in the log rather than guessed at.
+- **Deleting an account no longer leaves its hidden-unit preferences behind.** `disabled_units` has no foreign key to `users`, so it survived every account-removal path. All four (self-delete, admin delete, disable user management, lockout recovery) now clear it. Recipe comments are deliberately left alone, since a null author there means a deleted account rather than an anonymous one. The same incomplete list existed a second time in the OIDC first-login bootstrap, so an instance whose first account arrives via SSO had the identical bug; both paths now share one implementation.
+
 ---
 
 ## [1.1.4-dev02] - 2026-08-16 (pre-release)
