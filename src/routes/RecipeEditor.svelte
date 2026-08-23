@@ -307,8 +307,21 @@
     } catch { pantryNames = []; }
   }
 
+  // Stable per-ingredient id — used by the per-step "linked ingredients"
+  // feature (issue #40) so steps can reference specific ingredients
+  // across reorders / renames. crypto.randomUUID is fine on every
+  // browser the app supports and inside Capacitor's WebView; a Math
+  // fallback keeps SSR / test harnesses that lack it happy.
+  function _newIngId() {
+    try {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+      }
+    } catch { /* fall through */ }
+    return 'ing_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+  }
   function _blankIngredient() {
-    return { qty: '', unit: '', name: '', note: '' };
+    return { id: _newIngId(), qty: '', unit: '', name: '', note: '' };
   }
 
   async function load() {
@@ -332,7 +345,12 @@
           name: g.name || '',
           items: (g.items?.length ? g.items : [_blankIngredient()])
             .map(i => {
-              const row = { qty: i.qty ?? '', unit: i.unit ?? '', name: i.name ?? '', note: i.note ?? '' };
+              // Backfill a stable id for legacy recipes so per-step link
+              // refs have something to point at once the user edits.
+              const row = {
+                id: i.id || _newIngId(),
+                qty: i.qty ?? '', unit: i.unit ?? '', name: i.name ?? '', note: i.note ?? '',
+              };
               // Carry the manual Pantry link forward — without this the
               // round-trip silently drops it and the row falls back to
               // auto-name resolve, losing the user's pick.
@@ -342,11 +360,22 @@
         }));
       // Steps support an optional `title` (short summary like "Preheat Oven")
       // shown as "Step N: Title" in the view. Old string-only steps still load.
+      // `refIds` is the per-step "linked ingredients" set (issue #40) —
+      // preserved as-is when present, kept empty for legacy steps.
       steps       = r.steps?.length
         ? r.steps.map(s => typeof s === 'string'
-            ? { title: '', text: s }
-            : { title: s.title || '', text: s.text || '' })
-        : [{ title: '', text: '' }];
+            ? { title: '', text: s, refIds: [], imgUrl: '' }
+            : {
+                title: s.title || '',
+                text: s.text || '',
+                refIds: Array.isArray(s.refIds) ? [...s.refIds] : [],
+                // imgUrl was set by the step-photo picker but never
+                // hydrated back on load, so any saved step photo was
+                // silently dropped on the next edit. Fix while we're
+                // here since we're rewriting this block anyway.
+                imgUrl: s.imgUrl || '',
+              })
+        : [{ title: '', text: '', refIds: [], imgUrl: '' }];
       tags        = Array.isArray(r.tags)  ? [...r.tags]  : [];
       tools       = Array.isArray(r.tools) ? [...r.tools] : [];
       categoryId  = r.category_id != null ? String(r.category_id) : '';
@@ -685,7 +714,29 @@
     }
     ingredientGroups = ingredientGroups;
   }
-  function addStep() { steps = [...steps, { title: '', text: '' }]; }
+  function addStep() { steps = [...steps, { title: '', text: '', refIds: [], imgUrl: '' }]; }
+
+  // Toggle whether a given ingredient id is linked from step `si`.
+  // Called from the per-step chip picker below the step text.
+  function toggleStepIngredientRef(si, ingId) {
+    const cur = Array.isArray(steps[si]?.refIds) ? steps[si].refIds : [];
+    const next = cur.includes(ingId) ? cur.filter(x => x !== ingId) : [...cur, ingId];
+    steps[si] = { ...steps[si], refIds: next };
+    steps = steps;
+  }
+  // Flat list of all ingredients across every group, in visual order,
+  // for the per-step link picker.
+  $: allIngredientOptions = ingredientGroups
+    .flatMap(g => (g.items || []))
+    .filter(i => i && i.id && (i.name || '').trim())
+    .map(i => ({ id: i.id, name: i.name, qty: i.qty, unit: i.unit }));
+  // Resolve a ref id → the current ingredient row (for chip labels).
+  function _findIngById(id) {
+    for (const g of ingredientGroups) {
+      for (const it of (g.items || [])) if (it.id === id) return it;
+    }
+    return null;
+  }
 
   // ── Ingredient row kebab menu (mobile) ─────────────────────────────
   // Under 600px the three per-row action buttons (link-to-pantry,
@@ -774,6 +825,10 @@
           items: g.items
             .map(i => {
               const cleaned = {
+                // Stable id survives across save/load so per-step
+                // ref_ids keep pointing at the same ingredient even
+                // after renames / reorders (issue #40).
+                id:   i.id || _newIngId(),
                 qty:  (i.qty  ?? '').toString().trim(),
                 unit: (i.unit ?? '').toString().trim(),
                 name: (i.name ?? '').toString().trim(),
@@ -790,12 +845,34 @@
         }))
         .filter(g => g.items.length > 0 || g.name);
 
+      // Build a set of ingredient ids that survived the cleanup so we
+      // can prune any dangling refIds pointing at removed rows.
+      const _liveIngIds = new Set(
+        cleanedIngredients.flatMap(g => g.items.map(i => i.id))
+      );
+
       const cleanedSteps = steps
-        .map(s => ({
-          title: (s.title ?? '').toString().trim(),
-          text:  (s.text  ?? '').toString().trim(),
-        }))
-        .filter(s => s.title || s.text);
+        .map(s => {
+          const cleaned = {
+            title: (s.title ?? '').toString().trim(),
+            text:  (s.text  ?? '').toString().trim(),
+          };
+          // Preserve per-step linked ingredients (issue #40). Filter
+          // against live ingredient ids so removed rows don't leave
+          // dangling refs. Only persist when non-empty to keep the
+          // JSON shape identical to legacy for recipes that never use
+          // the feature.
+          if (Array.isArray(s.refIds) && s.refIds.length > 0) {
+            const kept = s.refIds.filter(id => _liveIngIds.has(id));
+            if (kept.length > 0) cleaned.refIds = kept;
+          }
+          // Preserve step photo (was silently dropped on every save
+          // before this patch — the picker set steps[i].imgUrl but
+          // save() didn't include it in the persisted object).
+          if (s.imgUrl) cleaned.imgUrl = s.imgUrl;
+          return cleaned;
+        })
+        .filter(s => s.title || s.text || s.imgUrl);
 
       // Combobox stores chip arrays directly. Trim + drop empties on
       // save so any noise from inline create doesn't persist.
@@ -1123,6 +1200,37 @@
                     <p class="step-hint">
                       Markdown: <strong>**bold**</strong>, <em>*italic*</em>, <u>__underline__</u>, <code>- bullet</code>, <code>1. number</code>. Time mentions like <em>15 minutes</em> become tappable timers.
                     </p>
+                  {/if}
+                  <!-- Per-step ingredient links (issue #40). Users tap
+                       ingredients to attach them to this step; Cook
+                       Mode then renders those inline below the step so
+                       quantities are visible without scrolling back to
+                       the top. Ingredients not linked to any step
+                       still appear in the standard top list. Only
+                       renders when there are named ingredients to link
+                       against. -->
+                  {#if allIngredientOptions.length > 0}
+                    {@const _linked = new Set(Array.isArray(steps[i]?.refIds) ? steps[i].refIds : [])}
+                    <div class="step-links">
+                      <span class="step-links-label">
+                        <span class="material-symbols-rounded">link</span>
+                        {_linked.size > 0
+                          ? `${_linked.size} ingredient${_linked.size === 1 ? '' : 's'} linked`
+                          : 'Link ingredients used in this step'}
+                      </span>
+                      <div class="step-links-chips">
+                        {#each allIngredientOptions as opt (opt.id)}
+                          <button type="button" class="step-link-chip" class:active={_linked.has(opt.id)}
+                            on:click={() => toggleStepIngredientRef(i, opt.id)}
+                            title={_linked.has(opt.id) ? 'Unlink from this step' : 'Link to this step'}>
+                            {#if _linked.has(opt.id)}
+                              <span class="material-symbols-rounded">check</span>
+                            {/if}
+                            <span class="step-link-chip-name">{opt.name}</span>
+                          </button>
+                        {/each}
+                      </div>
+                    </div>
                   {/if}
                   <!-- Step photo: collapsed-by-default. Empty state shows
                        a small + Add Photo button next to the row's other
@@ -2015,6 +2123,49 @@
     line-height: 1.4;
   }
   .step-hint strong, .step-hint em, .step-hint u { color: var(--text-2); }
+
+  /* Per-step ingredient links (issue #40). A compact label + chip
+     strip. Chips are toggles — inactive is outline, active is
+     accent-tinted with a check mark. */
+  .step-links {
+    display: flex; flex-direction: column; gap: 6px;
+    margin: 8px 0 2px;
+    padding: 8px 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+  .step-links-label {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 600; color: var(--text-3);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .step-links-label .material-symbols-rounded { font-size: 14px; color: var(--accent); }
+  .step-links-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .step-link-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    padding: 3px 10px;
+    border-radius: var(--radius-full, 99px);
+    font: inherit; font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    max-width: 240px;
+    transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+  }
+  .step-link-chip:hover { color: var(--text-1); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+  .step-link-chip.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .step-link-chip .material-symbols-rounded { font-size: 13px; }
+  .step-link-chip-name {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 200px;
+  }
 
   /* New-category dialog. Modest modal — backdrop + centered card. */
   .cat-modal-backdrop {

@@ -282,6 +282,25 @@
       else    localStorage.removeItem(`ct:cookmode:${rid}`);
     } catch {}
   }
+  // Resolve a step's ref_ids → the actual ingredient objects from the
+  // recipe's grouped-ingredients tree. Used to render the per-step
+  // inline ingredient list (issue #40). Returns in refIds order so the
+  // author can control the order in which linked ingredients appear
+  // under the step. Silently drops any dangling id (survived a save
+  // race, or the linked ingredient got deleted on a foreign client).
+  function _resolveStepIngs(refIds) {
+    if (!recipe || !Array.isArray(recipe.ingredients)) return [];
+    const byId = new Map();
+    for (const g of recipe.ingredients) {
+      for (const it of (g.items || [])) if (it?.id) byId.set(it.id, it);
+    }
+    const out = [];
+    for (const id of refIds) {
+      const it = byId.get(id);
+      if (it) out.push(it);
+    }
+    return out;
+  }
   function toggleIng(key) {
     if (!cookMode) return; // checks only mutate during an active cook session
     if (ingChecks.has(key)) ingChecks.delete(key);
@@ -1034,6 +1053,8 @@
                 {@const text  = typeof step === 'string' ? step : (step.text || '')}
                 {@const stepImg = typeof step === 'string' ? null : (step.imgUrl || null)}
                 {@const parts = splitWithTimes(text)}
+                {@const stepRefIds = (typeof step === 'string' || !Array.isArray(step.refIds)) ? [] : step.refIds}
+                {@const stepIngs = stepRefIds.length > 0 ? _resolveStepIngs(stepRefIds) : []}
                 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
                 <li class="step" class:checked={stepChecks.has(i)} id={`step-${i}`}
                   on:click={(e) => {
@@ -1065,6 +1086,22 @@
                       <span class="step-heading">
                         <span class="step-title">{title}</span>
                       </span>
+                    {/if}
+                    {#if stepIngs.length > 0}
+                      <!-- Per-step linked ingredients (issue #40). Small
+                           inline list so users don't scroll back to the
+                           top ingredients section during Cook Mode. -->
+                      <ul class="step-ings" aria-label={`Ingredients for step ${i + 1}`}>
+                        {#each stepIngs as ing (ing.id)}
+                          <li class="step-ing">
+                            {#if ing.qty || ing.unit}
+                              <span class="step-ing-qty">{ing.qty || ''}{ing.qty && ing.unit ? ' ' : ''}{ing.unit || ''}</span>
+                            {/if}
+                            <span class="step-ing-name">{ing.name}</span>
+                            {#if ing.note}<span class="step-ing-note">{ing.note}</span>{/if}
+                          </li>
+                        {/each}
+                      </ul>
                     {/if}
                     {#if stepImg}
                       <img class="step-image" src={resolveAssetUrl(stepImg)} alt={`Step ${i + 1}`} loading="lazy" />
@@ -2255,6 +2292,39 @@
     color: var(--text-1);
   }
   .step-text { color: var(--text-1); line-height: 1.5; font-size: 15px; }
+
+  /* Per-step linked ingredients (issue #40) — small inline list so
+     users don't scroll back to the top ingredients section during
+     Cook Mode. Sits between the step heading and the step text /
+     image so the quantities read as part of the step context. */
+  .step-ings {
+    list-style: none;
+    margin: 4px 0 6px;
+    padding: 8px 12px;
+    display: flex; flex-direction: column; gap: 4px;
+    background: color-mix(in srgb, var(--accent) 6%, var(--surface-2));
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+    border-radius: var(--radius-md);
+  }
+  .step-ing {
+    display: flex; align-items: baseline; gap: 6px;
+    font-size: 13px; color: var(--text-2); line-height: 1.4;
+  }
+  .step-ing-qty {
+    font-weight: 700; color: var(--accent);
+    min-width: 70px;
+    font-variant-numeric: tabular-nums;
+  }
+  .step-ing-name { color: var(--text-1); font-weight: 500; }
+  .step-ing-note { color: var(--text-3); font-style: italic; font-size: 12px; }
+  /* Cook mode scales the inline list to match the surrounding step
+     text (17px / 1.55) so quantities read at arm's length. */
+  .cook-mode .step-ing { font-size: 16px; line-height: 1.5; }
+  .cook-mode .step-ing-qty { min-width: 90px; font-size: 16px; }
+  .cook-mode .step-ing-note { font-size: 14px; }
+  /* When the step is checked done, fade the inline ingredients to
+     match the muted .step-text / .step-title treatment above. */
+  .step.checked .step-ings { opacity: 0.55; }
   .step-image {
     display: block;
     width: 100%;
