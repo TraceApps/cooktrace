@@ -424,6 +424,10 @@
     </div>
     {/if}
 
+    <!-- Sticky toolbar wraps the view switcher + month nav + filter row
+         so they follow the user down long day-groups on wide screens.
+         Matches the Shopping / Manage / Settings sticky-toolbar pattern. -->
+    <div class="diary-toolbar">
     <!-- View switcher -->
     <div class="view-switch">
       <div class="view-chips" role="radiogroup" aria-label="View"
@@ -460,6 +464,7 @@
         </button>
       {/if}
     </div>
+    </div>
 
     {#if loading}
       <div class="state"><span class="material-symbols-rounded spin">progress_activity</span></div>
@@ -484,6 +489,11 @@
         <button class="btn btn-secondary" on:click={clearFilter}>{$_('routes.diary.clear_filter')}</button>
       </div>
     {:else if view === 'list'}
+      <!-- Day-groups grid: single column on mobile, masonry auto-fill
+           at wide widths so a week of cooking fits on one screen
+           instead of scrolling past today, yesterday, day-before...
+           Same pattern Shopping uses for its aisle groups. -->
+      <div class="day-grid">
       {#each groupedByDate as [date, items]}
         {@const planned = date >= todayIso}
         <div class="day-group" class:planned in:fade={{ duration: 120 }}>
@@ -542,6 +552,7 @@
           </ul>
         </div>
       {/each}
+      </div>
     {:else if view === 'month'}
       <!-- Month grid -->
       <div class="month-grid">
@@ -886,6 +897,20 @@
     .stats-card { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 
+  /* Sticky diary toolbar: wraps view-switch + filter-row so both
+     follow the user down long lists on wide screens. Sits below the
+     page-header. Small negative top margin cancels the natural gap
+     between page-content top and header bottom so the sticky attaches
+     flush. */
+  .diary-toolbar {
+    position: sticky;
+    top: calc(var(--page-top, var(--safe-top)) + 56px + var(--hamburger-row, 0px));
+    z-index: 15;
+    background: var(--bg);
+    padding-top: 6px;
+    margin: -6px 0 4px;
+  }
+
   .view-switch {
     display: flex;
     align-items: center;
@@ -956,7 +981,28 @@
   .spin { font-size: 32px; animation: spin 1.2s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* List view */
+  /* List view — day-groups stack single-column on mobile, tile in an
+     auto-fill grid at >=1200px so a week of cooking fits on one
+     screen. Each day-card becomes a self-contained bordered surface
+     at wide widths so the visual break between days stays clear. */
+  .day-grid { display: block; }
+  @media (min-width: 1200px) {
+    .day-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 20px;
+      align-items: start;
+    }
+    .day-grid .day-group {
+      margin: 0;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 12px 14px;
+    }
+    .day-grid .day-header { padding: 0; margin-bottom: 8px; }
+  }
+
   .day-group { margin-bottom: 16px; }
   .day-group.planned .day-header { color: var(--accent); }
   .day-header {
@@ -1069,6 +1115,11 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+  }
+  /* Roomier month cells on wide screens so 3-5 cook pills fit per
+     day without the name truncating. clamp() keeps growth sane. */
+  @media (min-width: 1280px) {
+    .cell { min-height: clamp(88px, 14vh, 180px); padding: 6px 7px; gap: 3px; }
   }
   .cell.dim { background: var(--bg); opacity: 0.6; }
   .cell.today { box-shadow: inset 0 0 0 2px var(--accent); }
@@ -1230,6 +1281,14 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 8px;
+  }
+  /* Bigger tiles on wide viewports — 140px tiles read as thumbnail
+     bricks on a 1920px monitor; 180px feels like an actual photo. */
+  @media (min-width: 1200px) {
+    .photo-grid {
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
+    }
   }
   .photo-tile {
     position: relative;
