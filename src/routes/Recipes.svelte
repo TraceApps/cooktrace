@@ -1650,11 +1650,6 @@
   }
   .search {
     width: 100%;
-    /* Cap on wide viewports so the search box doesn't stretch to a
-       ~1900px slab on a 1920px monitor. 520px is roomy for a query
-       without going comically wide. Applies to both the recipes-tab
-       and shared-tab search rows (they share this class). */
-    max-width: 520px;
     box-sizing: border-box;
     background: var(--surface-1);
     border: 1px solid var(--border);
@@ -1880,15 +1875,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 14px;
-    /* Ultrawide: shrink the min column so more cards fit per row on
-       1600px+ monitors. Cookbook grid gets its own slightly larger
-       min (240px) to keep catalogue entries readable — set in the
-       .cookbook-grid override further down. Mirrors Pantry pattern. */
     padding-top: 4px;
-  }
-  @media (min-width: 1600px) {
-    .grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
-    .grid.cookbook-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
   }
 
   .recipe-card {

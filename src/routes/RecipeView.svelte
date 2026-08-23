@@ -315,10 +315,35 @@
   }
   function toggleStep(idx) {
     if (!cookMode) return; // see toggleIng
-    if (stepChecks.has(idx)) stepChecks.delete(idx);
-    else stepChecks.add(idx);
+    const willCheck = !stepChecks.has(idx);
+    if (willCheck) stepChecks.add(idx);
+    else stepChecks.delete(idx);
     stepChecks = stepChecks;
     _saveChecks(id, 'step', stepChecks);
+    // Marking a step done also marks off its linked ingredients as
+    // used. Users who worked straight through the step without
+    // checking each ingredient individually get the same end state as
+    // if they had. One-way only: un-checking the step does NOT
+    // un-check ingredients (those ingredients may have been used by
+    // other steps too). Skip when the step has no linked refs.
+    if (willCheck) {
+      const step = recipe?.steps?.[idx];
+      const refIds = (typeof step === 'string' || !Array.isArray(step?.refIds)) ? [] : step.refIds;
+      if (refIds.length > 0) {
+        const linked = _resolveStepIngs(refIds);
+        let touched = false;
+        for (const ing of linked) {
+          if (!ingChecks.has(ing.checkKey)) {
+            ingChecks.add(ing.checkKey);
+            touched = true;
+          }
+        }
+        if (touched) {
+          ingChecks = ingChecks;
+          _saveChecks(id, 'ing', ingChecks);
+        }
+      }
+    }
   }
   function toggleTool(idx) {
     if (!cookMode) return; // see toggleIng
