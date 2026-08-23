@@ -1062,7 +1062,16 @@
         </div>
       {/if}
     {:else}
+      <!-- Groups grid: single column on mobile, masonry auto-fill at
+           wide widths so all category sections fit on one screen
+           instead of stacking full-width. Only kicks in when we're
+           actually grouped (sort=name + filter=all + no query);
+           .flat-mode disables it so search/filter results stay one
+           continuous grid. Same shell Shopping uses. -->
+      <div class="pantry-groups-grid"
+        class:flat-mode={groupedSections.length === 1 && !groupedSections[0]?.label}>
       {#each groupedSections as section (section.key)}
+        <section class="pantry-group">
         {#if section.label}
           <h3 class="section-heading">
             <span class="material-symbols-rounded">{section.icon || 'help'}</span>
@@ -1084,6 +1093,7 @@
               class:in-stock={inStockDisplay}
               class:selected={isSelected}
               class:generic={isGen}
+              class:expanded={isGen && expanded}
               on:click={() => onRowClick(it)}
               use:longpress
               on:longpress={() => onRowLongPress(it)}
@@ -1220,7 +1230,9 @@
             {/if}
           {/each}
         </div>
+        </section>
       {/each}
+      </div>
     {/if}
 
     {#if searchSource === 'all' && query.trim()}
@@ -1789,12 +1801,65 @@
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 12px;
   }
+  /* Grouped-category sections tile at wide widths: each category
+     becomes a self-contained card in an auto-fill grid so Produce +
+     Dairy + Pantry-Staples + Frozen fit on one screen. Flat-mode
+     (search / filter result — one unlabelled section) stays a single
+     continuous grid at every viewport. */
+  .pantry-groups-grid { display: block; }
+  .pantry-group { margin-bottom: 20px; }
+  @media (min-width: 1200px) {
+    .pantry-groups-grid:not(.flat-mode) {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+      gap: 20px;
+      align-items: start;
+    }
+    .pantry-groups-grid:not(.flat-mode) .pantry-group {
+      margin: 0;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 10px 12px;
+    }
+    .pantry-groups-grid:not(.flat-mode) .pantry-group .section-heading {
+      margin-top: 0;
+    }
+    /* Inside a section card the item grid collapses to a single
+       column of full-width rows so cards actually fit the 420px
+       column. Density comes from having many category cards at
+       once, not from cramming items 2-wide inside one section. */
+    .pantry-groups-grid:not(.flat-mode) .pantry-group .card-grid {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+  }
+
   /* List mode — dense horizontal-row layout at every viewport. A
      thumbnail (72px desktop / 64px mobile) on the left, name + brand
      + meta stacked on the right. Grid mode keeps the vertical cards. */
   .card-grid.list {
     grid-template-columns: 1fr;
     gap: 6px;
+  }
+  /* On very wide viewports list mode takes 2 columns so a 1500px
+     wide row per item doesn't feel like empty space. Only fires
+     outside the pantry-groups-grid (grouped mode already caps the
+     column at 420px). */
+  @media (min-width: 1400px) {
+    .pantry-groups-grid.flat-mode .card-grid.list {
+      grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+    }
+  }
+
+  /* Expanded generic anchors its whole row in the grid so its
+     variant siblings flow directly below it instead of landing
+     next to unrelated items. Grid mode + flat-mode only (grouped
+     mode's inner grid is already single-column). */
+  @media (min-width: 1200px) {
+    .pantry-groups-grid.flat-mode .card-grid:not(.list) .pcard.generic.expanded {
+      grid-column: 1 / -1;
+    }
   }
   .card-grid.list .pcard {
     flex-direction: row;
@@ -2172,6 +2237,17 @@
   }
   .category-chips::-webkit-scrollbar { display: none; }
   .category-chips .seg { flex-shrink: 0; }
+  /* Wide viewports: show every category chip at once instead of the
+     mobile horizontal scroller. Wrap into rows so the whole taxonomy
+     is scannable without swiping. */
+  @media (min-width: 1200px) {
+    .category-chips {
+      overflow-x: visible;
+      flex-wrap: wrap;
+      touch-action: auto;
+    }
+    .category-chips .seg { flex-shrink: 1; }
+  }
 
   /* Advanced (nutrition) section in the edit modal */
   .adv-toggle {
