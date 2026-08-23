@@ -1530,18 +1530,12 @@
 {#if stepPhotoSheetIdx != null && steps[stepPhotoSheetIdx]}
   <div class="cat-modal-backdrop" on:click={closeStepPhotoSheet}>
     <div class="cat-modal" on:click|stopPropagation>
-      <div class="step-photo-modal-head">
-        <h3 class="cat-modal-title">Step {stepPhotoSheetIdx + 1} Photo</h3>
-        <button class="btn-icon step-photo-close" on:click={closeStepPhotoSheet}
-          aria-label="Close" title="Close">
-          <span class="material-symbols-rounded">close</span>
-        </button>
-      </div>
+      <h3 class="cat-modal-title">Step {stepPhotoSheetIdx + 1} Photo</h3>
       <ImagePicker bind:value={steps[stepPhotoSheetIdx].imgUrl}
         aspect="16 / 9"
         placeholder={$_('recipe_editor_ct.add_step_photo_ph')} />
       <div class="cat-modal-actions">
-        <button class="btn btn-secondary" on:click={closeStepPhotoSheet}>Cancel</button>
+        <button class="btn btn-secondary" on:click={closeStepPhotoSheet}>{$_('recipe_editor_ct.cancel')}</button>
         <button class="btn btn-primary" on:click={closeStepPhotoSheet}>{$_('recipe_editor_ct.done')}</button>
       </div>
     </div>
@@ -2248,23 +2242,6 @@
     font-weight: 700;
     color: var(--text-1);
   }
-  /* Header row for modals that need a close X alongside the title
-     (step photo sheet). Titles that stand alone stay left-aligned. */
-  .step-photo-modal-head {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-  .step-photo-close {
-    width: 32px; height: 32px;
-    display: inline-flex; align-items: center; justify-content: center;
-    background: transparent; border: none; cursor: pointer;
-    color: var(--text-3);
-    border-radius: 50%;
-    transition: background var(--dur-fast), color var(--dur-fast);
-  }
-  .step-photo-close:hover { background: var(--surface-2); color: var(--text-1); }
-  .step-photo-close .material-symbols-rounded { font-size: 20px; }
   .cat-modal-swatches {
     display: flex;
     gap: 6px;
