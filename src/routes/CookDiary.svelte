@@ -33,11 +33,29 @@
   $: filterRecipeName = filterRecipe
     ? (filterRecipe.name || filterRecipe.recipe_name || 'Recipe')
     : '';
-  // All view branches read from displayEntries so the recipe filter
-  // applies uniformly to List / Month / Photos.
-  $: displayEntries = filterRecipeId
-    ? entries.filter(e => e.recipe_id === filterRecipeId)
-    : entries;
+  // Text search across recipe name + notes + cook name. Applies
+  // uniformly to List / Month / Photos alongside the recipe filter
+  // and the meal-type chip.
+  let diarySearch = '';
+  let mealFilter = ''; // '' | 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'other'
+  $: _diaryQuery = diarySearch.trim().toLowerCase();
+
+  // All view branches read from displayEntries so the recipe filter,
+  // meal-type chip, and text search apply uniformly to List / Month
+  // / Photos.
+  $: displayEntries = (() => {
+    let list = entries;
+    if (filterRecipeId) list = list.filter(e => e.recipe_id === filterRecipeId);
+    if (mealFilter)     list = list.filter(e => (e.meal_type || '') === mealFilter);
+    if (_diaryQuery) {
+      list = list.filter(e =>
+        ((e.recipe_name || '').toLowerCase().includes(_diaryQuery)) ||
+        ((e.notes       || '').toLowerCase().includes(_diaryQuery)) ||
+        ((e.cooked_by_full_name || e.cooked_by_username || '').toLowerCase().includes(_diaryQuery))
+      );
+    }
+    return list;
+  })();
 
   async function openFilterPicker() {
     filterPickerOpen = true;
@@ -447,7 +465,21 @@
       {/if}
     </div>
 
-    <!-- Recipe filter chip — applies across List / Month / Photos. -->
+    <!-- Text search — matches recipe name, notes, and cook name.
+         Applies alongside the recipe + meal-type filters. -->
+    <div class="diary-search">
+      <span class="material-symbols-rounded search-icon">search</span>
+      <input class="search-input" type="search" placeholder="Search recipes, notes…"
+        bind:value={diarySearch} />
+      {#if diarySearch}
+        <button class="search-clear" on:click={() => diarySearch = ''} title="Clear search" aria-label="Clear search">
+          <span class="material-symbols-rounded" style="font-size:18px">close</span>
+        </button>
+      {/if}
+    </div>
+
+    <!-- Recipe filter chip + meal-type quick chips. Both apply across
+         List / Month / Photos. -->
     <div class="filter-row">
       {#if filterRecipeId}
         <span class="filter-chip active" transition:fade={{ duration: 120 }}>
@@ -463,6 +495,22 @@
           Filter by Recipe
         </button>
       {/if}
+      <span class="meal-chips" role="radiogroup" aria-label="Filter by meal type">
+        {#each [
+          { v: 'breakfast', label: 'Breakfast', icon: 'wb_sunny' },
+          { v: 'lunch',     label: 'Lunch',     icon: 'lunch_dining' },
+          { v: 'dinner',    label: 'Dinner',    icon: 'restaurant' },
+          { v: 'snack',     label: 'Snack',     icon: 'cookie' },
+        ] as m}
+          <button class="meal-chip" class:active={mealFilter === m.v}
+            aria-pressed={mealFilter === m.v}
+            on:click={() => mealFilter = mealFilter === m.v ? '' : m.v}
+            title={m.label}>
+            <span class="material-symbols-rounded">{m.icon}</span>
+            {m.label}
+          </button>
+        {/each}
+      </span>
     </div>
     </div>
 
@@ -481,12 +529,12 @@
         <p>{$_('routes.diary.empty_desc')}</p>
         <button class="btn btn-primary" on:click={openPlan}>{$_('routes.diary.plan_cook')}</button>
       </div>
-    {:else if filterRecipeId && displayEntries.length === 0}
+    {:else if (filterRecipeId || mealFilter || _diaryQuery) && displayEntries.length === 0}
       <div class="state empty" in:fade={{ duration: 120 }}>
         <span class="material-symbols-rounded empty-icon">filter_alt_off</span>
         <h2>{$_('routes.diary.no_matches_title')}</h2>
-        <p>{$_('routes.diary.no_matches_desc', { values: { name: filterRecipeName || $_('routes.diary.this_recipe') } })}</p>
-        <button class="btn btn-secondary" on:click={clearFilter}>{$_('routes.diary.clear_filter')}</button>
+        <p>Try clearing the search, meal-type, or recipe filter.</p>
+        <button class="btn btn-secondary" on:click={() => { filterRecipeId = null; mealFilter = ''; diarySearch = ''; }}>Clear filters</button>
       </div>
     {:else if view === 'list'}
       <!-- Day-groups grid: single column on mobile, masonry auto-fill
@@ -500,6 +548,9 @@
           <div class="day-header">
             <span class="day-date">{shortDate(date)}</span>
             <span class="day-rel">{relativeTime(date)}</span>
+            <span class="day-count" title={`${items.length} ${items.length === 1 ? 'cook' : 'cooks'}`}>
+              {items.length} {items.length === 1 ? 'cook' : 'cooks'}
+            </span>
             {#if planned}<span class="day-tag">{$_('cookdiary_page.planned_tag')}</span>{/if}
           </div>
           <ul class="day-list">
@@ -1013,6 +1064,16 @@
   .day-date { font-weight: 700; font-size: 14px; color: var(--text-1); }
   .day-group.planned .day-date { color: var(--accent); }
   .day-rel { font-size: 12px; color: var(--text-3); }
+  .day-count {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    padding: 2px 8px;
+    border-radius: var(--radius-full, 99px);
+  }
   .day-tag {
     margin-left: auto;
     font-size: 10px;
@@ -1073,7 +1134,17 @@
   }
   .entry-stars .material-symbols-rounded.on { color: var(--accent); }
   .entry-by    { font-size: 11px; color: var(--text-3); margin-top: 2px; font-style: italic; }
-  .entry-notes { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .entry-notes {
+    font-size: 12px; color: var(--text-3); margin-top: 2px;
+    /* Truncate long notes to 2 lines so day-grid cards stay a
+       consistent height. Full text still lives in the DOM (accessible
+       via long-press to open the entry menu / edit view). */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
   .entry-actions { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
   .entry-badge {
     flex-shrink: 0;
@@ -1232,7 +1303,60 @@
   .empty-line { color: var(--text-3); font-size: 13px; text-align: center; padding: 16px; margin: 0; font-style: italic; }
 
   /* Recipe filter chip — narrows List / Month / Photos to one recipe. */
-  .filter-row { margin-bottom: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+  /* Search input in the sticky toolbar. Matches recipe name, notes,
+     and cook name. Same visual language as Settings + Manage search. */
+  .diary-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding: 0 2px;
+  }
+  .diary-search .search-icon { font-size: 20px; color: var(--text-3); flex-shrink: 0; }
+  .diary-search .search-input {
+    flex: 1;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full, 999px);
+    padding: 7px 14px;
+    font-size: 14px;
+    color: var(--text-1);
+    outline: none;
+    min-width: 0;
+  }
+  .diary-search .search-input:focus { border-color: var(--accent); }
+  .diary-search .search-clear {
+    background: transparent; border: none; cursor: pointer;
+    color: var(--text-3);
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .diary-search .search-clear:hover { color: var(--text-1); background: var(--surface-2); }
+
+  .filter-row { margin-bottom: 14px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  /* Meal-type quick chips — sit to the right of the recipe filter
+     chip and toggle a single meal_type filter across all three views. */
+  .meal-chips { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+  .meal-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-3);
+    padding: 4px 10px 4px 8px;
+    border-radius: var(--radius-full, 99px);
+    font: inherit; font-size: 12px; font-weight: 600;
+    cursor: pointer;
+    transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+  }
+  .meal-chip:hover { color: var(--text-1); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+  .meal-chip .material-symbols-rounded { font-size: 14px; }
+  .meal-chip.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
   .filter-chip {
     display: inline-flex;
     align-items: center;

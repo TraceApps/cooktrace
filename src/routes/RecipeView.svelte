@@ -1,5 +1,17 @@
 <script>
   import { push } from 'svelte-spa-router';
+
+  // Close: prefer browser back so opening a recipe from Diary /
+  // Shopping / a cookbook returns to that origin instead of always
+  // dumping the user on the Recipes tab. Falls back to /recipes when
+  // there's no history (deep link from an external app or a new tab).
+  function _closeRecipe() {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+    } else {
+      push('/recipes');
+    }
+  }
   import { fade } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
   import { formatDuration } from '../lib/duration.js';
@@ -699,7 +711,7 @@
           </button>
         {/if}
       {/if}
-      <button class="btn-icon close-btn" on:click={() => push('/recipes')} aria-label="Close" title="Close">
+      <button class="btn-icon close-btn" on:click={_closeRecipe} aria-label="Close" title="Close">
         <span class="material-symbols-rounded">close</span>
       </button>
     {/if}
