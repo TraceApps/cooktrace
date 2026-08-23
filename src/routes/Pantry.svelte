@@ -1801,39 +1801,15 @@
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 12px;
   }
-  /* Grouped-category sections tile at wide widths: each category
-     becomes a self-contained card in an auto-fill grid so Produce +
-     Dairy + Pantry-Staples + Frozen fit on one screen. Flat-mode
-     (search / filter result — one unlabelled section) stays a single
-     continuous grid at every viewport. */
+  /* Category sections stack full-width and each section's inner
+     .card-grid stays a fluid auto-fill row so items get maximum
+     density across the whole page. (An earlier revision tiled the
+     sections themselves into a masonry — that made cards huge
+     because each section was capped at a 420px column with a
+     single-item-per-row inside. Reverted to the original behavior;
+     sections stack, items breathe.) */
   .pantry-groups-grid { display: block; }
   .pantry-group { margin-bottom: 20px; }
-  @media (min-width: 1200px) {
-    .pantry-groups-grid:not(.flat-mode) {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
-      gap: 20px;
-      align-items: start;
-    }
-    .pantry-groups-grid:not(.flat-mode) .pantry-group {
-      margin: 0;
-      background: var(--surface-1);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 10px 12px;
-    }
-    .pantry-groups-grid:not(.flat-mode) .pantry-group .section-heading {
-      margin-top: 0;
-    }
-    /* Inside a section card the item grid collapses to a single
-       column of full-width rows so cards actually fit the 420px
-       column. Density comes from having many category cards at
-       once, not from cramming items 2-wide inside one section. */
-    .pantry-groups-grid:not(.flat-mode) .pantry-group .card-grid {
-      grid-template-columns: 1fr;
-      gap: 8px;
-    }
-  }
 
   /* List mode — dense horizontal-row layout at every viewport. A
      thumbnail (72px desktop / 64px mobile) on the left, name + brand
@@ -1843,21 +1819,18 @@
     gap: 6px;
   }
   /* On very wide viewports list mode takes 2 columns so a 1500px
-     wide row per item doesn't feel like empty space. Only fires
-     outside the pantry-groups-grid (grouped mode already caps the
-     column at 420px). */
+     wide row per item doesn't feel like empty space. */
   @media (min-width: 1400px) {
-    .pantry-groups-grid.flat-mode .card-grid.list {
+    .card-grid.list {
       grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
     }
   }
 
   /* Expanded generic anchors its whole row in the grid so its
-     variant siblings flow directly below it instead of landing
-     next to unrelated items. Grid mode + flat-mode only (grouped
-     mode's inner grid is already single-column). */
+     variant siblings flow directly below it instead of landing next
+     to unrelated items. Grid mode only. */
   @media (min-width: 1200px) {
-    .pantry-groups-grid.flat-mode .card-grid:not(.list) .pcard.generic.expanded {
+    .card-grid:not(.list) .pcard.generic.expanded {
       grid-column: 1 / -1;
     }
   }
