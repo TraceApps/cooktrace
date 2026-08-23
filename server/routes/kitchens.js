@@ -112,32 +112,6 @@ router.put('/:id/auto-share', wrap((req, res) => {
   res.json(result);
 }));
 
-// ── POST /:id/auto-share/resync — re-run the fan-out for me ──────────
-// Safety valve when auto-share was toggled but recipes never appeared
-// on the other members' side (race, silent DB error, member added
-// while the toggle was mid-flight, etc.). Idempotent — the fan-out
-// helper uses INSERT OR IGNORE so re-running is safe and only adds
-// missing rows. Requires auto_share=1 for the caller so this isn't a
-// bypass to share your library without opting in.
-router.post('/:id/auto-share/resync', wrap((req, res) => {
-  const u = uid(req);
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
-  if (!_isMember(id, u)) return res.status(403).json({ error: 'Not a member of this kitchen' });
-  const meRow = db.prepare(
-    `SELECT auto_share FROM kitchen_members WHERE kitchen_id = ? AND user_id = ?`
-  ).get(id, u);
-  if (!meRow || meRow.auto_share !== 1) {
-    return res.status(400).json({ error: 'Auto-share is off for this kitchen. Turn it on first.' });
-  }
-  const memberIds = db.prepare(
-    `SELECT user_id FROM kitchen_members WHERE kitchen_id = ?`
-  ).all(id).map(m => m.user_id);
-  const tx = db.transaction(() => _fanoutAllMyRecipesIntoKitchen(u, id, memberIds));
-  const stats = tx();
-  res.json({ ok: true, ...stats });
-}));
-
 // ── POST / — create a kitchen ────────────────────────────────────────
 // Caller becomes the owner + first member. In single-user mode the
 // feature is unused (no other users to share with) but creation still
