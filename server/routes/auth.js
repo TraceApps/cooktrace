@@ -395,7 +395,8 @@ router.post('/forgot-password', rateLimitLogin, wrap(async (req, res) => {
   const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
   db.prepare('INSERT INTO password_reset_tokens (token, user_id, expires_at) VALUES (?, ?, ?)').run(token, user.id, expires);
 
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0].trim();
+  const baseUrl = `${proto}://${req.headers['x-forwarded-host'] || req.get('host')}`;
   try {
     await sendPasswordReset(user.email, `${baseUrl}/#/reset-password?token=${token}`);
   } catch (e) {
@@ -444,7 +445,8 @@ router.post('/invite', requireAuth, requireAdmin, wrap(async (req, res) => {
   db.prepare('INSERT INTO invite_tokens (token, email, role, created_by, expires_at) VALUES (?, ?, ?, ?, ?)')
     .run(token, email ? email.trim().toLowerCase() : null, role, req.user.id, expires);
 
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0].trim();
+  const baseUrl = `${proto}://${req.headers['x-forwarded-host'] || req.get('host')}`;
   const inviteUrl = `${baseUrl}/#/accept-invite?token=${token}`;
 
   if (email && isEmailConfigured()) {
