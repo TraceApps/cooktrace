@@ -176,6 +176,28 @@
     finally { autoShareBusyId = null; }
   }
 
+  // Safety valve: re-run the fan-out for an auto-share-on kitchen.
+  // Covers the "toggle-on but members can't see anything" state that
+  // shouldn't happen but occasionally does (race, silent DB error).
+  // Idempotent — server uses INSERT OR IGNORE so this only fills in
+  // whatever's missing.
+  let resyncBusyId = null;
+  async function resyncAutoShare(k) {
+    resyncBusyId = k.id;
+    try {
+      const res = await NtApi.resyncKitchenAutoShare(k.id);
+      kitchens = kitchens.map(x => x.id === k.id
+        ? { ...x, auto_shared_count: res.recipes || x.auto_shared_count }
+        : x);
+      if (res.added > 0) {
+        showSuccess(`Re-shared ${res.recipes} ${res.recipes === 1 ? 'recipe' : 'recipes'} (${res.added} new grant${res.added === 1 ? '' : 's'})`);
+      } else {
+        showSuccess(`Everything's already in sync (${res.recipes} ${res.recipes === 1 ? 'recipe' : 'recipes'})`);
+      }
+    } catch (e) { showError(e.message || 'Could not resync'); }
+    finally { resyncBusyId = null; }
+  }
+
   async function deleteKitchen(k) {
     const ok = await confirmDialog({
       title: `Delete Kitchen "${k.name}"?`,
@@ -256,6 +278,15 @@
                       Turn on to share your full recipe library with everyone in this Kitchen, now and going forward.
                     {/if}
                   </span>
+                  {#if k.auto_share}
+                    <button class="btn-link auto-share-resync"
+                      disabled={resyncBusyId === k.id}
+                      on:click={() => resyncAutoShare(k)}
+                      title="Re-run the fan-out. Safe to click anytime — fills in any missing grants.">
+                      <span class="material-symbols-rounded">autorenew</span>
+                      {resyncBusyId === k.id ? 'Resyncing…' : 'Resync now'}
+                    </button>
+                  {/if}
                 </div>
                 <button class="switch" class:on={k.auto_share}
                   disabled={autoShareBusyId === k.id}
@@ -411,6 +442,22 @@
   .auto-share-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .auto-share-title { font-size: 13px; font-weight: 600; color: var(--text-1); }
   .auto-share-hint { font-size: 11px; color: var(--text-3); line-height: 1.4; }
+  .auto-share-resync {
+    align-self: flex-start;
+    display: inline-flex; align-items: center; gap: 4px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    font: inherit; font-size: 11px; font-weight: 600;
+    cursor: pointer;
+    margin-top: 6px;
+    transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+  }
+  .auto-share-resync:hover:not(:disabled) { background: var(--surface-2); color: var(--text-1); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+  .auto-share-resync:disabled { opacity: 0.55; cursor: not-allowed; }
+  .auto-share-resync .material-symbols-rounded { font-size: 13px; }
   .switch {
     width: 38px; height: 22px;
     border-radius: 999px;

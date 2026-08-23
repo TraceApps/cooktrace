@@ -295,6 +295,7 @@ const _CtApiHttp = {
   // carries { enabled, recipes, added } so the UI can toast a
   // meaningful summary of the fanout.
   setKitchenAutoShare(kitchenId, enabled)     { return this.put(`/api/kitchens/${kitchenId}/auto-share`, { enabled }); },
+  resyncKitchenAutoShare(kitchenId)           { return this.post(`/api/kitchens/${kitchenId}/auto-share/resync`, {}); },
 
   getCookbooks()                              { return this.get('/api/cookbooks'); },
   async getCookbook(id) {
@@ -415,7 +416,7 @@ import { CtApiCached } from './api-cached.js';
 const SERVER_ONLY_METHODS = new Set([
   'getKitchens', 'getKitchenMembers', 'createKitchen', 'deleteKitchen',
   'addKitchenMember', 'removeKitchenMember', 'shareRecipeWithKitchen',
-  'setKitchenAutoShare', 'shareCookbookWithKitchen',
+  'setKitchenAutoShare', 'resyncKitchenAutoShare', 'shareCookbookWithKitchen',
   'getCookbooksSharedWithMe', 'getCookbookShares',
   'shareCookbookWithUsers', 'unshareCookbookWithUser',
   'getSharePeers', 'getRecipeShares', 'shareRecipeWithUsers',

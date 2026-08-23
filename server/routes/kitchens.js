@@ -47,7 +47,7 @@ router.get('/', wrap((req, res) => {
     SELECT k.id, k.name, k.slug, k.owner_user_id, k.created_at,
            m.role, m.auto_share,
            (SELECT COUNT(*) FROM kitchen_members WHERE kitchen_id = k.id) AS member_count,
-           (SELECT COUNT(*) FROM recipe_shares
+           (SELECT COUNT(DISTINCT recipe_id) FROM recipe_shares
               WHERE via_kitchen_id = k.id AND granted_by = ?) AS auto_shared_count
       FROM kitchens k
       JOIN kitchen_members m ON m.kitchen_id = k.id
@@ -68,14 +68,16 @@ function _fanoutAllMyRecipesIntoKitchen(userId, kitchenId, toUserIds) {
     `INSERT OR IGNORE INTO recipe_shares (recipe_id, grantee_id, granted_by, via_kitchen_id)
      VALUES (?, ?, ?, ?)`
   );
-  let added = 0;
+  let added = 0, grants = 0;
   for (const r of recipes) {
     for (const grantee of toUserIds) {
       if (grantee === userId) continue;
+      grants++;
       const res = ins.run(r.id, grantee, userId, kitchenId);
       if (res.changes > 0) added++;
     }
   }
+  console.info(`[kitchen ${kitchenId}] auto-share fan-out: user=${userId} recipes=${recipes.length} grants_attempted=${grants} rows_inserted=${added}`);
   return { recipes: recipes.length, added };
 }
 
@@ -108,6 +110,32 @@ router.put('/:id/auto-share', wrap((req, res) => {
   });
   const result = tx();
   res.json(result);
+}));
+
+// ── POST /:id/auto-share/resync — re-run the fan-out for me ──────────
+// Safety valve when auto-share was toggled but recipes never appeared
+// on the other members' side (race, silent DB error, member added
+// while the toggle was mid-flight, etc.). Idempotent — the fan-out
+// helper uses INSERT OR IGNORE so re-running is safe and only adds
+// missing rows. Requires auto_share=1 for the caller so this isn't a
+// bypass to share your library without opting in.
+router.post('/:id/auto-share/resync', wrap((req, res) => {
+  const u = uid(req);
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+  if (!_isMember(id, u)) return res.status(403).json({ error: 'Not a member of this kitchen' });
+  const meRow = db.prepare(
+    `SELECT auto_share FROM kitchen_members WHERE kitchen_id = ? AND user_id = ?`
+  ).get(id, u);
+  if (!meRow || meRow.auto_share !== 1) {
+    return res.status(400).json({ error: 'Auto-share is off for this kitchen. Turn it on first.' });
+  }
+  const memberIds = db.prepare(
+    `SELECT user_id FROM kitchen_members WHERE kitchen_id = ?`
+  ).all(id).map(m => m.user_id);
+  const tx = db.transaction(() => _fanoutAllMyRecipesIntoKitchen(u, id, memberIds));
+  const stats = tx();
+  res.json({ ok: true, ...stats });
 }));
 
 // ── POST / — create a kitchen ────────────────────────────────────────
