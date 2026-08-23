@@ -35,6 +35,7 @@ import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { isEmptyForGuard } from '../lib/recipe-guards.js';
+import { autoShareNewRecipe } from '../lib/auto-share.js';
 
 // Option E guard (2026-08-11): the recipe UPDATE path replaces nested
 // JSON fields (ingredients/steps/tags/tools/nutrition) wholesale. A
@@ -212,6 +213,15 @@ router.post('/push', wrap((req, res) => {
           const serverId = info.lastInsertRowid;
           results[name].push({ client_id: row.client_id, server_id: serverId });
           idMaps[name][row.client_id] = serverId;
+          // Auto-share fan-out for native-created recipes. The REST
+          // POST /api/recipes route calls this same helper; without
+          // it here, Android-native recipe creates never fanned out
+          // to Kitchen members. Same fix rules: idempotent, no-op
+          // when the user has no auto_share kitchens.
+          if (name === 'recipes') {
+            try { autoShareNewRecipe(u, serverId); }
+            catch (e) { console.warn('[sync] auto-share fan-out failed for recipe', serverId, e?.message); }
+          }
         }
       }
     });

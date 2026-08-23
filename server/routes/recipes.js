@@ -42,29 +42,12 @@ function _userArgs(u) {
   return u == null ? [] : [u];
 }
 
-// Auto-share fanout — called after every recipe INSERT (manual create,
-// URL scrape, ZIP import, photo import, all paths). If the user has
-// auto_share=1 for any Kitchen they belong to, fan out per-user grants
-// to every other member of that Kitchen via recipe_shares. Idempotent
-// via UNIQUE(recipe_id, grantee_id). No-op when user has no kitchens
-// or hasn't enabled auto-share for any of them.
-function _autoShareNewRecipe(userId, recipeId) {
-  if (userId == null || !Number.isFinite(recipeId)) return;
-  const kitchens = db.prepare(
-    `SELECT kitchen_id FROM kitchen_members WHERE user_id = ? AND auto_share = 1`
-  ).all(userId);
-  if (kitchens.length === 0) return;
-  const ins = db.prepare(
-    `INSERT OR IGNORE INTO recipe_shares (recipe_id, grantee_id, granted_by, via_kitchen_id)
-     VALUES (?, ?, ?, ?)`
-  );
-  for (const k of kitchens) {
-    const members = db.prepare(
-      `SELECT user_id FROM kitchen_members WHERE kitchen_id = ? AND user_id != ?`
-    ).all(k.kitchen_id, userId);
-    for (const m of members) ins.run(recipeId, m.user_id, userId, k.kitchen_id);
-  }
-}
+// Auto-share fan-out is now in server/lib/auto-share.js so both this
+// route AND server/routes/sync.js can call it. Native-app recipe
+// creates flow through /sync/push, which bypassed the previous in-file
+// helper and silently dropped every mobile-created recipe out of
+// auto-share (root cause of the "member sees nothing" bug).
+import { autoShareNewRecipe as _autoShareNewRecipe } from '../lib/auto-share.js';
 
 // Tack the creator's current avatar onto a hydrated recipe so the
 // byline can render their photo. Live lookup (cheap PK fetch) keeps
