@@ -1,16 +1,16 @@
 <script>
   import { push } from 'svelte-spa-router';
 
-  // Close: prefer browser back so opening a recipe from Diary /
-  // Shopping / a cookbook returns to that origin instead of always
-  // dumping the user on the Recipes tab. Falls back to /recipes when
-  // there's no history (deep link from an external app or a new tab).
+  // Close: always navigates to /recipes. An earlier revision tried to
+  // use window.history.back() so opening from Diary / Cookbook would
+  // return there instead of dumping on the Recipes tab, but that
+  // interacted badly with the App.svelte {#key $location} page-
+  // transition remount + iOS hash-history quirks and could trap the
+  // user in a close-loop. Reverted to a plain push so nav is
+  // predictable regardless of origin. A proper route-history store is
+  // the right way to bring "back to origin" back — future pass.
   function _closeRecipe() {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      window.history.back();
-    } else {
-      push('/recipes');
-    }
+    push('/recipes');
   }
   import { fade } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
