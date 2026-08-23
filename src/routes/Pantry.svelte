@@ -561,6 +561,35 @@
     });
   }).length;
 
+  // Expiring-soon spotlight (wide-screen ribbon). Sorted by earliest
+  // effective expiry so the most urgent items come first. Cap at 8 so
+  // the ribbon stays a horizontal strip instead of a wall.
+  $: expiringSoonItems = topItems
+    .map(i => ({ item: i, exp: _effectiveExpiry(i, (variantsByParent.get(i.id) || []).length > 0) }))
+    .filter(x => {
+      if (!x.exp) return false;
+      const s = _expiryStatus(x.exp);
+      return s === 'warn' || s === 'past';
+    })
+    .sort((a, b) => (a.exp || '').localeCompare(b.exp || ''))
+    .slice(0, 8);
+
+  function _daysUntil(dateStr) {
+    if (!dateStr) return null;
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const then = new Date(dateStr + 'T00:00:00');
+    const days = Math.round((then - now) / 86400000);
+    return days;
+  }
+  function _expiryLabel(dateStr) {
+    const d = _daysUntil(dateStr);
+    if (d == null) return '';
+    if (d < 0)  return `${Math.abs(d)}d past`;
+    if (d === 0) return 'today';
+    if (d === 1) return '1d left';
+    return `${d}d left`;
+  }
+
   // Grouping: when "All categories" is selected AND no search query,
   // bucket the filtered items by category so each renders under its
   // own heading. Otherwise return a single flat bucket.
@@ -1014,6 +1043,47 @@
               </button>
             </div>
           {/if}
+        </div>
+      </div>
+    {/if}
+
+    <!-- Expiring-soon spotlight (wide-screen only). A horizontal strip
+         of the most urgent items so the "use these up first" set is
+         visible without switching to the Expiring Soon filter chip.
+         Only renders when there's actually anything expiring and only
+         at >=1200px (mobile already has the filter chip). Clicking a
+         tile opens the item; clicking the "See all" tail jumps to the
+         Expiring Soon filter. -->
+    {#if expiringSoonItems.length > 0}
+      <div class="expiring-spotlight" role="region" aria-label="Expiring soon">
+        <div class="spotlight-head">
+          <span class="material-symbols-rounded">schedule</span>
+          <span class="spotlight-title">Expiring soon</span>
+          <span class="spotlight-count">{expiringSoonCount}</span>
+          <button class="spotlight-all" on:click={() => { stockFilter = 'expiring'; }}>
+            See all
+            <span class="material-symbols-rounded" style="font-size:14px">chevron_right</span>
+          </button>
+        </div>
+        <div class="spotlight-strip">
+          {#each expiringSoonItems as x (x.item.id)}
+            {@const past = _expiryStatus(x.exp) === 'past'}
+            <button class="spotlight-tile" class:past
+              on:click={() => onRowClick(x.item)}
+              title={`${x.item.name} — ${_expiryLabel(x.exp)}`}>
+              <div class="spotlight-photo">
+                {#if x.item.img_url}
+                  <img src={x.item.img_url} alt="" loading="lazy" />
+                {:else}
+                  <span class="material-symbols-rounded">{_catIconBySlug(_itemSlug(x.item))}</span>
+                {/if}
+              </div>
+              <div class="spotlight-body">
+                <span class="spotlight-name">{x.item.name}</span>
+                <span class="spotlight-days">{_expiryLabel(x.exp)}</span>
+              </div>
+            </button>
+          {/each}
         </div>
       </div>
     {/if}
@@ -1800,6 +1870,94 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 12px;
+  }
+  /* Ultrawide: shrink the min column so more cards fit per row on
+     a 1920px+ monitor without changing the card design. Trade-off
+     is slightly tighter cards; net win is 30-50% more items in view. */
+  @media (min-width: 1600px) {
+    .card-grid:not(.list) {
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 14px;
+    }
+  }
+
+  /* Expiring-soon spotlight — wide-screen only ribbon that surfaces
+     the most urgent items horizontally at the top of the pantry so
+     they're visible without switching filters. Tiles are small photo
+     + name + "3d left" pill. Past-expiry tiles pick up a red tint. */
+  .expiring-spotlight { display: none; }
+  @media (min-width: 1200px) {
+    .expiring-spotlight {
+      display: block;
+      margin: 8px 0 14px;
+      padding: 10px 12px;
+      background: color-mix(in srgb, var(--warning, #f59e0b) 8%, var(--surface-1));
+      border: 1px solid color-mix(in srgb, var(--warning, #f59e0b) 30%, var(--border));
+      border-radius: var(--radius-lg);
+    }
+    .spotlight-head {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 8px;
+    }
+    .spotlight-head .material-symbols-rounded { font-size: 18px; color: var(--warning, #f59e0b); }
+    .spotlight-title { font-size: 13px; font-weight: 700; color: var(--text-1); }
+    .spotlight-count {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: color-mix(in srgb, var(--warning, #f59e0b) 20%, transparent);
+      color: var(--warning, #f59e0b);
+      padding: 2px 8px; border-radius: 999px;
+    }
+    .spotlight-all {
+      margin-left: auto;
+      display: inline-flex; align-items: center; gap: 2px;
+      background: transparent; border: none; cursor: pointer;
+      color: var(--text-3); font: inherit; font-size: 12px; font-weight: 600;
+      padding: 4px 8px; border-radius: var(--radius-sm);
+    }
+    .spotlight-all:hover { color: var(--text-1); background: var(--surface-2); }
+    .spotlight-strip {
+      display: flex; gap: 10px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-bottom: 2px;
+    }
+    .spotlight-strip::-webkit-scrollbar { display: none; }
+    .spotlight-tile {
+      flex: 0 0 auto;
+      display: flex; align-items: center; gap: 8px;
+      width: 220px;
+      padding: 6px 10px 6px 6px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: transform var(--dur-fast), border-color var(--dur-fast);
+      text-align: left;
+    }
+    .spotlight-tile:hover { transform: translateY(-1px); border-color: var(--accent-dim); }
+    .spotlight-tile.past { border-color: color-mix(in srgb, var(--danger, #ef4444) 45%, var(--border)); }
+    .spotlight-photo {
+      width: 40px; height: 40px; flex-shrink: 0;
+      background: var(--surface-2); border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+    .spotlight-photo img { width: 100%; height: 100%; object-fit: cover; }
+    .spotlight-photo .material-symbols-rounded { font-size: 20px; color: var(--accent); opacity: 0.7; }
+    .spotlight-body {
+      display: flex; flex-direction: column; gap: 2px; min-width: 0;
+    }
+    .spotlight-name {
+      font-size: 13px; font-weight: 600; color: var(--text-1);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 150px;
+    }
+    .spotlight-days {
+      font-size: 11px; font-weight: 600;
+      color: var(--warning, #f59e0b);
+    }
+    .spotlight-tile.past .spotlight-days { color: var(--danger, #ef4444); }
   }
   /* Category sections stack full-width and each section's inner
      .card-grid stays a fluid auto-fill row so items get maximum
