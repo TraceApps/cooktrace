@@ -283,21 +283,26 @@
     } catch {}
   }
   // Resolve a step's ref_ids → the actual ingredient objects from the
-  // recipe's grouped-ingredients tree. Used to render the per-step
-  // inline ingredient list (issue #40). Returns in refIds order so the
-  // author can control the order in which linked ingredients appear
-  // under the step. Silently drops any dangling id (survived a save
-  // race, or the linked ingredient got deleted on a foreign client).
+  // recipe's grouped-ingredients tree. Returns in refIds order so the
+  // author controls the order. Each entry carries `checkKey` = the
+  // same `${gi}-${ii}` the top ingredients list uses so ingChecks
+  // stays in one place — tap-to-check syncs both surfaces. Silently
+  // drops dangling refs (removed ingredient, save race, foreign edit).
   function _resolveStepIngs(refIds) {
     if (!recipe || !Array.isArray(recipe.ingredients)) return [];
     const byId = new Map();
-    for (const g of recipe.ingredients) {
-      for (const it of (g.items || [])) if (it?.id) byId.set(it.id, it);
+    for (let gi = 0; gi < recipe.ingredients.length; gi++) {
+      const g = recipe.ingredients[gi];
+      const items = g?.items || [];
+      for (let ii = 0; ii < items.length; ii++) {
+        const it = items[ii];
+        if (it?.id) byId.set(it.id, { it, checkKey: `${gi}-${ii}` });
+      }
     }
     const out = [];
     for (const id of refIds) {
-      const it = byId.get(id);
-      if (it) out.push(it);
+      const hit = byId.get(id);
+      if (hit) out.push({ ...hit.it, checkKey: hit.checkKey });
     }
     return out;
   }
@@ -1090,15 +1095,35 @@
                     {#if stepIngs.length > 0}
                       <!-- Per-step linked ingredients (issue #40). Small
                            inline list so users don't scroll back to the
-                           top ingredients section during Cook Mode. -->
+                           top ingredients section during Cook Mode.
+                           Tap in cook mode toggles the SAME check state
+                           as the top ingredients list — check off "1 cup
+                           rice" here and it strikes through up top too. -->
                       <ul class="step-ings" aria-label={`Ingredients for step ${i + 1}`}>
                         {#each stepIngs as ing (ing.id)}
-                          <li class="step-ing">
-                            {#if ing.qty || ing.unit}
-                              <span class="step-ing-qty">{ing.qty || ''}{ing.qty && ing.unit ? ' ' : ''}{ing.unit || ''}</span>
+                          {@const _checked = ingChecks.has(ing.checkKey)}
+                          <li class="step-ing" class:checked={_checked} class:tappable={cookMode}>
+                            {#if cookMode}
+                              <button type="button" class="step-ing-btn"
+                                on:click|stopPropagation={() => toggleIng(ing.checkKey)}
+                                aria-pressed={_checked}
+                                title={_checked ? 'Uncheck ingredient' : 'Mark ingredient used'}>
+                                <span class="step-ing-check material-symbols-rounded">
+                                  {_checked ? 'check_box' : 'check_box_outline_blank'}
+                                </span>
+                                {#if ing.qty || ing.unit}
+                                  <span class="step-ing-qty">{ing.qty || ''}{ing.qty && ing.unit ? ' ' : ''}{ing.unit || ''}</span>
+                                {/if}
+                                <span class="step-ing-name">{ing.name}</span>
+                                {#if ing.note}<span class="step-ing-note">{ing.note}</span>{/if}
+                              </button>
+                            {:else}
+                              {#if ing.qty || ing.unit}
+                                <span class="step-ing-qty">{ing.qty || ''}{ing.qty && ing.unit ? ' ' : ''}{ing.unit || ''}</span>
+                              {/if}
+                              <span class="step-ing-name">{ing.name}</span>
+                              {#if ing.note}<span class="step-ing-note">{ing.note}</span>{/if}
                             {/if}
-                            <span class="step-ing-name">{ing.name}</span>
-                            {#if ing.note}<span class="step-ing-note">{ing.note}</span>{/if}
                           </li>
                         {/each}
                       </ul>
@@ -2310,6 +2335,24 @@
     display: flex; align-items: baseline; gap: 6px;
     font-size: 13px; color: var(--text-2); line-height: 1.4;
   }
+  /* Tap-to-check button variant used in cook mode. Wraps the whole
+     row content so the entire strip is a target. */
+  .step-ing-btn {
+    all: unset;
+    display: flex; align-items: baseline; gap: 6px;
+    width: 100%;
+    cursor: pointer;
+    padding: 2px 0;
+    border-radius: 4px;
+  }
+  .step-ing-btn:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  .step-ing-check {
+    font-size: 18px; color: var(--text-3);
+    flex-shrink: 0;
+    transition: color var(--dur-fast);
+    align-self: center;
+  }
+  .step-ing.checked .step-ing-check { color: var(--accent); }
   .step-ing-qty {
     font-weight: 700; color: var(--accent);
     min-width: 70px;
@@ -2317,13 +2360,24 @@
   }
   .step-ing-name { color: var(--text-1); font-weight: 500; }
   .step-ing-note { color: var(--text-3); font-style: italic; font-size: 12px; }
+  /* Checked state: strike through name + qty, fade unit / note, so
+     it visually mirrors the top ingredients list's .ingredient.checked
+     treatment. */
+  .step-ing.checked .step-ing-qty,
+  .step-ing.checked .step-ing-name,
+  .step-ing.checked .step-ing-note {
+    color: var(--text-3);
+    text-decoration: line-through;
+    text-decoration-color: color-mix(in srgb, var(--text-3) 60%, transparent);
+  }
   /* Cook mode scales the inline list to match the surrounding step
      text (17px / 1.55) so quantities read at arm's length. */
   .cook-mode .step-ing { font-size: 16px; line-height: 1.5; }
   .cook-mode .step-ing-qty { min-width: 90px; font-size: 16px; }
   .cook-mode .step-ing-note { font-size: 14px; }
-  /* When the step is checked done, fade the inline ingredients to
-     match the muted .step-text / .step-title treatment above. */
+  .cook-mode .step-ing-check { font-size: 20px; }
+  /* When the step itself is checked done, fade the whole inline
+     block to match the muted .step-text / .step-title treatment. */
   .step.checked .step-ings { opacity: 0.55; }
   .step-image {
     display: block;

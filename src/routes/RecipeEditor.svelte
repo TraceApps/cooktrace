@@ -730,6 +730,27 @@
     .flatMap(g => (g.items || []))
     .filter(i => i && i.id && (i.name || '').trim())
     .map(i => ({ id: i.id, name: i.name, qty: i.qty, unit: i.unit }));
+
+  // Per-step link panel expand state — collapsed by default so the
+  // chip strip doesn't hog vertical space in the editor. Set of step
+  // indices currently expanded. Auto-expand any step that already has
+  // linked ingredients on load so the user sees the current state.
+  let stepLinksExpanded = new Set();
+  function toggleStepLinksPanel(si) {
+    const next = new Set(stepLinksExpanded);
+    if (next.has(si)) next.delete(si); else next.add(si);
+    stepLinksExpanded = next;
+  }
+  // On steps change (load / add / remove), pre-expand any step that
+  // has linked ingredients so the user can see them at a glance.
+  // Otherwise the count in the header is the only signal.
+  $: if (steps) {
+    const auto = new Set(stepLinksExpanded);
+    steps.forEach((s, i) => {
+      if (Array.isArray(s?.refIds) && s.refIds.length > 0) auto.add(i);
+    });
+    if (auto.size !== stepLinksExpanded.size) stepLinksExpanded = auto;
+  }
   // Resolve a ref id → the current ingredient row (for chip labels).
   function _findIngById(id) {
     for (const g of ingredientGroups) {
@@ -1211,25 +1232,34 @@
                        against. -->
                   {#if allIngredientOptions.length > 0}
                     {@const _linked = new Set(Array.isArray(steps[i]?.refIds) ? steps[i].refIds : [])}
-                    <div class="step-links">
-                      <span class="step-links-label">
+                    {@const _expanded = stepLinksExpanded.has(i)}
+                    <div class="step-links" class:expanded={_expanded}>
+                      <button type="button" class="step-links-toggle"
+                        on:click={() => toggleStepLinksPanel(i)}
+                        aria-expanded={_expanded}
+                        title={_expanded ? 'Hide ingredient links' : 'Link ingredients used in this step'}>
                         <span class="material-symbols-rounded">link</span>
-                        {_linked.size > 0
-                          ? `${_linked.size} ingredient${_linked.size === 1 ? '' : 's'} linked`
-                          : 'Link ingredients used in this step'}
-                      </span>
-                      <div class="step-links-chips">
-                        {#each allIngredientOptions as opt (opt.id)}
-                          <button type="button" class="step-link-chip" class:active={_linked.has(opt.id)}
-                            on:click={() => toggleStepIngredientRef(i, opt.id)}
-                            title={_linked.has(opt.id) ? 'Unlink from this step' : 'Link to this step'}>
-                            {#if _linked.has(opt.id)}
-                              <span class="material-symbols-rounded">check</span>
-                            {/if}
-                            <span class="step-link-chip-name">{opt.name}</span>
-                          </button>
-                        {/each}
-                      </div>
+                        <span class="step-links-label">
+                          {_linked.size > 0
+                            ? `${_linked.size} ingredient${_linked.size === 1 ? '' : 's'} linked`
+                            : 'Link ingredients used in this step'}
+                        </span>
+                        <span class="material-symbols-rounded step-links-chev" class:open={_expanded}>expand_more</span>
+                      </button>
+                      {#if _expanded}
+                        <div class="step-links-chips" transition:slide={{ duration: 140 }}>
+                          {#each allIngredientOptions as opt (opt.id)}
+                            <button type="button" class="step-link-chip" class:active={_linked.has(opt.id)}
+                              on:click={() => toggleStepIngredientRef(i, opt.id)}
+                              title={_linked.has(opt.id) ? 'Unlink from this step' : 'Link to this step'}>
+                              {#if _linked.has(opt.id)}
+                                <span class="material-symbols-rounded">check</span>
+                              {/if}
+                              <span class="step-link-chip-name">{opt.name}</span>
+                            </button>
+                          {/each}
+                        </div>
+                      {/if}
                     </div>
                   {/if}
                   <!-- Step photo: collapsed-by-default. Empty state shows
@@ -1500,11 +1530,18 @@
 {#if stepPhotoSheetIdx != null && steps[stepPhotoSheetIdx]}
   <div class="cat-modal-backdrop" on:click={closeStepPhotoSheet}>
     <div class="cat-modal" on:click|stopPropagation>
-      <h3 class="cat-modal-title">Step {stepPhotoSheetIdx + 1} Photo</h3>
+      <div class="step-photo-modal-head">
+        <h3 class="cat-modal-title">Step {stepPhotoSheetIdx + 1} Photo</h3>
+        <button class="btn-icon step-photo-close" on:click={closeStepPhotoSheet}
+          aria-label="Close" title="Close">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </div>
       <ImagePicker bind:value={steps[stepPhotoSheetIdx].imgUrl}
         aspect="16 / 9"
         placeholder={$_('recipe_editor_ct.add_step_photo_ph')} />
       <div class="cat-modal-actions">
+        <button class="btn btn-secondary" on:click={closeStepPhotoSheet}>Cancel</button>
         <button class="btn btn-primary" on:click={closeStepPhotoSheet}>{$_('recipe_editor_ct.done')}</button>
       </div>
     </div>
@@ -2124,23 +2161,38 @@
   }
   .step-hint strong, .step-hint em, .step-hint u { color: var(--text-2); }
 
-  /* Per-step ingredient links (issue #40). A compact label + chip
-     strip. Chips are toggles — inactive is outline, active is
-     accent-tinted with a check mark. */
+  /* Per-step ingredient links (issue #40). Collapsed by default — a
+     small toggle row shows the count and expands to reveal the chip
+     picker. Keeps the editor vertically compact when the user isn't
+     using the feature; opens with a soft slide when they are. */
   .step-links {
     display: flex; flex-direction: column; gap: 6px;
     margin: 8px 0 2px;
-    padding: 8px 10px;
+    padding: 6px 10px;
     background: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
+    transition: padding var(--dur-fast);
   }
+  .step-links.expanded { padding: 8px 10px 10px; }
+  .step-links-toggle {
+    display: flex; align-items: center; gap: 6px;
+    width: 100%;
+    background: transparent; border: none; padding: 4px 0;
+    color: var(--text-3);
+    font: inherit; cursor: pointer;
+    text-align: left;
+  }
+  .step-links-toggle:hover .step-links-label { color: var(--text-1); }
+  .step-links-toggle > .material-symbols-rounded { font-size: 14px; color: var(--accent); flex-shrink: 0; }
   .step-links-label {
-    display: inline-flex; align-items: center; gap: 6px;
+    flex: 1;
     font-size: 11px; font-weight: 600; color: var(--text-3);
     text-transform: uppercase; letter-spacing: 0.04em;
+    transition: color var(--dur-fast);
   }
-  .step-links-label .material-symbols-rounded { font-size: 14px; color: var(--accent); }
+  .step-links-chev { font-size: 18px !important; color: var(--text-3) !important; transition: transform 160ms ease; }
+  .step-links-chev.open { transform: rotate(180deg); }
   .step-links-chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .step-link-chip {
     display: inline-flex; align-items: center; gap: 4px;
@@ -2196,6 +2248,23 @@
     font-weight: 700;
     color: var(--text-1);
   }
+  /* Header row for modals that need a close X alongside the title
+     (step photo sheet). Titles that stand alone stay left-aligned. */
+  .step-photo-modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .step-photo-close {
+    width: 32px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: none; cursor: pointer;
+    color: var(--text-3);
+    border-radius: 50%;
+    transition: background var(--dur-fast), color var(--dur-fast);
+  }
+  .step-photo-close:hover { background: var(--surface-2); color: var(--text-1); }
+  .step-photo-close .material-symbols-rounded { font-size: 20px; }
   .cat-modal-swatches {
     display: flex;
     gap: 6px;
