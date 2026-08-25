@@ -7,11 +7,55 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.2.0-dev.01] - 2026-08-25 (pre-release)
+
+First dev pre-release of the 1.2.0 minor. The version jumps past
+1.1.4 because the accumulated scope on dev is well beyond patch:
+whole desktop UI overhaul across six pages, ingredient-to-step
+linking with Cook Mode inline render, PWA update prompt, admin
+inline-edit user, kitchen invite autocomplete, iOS viewport lock,
+plus the earlier single-user data-claim work. Roughly forty commits
+since 1.1.4-dev02.
+
+### Added
+
+- **Ingredient links on recipe steps.** Editor gets a collapsible "Link ingredients" panel per step with chip toggles for every named ingredient. In Cook Mode each step renders its linked ingredients inline right below the step text so quantities are visible without scrolling back to the top. Tapping an inline ingredient checks it off in the top list too, and marking a step done cascades the check to its linked ingredients. Tandoor imports carry their existing step-to-ingredient adjacency across automatically ([#40](https://github.com/TraceApps/cooktrace/issues/40)).
+- **Wide-screen desktop layouts across the six main pages.** Settings switches to a two-pane rail-plus-content shell matching NutriTrace and LiftTrace. Manage rail pins on scroll with a cross-fade on section swap plus a sort control and an "Unused" quick-filter chip. Shopping tiles category groups into a masonry grid with a sticky toolbar, auto-collapse for finished sections, and a progress bar. Diary condenses day-groups into a card grid with denser Month cells and Photos tiles. Pantry gets a category-chip wrap, a variant-row span for expanded generics, and an amber "Expiring soon" ribbon. Recipes gets skeleton-count parity with the grid.
+- **Diary search + meal-type filter.** Sticky toolbar gains a text search across recipe names, notes, and cook name, plus Breakfast / Lunch / Dinner / Snack quick chips. Each day-header shows a cook-count pill.
+- **Shared recipes search + sort + category filter.** Chips are scoped to only the categories that appear in what other users shared with you.
+- **Kitchens invite autocomplete.** Type-to-narrow picker pulls from the server user list (multi-user mode only). Freeform typing still works as a fallback.
+- **Admin inline edit user.** Full name and email edit in place from Settings → User Management. Username stays immutable as the stable identifier.
+- **PWA update flow.** In-app prompt asks to reload when a new version is out. Red dot on the Settings nav icon while an update is pending. Update-check cadence is configurable (Hourly / Every 4 hours / Every 12 hours / Daily / Manual).
+- **iOS PWA viewport lock.** Horizontal touch pan no longer drifts the whole page on iPhone Safari or the installed PWA. Rubber-band bounce stays contained inside the app.
+- **Server honors `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` env vars** via undici's `EnvHttpProxyAgent`, so every outbound scrape / import / AI call routes through a configured forward proxy without per-call-site changes.
+- **Step photos persist.** Recipe step photos survive save-and-reload (they were being silently dropped on every save before).
+
+### Changed
+
+- Profile page renders without its own header when opened from inside Settings; the Save button moves inline for the embedded view.
+- Recipe close button reliably returns to the Recipes list from any origin.
+- Cookbook import dialog's "Settings → Trace Assistant" link jumps straight to `/settings/ai` instead of the Settings index.
+
 ### Fixed
 
-- **Enabling user management no longer strands data written in single-user mode** ([TraceApps/docs#2](https://github.com/TraceApps/docs/issues/2)). An instance running with no accounts writes every row under a placeholder owner. Registering the first account only re-parented recipes, pantry, cook diary and the shopping list, so cookbooks, recipe and pantry categories, custom and disabled units, and Trace chat history became invisible to the new admin. All of them are now claimed, in one transaction. The same handover runs whether the first account is created with a password or by the first OIDC sign-in; both paths now share one implementation instead of keeping separate copies that drifted.
-- **Data left behind in single-user mode is adopted on upgrade.** Instances that already enabled user management on an earlier build had their unowned rows stranded for good. Startup now adopts them, once, when exactly one account exists. Zero accounts is ordinary single-user mode and is left alone; two or more is reported in the log rather than guessed at.
-- **Deleting an account no longer leaves its hidden-unit preferences behind.** `disabled_units` has no foreign key to `users`, so it survived every account-removal path. All four (self-delete, admin delete, disable user management, lockout recovery) now clear it. Recipe comments are deliberately left alone, since a null author there means a deleted account rather than an anonymous one. The same incomplete list existed a second time in the OIDC first-login bootstrap, so an instance whose first account arrives via SSO had the identical bug; both paths now share one implementation.
+- **Kitchen auto-share was silently dropping every recipe created on the native Android app.** The mobile-write path (`/api/sync/push`) went straight to the DB and never called the fan-out hook, so Kitchen members saw nothing new from anyone cooking on their phone. Every recipe insert path now fans out uniformly. Toggling auto-share off then back on backfills any recipes created before this cut.
+- **Kitchen "N recipes shared" count double-counted** in kitchens with two or more members. Now counts distinct recipes.
+- **File / cookbook / URL / bulk import dialogs returned "Invalid CSRF token" on PWA.** Raw fetch calls now attach the CSRF header via a shared helper so every mutating import endpoint works ([#43](https://github.com/TraceApps/cooktrace/issues/43)).
+- **Password reset links, invite links, and the SMTP test email's embedded logo rendered as `http://` behind a TLS-terminating reverse proxy**, which mail providers flagged as spam. Now honors `X-Forwarded-Proto` and `X-Forwarded-Host` ([#42](https://github.com/TraceApps/cooktrace/pull/42), thanks @clifmo).
+- **Data left behind in single-user mode is adopted on upgrade.** Instances that already enabled user management on an earlier build had their unowned rows stranded for good. Startup now adopts them, once, when exactly one account exists.
+- **Enabling user management no longer strands data written in single-user mode** ([TraceApps/docs#2](https://github.com/TraceApps/docs/issues/2)). Cookbooks, recipe / pantry categories, custom + disabled units, and Trace chat history are now claimed alongside recipes / pantry / diary / shopping, in one transaction. Same handover runs whether the first account is created with a password or by the first OIDC sign-in.
+- **Deleting an account no longer leaves its hidden-unit preferences behind.** `disabled_units` was missing from every account-removal path (self-delete, admin delete, disable user management, lockout recovery). Same incomplete list existed a second time in the OIDC first-login bootstrap; both paths now share one implementation.
+- Show Shared Recipes toggle now mixes shared recipes into the main grid even when the owned list is empty. Search and filter apply uniformly across owned and shared.
+- Recipes tab: search input, sort, and category chips render even when the owned count is zero if shared-mix is on.
+- Various pantry polish (split-chip active state, chip typography parity, variant create button, source-chip filter, all-mode field shape, external-search opacity).
+
+### Security
+
+- CSRF header now attached to every raw-fetch mutating call so file / cookbook / URL / bulk imports enforce CSRF the same as every other POST ([#43](https://github.com/TraceApps/cooktrace/issues/43)).
+- Password reset and invite URLs now land on the correct HTTPS origin behind a TLS proxy, preventing accidental link degradation to `http://` ([#42](https://github.com/TraceApps/cooktrace/pull/42)).
+- No new dependencies. `npm audit` reports 0 vulnerabilities.
 
 ---
 
