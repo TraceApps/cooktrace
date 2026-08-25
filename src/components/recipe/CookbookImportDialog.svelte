@@ -23,6 +23,7 @@
   import { createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
+  import { mutatingAuthHeaders } from '../../lib/api.js';
   import {
     aiEnabled, aiProvider, aiApiKey, aiModel, aiBaseUrl,
   } from '../../stores/settings.js';
@@ -92,6 +93,7 @@
         method: 'POST',
         body: form,
         credentials: 'include',
+        headers: mutatingAuthHeaders(),
       });
       const data = await res.json();
       if (!res.ok) {

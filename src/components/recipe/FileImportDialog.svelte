@@ -23,6 +23,7 @@
   import { createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
+  import { mutatingAuthHeaders } from '../../lib/api.js';
   import { formatDuration } from '../../lib/duration.js';
   import {
     aiEnabled, aiProvider, aiApiKey, aiModel, aiBaseUrl,
@@ -235,6 +236,7 @@ Rules:
         method: 'POST',
         body: form,
         credentials: 'include',
+        headers: mutatingAuthHeaders(),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -331,6 +333,7 @@ Rules:
         method: 'POST',
         body: form,
         credentials: 'include',
+        headers: mutatingAuthHeaders(),
       });
       const data = await res.json();
       if (!res.ok) {
