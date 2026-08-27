@@ -77,9 +77,10 @@ wrapped.getRecipe = async function (id) {
     if (local) return local;
   } catch { /* fall through */ }
   // Server fallback. Matches what _CtApiHttp.getRecipe does end-to-end
-  // (Bearer for native connected mode). Kept inline instead of importing
-  // _CtApiHttp because it's a module-private const in api.js.
-  const { getServerUrl, getAuthToken, apiUrl } = await import('./platform.js');
+  // (Bearer for native connected mode + the img_url→imgUrl normalization
+  // RecipeView relies on). Kept inline instead of importing _CtApiHttp
+  // because it's a module-private const in api.js.
+  const { getServerUrl, getAuthToken, apiUrl, resolveAssetUrl } = await import('./platform.js');
   const headers = {};
   if (getServerUrl()) {
     const token = getAuthToken();
@@ -87,7 +88,11 @@ wrapped.getRecipe = async function (id) {
   }
   const res = await fetch(apiUrl(`/api/recipes/${id}`), { headers, credentials: 'include' });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return await res.json();
+  const row = await res.json();
+  if (!row) return null;
+  // Same shape _imgFromApi produces so RecipeView renders correctly.
+  const { img_url, ...rest } = row;
+  return { ...rest, imgUrl: resolveAssetUrl(img_url) || '' };
 };
 
 // Kick off the periodic background sync the first time anything calls
