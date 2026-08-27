@@ -9,6 +9,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.0-dev.02] - 2026-08-26 (pre-release)
+
+Second dev pre-release of the 1.2.0 minor. One fix for a blank
+screen when opening a shared recipe on the native Android app.
+
+### Fixed
+
+- **Android native app showed a blank screen when opening a recipe someone shared with you.** The single-recipe read path (`NtApi.getRecipe`) dispatches to the cached impl on native connected mode, which reads from local SQLite. Local only holds recipes the user owns (sync-push writes owned recipes), so any shared recipe id missed and the view rendered against `null`. The cached impl now falls back to a server fetch on a local miss, so shared recipes open correctly. Owned recipes still hit local first for offline / speed.
+
+---
+
 ## [1.2.0-dev.01] - 2026-08-25 (pre-release)
 
 First dev pre-release of the 1.2.0 minor. The version jumps past
