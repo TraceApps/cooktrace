@@ -11,6 +11,7 @@
   import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
+  import { flip } from 'svelte/animate';
   import { push } from 'svelte-spa-router';
   import { formatDuration } from '../lib/duration.js';
   import { NtApi } from '../lib/api.js';
@@ -379,6 +380,7 @@
           on:consider={handleDndConsider}
           on:finalize={handleDndFinalize}>
           {#each displayRecipes as r (r.id)}
+          <div class="cb-grid-item" animate:flip={{ duration: FLIP_MS }}>
             {#if r?.isDndShadowItem}
               <div class="card recipe-card dnd-shadow" aria-hidden="true"></div>
             {:else if r.locked}
@@ -445,6 +447,7 @@
               {/if}
             </div>
             {/if}
+          </div>
           {/each}
         </div>
         {/if}
@@ -739,33 +742,59 @@
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 16px;
   }
+  /* Transparent pass-through wrapper — the actual grid item and the
+     element animate:flip targets. Svelte requires animate: to sit on
+     the single direct child of a keyed {#each}, but each recipe can
+     render one of three different top-level elements (shadow /
+     locked / normal card) depending on state, so the animation has
+     to live one level up on a wrapper instead of on each branch. No
+     box styling of its own so .recipe-card inside still looks and
+     sizes exactly as if it were the direct grid child.
+
+     Smooth drag-reorder: this wrapper is what actually gets the CSS
+     transform applied — both svelte-dnd-action's own drag animation
+     AND Svelte's animate:flip on the other cards making room animate
+     THIS element, not .recipe-card inside it. Without compositor
+     hints here the browser re-layouts/repaints every image-heavy
+     card from scratch each frame instead of doing pure GPU transform
+     work, which read as choppy (especially on Android WebView, less
+     GPU compositing headroom than desktop Chrome). will-change
+     promotes each item to its own layer up front; contain: paint
+     isolates its repaint cost so animating one doesn't force the
+     browser to reconsider its neighbors. */
+  .cb-grid-item {
+    min-width: 0;
+    will-change: transform;
+    contain: paint;
+  }
   .card.recipe-card {
     position: relative;
     background: var(--surface-1);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     overflow: hidden;
-    /* Smooth drag-reorder: svelte-dnd-action's FLIP technique animates
-       every card's position via CSS transform on every consider event.
-       Without these hints the browser re-layouts/repaints each image-
-       heavy card from scratch every frame, which is what read as
-       "choppy" (especially on Android WebView, weaker GPU compositing
-       than desktop Chrome). will-change promotes each card to its own
-       compositor layer up front so the transform is pure GPU work;
-       contain: paint isolates each card's repaint cost so animating
-       one doesn't force the browser to reconsider its neighbors. */
-    will-change: transform;
-    contain: paint;
   }
-  /* The actively-dragged card, id-targeted by svelte-dnd-action
-     (DRAGGED_ELEMENT_ID). Disable pointer-events on its contents so
-     hover/focus recalculation on the card underneath the cursor
-     doesn't compete with the drag gesture for a frame budget, and
-     give it a lifted look so the motion reads as physical rather
-     than the card just teleporting between grid cells. */
-  :global(#dnd-action-dragged-el) {
+  /* The actively-dragged item, id-targeted by svelte-dnd-action
+     (DRAGGED_ELEMENT_ID). The library marks .cb-grid-item itself
+     (the true dnd-zone child) with this id — that wrapper has no
+     border-radius of its own, so the lifted shadow targets the
+     .recipe-card nested inside it instead, matching the card's
+     rounded corners. Pointer-events disabled on the whole dragged
+     subtree so hover/focus recalculation doesn't compete with the
+     drag gesture for a frame budget. */
+  :global(#dnd-action-dragged-el .recipe-card) {
     box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  }
+  :global(#dnd-action-dragged-el) {
     cursor: grabbing;
+    /* contain: paint on .cb-grid-item clips anything painted past its
+       own border-box — including the lifted shadow above, since the
+       wrapper is sized identically to its single child. Drop
+       containment on just the one actively-dragged item so its
+       shadow renders in full; every other (non-dragged) card keeps
+       the containment benefit, which is where the FLIP-reflow jank
+       actually was. */
+    contain: none;
   }
   :global(#dnd-action-dragged-el *) {
     pointer-events: none;
