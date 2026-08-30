@@ -501,19 +501,6 @@
                   aria-label={`Move or copy ${r.name}`} title="Move / copy to another cookbook">
                   <span class="material-symbols-rounded">drive_file_move</span>
                 </button>
-                {#if cbReorderable}
-                  <!-- Purely decorative now — the whole card is the
-                       drag pickup target (see maybeDragHandle above),
-                       this is just a hover hint that it's draggable.
-                       Only shown when the visible list IS the true
-                       manual order (no search, sort = Manual). See
-                       cbReorderable above — a search or non-manual
-                       sort makes the drag zone's items diverge from
-                       the recipe's real position. -->
-                  <span class="cb-drag-handle" aria-hidden="true">
-                    <span class="material-symbols-rounded">drag_indicator</span>
-                  </span>
-                {/if}
               {/if}
             </div>
             {/if}
@@ -810,8 +797,8 @@
   /* Recipe grid (mirrors Recipes page) */
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
   }
   /* Transparent pass-through wrapper — the actual grid item and the
      element animate:flip targets. Svelte requires animate: to sit on
@@ -936,7 +923,7 @@
     display: flex; flex-direction: column;
   }
   .card-image {
-    aspect-ratio: 4 / 3;
+    aspect-ratio: 16 / 10;
     background: var(--surface-2);
     overflow: hidden;
     position: relative;
@@ -944,7 +931,7 @@
   .card-image img { width: 100%; height: 100%; object-fit: cover; }
   .card-image-fallback {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    font-size: 48px; color: var(--text-3); opacity: 0.4;
+    font-size: 56px; color: var(--text-3); opacity: 0.4;
   }
   .card-fav {
     position: absolute; top: 8px; right: 8px;
@@ -1039,25 +1026,6 @@
   .seg-radio label.on { color: var(--accent); }
   .seg-radio input { display: none; }
 
-  /* Drag hint (bottom-right of card on hover) — purely decorative.
-     The whole card is the actual drag pickup target (maybeDragHandle
-     on .card-drag-wrap); pointer-events: none here so this icon never
-     steals the tap that should reach the card underneath it. */
-  .cb-drag-handle {
-    position: absolute;
-    bottom: 6px;
-    right: 6px;
-    background: rgba(0, 0, 0, 0.55);
-    color: white;
-    border-radius: 50%;
-    width: 26px; height: 26px;
-    display: flex; align-items: center; justify-content: center;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity var(--dur-fast);
-  }
-  .recipe-card:hover .cb-drag-handle { opacity: 1; }
-  .cb-drag-handle .material-symbols-rounded { font-size: 16px; }
 
   /* Placeholder card svelte-dnd-action renders in the gap left by
      the item currently being dragged. Same footprint as a real
