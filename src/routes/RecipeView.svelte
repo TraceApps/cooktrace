@@ -1522,6 +1522,9 @@
   @media (min-width: 1280px) {
     .body { max-width: 1440px; }
   }
+  @media (min-width: 1600px) {
+    .body { max-width: 1760px; }
+  }
 
   /* Layout grid:
      • mobile (<960):  single column, stacks naturally via flex

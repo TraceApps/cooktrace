@@ -1619,6 +1619,9 @@
   @media (min-width: 1400px) {
     .form-wrap { max-width: 1480px; }
   }
+  @media (min-width: 1700px) {
+    .form-wrap { max-width: 1760px; }
+  }
   .form { display: flex; flex-direction: column; gap: 16px; }
 
   /* Cap the hero image preview so it stays a header anchor rather

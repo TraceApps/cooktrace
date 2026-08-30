@@ -455,10 +455,21 @@
 
   .editor-content {
     padding: 16px var(--page-px) 32px;
+    /* Was a flat 1180px cap at every viewport width — the same class
+       of bug Manage.svelte had before its wide-screen pass. The
+       .grid below is repeat(auto-fill, minmax(220px, 1fr)), so it
+       already flows more columns automatically once the wrapper has
+       room; it just never got the room. */
     max-width: 1180px;
     margin: 0 auto;
     width: 100%;
     box-sizing: border-box;
+  }
+  @media (min-width: 1280px) {
+    .editor-content { max-width: 1440px; }
+  }
+  @media (min-width: 1600px) {
+    .editor-content { max-width: 1760px; }
   }
 
   .state {
