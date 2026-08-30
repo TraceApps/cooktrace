@@ -820,13 +820,26 @@
      promotes each item to its own layer up front; contain: paint
      isolates its repaint cost so animating one doesn't force the
      browser to reconsider its neighbors. */
+  /* Grid's default align-items: stretch equalizes THIS wrapper's
+     height across a row, but the card inside it (its one child —
+     shadow / locked / normal, whichever the {#if} renders) doesn't
+     inherit that automatically: a plain block child sizes to its own
+     content, so taller cards (a wrapped 2-line title, a category
+     badge, more tag pills) end up visibly taller than their row
+     neighbors. display: flex + the card's own flex: 1 below is what
+     actually stretches it to match, so every card in a row ends up
+     the same height — matching the Recipes tab, whose card IS the
+     direct grid item with nothing in the way. */
   .cb-grid-item {
     min-width: 0;
     will-change: transform;
     contain: paint;
+    display: flex;
+    flex-direction: column;
   }
   .card.recipe-card {
     position: relative;
+    flex: 1;
     background: var(--surface-1);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
