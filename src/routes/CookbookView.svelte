@@ -128,9 +128,12 @@
   // Drag-and-drop reorder via svelte-dnd-action (same library Shopping
   // uses for its aisle groups). Only active when cbReorderable — the
   // grid is showing cookbook.recipes' true order (no search, sort =
-  // Manual). Grip handle sits on each card; the whole card stays the
-  // click target to open the recipe, so a handle keeps drag-start from
-  // fighting that.
+  // Manual). The pickup target is the whole card (image, name,
+  // description, everything inside .card-clickable) rather than a
+  // small dedicated handle — see maybeDragHandle below for how that's
+  // wired without fighting the card's own click-to-open button or the
+  // remove/move buttons, which sit as later siblings on top of it and
+  // so keep receiving their own clicks untouched.
   //
   // Bound directly to cookbook.recipes (not displayRecipes) because
   // dndzone needs a real array it can mutate live during a drag,
@@ -150,6 +153,34 @@
     cookbook = { ...cookbook, recipes: next };
     try { await NtApi.reorderCookbookRecipes(cookbook.id, next.map(x => x.id)); }
     catch (e2) { showError(e2.message || 'Could not save order'); }
+  }
+
+  // Wraps svelte-dnd-action's own `dragHandle` action so it can be
+  // attached/detached reactively instead of only via structural
+  // {#if}. The zone's own `dragDisabled: !cbReorderable` (above)
+  // already blocks an actual drag from starting whenever reordering
+  // isn't valid, but leaving the handle itself always mounted would
+  // leave a stray role="button" + tabindex sitting on every card in
+  // non-reorderable views (search active, sort != Manual) — a false
+  // affordance for screen readers. Detaching it entirely when
+  // `enabled` is false keeps that clean, same as the old dedicated
+  // handle span did with its {#if cbReorderable} guard.
+  function maybeDragHandle(node, enabled) {
+    let handle = null;
+    function attach() { if (!handle) handle = dragHandle(node); }
+    function detach() {
+      if (!handle) return;
+      handle.destroy();
+      handle = null;
+      node.removeAttribute('role');
+      node.removeAttribute('tabindex');
+      node.style.cursor = '';
+    }
+    if (enabled) attach();
+    return {
+      update(next) { next ? attach() : detach(); },
+      destroy: detach,
+    };
   }
 
   async function openMoveDialog(r) {
@@ -402,6 +433,7 @@
             <div class="card recipe-card"
               class:has-cat={!!r.category?.color}
               style={r.category?.color ? `--cat-color:${r.category.color}` : ''}>
+              <div class="card-drag-wrap" use:maybeDragHandle={cbReorderable && !cookbook.is_smart && !cookbook.shared_with_me}>
               <button class="card-clickable" on:click={() => push(`/recipes/${r.id}`)}>
                 <div class="card-image">
                   {#if r.imgUrl}
@@ -459,6 +491,7 @@
                   </div>
                 </div>
               </button>
+              </div>
               {#if !cookbook.is_smart && !cookbook.shared_with_me}
                 <button class="remove-btn" on:click={() => removeRecipe(r)}
                   aria-label={`Remove ${r.name}`} title="Remove from cookbook">
@@ -469,13 +502,15 @@
                   <span class="material-symbols-rounded">drive_file_move</span>
                 </button>
                 {#if cbReorderable}
-                  <!-- Only shown when the visible list IS the true
+                  <!-- Purely decorative now — the whole card is the
+                       drag pickup target (see maybeDragHandle above),
+                       this is just a hover hint that it's draggable.
+                       Only shown when the visible list IS the true
                        manual order (no search, sort = Manual). See
                        cbReorderable above — a search or non-manual
                        sort makes the drag zone's items diverge from
                        the recipe's real position. -->
-                  <span class="cb-drag-handle" use:dragHandle
-                    aria-label="Drag to reorder" title="Drag to reorder">
+                  <span class="cb-drag-handle" aria-hidden="true">
                     <span class="material-symbols-rounded">drag_indicator</span>
                   </span>
                 {/if}
@@ -524,6 +559,7 @@
       </div>
       <div style="padding: 12px 16px;">
         <div class="seg-radio">
+          <div class="seg-thumb" class:move={moveAction === 'move'}></div>
           <label class:on={moveAction === 'copy'}>
             <input type="radio" bind:group={moveAction} value="copy" />
             <span>{@html $_('cookbook_view_ct.copy_label_html')}</span>
@@ -884,6 +920,16 @@
   :global(#dnd-action-dragged-el *) {
     pointer-events: none;
   }
+  /* No box of its own (display: contents) so it adds zero layout
+     footprint around .card-clickable — it exists purely so
+     maybeDragHandle has a DOM node to mark as the drag pickup target
+     that's an ANCESTOR of (not the same element as) the button, which
+     keeps the button's native keyboard semantics (Enter/Space =
+     click) from colliding with the handle's own Enter/Space =
+     pick-up-for-keyboard-reorder behavior. Pointer events still
+     bubble through a display:contents node normally, so pressing
+     anywhere on the card (including the button) still reaches it. */
+  .card-drag-wrap { display: contents; }
   .card-clickable {
     background: none; border: none; padding: 0; width: 100%;
     text-align: left; cursor: pointer; color: inherit;
@@ -956,14 +1002,31 @@
   .move-btn:hover { background: rgba(0, 0, 0, 0.78); }
   .move-btn .material-symbols-rounded { font-size: 16px; }
 
-  /* Segmented radio for the move/copy choice */
+  /* Segmented radio for the move/copy choice. One sliding thumb
+     behind the two labels (rather than each label painting its own
+     background) so switching selection animates as a slide instead
+     of an instant pop between positions. */
   .seg-radio {
+    position: relative;
     display: flex; gap: 4px;
     background: var(--surface-2);
     padding: 4px;
     border-radius: var(--radius-md);
   }
+  .seg-thumb {
+    position: absolute;
+    top: 4px; left: 4px;
+    width: calc(50% - 6px);
+    height: calc(100% - 8px);
+    background: var(--surface-1);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: transform var(--dur-fast);
+  }
+  .seg-thumb.move { transform: translateX(calc(100% + 4px)); }
   .seg-radio label {
+    position: relative;
+    z-index: 1;
     flex: 1;
     display: flex; align-items: center; justify-content: center; gap: 6px;
     padding: 8px 10px;
@@ -971,20 +1034,15 @@
     cursor: pointer;
     font-size: 13px; font-weight: 600;
     color: var(--text-3);
-    transition: background var(--dur-fast), color var(--dur-fast);
+    transition: color var(--dur-fast);
   }
-  .seg-radio label.on {
-    background: var(--surface-1);
-    color: var(--accent);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
+  .seg-radio label.on { color: var(--accent); }
   .seg-radio input { display: none; }
-  .seg-radio small { color: var(--text-3); font-weight: 500; }
 
-  /* Drag handle (bottom-right of card on hover). Grip icon only —
-     the drag itself is driven by svelte-dnd-action's dragHandleZone
-     on the .grid container; this element is just the pickup target
-     so the rest of the card stays clickable to open the recipe. */
+  /* Drag hint (bottom-right of card on hover) — purely decorative.
+     The whole card is the actual drag pickup target (maybeDragHandle
+     on .card-drag-wrap); pointer-events: none here so this icon never
+     steals the tap that should reach the card underneath it. */
   .cb-drag-handle {
     position: absolute;
     bottom: 6px;
@@ -994,14 +1052,11 @@
     border-radius: 50%;
     width: 26px; height: 26px;
     display: flex; align-items: center; justify-content: center;
-    cursor: grab;
+    pointer-events: none;
     opacity: 0;
-    transition: opacity var(--dur-fast), background var(--dur-fast);
+    transition: opacity var(--dur-fast);
   }
-  .recipe-card:hover .cb-drag-handle,
-  .cb-drag-handle:focus-visible { opacity: 1; }
-  .cb-drag-handle:hover { background: rgba(0, 0, 0, 0.75); }
-  .cb-drag-handle:active { cursor: grabbing; }
+  .recipe-card:hover .cb-drag-handle { opacity: 1; }
   .cb-drag-handle .material-symbols-rounded { font-size: 16px; }
 
   /* Placeholder card svelte-dnd-action renders in the gap left by

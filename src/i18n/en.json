@@ -1223,8 +1223,8 @@
     "favorites_filter":          "Favorites",
     "add_recipes":               "Add Recipes",
     "move_or_copy":              "Move or Copy",
-    "copy_label_html":           "Copy <small>(keep here too)</small>",
-    "move_label_html":           "Move <small>(remove from here)</small>",
+    "copy_label_html":           "Copy",
+    "move_label_html":           "Move",
     "cancel":                    "Cancel"
   },
   "public_recipe_ct": {
