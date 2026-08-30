@@ -92,6 +92,36 @@
     }
   }
 
+  // Search + sort for the cookbook's own recipe grid. View-only — the
+  // underlying cookbook.recipes array (the manually-curated order the
+  // ↑/↓ reorder buttons operate on) is never touched by these. A
+  // cookbook with 30+ recipes has no way to find one otherwise.
+  let cbQuery = '';
+  let cbSort = 'manual'; // 'manual' | 'alpha' | 'fav'
+  // Note: intentionally NOT gated on !cookbook.is_smart — smart
+  // cookbooks can still be searched, and need the "no matches" empty
+  // state below to fire correctly. Reorder buttons are independently
+  // protected by their own !cookbook.is_smart check where they render.
+  $: cbFilterActive = !!(cbQuery.trim() || cbSort !== 'manual');
+  $: displayRecipes = (() => {
+    if (!cookbook) return [];
+    let list = cookbook.recipes || [];
+    const q = cbQuery.trim().toLowerCase();
+    if (q) list = list.filter(r => (r.name || '').toLowerCase().includes(q));
+    if (cbSort === 'alpha') {
+      list = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    } else if (cbSort === 'fav') {
+      list = [...list].sort((a, b) => (b.favorite === true) - (a.favorite === true) || (a.name || '').localeCompare(b.name || ''));
+    }
+    return list;
+  })();
+  // Reorder buttons only make sense against the true manual order —
+  // when a search or non-manual sort is active, the visible list's
+  // position no longer matches cookbook.recipes indices, so ↑/↓ would
+  // silently reorder against the wrong neighbors. Hide them (remove /
+  // move stay available — those are id-based, always safe).
+  $: cbReorderable = !cbFilterActive;
+
   // Reorder via ↑/↓ buttons. Smart cookbooks are computed and don't
   // honor manual order, so the buttons are hidden in that mode.
   async function reorderRecipe(r, direction) {
@@ -259,8 +289,41 @@
           {/if}
         </div>
       {:else}
+        {#if cookbook.recipes.length > 1}
+          <!-- Search + sort for the cookbook's own recipe list. View-
+               only: never touches the manually-curated order the ↑/↓
+               buttons operate on. Reorder buttons hide themselves
+               below whenever this view differs from the true order
+               (see cbReorderable). -->
+          <div class="cb-search-row">
+            <div class="cb-search">
+              <span class="material-symbols-rounded">search</span>
+              <input type="search" placeholder="Search this cookbook…" bind:value={cbQuery} />
+              {#if cbQuery}
+                <button class="cb-search-clear" on:click={() => cbQuery = ''} aria-label="Clear search">
+                  <span class="material-symbols-rounded">close</span>
+                </button>
+              {/if}
+            </div>
+            {#if !cookbook.is_smart}
+              <select class="cb-sort" bind:value={cbSort} title="Sort">
+                <option value="manual">Manual Order</option>
+                <option value="alpha">A → Z</option>
+                <option value="fav">Favorites First</option>
+              </select>
+            {/if}
+          </div>
+        {/if}
+
+        {#if cbFilterActive && displayRecipes.length === 0}
+          <div class="state empty">
+            <span class="material-symbols-rounded empty-icon">search_off</span>
+            <h2>No recipes match "{cbQuery}"</h2>
+            <button class="btn btn-secondary" on:click={() => { cbQuery = ''; cbSort = 'manual'; }}>Clear search</button>
+          </div>
+        {:else}
         <div class="grid">
-          {#each cookbook.recipes as r, i (r.id)}
+          {#each displayRecipes as r, i (r.id)}
             {#if r.locked}
               <!-- Locked placeholder — the reader doesn't have their
                    own access to this recipe. Show the name so they
@@ -311,23 +374,32 @@
                   aria-label={`Move or copy ${r.name}`} title="Move / copy to another cookbook">
                   <span class="material-symbols-rounded">drive_file_move</span>
                 </button>
-                <div class="reorder-row">
-                  <button class="reorder-btn" on:click={() => reorderRecipe(r, 'up')}
-                    aria-label="Move up" title="Move up"
-                    disabled={i === 0}>
-                    <span class="material-symbols-rounded">keyboard_arrow_left</span>
-                  </button>
-                  <button class="reorder-btn" on:click={() => reorderRecipe(r, 'down')}
-                    aria-label="Move down" title="Move down"
-                    disabled={i === cookbook.recipes.length - 1}>
-                    <span class="material-symbols-rounded">keyboard_arrow_right</span>
-                  </button>
-                </div>
+                {#if cbReorderable}
+                  <!-- Only shown when the visible list IS the true
+                       manual order (no search, sort = Manual). See
+                       cbReorderable above — a search or non-manual
+                       sort makes i not correspond to the recipe's
+                       real position, so ↑/↓ would silently reorder
+                       against the wrong neighbors. -->
+                  <div class="reorder-row">
+                    <button class="reorder-btn" on:click={() => reorderRecipe(r, 'up')}
+                      aria-label="Move up" title="Move up"
+                      disabled={i === 0}>
+                      <span class="material-symbols-rounded">keyboard_arrow_left</span>
+                    </button>
+                    <button class="reorder-btn" on:click={() => reorderRecipe(r, 'down')}
+                      aria-label="Move down" title="Move down"
+                      disabled={i === cookbook.recipes.length - 1}>
+                      <span class="material-symbols-rounded">keyboard_arrow_right</span>
+                    </button>
+                  </div>
+                {/if}
               {/if}
             </div>
             {/if}
           {/each}
         </div>
+        {/if}
       {/if}
     {/if}
   </div>
@@ -526,6 +598,56 @@
     font-size: 11px;
     font-weight: 600;
   }
+
+  /* Search + sort for the cookbook's own recipe grid. */
+  .cb-search-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin: 4px 0 16px;
+    flex-wrap: wrap;
+  }
+  .cb-search {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 9px 12px;
+  }
+  .cb-search .material-symbols-rounded { font-size: 18px; color: var(--text-3); flex-shrink: 0; }
+  .cb-search input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text-1);
+    font-size: 14px;
+    min-width: 0;
+  }
+  .cb-search-clear {
+    background: transparent; border: none; cursor: pointer;
+    color: var(--text-3);
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .cb-search-clear:hover { color: var(--text-1); background: var(--surface-2); }
+  .cb-sort {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 9px 12px;
+    color: var(--text-1);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .cb-sort:focus { outline: 2px solid var(--accent-dim); border-color: var(--accent); }
 
   /* Recipe grid (mirrors Recipes page) */
   .grid {
