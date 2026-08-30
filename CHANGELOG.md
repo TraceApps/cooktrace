@@ -9,6 +9,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.0-dev.03] - 2026-08-30 (pre-release)
+
+Third dev pre-release of the 1.2.0 minor. Cookbook view gets search,
+drag-and-drop reorder, a settable cover image, and full card parity
+with the Recipes tab.
+
+### Added
+
+- **Cookbook recipe grid gets search + sort.** Search box + sort dropdown (Manual Order / A-Z / Favorites First) appear once a cookbook has more than one recipe. A no-matches empty state shows when a search returns nothing. Smart cookbooks keep search but hide sort (their order comes from the saved filter).
+- **Cookbook recipes are drag-and-drop reorderable.** Manual order supports picking a card up from anywhere on it and dropping it into a new position, with every other card sliding smoothly out of the way rather than popping to its new spot. Only active in Manual order view; a search or any other sort disables it, same as the old up/down buttons did.
+- **Cookbook cover image is settable.** Tap the cover thumbnail (owner, non-smart cookbooks) to pick a new cover via the same image picker recipe step photos use.
+
+### Changed
+
+- **Cookbook recipe cards now match the Recipes tab exactly:** same size, same fields (category badge, star rating, tags, pantry-match pill), same uniform row heights. They were previously thinner and missing all of that; the server was pulling a narrower, unhydrated column set for cookbook reads than every other recipe-card endpoint uses.
+- **Move/Copy dialog's toggle slides between Move and Copy** instead of snapping, and dropped the redundant "(keep here too)" / "(remove from here)" explainer text.
+- Recipe view, Recipe editor, and Cookbook view content width now scales up further on ultrawide monitors instead of leaving dead space on either side past ~1440-1480px.
+
+### Fixed
+
+- **`HTTP_PROXY` / `HTTPS_PROXY` missing a scheme now gives a clear startup error** instead of an opaque one (port of a NutriTrace fix).
+
+---
+
 ## [1.2.0-dev.02] - 2026-08-26 (pre-release)
 
 Second dev pre-release of the 1.2.0 minor. One fix for a blank
