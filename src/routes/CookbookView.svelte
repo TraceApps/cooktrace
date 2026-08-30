@@ -399,7 +399,9 @@
                 </div>
               </div>
             {:else}
-            <div class="card recipe-card">
+            <div class="card recipe-card"
+              class:has-cat={!!r.category?.color}
+              style={r.category?.color ? `--cat-color:${r.category.color}` : ''}>
               <button class="card-clickable" on:click={() => push(`/recipes/${r.id}`)}>
                 <div class="card-image">
                   {#if r.imgUrl}
@@ -412,7 +414,28 @@
                   {/if}
                 </div>
                 <div class="card-body">
+                  <!-- Same field set as the Recipes tab's own card
+                       (category, rating, tags, pantry-match) — a
+                       cookbook recipe now carries identical info to
+                       its counterpart on the Recipes tab. Was a
+                       thinner card here before: the server only
+                       pulled a narrow column list with no category/
+                       tags/pantry_match. See server/lib/
+                       recipe-hydrate.js. -->
+                  {#if r.category}
+                    <span class="card-category"
+                      style={r.category.color ? `--cat-color:${r.category.color}` : ''}>
+                      {r.category.name}
+                    </span>
+                  {/if}
                   <h3 class="card-name">{r.name}</h3>
+                  {#if r.rating}
+                    <div class="card-rating" aria-label={`Rated ${r.rating} of 5`}>
+                      {#each [1,2,3,4,5] as n}
+                        <span class="material-symbols-rounded star" class:filled={n <= r.rating}>{n <= r.rating ? 'star' : 'star_border'}</span>
+                      {/each}
+                    </div>
+                  {/if}
                   {#if r.description}<p class="card-desc">{r.description}</p>{/if}
                   <div class="card-meta">
                     {#if totalMinutes(r) > 0}
@@ -420,6 +443,18 @@
                     {/if}
                     {#if r.servings}
                       <span class="meta-pill"><span class="material-symbols-rounded">restaurant</span>{r.servings}</span>
+                    {/if}
+                    {#if r.pantry_match && r.pantry_match.need > 0}
+                      {@const pct = r.pantry_match.have / r.pantry_match.need}
+                      <span class="meta-pill" class:full={pct === 1} class:partial={pct > 0 && pct < 1} class:none={pct === 0}>
+                        <span class="material-symbols-rounded">kitchen</span>
+                        {r.pantry_match.have}/{r.pantry_match.need}
+                      </span>
+                    {/if}
+                    {#if r.tags?.length}
+                      {#each r.tags.slice(0, 2) as tag}
+                        <span class="meta-pill tag">{tag}</span>
+                      {/each}
                     {/if}
                   </div>
                 </div>
@@ -773,6 +808,56 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     overflow: hidden;
+  }
+  /* Subtle category-color stripe along the left edge, matching the
+     Recipes tab's own card treatment. Only applied when the recipe
+     has a category with a color set. */
+  .card.recipe-card.has-cat { border-left: 3px solid var(--cat-color); }
+  @media (hover: hover) {
+    .card.recipe-card.has-cat:hover {
+      border-color: color-mix(in srgb, var(--cat-color) 35%, var(--border));
+      border-left-color: var(--cat-color);
+    }
+  }
+  .card-category {
+    align-self: flex-start;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+    color: var(--cat-color, var(--accent));
+    background: color-mix(in srgb, var(--cat-color, var(--accent)) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--cat-color, var(--accent)) 35%, transparent);
+  }
+  .card-rating {
+    display: inline-flex;
+    gap: 1px;
+    margin-top: -2px;
+  }
+  .card-rating .star {
+    font-size: 13px;
+    color: var(--text-3);
+    font-variation-settings: 'FILL' 0;
+  }
+  .card-rating .star.filled {
+    color: var(--accent);
+    font-variation-settings: 'FILL' 1;
+  }
+  .meta-pill.tag { background: var(--accent-dim); color: var(--accent); }
+  .meta-pill.full {
+    background: color-mix(in srgb, var(--success, #22c55e) 18%, transparent);
+    color: var(--success, #22c55e);
+  }
+  .meta-pill.partial {
+    background: color-mix(in srgb, #f59e0b 16%, transparent);
+    color: #f59e0b;
+  }
+  .meta-pill.none {
+    background: transparent;
+    color: var(--text-3);
+    border: 1px solid var(--border);
   }
   /* The actively-dragged item, id-targeted by svelte-dnd-action
      (DRAGGED_ELEMENT_ID). The library marks .cb-grid-item itself
