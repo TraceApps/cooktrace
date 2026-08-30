@@ -745,6 +745,30 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     overflow: hidden;
+    /* Smooth drag-reorder: svelte-dnd-action's FLIP technique animates
+       every card's position via CSS transform on every consider event.
+       Without these hints the browser re-layouts/repaints each image-
+       heavy card from scratch every frame, which is what read as
+       "choppy" (especially on Android WebView, weaker GPU compositing
+       than desktop Chrome). will-change promotes each card to its own
+       compositor layer up front so the transform is pure GPU work;
+       contain: paint isolates each card's repaint cost so animating
+       one doesn't force the browser to reconsider its neighbors. */
+    will-change: transform;
+    contain: paint;
+  }
+  /* The actively-dragged card, id-targeted by svelte-dnd-action
+     (DRAGGED_ELEMENT_ID). Disable pointer-events on its contents so
+     hover/focus recalculation on the card underneath the cursor
+     doesn't compete with the drag gesture for a frame budget, and
+     give it a lifted look so the motion reads as physical rather
+     than the card just teleporting between grid cells. */
+  :global(#dnd-action-dragged-el) {
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+    cursor: grabbing;
+  }
+  :global(#dnd-action-dragged-el *) {
+    pointer-events: none;
   }
   .card-clickable {
     background: none; border: none; padding: 0; width: 100%;
