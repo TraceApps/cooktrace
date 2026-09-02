@@ -64,7 +64,11 @@ edge cases, and more).
 
 ### Security
 
-- No new dependencies since v1.1.3. `npm audit` reports 0 vulnerabilities.
+- **fast-uri** bumped 3.1.5 → 3.1.7, closes four HIGH advisories: [GHSA-5jgf-p345-68v8](https://github.com/advisories/GHSA-5jgf-p345-68v8), [GHSA-f65p-4m7j-42xc](https://github.com/advisories/GHSA-f65p-4m7j-42xc), [GHSA-fph4-wmhf-6fwf](https://github.com/advisories/GHSA-fph4-wmhf-6fwf), and [GHSA-jqff-g426-hqxp](https://github.com/advisories/GHSA-jqff-g426-hqxp) (host confusion and SSRF via malformed URI normalization).
+- **browserslist** bumped 4.28.1 → 4.28.8, closes [GHSA-c83g-rgw3-j3cx](https://github.com/advisories/GHSA-c83g-rgw3-j3cx) (unbounded memory growth, HIGH) and [GHSA-73wf-gq98-2v4g](https://github.com/advisories/GHSA-73wf-gq98-2v4g) (crash / prototype write via untrusted stats file, HIGH).
+- **@xmldom/xmldom** bumped 0.8.13 → 0.8.15, closes [GHSA-6gmq-8vp8-gcm6](https://github.com/advisories/GHSA-6gmq-8vp8-gcm6) (XML fragment injection, moderate).
+- **qs** (server) bumped 6.15.3 → 6.16.0, closes [GHSA-x5fp-wj9c-mxmx](https://github.com/advisories/GHSA-x5fp-wj9c-mxmx) (array-limit bypass) and [GHSA-4mjr-xmp4-gh2g](https://github.com/advisories/GHSA-4mjr-xmp4-gh2g) (denial of service), both moderate.
+- All standard transitive bumps via `npm audit fix` (client + server). `npm audit` and `npm test` both clean after.
 
 ---
 
