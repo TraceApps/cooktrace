@@ -48,6 +48,26 @@
   for (const g of UNIT_GROUPS) for (const u of g.units) BUILTIN_ABBRS.add(u.abbr);
   const CATEGORY_OPTIONS = [...UNIT_GROUPS.map(g => g.label), 'Custom'];
 
+  // Filter — one input filters both built-in groups and the custom
+  // list. Matches abbr OR full name so users can type either. Groups
+  // whose built-ins all drop out disappear entirely to keep the page
+  // tidy under a narrow filter.
+  let filter = '';
+  function _matches(u, needle) {
+    const abbr = (u.abbr || '').toLowerCase();
+    const full = (u.full || u.full_name || '').toLowerCase();
+    return abbr.includes(needle) || full.includes(needle);
+  }
+  $: needle = filter.trim().toLowerCase();
+  $: filteredGroups = needle
+    ? UNIT_GROUPS
+        .map(g => ({ ...g, units: g.units.filter(u => _matches(u, needle)) }))
+        .filter(g => g.units.length > 0)
+    : UNIT_GROUPS;
+  $: filteredCustom = needle ? custom.filter(u => _matches(u, needle)) : custom;
+  $: totalMatches = filteredGroups.reduce((s, g) => s + g.units.length, 0) + filteredCustom.length;
+  $: filteredEmpty = !!needle && totalMatches === 0;
+
   async function load() {
     loading = true;
     try {
@@ -185,7 +205,13 @@
       {/if}
     </div>
 
-    {#each UNIT_GROUPS as group (group.label)}
+    <input class="input filter" type="search" placeholder="Filter units by abbreviation or name…" bind:value={filter} />
+
+    {#if filteredEmpty}
+      <p class="empty">No units match "{filter}".</p>
+    {/if}
+
+    {#each filteredGroups as group (group.label)}
       <section class="grp">
         <h3 class="grp-title">{group.label}</h3>
         <ul class="row-list">
@@ -210,13 +236,14 @@
       </section>
     {/each}
 
+    {#if !needle || filteredCustom.length > 0 || custom.length === 0}
     <section class="grp">
       <h3 class="grp-title">{$_('manage_units.custom_group')}</h3>
       {#if custom.length === 0}
         <p class="empty">No custom units yet.</p>
       {:else}
         <ul class="row-list">
-          {#each custom as u (u.id)}
+          {#each filteredCustom as u (u.id)}
             <li class="row">
               {#if editingId === u.id}
                 <div class="edit-form">
@@ -266,6 +293,7 @@
         </button>
       </div>
     </section>
+    {/if}
   {/if}
 </div>
 
@@ -293,12 +321,32 @@
     color: var(--text-3);
   }
 
+  .filter { width: 100%; box-sizing: border-box; }
+
   .row-list { list-style: none; margin: 0; padding: 0; }
   .row {
     display: flex; align-items: center; gap: 10px;
     padding: 10px 0; border-top: 1px solid var(--border);
   }
   .row:first-child { border-top: none; }
+
+  /* Wide screens — collapse the single-column stack into a responsive
+     card grid so the built-in + custom lists don't sprawl vertically.
+     Applies to BOTH lists (built-in group + custom section). */
+  @media (min-width: 1200px) {
+    .row-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 4px 24px;
+    }
+    .row, .row:first-child {
+      border-top: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 10px 12px;
+      background: var(--surface-1);
+    }
+  }
   .row.off .abbr, .row.off .full { color: var(--text-3); text-decoration: line-through; }
 
   .badge {

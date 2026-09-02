@@ -20,7 +20,7 @@
   import { createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
-  import { NtApi } from '../../lib/api.js';
+  import { NtApi, mutatingAuthHeaders } from '../../lib/api.js';
   import { showSuccess, showError } from '../../stores/toast.js';
   import { portal } from '../../lib/portal.js';
 
@@ -64,7 +64,7 @@
       try {
         await fetch('/api/recipes/bulk-cancel', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...mutatingAuthHeaders() },
           body: JSON.stringify({ cacheUuid: scanResult.cacheUuid }),
           credentials: 'include',
         });
@@ -131,7 +131,7 @@
     try {
       const res = await fetch('/api/recipes/batch-scrape', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...mutatingAuthHeaders() },
         body: JSON.stringify({ urls }),
         credentials: 'include',
       });
@@ -167,7 +167,7 @@
     try {
       const res = await fetch('/api/recipes/bulk-commit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...mutatingAuthHeaders() },
         body: JSON.stringify({
           cacheUuid: scanResult.cacheUuid,
           selectedIds: Array.from(selected),

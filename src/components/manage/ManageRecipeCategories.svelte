@@ -6,6 +6,7 @@
    */
   import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
+  import { push } from 'svelte-spa-router';
   import { NtApi } from '../../lib/api.js';
   import { showError, showSuccess } from '../../stores/toast.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
@@ -26,6 +27,12 @@
   let newName = '';
   let newColor = SWATCHES[0];
   let creating = false;
+
+  let filter = '';
+  $: filtered = filter.trim()
+    ? categories.filter(c => c.name.toLowerCase().includes(filter.trim().toLowerCase()))
+    : categories;
+  $: filteredEmpty = categories.length > 0 && filtered.length === 0;
 
   async function load() {
     loading = true;
@@ -131,8 +138,12 @@
   {:else if categories.length === 0}
     <p class="empty">No categories yet. Add one below.</p>
   {:else}
+    <input class="input filter" type="search" placeholder="Filter…" bind:value={filter} />
+    {#if filteredEmpty}
+      <p class="empty">No items match "{filter}".</p>
+    {:else}
     <ul class="row-list">
-      {#each categories as c (c.id)}
+      {#each filtered as c (c.id)}
         <li class="row"
           class:dragging={draggingId === c.id}
           class:drag-over={dragOverId === c.id}
@@ -170,10 +181,17 @@
             <span class="dot" style={c.color ? `background:${c.color}` : ''}></span>
             <span class="row-name">{c.name}</span>
             {#if Number.isFinite(c.recipe_count)}
-              <span class="usage-pill" class:zero={c.recipe_count === 0}
-                title={c.recipe_count === 0 ? 'No recipes use this category' : `${c.recipe_count} recipe${c.recipe_count === 1 ? '' : 's'}`}>
-                {c.recipe_count} {c.recipe_count === 1 ? 'recipe' : 'recipes'}
-              </span>
+              {#if c.recipe_count > 0}
+                <button type="button" class="usage-pill linked"
+                  title={`View the ${c.recipe_count} recipe${c.recipe_count === 1 ? '' : 's'} in this category`}
+                  on:click={() => push(`/recipes?category=${c.slug}`)}>
+                  {c.recipe_count} {c.recipe_count === 1 ? 'recipe' : 'recipes'}
+                </button>
+              {:else}
+                <span class="usage-pill zero" title="No recipes use this category">
+                  {c.recipe_count} recipes
+                </span>
+              {/if}
             {/if}
             <span class="row-meta">/{c.slug}</span>
             <div class="row-actions">
@@ -188,6 +206,7 @@
         </li>
       {/each}
     </ul>
+    {/if}
   {/if}
 
   <div class="add-row">
@@ -213,6 +232,8 @@
   .mgr-desc { margin: 0; color: var(--text-3); font-size: 13px; }
   .empty { color: var(--text-3); font-size: 13px; }
 
+  .filter { width: 100%; box-sizing: border-box; }
+
   .row-list { list-style: none; margin: 0; padding: 0; }
   .row {
     display: flex;
@@ -222,6 +243,24 @@
     border-top: 1px solid var(--border);
   }
   .row:first-child { border-top: none; }
+
+  /* Wide screens — collapse the single-column stack into a responsive
+     card grid so we don't waste the horizontal real estate. Each row
+     turns into a compact self-contained card. */
+  @media (min-width: 1200px) {
+    .row-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 4px 24px;
+    }
+    .row, .row:first-child {
+      border-top: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      background: var(--surface-1);
+    }
+  }
   .row[draggable=true] { cursor: grab; }
   .row.dragging { opacity: 0.4; }
   .row.drag-over { background: color-mix(in srgb, var(--accent) 10%, transparent); }
@@ -257,6 +296,22 @@
     background: transparent;
     color: var(--text-3);
     border: 1px solid var(--border);
+  }
+  /* Linked usage pill — clickable button variant that jumps to the
+     Recipes page pre-filtered by this category. Keep pill styling; add
+     hover cue but no underline. */
+  button.usage-pill {
+    font-family: inherit;
+    border: none;
+  }
+  .usage-pill.linked {
+    cursor: pointer;
+    text-decoration: none;
+    transition: background var(--dur-fast), color var(--dur-fast);
+  }
+  .usage-pill.linked:hover {
+    background: var(--accent-dim);
+    color: var(--accent);
   }
   .row-meta {
     color: var(--text-3); font-size: 12px;

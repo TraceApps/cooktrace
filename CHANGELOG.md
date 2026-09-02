@@ -9,6 +9,201 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.0] - 2026-09-02
+
+Minor release. Big themes: ingredient-to-step linking with inline Cook
+Mode rendering, a wide-screen desktop pass across six main pages plus
+the Cookbook view, real drag-and-drop cookbook reordering with a
+settable cover image, and a large batch of fixes accumulated since
+v1.1.3 (Kitchen auto-share, CSRF on import dialogs, email links behind
+a reverse proxy, single-user-mode data adoption, pantry sort/search
+edge cases, and more).
+
+### Added
+
+- **Ingredient links on recipe steps.** Editor gets a collapsible "Link ingredients" panel per step with chip toggles for every named ingredient. In Cook Mode each step renders its linked ingredients inline right below the step text so quantities are visible without scrolling back to the top. Tapping an inline ingredient checks it off in the top list too, and marking a step done cascades the check to its linked ingredients. Tandoor imports carry their existing step-to-ingredient adjacency across automatically ([#40](https://github.com/TraceApps/cooktrace/issues/40)).
+- **Wide-screen desktop layouts across the six main pages.** Settings switches to a two-pane rail-plus-content shell matching NutriTrace and LiftTrace. Manage's section-swap gets a cross-fade plus a sort control and an "Unused" quick-filter chip. Shopping tiles category groups into a masonry grid with a sticky toolbar, auto-collapse for finished sections, and a progress bar. Diary switches its day list to a card grid on wide screens, with roomier Month cells (more cook pills fit per day) and bigger Photos tiles. Pantry gets a category-chip wrap, a variant-row span for expanded generics, and an amber "Expiring soon" ribbon. Recipes' loading skeleton renders more placeholder cards (8 to 12) so it fills a wide grid instead of leaving a gap under a short first batch. Recipe view, Recipe editor, and Cookbook view also get wider ultrawide-monitor caps so nothing is left with dead space on either side past ~1440-1480px.
+- **Cookbook view gets search, drag-and-drop reorder, and a settable cover image.** Search box + sort dropdown (Manual Order / A-Z / Favorites First) once a cookbook has more than one recipe. Manual order supports picking a card up from anywhere on it (not just a small handle) and dropping it into a new position, with the rest of the grid sliding smoothly out of the way. Cover image is settable from the same picker recipe step photos use. Cookbook recipe cards also now match the Recipes tab's cards exactly (size, category badge, star rating, tags, pantry-match pill, uniform row heights); they were previously thinner and missing most of that.
+- **Diary search + meal-type filter.** Sticky toolbar gains a text search across recipe names, notes, and cook name, plus Breakfast / Lunch / Dinner / Snack quick chips. Each day-header shows a cook-count pill.
+- **Shared recipes get a category filter.** Chips are scoped to only the categories that appear in what other users shared with you (search and sort already applied there).
+- **Kitchens invite autocomplete.** Type-to-narrow picker pulls from the server user list (multi-user mode only). Freeform typing still works as a fallback.
+- **Admin inline edit user.** Full name and email edit in place from Settings → User Management. Username stays immutable as the stable identifier.
+- **PWA update flow.** In-app prompt asks to reload when a new version is out. Red dot on the Settings nav icon while an update is pending. Update-check cadence is configurable (Hourly / Every 4 hours / Every 12 hours / Daily / Manual).
+- **iOS PWA viewport lock.** Horizontal touch pan no longer drifts the whole page on iPhone Safari or the installed PWA. Rubber-band bounce stays contained inside the app.
+- **Server honors `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` env vars** via undici's `EnvHttpProxyAgent`, so every outbound scrape / import / AI call routes through a configured forward proxy without per-call-site changes. A missing scheme on either var now gives a clear startup error instead of an opaque one.
+
+### Changed
+
+- **Pantry source-chip (OFF / USDA / All) is now a filter, not an append.** With an active query, picking one of these hides the local pantry list and shows only that source's external results. Local pantry stays visible when the Pantry chip is picked or when the query is empty. Grid / list view toggle hides accordingly when the pantry list itself is hidden.
+- **Move/Copy dialog's toggle slides between Move and Copy** instead of snapping, and dropped the redundant "(keep here too)" / "(remove from here)" explainer text.
+- Profile page renders without its own header when opened from inside Settings; the Save button moves inline for the embedded view.
+- Recipe close button reliably returns to the Recipes list from any origin.
+- Cookbook import dialog's "Settings → Trace Assistant" link jumps straight to `/settings/ai` instead of the Settings index.
+
+### Fixed
+
+- **Kitchen auto-share was silently dropping every recipe created on the native Android app.** The mobile-write path (`/api/sync/push`) went straight to the DB and never called the fan-out hook, so Kitchen members saw nothing new from anyone cooking on their phone. Every recipe insert path now fans out uniformly. Toggling auto-share off then back on backfills any recipes created before this cut.
+- **Kitchen "N recipes shared" count double-counted** in kitchens with two or more members. Now counts distinct recipes.
+- **File / cookbook / URL / bulk import dialogs returned "Invalid CSRF token" on PWA.** Raw fetch calls now attach the CSRF header via a shared helper so every mutating import endpoint works ([#43](https://github.com/TraceApps/cooktrace/issues/43)).
+- **Password reset links, invite links, and the SMTP test email's embedded logo rendered as `http://` behind a TLS-terminating reverse proxy**, which mail providers flagged as spam. Now honors `X-Forwarded-Proto` and `X-Forwarded-Host` ([#42](https://github.com/TraceApps/cooktrace/pull/42), thanks @clifmo).
+- **Data left behind in single-user mode is adopted on upgrade.** Instances that already enabled user management on an earlier build had their unowned rows stranded for good. Startup now adopts them, once, when exactly one account exists.
+- **Enabling user management no longer strands data written in single-user mode** ([TraceApps/docs#2](https://github.com/TraceApps/docs/issues/2)). Cookbooks, recipe / pantry categories, custom + disabled units, and Trace chat history are now claimed alongside recipes / pantry / diary / shopping, in one transaction.
+- **Deleting an account no longer leaves its hidden-unit preferences behind.** `disabled_units` is now included in every account-removal path (self-delete, admin delete, disable user management, lockout recovery) and the OIDC first-login bootstrap.
+- **Android native app showed a blank screen when opening a recipe someone shared with you.** The single-recipe read path now falls back to a server fetch on a local cache miss, instead of rendering against `null`.
+- **Recipe step photos now persist.** They were being silently dropped on every save before.
+- **Pantry items no longer disappear when sorted A-Z** if their category slug doesn't match a current pantry-categories catalog entry ([#41](https://github.com/TraceApps/cooktrace/issues/41), thanks @xiaojwus). Orphaned buckets now fall into Uncategorized instead of vanishing.
+- **Variant Create button** enables when only an override name is typed. Button label now reflects which name will actually be created.
+- **"All" mode pantry search results** render with full name, brand, barcode, and thumbnail instead of a blank row.
+- **External OFF / USDA search results** render at full opacity instead of picking up the local out-of-stock dimming.
+- **Split-chip pills (OFF, USDA)** light up as one unit on hover and active state instead of just the half the cursor is over.
+- **Recipe save now guards against a stale or misbehaving client wiping `ingredients` / `steps` / `tags` / `tools`** by sending an empty value over existing content. Legitimate deletes via the per-item delete flows still work.
+- **Clearing the Trace chat now asks for confirmation** instead of wiping the conversation on a single tap, with no way back.
+- **Cook-diary rows with multiple broken phone-local photos now converge in one sync cycle** instead of one cycle per photo.
+- **Missing-photo placeholder in the diary photos view** is more robust to future markup changes around it.
+- **Ingredient-name suggestions on mobile no longer cover the keyboard and most of the screen.** The field used a native `<input list>` / `<datalist>` combo, which mobile WebViews render as their own OS-level picker with no awareness of the app's layout or the on-screen keyboard. Replaced with an in-app dropdown that positions itself against the actual visible viewport, same approach the unit picker next to it already used.
+
+### Security
+
+- No new dependencies since v1.1.3. `npm audit` reports 0 vulnerabilities.
+
+---
+
+## [1.2.0-dev.03] - 2026-08-30 (pre-release)
+
+Third dev pre-release of the 1.2.0 minor. Cookbook view gets search,
+drag-and-drop reorder, a settable cover image, and full card parity
+with the Recipes tab.
+
+### Added
+
+- **Cookbook recipe grid gets search + sort.** Search box + sort dropdown (Manual Order / A-Z / Favorites First) appear once a cookbook has more than one recipe. A no-matches empty state shows when a search returns nothing. Smart cookbooks keep search but hide sort (their order comes from the saved filter).
+- **Cookbook recipes are drag-and-drop reorderable.** Manual order supports picking a card up from anywhere on it and dropping it into a new position, with every other card sliding smoothly out of the way rather than popping to its new spot. Only active in Manual order view; a search or any other sort disables it, same as the old up/down buttons did.
+- **Cookbook cover image is settable.** Tap the cover thumbnail (owner, non-smart cookbooks) to pick a new cover via the same image picker recipe step photos use.
+
+### Changed
+
+- **Cookbook recipe cards now match the Recipes tab exactly:** same size, same fields (category badge, star rating, tags, pantry-match pill), same uniform row heights. They were previously thinner and missing all of that; the server was pulling a narrower, unhydrated column set for cookbook reads than every other recipe-card endpoint uses.
+- **Move/Copy dialog's toggle slides between Move and Copy** instead of snapping, and dropped the redundant "(keep here too)" / "(remove from here)" explainer text.
+- Recipe view, Recipe editor, and Cookbook view content width now scales up further on ultrawide monitors instead of leaving dead space on either side past ~1440-1480px.
+
+### Fixed
+
+- **`HTTP_PROXY` / `HTTPS_PROXY` missing a scheme now gives a clear startup error** instead of an opaque one (port of a NutriTrace fix).
+
+---
+
+## [1.2.0-dev.02] - 2026-08-26 (pre-release)
+
+Second dev pre-release of the 1.2.0 minor. One fix for a blank
+screen when opening a shared recipe on the native Android app.
+
+### Fixed
+
+- **Android native app showed a blank screen when opening a recipe someone shared with you.** The single-recipe read path (`NtApi.getRecipe`) dispatches to the cached impl on native connected mode, which reads from local SQLite. Local only holds recipes the user owns (sync-push writes owned recipes), so any shared recipe id missed and the view rendered against `null`. The cached impl now falls back to a server fetch on a local miss, so shared recipes open correctly. Owned recipes still hit local first for offline / speed.
+
+---
+
+## [1.2.0-dev.01] - 2026-08-25 (pre-release)
+
+First dev pre-release of the 1.2.0 minor. The version jumps past
+1.1.4 because the accumulated scope on dev is well beyond patch:
+whole desktop UI overhaul across six pages, ingredient-to-step
+linking with Cook Mode inline render, PWA update prompt, admin
+inline-edit user, kitchen invite autocomplete, iOS viewport lock,
+plus the earlier single-user data-claim work. Roughly forty commits
+since 1.1.4-dev02.
+
+### Added
+
+- **Ingredient links on recipe steps.** Editor gets a collapsible "Link ingredients" panel per step with chip toggles for every named ingredient. In Cook Mode each step renders its linked ingredients inline right below the step text so quantities are visible without scrolling back to the top. Tapping an inline ingredient checks it off in the top list too, and marking a step done cascades the check to its linked ingredients. Tandoor imports carry their existing step-to-ingredient adjacency across automatically ([#40](https://github.com/TraceApps/cooktrace/issues/40)).
+- **Wide-screen desktop layouts across the six main pages.** Settings switches to a two-pane rail-plus-content shell matching NutriTrace and LiftTrace. Manage rail pins on scroll with a cross-fade on section swap plus a sort control and an "Unused" quick-filter chip. Shopping tiles category groups into a masonry grid with a sticky toolbar, auto-collapse for finished sections, and a progress bar. Diary condenses day-groups into a card grid with denser Month cells and Photos tiles. Pantry gets a category-chip wrap, a variant-row span for expanded generics, and an amber "Expiring soon" ribbon. Recipes gets skeleton-count parity with the grid.
+- **Diary search + meal-type filter.** Sticky toolbar gains a text search across recipe names, notes, and cook name, plus Breakfast / Lunch / Dinner / Snack quick chips. Each day-header shows a cook-count pill.
+- **Shared recipes search + sort + category filter.** Chips are scoped to only the categories that appear in what other users shared with you.
+- **Kitchens invite autocomplete.** Type-to-narrow picker pulls from the server user list (multi-user mode only). Freeform typing still works as a fallback.
+- **Admin inline edit user.** Full name and email edit in place from Settings → User Management. Username stays immutable as the stable identifier.
+- **PWA update flow.** In-app prompt asks to reload when a new version is out. Red dot on the Settings nav icon while an update is pending. Update-check cadence is configurable (Hourly / Every 4 hours / Every 12 hours / Daily / Manual).
+- **iOS PWA viewport lock.** Horizontal touch pan no longer drifts the whole page on iPhone Safari or the installed PWA. Rubber-band bounce stays contained inside the app.
+- **Server honors `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` env vars** via undici's `EnvHttpProxyAgent`, so every outbound scrape / import / AI call routes through a configured forward proxy without per-call-site changes.
+- **Step photos persist.** Recipe step photos survive save-and-reload (they were being silently dropped on every save before).
+
+### Changed
+
+- Profile page renders without its own header when opened from inside Settings; the Save button moves inline for the embedded view.
+- Recipe close button reliably returns to the Recipes list from any origin.
+- Cookbook import dialog's "Settings → Trace Assistant" link jumps straight to `/settings/ai` instead of the Settings index.
+
+### Fixed
+
+- **Kitchen auto-share was silently dropping every recipe created on the native Android app.** The mobile-write path (`/api/sync/push`) went straight to the DB and never called the fan-out hook, so Kitchen members saw nothing new from anyone cooking on their phone. Every recipe insert path now fans out uniformly. Toggling auto-share off then back on backfills any recipes created before this cut.
+- **Kitchen "N recipes shared" count double-counted** in kitchens with two or more members. Now counts distinct recipes.
+- **File / cookbook / URL / bulk import dialogs returned "Invalid CSRF token" on PWA.** Raw fetch calls now attach the CSRF header via a shared helper so every mutating import endpoint works ([#43](https://github.com/TraceApps/cooktrace/issues/43)).
+- **Password reset links, invite links, and the SMTP test email's embedded logo rendered as `http://` behind a TLS-terminating reverse proxy**, which mail providers flagged as spam. Now honors `X-Forwarded-Proto` and `X-Forwarded-Host` ([#42](https://github.com/TraceApps/cooktrace/pull/42), thanks @clifmo).
+- **Data left behind in single-user mode is adopted on upgrade.** Instances that already enabled user management on an earlier build had their unowned rows stranded for good. Startup now adopts them, once, when exactly one account exists.
+- **Enabling user management no longer strands data written in single-user mode** ([TraceApps/docs#2](https://github.com/TraceApps/docs/issues/2)). Cookbooks, recipe / pantry categories, custom + disabled units, and Trace chat history are now claimed alongside recipes / pantry / diary / shopping, in one transaction. Same handover runs whether the first account is created with a password or by the first OIDC sign-in.
+- **Deleting an account no longer leaves its hidden-unit preferences behind.** `disabled_units` was missing from every account-removal path (self-delete, admin delete, disable user management, lockout recovery). Same incomplete list existed a second time in the OIDC first-login bootstrap; both paths now share one implementation.
+- Show Shared Recipes toggle now mixes shared recipes into the main grid even when the owned list is empty. Search and filter apply uniformly across owned and shared.
+- Recipes tab: search input, sort, and category chips render even when the owned count is zero if shared-mix is on.
+- Various pantry polish (split-chip active state, chip typography parity, variant create button, source-chip filter, all-mode field shape, external-search opacity).
+
+### Security
+
+- CSRF header now attached to every raw-fetch mutating call so file / cookbook / URL / bulk imports enforce CSRF the same as every other POST ([#43](https://github.com/TraceApps/cooktrace/issues/43)).
+- Password reset and invite URLs now land on the correct HTTPS origin behind a TLS proxy, preventing accidental link degradation to `http://` ([#42](https://github.com/TraceApps/cooktrace/pull/42)).
+- No new dependencies. `npm audit` reports 0 vulnerabilities.
+
+---
+
+## [1.1.4-dev02] - 2026-08-16 (pre-release)
+
+Second dev pre-release of the 1.1.4 patch. Six findings from the code
+review of dev01: two silent data-loss guards on the recipe write path,
+a sync photo reconcile that took multiple cycles to converge, and a
+Trace confirmation dialog with UI polish.
+
+### Fixed
+
+- **Clearing the Trace chat now asks for confirmation.** A single tap on the header button previously wiped the entire conversation with no way back. Ports the same guard LiftTrace added in [TraceApps/lifttrace#50](https://github.com/TraceApps/lifttrace/pull/50) so behavior stays uniform across the three Trace apps. Also fixes a z-index bug where the confirm dialog opened behind the Trace panel.
+- **Recipe save from a client sending flat-shape ingredients no longer silently reverts.** The server-side empty-guard required every ingredient element to expose an `.items` field (grouped shape). Any client sending the legacy flat shape (`[{name, quantity, unit}, ...]`) — older builds, AI generators, some importers — was misclassified as empty, so the caller's non-empty ingredients were silently dropped in favor of the server's prior JSON. Now distinguishes by whether the element carries an own `items` field.
+- **Removing all tags from a recipe no longer silently reverts.** The tag chip UI's "remove all" edit sent `tags: []`, but the empty-guard treated that as "don't overwrite server tags", so on next refresh the tags reappeared. Tags removed from the guard list entirely — small blast radius (flat string array), common UI action, wrong tradeoff to preserve.
+- **Cook-diary rows with multiple broken phone-local photos now converge in one sync cycle** instead of one cycle per photo. Prior implementation processed each broken photo as its own job and spliced the array during iteration, silently shifting later jobs' cached array indexes so only the first got rewritten each pass.
+- **Missing-photo placeholder in the diary photos view no longer breaks silently if the tile markup gains a wrapper.** The `on:error` handler now uses `closest('.photo-tile')` / `closest('.lightbox-img-wrap')` instead of `parentElement`, so future DOM changes can't silently regress the fallback.
+
+### Changed
+
+- **Photo-reconcile SQL string literals switched to single quotes** (SQL standard) so the reconcile pass doesn't silently fail on any future `@capacitor-community/sqlite` build that disables `SQLITE_DQS_DML` (the SQLite team's own recommended default). The queries previously used SQLite's legacy double-quoted-string tolerance, which was silently OK today but would break on a strict-mode upgrade.
+- **Pantry orphan-slug console warning no longer spams the console.** The warn sat inside a reactive block that re-runs on every keystroke; users with orphan-slug items previously saw it 3× per typed word. Deduped via a module-scope Set so each unique orphan slug logs at most once per page load.
+
+### Security
+
+- No new dependencies. `npm audit` reports 0 vulnerabilities.
+
+---
+
+## [1.1.4-dev01] - 2026-08-16 (pre-release)
+
+First dev pre-release of the 1.1.4 patch. Bug fixes and pantry UI polish
+from the last two weeks plus a server-side recipe-write safety guard.
+
+### Fixed
+
+- **Pantry items no longer disappear when sorted A-Z** if their category slug doesn't match a current pantry-categories catalog entry ([#41](https://github.com/TraceApps/cooktrace/issues/41), thanks @xiaojwus). The grouping code silently dropped orphaned buckets; they now fall into Uncategorized so nothing is invisible. Trigger isn't specific to Chinese category names, but non-ASCII category slugs are one common way to hit slug drift between item and catalog.
+- **Variant Create button** enables when only an override name is typed (previously required a brand or the click did nothing). Button label now reflects which name will actually be created.
+- **"All" mode search results** render with full name, brand, barcode, and thumbnail. Previously showed only the source label with blank content due to a field-shape mismatch in the merged list.
+- **External OFF / USDA search results** render at full opacity. The out-of-stock signal for local pantry rows was leaking to external rows.
+- **Split-chip pills (OFF, USDA)** light up as one unit on hover and active state instead of just the half the cursor is over; text sizes match the non-split chips.
+- **Recipe save no longer wipes `ingredients` / `steps` / `tags` / `tools`** from a stale mobile client. Server-side empty-guards refuse an incoming empty value on a field that already has content. Legitimate deletes still work via the per-item delete flows.
+
+### Changed
+
+- **Pantry source-chip (OFF / USDA / All) is now a filter, not an append.** With an active query, picking one of these hides the local pantry list and shows only that source's external results. Local pantry stays visible when the Pantry chip is picked or when the query is empty.
+- **Grid / list view toggle** hides when the pantry list itself is hidden (external source chip with active query). The toggle has nothing to act on in that state.
+
+### Security
+
+- No new dependencies. `npm audit` reports 0 vulnerabilities.
+
+---
+
 ## [1.1.3] - 2026-08-08
 
 ### Fixed

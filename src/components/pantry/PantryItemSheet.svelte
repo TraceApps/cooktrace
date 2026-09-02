@@ -371,6 +371,9 @@
       // either, so ask the host to refetch.
       dispatch('refresh');
     } catch (e) {
+      // Surface the underlying error so logcat / DevTools show what failed
+      // when the toast isn't specific enough for triage.
+      console.error('[pantry] _addNewVariant failed:', e);
       showError(e?.message || 'Could not add variant');
     }
   }
@@ -1286,7 +1289,7 @@
                     {/if}
                     <span class="variant-add-spacer"></span>
                     <button class="btn btn-secondary" on:click={() => { addingVariantRow = false; newVariantBrand = ''; newVariantName = ''; newVariantNameOverride = false; }}>{$_('pantry_sheet_extra.cancel')}</button>
-                    <button class="btn btn-primary" on:click={_addNewVariant} disabled={!newVariantBrand.trim()}>{newVariantBrand.trim() ? `Create "${newVariantBrand.trim()}"` : 'Create Variant'}</button>
+                    <button class="btn btn-primary" on:click={_addNewVariant} disabled={!newVariantBrand.trim() && !(newVariantNameOverride && newVariantName.trim())}>{#if newVariantBrand.trim()}Create "{newVariantBrand.trim()}"{:else if newVariantNameOverride && newVariantName.trim()}Create "{newVariantName.trim()}"{:else}Create Variant{/if}</button>
                   </div>
                 </div>
               </div>
@@ -1342,7 +1345,7 @@
                     {/if}
                     <span class="variant-add-spacer"></span>
                     <button class="btn btn-secondary" on:click={() => { addingVariantRow = false; newVariantBrand = ''; newVariantName = ''; newVariantNameOverride = false; }}>{$_('pantry_sheet_extra.cancel')}</button>
-                    <button class="btn btn-primary" on:click={_addNewVariant} disabled={!newVariantBrand.trim()}>{newVariantBrand.trim() ? `Create "${newVariantBrand.trim()}"` : 'Create Variant'}</button>
+                    <button class="btn btn-primary" on:click={_addNewVariant} disabled={!newVariantBrand.trim() && !(newVariantNameOverride && newVariantName.trim())}>{#if newVariantBrand.trim()}Create "{newVariantBrand.trim()}"{:else if newVariantNameOverride && newVariantName.trim()}Create "{newVariantName.trim()}"{:else}Create Variant{/if}</button>
                   </div>
                 </div>
               </div>

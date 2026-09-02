@@ -34,6 +34,36 @@ import { Router } from 'express';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
+import { isEmptyForGuard } from '../lib/recipe-guards.js';
+import { autoShareNewRecipe } from '../lib/auto-share.js';
+
+// Option E guard (2026-08-11): the recipe UPDATE path replaces nested
+// JSON fields (ingredients/steps/tags/tools/nutrition) wholesale. A
+// stale mobile client whose local recipe was truncated would wipe the
+// server's real content on sync. Fix: for the recipes table only, if
+// an incoming nested field is empty AND the server has content, keep
+// the server value in the bound arguments. Applied inline here rather
+// than in _buildUpdateSql because the guard needs the current server
+// row (which the generic builder doesn't have access to).
+function _guardRecipeValuesForUpdate(values, spec, serverRow) {
+  const FIELDS = { ingredients: 'ingredients', steps: 'array', tags: 'array', tools: 'array', nutrition: 'object' };
+  const out = values.slice();
+  for (let i = 0; i < spec.cols.length; i++) {
+    const col = spec.cols[i];
+    const kind = FIELDS[col];
+    if (!kind) continue;
+    let incoming;
+    try { incoming = JSON.parse(out[i] ?? 'null'); } catch { incoming = null; }
+    if (!isEmptyForGuard(incoming, kind)) continue;
+    // Incoming empty; check server. Server row's field is already a
+    // string in the row shape (raw column). If server has content,
+    // preserve it in the bind slot.
+    let existing;
+    try { existing = JSON.parse(serverRow?.[col] ?? 'null'); } catch { existing = null; }
+    if (!isEmptyForGuard(existing, kind)) out[i] = serverRow[col];
+  }
+  return out;
+}
 
 const router = Router();
 router.use(requireAuth);
@@ -152,14 +182,19 @@ router.post('/push', wrap((req, res) => {
     const txn = db.transaction(() => {
       for (const row of rows) {
         const translated = _translateParents(row, spec, idMaps);
-        const values = spec.cols.map(c => _coerce(translated[c]));
+        let values = spec.cols.map(c => _coerce(translated[c]));
 
         if (row.server_id) {
+          // Fetch enough of the existing row to (a) authorize the write
+          // and (b) fuel the recipes empty-guard.
           const existing = db.prepare(
-            `SELECT id, user_id FROM ${name} WHERE id = ?`
+            `SELECT * FROM ${name} WHERE id = ?`
           ).get(row.server_id);
           if (!existing) continue;
           if ((u == null && existing.user_id != null) || (u != null && existing.user_id !== u)) continue;
+          if (name === 'recipes') {
+            values = _guardRecipeValuesForUpdate(values, spec, existing);
+          }
           db.prepare(updateSql).run(
             ...values,
             translated.updated_at || _now(),
@@ -178,6 +213,15 @@ router.post('/push', wrap((req, res) => {
           const serverId = info.lastInsertRowid;
           results[name].push({ client_id: row.client_id, server_id: serverId });
           idMaps[name][row.client_id] = serverId;
+          // Auto-share fan-out for native-created recipes. The REST
+          // POST /api/recipes route calls this same helper; without
+          // it here, Android-native recipe creates never fanned out
+          // to Kitchen members. Same fix rules: idempotent, no-op
+          // when the user has no auto_share kitchens.
+          if (name === 'recipes') {
+            try { autoShareNewRecipe(u, serverId); }
+            catch (e) { console.warn('[sync] auto-share fan-out failed for recipe', serverId, e?.message); }
+          }
         }
       }
     });
@@ -186,7 +230,13 @@ router.post('/push', wrap((req, res) => {
   }
 
   // ── disabled_units: replace-by-set ────────────────────────────────
-  if (Array.isArray(tables.disabled_units)) {
+  //
+  // Option E guard: only DELETE-then-INSERT when the client has actually
+  // sent entries. An empty array from a stale/wiped client used to
+  // silently truncate the user's whole disabled-units set. If the client
+  // genuinely wants to clear the set, the app can add an explicit flag
+  // later — no current UI path does this.
+  if (Array.isArray(tables.disabled_units) && tables.disabled_units.length > 0) {
     const txn = db.transaction(() => {
       db.prepare(`DELETE FROM disabled_units WHERE ${userClause(u)}`).run(...userArgs(u));
       const ins = db.prepare(`INSERT OR IGNORE INTO disabled_units (user_id, abbr) VALUES (?, ?)`);
@@ -202,12 +252,15 @@ router.post('/push', wrap((req, res) => {
       recipe_id:   idMaps.recipes?.[r.recipe_id]   || r.recipe_id,
       sort_order:  r.sort_order ?? 0,
     })).filter(r => r.cookbook_id && r.recipe_id);
-    const cookbookIds = [...new Set(translated.map(r => r.cookbook_id))];
+    // Option E guard (2026-08-11): additive-only. Prior behavior
+    // DELETE-then-INSERTed all links for every cookbook in the
+    // payload, so a stale client whose local cache had fewer links
+    // for cookbook X than the server would truncate the server's
+    // set on push. Removing a link from a cookbook now needs the
+    // explicit `DELETE /api/cookbooks/:id/links/:recipe_id` route;
+    // sync push only adds. Insertion order per link is preserved via
+    // sort_order on the row.
     const txn = db.transaction(() => {
-      if (cookbookIds.length) {
-        const ph = cookbookIds.map(() => '?').join(',');
-        db.prepare(`DELETE FROM recipe_cookbook_links WHERE cookbook_id IN (${ph})`).run(...cookbookIds);
-      }
       const ins = db.prepare(
         `INSERT OR IGNORE INTO recipe_cookbook_links (cookbook_id, recipe_id, sort_order) VALUES (?, ?, ?)`
       );

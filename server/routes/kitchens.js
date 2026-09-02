@@ -47,7 +47,7 @@ router.get('/', wrap((req, res) => {
     SELECT k.id, k.name, k.slug, k.owner_user_id, k.created_at,
            m.role, m.auto_share,
            (SELECT COUNT(*) FROM kitchen_members WHERE kitchen_id = k.id) AS member_count,
-           (SELECT COUNT(*) FROM recipe_shares
+           (SELECT COUNT(DISTINCT recipe_id) FROM recipe_shares
               WHERE via_kitchen_id = k.id AND granted_by = ?) AS auto_shared_count
       FROM kitchens k
       JOIN kitchen_members m ON m.kitchen_id = k.id
@@ -68,14 +68,16 @@ function _fanoutAllMyRecipesIntoKitchen(userId, kitchenId, toUserIds) {
     `INSERT OR IGNORE INTO recipe_shares (recipe_id, grantee_id, granted_by, via_kitchen_id)
      VALUES (?, ?, ?, ?)`
   );
-  let added = 0;
+  let added = 0, grants = 0;
   for (const r of recipes) {
     for (const grantee of toUserIds) {
       if (grantee === userId) continue;
+      grants++;
       const res = ins.run(r.id, grantee, userId, kitchenId);
       if (res.changes > 0) added++;
     }
   }
+  console.info(`[kitchen ${kitchenId}] auto-share fan-out: user=${userId} recipes=${recipes.length} grants_attempted=${grants} rows_inserted=${added}`);
   return { recipes: recipes.length, added };
 }
 

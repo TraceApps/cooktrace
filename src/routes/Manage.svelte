@@ -12,7 +12,8 @@
    */
   import { _ } from 'svelte-i18n';
   import { push } from 'svelte-spa-router';
-  import { pageBanners, bannerStyle } from '../stores/settings.js';
+  import { fade } from 'svelte/transition';
+  import { pageBanners, bannerStyle, disableAnimations } from '../stores/settings.js';
   import { NtApi } from '../lib/api.js';
   import ManageRecipeCategories from '../components/manage/ManageRecipeCategories.svelte';
   import ManagePantryCategories from '../components/manage/ManagePantryCategories.svelte';
@@ -117,36 +118,40 @@
       {/each}
     </nav>
 
-    <!-- Pane swap is direct (no {#key}) so the page-header banner
-         stays mounted and the rail pill is the only visible motion
-         when the user picks a section. Each panel does its own
-         loading internally. -->
+    <!-- Pane swap uses {#key activeId} + in:fade so switching sections
+         gives a soft cross-fade instead of a hard cut. Matches the NT
+         Settings pattern. The page-header banner + rail pill stay
+         mounted through the swap (they live outside this .pane). -->
     <main class="pane">
-      {#if activeId === 'recipe-categories'}
-        <ManageRecipeCategories />
-      {:else if activeId === 'pantry-categories'}
-        <ManagePantryCategories />
-      {:else if activeId === 'tags'}
-        <ManageTaxonomyList
-          title="Tags"
-          description="Free-form descriptors users add to recipes (vegan, italian, weeknight). Renaming or deleting cascades through every recipe that uses it."
-          loadFn={() => NtApi.getRecipeTags()}
-          renameFn={(o, n) => NtApi.renameRecipeTag(o, n)}
-          deleteFn={(name) => NtApi.deleteRecipeTag(name)}
-        />
-      {:else if activeId === 'kitchen-gear'}
-        <ManageTaxonomyList
-          title="Kitchen Gear"
-          description="Tools users list on recipes — pans, spatulas, mixers, parchment paper, sheet trays, anything they reach for. Renaming or deleting cascades through every recipe."
-          loadFn={() => NtApi.getRecipeTools()}
-          renameFn={(o, n) => NtApi.renameRecipeTool(o, n)}
-          deleteFn={(name) => NtApi.deleteRecipeTool(name)}
-        />
-      {:else if activeId === 'units'}
-        <ManageUnits />
-      {:else if activeId === 'cookbooks'}
-        <ManageCookbooks />
-      {/if}
+      {#key activeId}
+        <div class="pane-fade" in:fade={{ duration: $disableAnimations ? 0 : 140 }}>
+          {#if activeId === 'recipe-categories'}
+            <ManageRecipeCategories />
+          {:else if activeId === 'pantry-categories'}
+            <ManagePantryCategories />
+          {:else if activeId === 'tags'}
+            <ManageTaxonomyList
+              title="Tags"
+              description="Free-form descriptors users add to recipes (vegan, italian, weeknight). Renaming or deleting cascades through every recipe that uses it."
+              loadFn={() => NtApi.getRecipeTags()}
+              renameFn={(o, n) => NtApi.renameRecipeTag(o, n)}
+              deleteFn={(name) => NtApi.deleteRecipeTag(name)}
+            />
+          {:else if activeId === 'kitchen-gear'}
+            <ManageTaxonomyList
+              title="Kitchen Gear"
+              description="Tools users list on recipes — pans, spatulas, mixers, parchment paper, sheet trays, anything they reach for. Renaming or deleting cascades through every recipe."
+              loadFn={() => NtApi.getRecipeTools()}
+              renameFn={(o, n) => NtApi.renameRecipeTool(o, n)}
+              deleteFn={(name) => NtApi.deleteRecipeTool(name)}
+            />
+          {:else if activeId === 'units'}
+            <ManageUnits />
+          {:else if activeId === 'cookbooks'}
+            <ManageCookbooks />
+          {/if}
+        </div>
+      {/key}
     </main>
   </div>
 </div>
@@ -155,23 +160,34 @@
   .manage-page { padding-bottom: 24px; }
 
   /* Two-column body. Stacks on mobile so the rail becomes a horizontal
-     chip-row at the top. */
+     chip-row at the top. No outer max-width cap: on wide monitors the
+     two-pane should fill the viewport (same principle Settings and
+     Diary follow) instead of stranding hundreds of pixels of dead
+     space to the left and right. */
   .manage-body {
     display: flex;
     flex-direction: column;
     gap: 16px;
     padding: 16px var(--page-px) 24px;
-    max-width: 1280px;
-    margin: 0 auto;
     box-sizing: border-box;
     width: 100%;
   }
   @media (min-width: 880px) {
     .manage-body {
       display: grid;
-      grid-template-columns: 280px 1fr;
+      grid-template-columns: 280px minmax(0, 1fr);
       gap: 24px;
       align-items: flex-start;
+    }
+  }
+  /* Ultrawide (>=1440px): give the rail a touch more room so long
+     descriptions ("Tools used in recipes, pots, pans, spatulas…")
+     don't wrap as aggressively. Right pane keeps minmax(0,1fr) so
+     it soaks up the rest of the viewport. */
+  @media (min-width: 1440px) {
+    .manage-body {
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 28px;
     }
   }
 
@@ -185,6 +201,8 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     padding-bottom: 4px;
+    /* Opt back in to horizontal touch (body sets pan-y for iOS lock). */
+    touch-action: pan-x;
   }
   /* Sliding pill that animates between rail items. Sized + positioned
      by JS-measured CSS vars (--rail-x/y/w/h). Spring transition for
@@ -239,10 +257,24 @@
     .rail {
       flex-direction: column;
       gap: 4px;
-      overflow: visible;
       padding: 0;
       position: sticky;
-      top: 16px;
+      /* Pin below the page-header (which is itself sticky at top:0).
+         Same offset math the Settings rail uses so the two pages feel
+         identical. --page-top / --hamburger-row are set globally by
+         App.svelte based on banner mode + persistent-sidebar state. */
+      top: calc(var(--page-top, var(--safe-top)) + 72px + var(--hamburger-row, 0px));
+      /* Own scroll when the rail is taller than the viewport, so the
+         section list never scrolls with the right pane. */
+      max-height: calc(100vh
+        - var(--page-top, var(--safe-top))
+        - 92px
+        - var(--hamburger-row, 0px)
+        - var(--nav-h, 0px)
+        - var(--safe-bottom, 0px));
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
     }
     .rail-item {
       width: 100%;

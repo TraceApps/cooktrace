@@ -23,6 +23,7 @@
   import { createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
+  import { mutatingAuthHeaders } from '../../lib/api.js';
   import {
     aiEnabled, aiProvider, aiApiKey, aiModel, aiBaseUrl,
   } from '../../stores/settings.js';
@@ -92,6 +93,7 @@
         method: 'POST',
         body: form,
         credentials: 'include',
+        headers: mutatingAuthHeaders(),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -273,7 +275,7 @@ Rules:
           {#if envLocked}
             <p>Cookbook import isn't available when the AI provider is configured via environment variables — the server proxy doesn't relay tool calls. Ask the admin to switch to the user-key flow.</p>
           {:else}
-            <p>Cookbook import needs Trace AI. Enable it in <a href="#/settings" on:click|preventDefault={() => { close(); push('/settings'); }}>Settings → Trace Assistant</a> first, or use Bulk Import for already-split recipe files.</p>
+            <p>Cookbook import needs Trace AI. Enable it in <a href="#/settings/ai" on:click|preventDefault={() => { close(); push('/settings/ai'); }}>Settings → Trace Assistant</a> first, or use Bulk Import for already-split recipe files.</p>
           {/if}
         </div>
         <footer class="actions">

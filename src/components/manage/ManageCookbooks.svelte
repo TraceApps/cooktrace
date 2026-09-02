@@ -40,6 +40,12 @@
   let _coverInputs = {};   // id → file-input ref for inline cover upload
   let coverUploading = false;
 
+  let filter = '';
+  $: filtered = filter.trim()
+    ? cookbooks.filter(cb => cb.name.toLowerCase().includes(filter.trim().toLowerCase()))
+    : cookbooks;
+  $: filteredEmpty = cookbooks.length > 0 && filtered.length === 0;
+
   async function load() {
     loading = true;
     try {
@@ -230,8 +236,12 @@
     {#if cookbooks.length === 0}
       <p class="empty">No cookbooks yet. Create one below.</p>
     {:else}
+      <input class="input filter" type="search" placeholder="Filter…" bind:value={filter} />
+      {#if filteredEmpty}
+        <p class="empty">No items match "{filter}".</p>
+      {:else}
       <ul class="row-list">
-        {#each cookbooks as cb (cb.id)}
+        {#each filtered as cb (cb.id)}
           <li class="row"
             class:dragging={draggingId === cb.id}
             class:drag-over={dragOverId === cb.id && draggingId !== cb.id}
@@ -308,6 +318,7 @@
           </li>
         {/each}
       </ul>
+      {/if}
     {/if}
 
     <div class="add-row">
@@ -361,6 +372,8 @@
   .mgr-desc { margin: 0; color: var(--text-3); font-size: 13px; }
   .empty { color: var(--text-3); font-size: 13px; margin: 0; }
 
+  .filter { width: 100%; box-sizing: border-box; }
+
   .row-list { list-style: none; margin: 0; padding: 0; }
   .row {
     display: flex; align-items: center; gap: 14px;
@@ -368,6 +381,25 @@
     border-top: 1px solid var(--border);
   }
   .row:first-child { border-top: none; }
+
+  /* Wide screens — collapse the single-column stack into a responsive
+     card grid so cookbooks (cover + title + desc + count) tile side by
+     side. Larger minmax than the other managers because each row is
+     already a rich card with a 56px cover thumbnail. */
+  @media (min-width: 1200px) {
+    .row-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+      gap: 8px 24px;
+    }
+    .row, .row:first-child {
+      border-top: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      background: var(--surface-1);
+    }
+  }
 
   .cover {
     flex-shrink: 0;

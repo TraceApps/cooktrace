@@ -15,6 +15,7 @@
   import { confirmDialog } from '../../stores/confirmDialog.js';
   import { currentUser, userMgmtActive } from '../../stores/auth.js';
   import Spinner from '../ui/Spinner.svelte';
+  import Combobox from '../ui/Combobox.svelte';
 
   let kitchens = [];
   let loading = false;
@@ -25,12 +26,33 @@
   // Per-kitchen expanded panel state
   let openId = null;
   let members = {};      // { kitchenId: [member, ...] }
-  let inviteName = '';
+  let inviteName = '';        // Combobox picked value (display name string)
+  let inviteTyped = '';       // Raw typed text (for freeform invite fallback)
   let inviteBusy = false;
+
+  // Peer list for the invite autocomplete. Comes from /api/users/list
+  // which is gated on sharing_enabled; if disabled we get [] and the
+  // Combobox behaves like a plain create-on-enter input. Each entry is
+  // { name, username } — name is the display label, username is what
+  // the invite endpoint requires. Load once alongside kitchens.
+  let peers = [];
+  async function loadPeers() {
+    try { peers = await NtApi.getUsersList(); }
+    catch (e) {
+      // Non-fatal — the Combobox falls back to freeform-invite. Log
+      // instead of silent swallow so a 401/403/500 doesn't look like
+      // "no other users" to the user.
+      console.warn('[kitchens] getUsersList failed', e);
+      peers = [];
+    }
+  }
 
   async function load() {
     loading = true;
-    try { kitchens = await NtApi.getKitchens(); }
+    try {
+      const [ks] = await Promise.all([NtApi.getKitchens(), loadPeers()]);
+      kitchens = ks;
+    }
     catch (e) { showError(e.message || 'Could not load Kitchens'); kitchens = []; }
     finally { loading = false; }
   }
@@ -57,17 +79,36 @@
     if (openId === id) { openId = null; return; }
     openId = id;
     inviteName = '';
+    inviteTyped = '';
     if (!members[id]) await loadMembers(id);
   }
 
+  // Resolve the invite input to a username. Priority:
+  //   1. Combobox picked a peer whose display name matches — use their
+  //      username (handles peers whose display name differs from
+  //      username, e.g. "Joseph Lo Campo" -> "joe").
+  //   2. Freeform typed text — send as-is; server looks up by username.
+  //   3. Nothing typed — no-op.
+  function _resolveInviteUsername() {
+    const picked = (inviteName || '').trim();
+    const typed  = (inviteTyped || '').trim();
+    if (picked) {
+      const peer = peers.find(p => p.name === picked || p.username === picked);
+      if (peer?.username) return peer.username;
+      return picked;
+    }
+    return typed;
+  }
+
   async function invite(kitchenId) {
-    const username = inviteName.trim();
+    const username = _resolveInviteUsername();
     if (!username) return;
     inviteBusy = true;
     try {
       await NtApi.addKitchenMember(kitchenId, username);
       showSuccess(`Added ${username}`);
       inviteName = '';
+      inviteTyped = '';
       await loadMembers(kitchenId);
       // Update member_count cached on the row.
       kitchens = kitchens.map(k => k.id === kitchenId ? { ...k, member_count: (members[kitchenId] || []).length } : k);
@@ -244,10 +285,23 @@
 
               {#if isOwner(k)}
                 <div class="invite-row">
-                  <input class="input" type="text" placeholder={$_('settings_kitchens_ct.invite_username_ph')} bind:value={inviteName}
-                    on:keydown={(e) => { if (e.key === 'Enter') invite(k.id); }} />
+                  <div class="invite-picker">
+                    <Combobox
+                      mode="single"
+                      bind:value={inviteName}
+                      bind:typed={inviteTyped}
+                      options={peers}
+                      placeholder={peers.length > 0
+                        ? 'Type a name or username…'
+                        : $_('settings_kitchens_ct.invite_username_ph')}
+                      creatable={true}
+                      createLabel="Add"
+                      maxResults={20}
+                      on:create={() => invite(k.id)}
+                    />
+                  </div>
                   <button class="btn btn-secondary" on:click={() => invite(k.id)}
-                    disabled={inviteBusy || !inviteName.trim()}>
+                    disabled={inviteBusy || (!inviteName.trim() && !inviteTyped.trim())}>
                     {inviteBusy ? 'Adding…' : 'Add'}
                   </button>
                 </div>
@@ -387,7 +441,8 @@
     font-size: 13px;
   }
   .member-name { display: inline-flex; align-items: center; gap: 6px; }
-  .invite-row { display: flex; gap: 8px; margin-top: 4px; }
+  .invite-row { display: flex; gap: 8px; margin-top: 4px; align-items: center; }
   .invite-row .input { flex: 1; }
+  .invite-picker { flex: 1; min-width: 0; }
   .kitchen-actions { display: flex; justify-content: flex-end; padding-top: 6px; }
 </style>

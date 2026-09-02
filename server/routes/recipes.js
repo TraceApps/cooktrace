@@ -18,6 +18,7 @@ import { aiExtractRecipe } from '../lib/recipe-ai-fallback.js';
 import { scrapeWithRecipeScrapers, isRecipeScrapersAvailable } from '../lib/recipe-scrapers-bridge.js';
 import { importRecipeFromText, importPaprikaArchive, scanRecipeZip, scanLoadedZip, loadRecipeZip, readImageFromLoadedZip, readZipImageBytes, mealieEventImagePaths } from '../lib/recipe-importers.js';
 import { extractText, detectFileType } from '../lib/text-extractors.js';
+import { guardNestedRecipeFields } from '../lib/recipe-guards.js';
 import { parseRecipeText, HIGH_CONFIDENCE_THRESHOLD } from '../lib/heuristic-recipe-parser.js';
 import JSZip from 'jszip';
 import path from 'node:path';
@@ -41,29 +42,26 @@ function _userArgs(u) {
   return u == null ? [] : [u];
 }
 
-// Auto-share fanout — called after every recipe INSERT (manual create,
-// URL scrape, ZIP import, photo import, all paths). If the user has
-// auto_share=1 for any Kitchen they belong to, fan out per-user grants
-// to every other member of that Kitchen via recipe_shares. Idempotent
-// via UNIQUE(recipe_id, grantee_id). No-op when user has no kitchens
-// or hasn't enabled auto-share for any of them.
-function _autoShareNewRecipe(userId, recipeId) {
-  if (userId == null || !Number.isFinite(recipeId)) return;
-  const kitchens = db.prepare(
-    `SELECT kitchen_id FROM kitchen_members WHERE user_id = ? AND auto_share = 1`
-  ).all(userId);
-  if (kitchens.length === 0) return;
-  const ins = db.prepare(
-    `INSERT OR IGNORE INTO recipe_shares (recipe_id, grantee_id, granted_by, via_kitchen_id)
-     VALUES (?, ?, ?, ?)`
-  );
-  for (const k of kitchens) {
-    const members = db.prepare(
-      `SELECT user_id FROM kitchen_members WHERE kitchen_id = ? AND user_id != ?`
-    ).all(k.kitchen_id, userId);
-    for (const m of members) ins.run(recipeId, m.user_id, userId, k.kitchen_id);
-  }
-}
+// Auto-share fan-out is now in server/lib/auto-share.js so both this
+// route AND server/routes/sync.js can call it. Native-app recipe
+// creates flow through /sync/push, which bypassed the previous in-file
+// helper and silently dropped every mobile-created recipe out of
+// auto-share (root cause of the "member sees nothing" bug).
+import { autoShareNewRecipe as _autoShareNewRecipe } from '../lib/auto-share.js';
+
+// Recipe row -> API-shape hydration lives in server/lib/recipe-hydrate.js
+// so cookbooks.js can hydrate cookbook recipe cards identically (they
+// were missing category / tags / pantry_match versus this endpoint's
+// cards — same class of drift as the auto-share miss above). Aliased
+// to the original local names so every call site below is unchanged.
+import {
+  hydrateRecipe as _hydrate,
+  normaliseIngredientGroups as _normaliseIngredientGroups,
+  safeJson as _safeJson,
+  matchSummary as _matchSummary,
+  buildStockSet as _buildStockSet,
+  buildCategoryMap as _buildCategoryMap,
+} from '../lib/recipe-hydrate.js';
 
 // Tack the creator's current avatar onto a hydrated recipe so the
 // byline can render their photo. Live lookup (cheap PK fetch) keeps
@@ -87,53 +85,6 @@ function _withCreatorAvatar(hydrated, row) {
     // is the email in most installs).
     created_by_full_name: creatorFullName,
   };
-}
-
-function _hydrate(row, categoryMap = null) {
-  if (!row) return null;
-  // Resolve the recipe's category. Single-recipe path passes no map and
-  // we fall back to a per-row SELECT (cheap, one query). The list path
-  // builds a Map up-front and passes it in to avoid N+1.
-  let category = null;
-  if (row.category_id != null) {
-    if (categoryMap) {
-      category = categoryMap.get(row.category_id) || null;
-    } else {
-      category = db.prepare(
-        `SELECT id, name, slug, color FROM recipe_categories WHERE id = ?`
-      ).get(row.category_id) || null;
-    }
-  }
-  return {
-    ...row,
-    // Always return ingredients in the new grouped shape:
-    //   [{ name: '', items: [{ qty, unit, name, note }, ...] }, ...]
-    // Old flat-array recipes get hoisted into a single unnamed group on read.
-    ingredients: _normaliseIngredientGroups(_safeJson(row.ingredients, [])),
-    steps:       _safeJson(row.steps, []),
-    tags:        _safeJson(row.tags, []),
-    tools:       _safeJson(row.tools, []),
-    nutrition:   _safeJson(row.nutrition, {}),
-    favorite:    !!row.favorite,
-    category,
-  };
-}
-
-function _normaliseIngredientGroups(raw) {
-  if (!Array.isArray(raw) || raw.length === 0) return [];
-  // Detect old flat shape: items have qty/unit/name at the top level rather
-  // than an `items` array. Wrap in a single empty-name group.
-  const looksFlat = raw.every(r => r && typeof r === 'object' && !Array.isArray(r.items));
-  if (looksFlat) return [{ name: '', items: raw }];
-  // Already grouped — make sure each entry has the expected shape.
-  return raw.map(g => ({
-    name:  (g && g.name) || '',
-    items: Array.isArray(g && g.items) ? g.items : [],
-  }));
-}
-function _safeJson(text, fallback) {
-  if (text == null || text === '') return fallback;
-  try { return JSON.parse(text); } catch { return fallback; }
 }
 
 // Sodium ↔ salt derivation lives in server/lib/nutrition-derive.js so
@@ -222,57 +173,15 @@ router.get('/', wrap((req, res) => {
     `SELECT * FROM recipes WHERE ${_whereUser(u)} AND deleted_at IS NULL ORDER BY updated_at DESC`
   ).all(..._userArgs(u));
 
-  // Build a Set of "effectively in-stock" pantry_item_ids once for the
-  // whole list, so the pantry-match summary on each card is
-  // O(ingredients) per recipe.
-  //
-  // Variant-aware (Issue #4): a row counts as in-stock when its own
-  // in_stock = 1, OR when it is a generic with at least one in-stock
-  // child variant. Recipes whose ingredient links to either the parent
-  // or a specific child get a correct match either way.
-  const allStock = db.prepare(
-    `SELECT id, generic_parent_id, in_stock FROM pantry_items
-       WHERE ${_whereUser(u)} AND deleted_at IS NULL`
-  ).all(..._userArgs(u));
-  const stockSet = new Set();
-  const stockedByParent = new Set();
-  for (const r of allStock) {
-    if (r.in_stock) {
-      stockSet.add(r.id);
-      if (r.generic_parent_id != null) stockedByParent.add(r.generic_parent_id);
-    }
-  }
-  // Promote every generic whose any child is in stock.
-  for (const r of allStock) {
-    if (stockedByParent.has(r.id)) stockSet.add(r.id);
-  }
-
-  // Bulk-prefetch categories for the user once, then index by id. Avoids
-  // an N+1 SELECT inside _hydrate.
-  const catMap = new Map();
-  for (const c of db.prepare(
-    `SELECT id, name, slug, color FROM recipe_categories WHERE ${_whereUser(u)}`
-  ).all(..._userArgs(u))) {
-    catMap.set(c.id, c);
-  }
+  // Stock set + category map are per-user, request-scoped batch
+  // helpers from recipe-hydrate.js — shared with cookbooks.js so both
+  // surfaces compute pantry_match and category identically.
+  const stockSet = _buildStockSet(u);
+  const catMap = _buildCategoryMap(u);
 
   const out = ownRows.map(r => _hydrate(r, catMap)).map(r => ({ ...r, pantry_match: _matchSummary(r.ingredients, stockSet) }));
   res.json(out);
 }));
-
-// Count "X of Y ingredients you have in stock" given the recipe's grouped
-// ingredient JSON + a Set of in-stock pantry_item_ids.
-function _matchSummary(grouped, stockSet) {
-  if (!Array.isArray(grouped)) return { have: 0, need: 0 };
-  let have = 0, need = 0;
-  for (const g of grouped) {
-    for (const it of (g.items || [])) {
-      need++;
-      if (it.pantry_item_id && stockSet.has(it.pantry_item_id)) have++;
-    }
-  }
-  return { have, need };
-}
 
 // ── Categories ──────────────────────────────────────────────────────────
 // Per-user catalog. Declared BEFORE /:id handlers so the static prefix
@@ -639,6 +548,19 @@ router.put('/:id', wrap((req, res) => {
   const data = _toStorage(body);
   if (!data.name) return res.status(400).json({ error: 'Name is required' });
 
+  // Option E guard (2026-08-11): if any of the nested JSON fields
+  // (ingredients / steps / tags / tools / nutrition) is empty on the
+  // incoming request BUT non-empty on the server row, preserve the
+  // server value. This closes the wipe class: a stale mobile client
+  // whose cached recipe was truncated can no longer blow away the
+  // server's real ingredients/steps just by saving. Genuine empties
+  // are exceptionally rare in the UI (users delete the recipe, not
+  // clear its steps) so the tradeoff is right. See
+  // project_traceapps_diary_merge_port for the audit trail; if a
+  // real workflow later needs to send a legitimate empty for one of
+  // these fields, promote CT to full Option C (per-uuid merge).
+  const guarded = guardNestedRecipeFields({ existing, incoming: data });
+
   db.prepare(
     `UPDATE recipes SET
        name = ?, description = ?, img_url = ?, servings = ?, yield_text = ?,
@@ -650,7 +572,7 @@ router.put('/:id', wrap((req, res) => {
   ).run(
     data.name, data.description, data.img_url, data.servings, data.yield_text,
     data.prep_minutes, data.cook_minutes, data.total_minutes, data.rest_minutes, data.rating, data.favorite,
-    data.ingredients, data.steps, data.tags, data.tools, data.nutrition,
+    guarded.ingredients, guarded.steps, guarded.tags, guarded.tools, guarded.nutrition,
     data.source_url, data.notes, data.visibility, data.category_id, data.video_url,
     id,
   );

@@ -65,6 +65,36 @@ for (const [key, value] of Object.entries(CtApiNative)) {
   }
 }
 
+// getRecipe fallback: on native connected mode, only recipes the user
+// OWNS are synced into local SQLite. Recipes shared with them via
+// Kitchen or a direct grant live only on the server. A local lookup
+// for a shared recipe id returns null → blank RecipeView. Wrap the
+// cached getRecipe so a local miss falls back to the server. Owned
+// recipes still hit local first for offline / speed.
+wrapped.getRecipe = async function (id) {
+  try {
+    const local = await CtApiNative.getRecipe(id);
+    if (local) return local;
+  } catch { /* fall through */ }
+  // Server fallback. Matches what _CtApiHttp.getRecipe does end-to-end
+  // (Bearer for native connected mode + the img_url→imgUrl normalization
+  // RecipeView relies on). Kept inline instead of importing _CtApiHttp
+  // because it's a module-private const in api.js.
+  const { getServerUrl, getAuthToken, apiUrl, resolveAssetUrl } = await import('./platform.js');
+  const headers = {};
+  if (getServerUrl()) {
+    const token = getAuthToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(apiUrl(`/api/recipes/${id}`), { headers, credentials: 'include' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const row = await res.json();
+  if (!row) return null;
+  // Same shape _imgFromApi produces so RecipeView renders correctly.
+  const { img_url, ...rest } = row;
+  return { ...rest, imgUrl: resolveAssetUrl(img_url) || '' };
+};
+
 // Kick off the periodic background sync the first time anything calls
 // into the cached impl. Safe to call repeatedly (startSyncLoop is
 // idempotent).

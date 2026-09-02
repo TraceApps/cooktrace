@@ -9,6 +9,18 @@ import { Router } from 'express';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
+// Same recipe-card hydration the Recipes tab uses (category, tags,
+// rating, pantry_match) — cookbook recipe rows were previously pulled
+// with a much narrower SELECT and no hydration step, so a recipe's
+// card looked materially thinner inside a cookbook than on the
+// Recipes tab. See server/lib/recipe-hydrate.js for why this is
+// shared rather than a second, thinner copy.
+import {
+  hydrateRecipe,
+  matchSummary,
+  buildStockSet,
+  buildCategoryMap,
+} from '../lib/recipe-hydrate.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -66,9 +78,12 @@ function _evalSmartFilter(userId, filter) {
     where.push(`COALESCE(r.prep_minutes, 0) + COALESCE(r.cook_minutes, 0) <= ?`);
     args.push(filter.max_total_minutes);
   }
+  // Full row (not a narrow column list) — the caller runs every row
+  // through hydrateRecipe/matchSummary just like the non-smart branch,
+  // so a smart cookbook's cards get the same category/tags/rating/
+  // pantry_match as everywhere else recipe cards render.
   const sql = `
-    SELECT r.id, r.name, r.description, r.img_url, r.servings, r.rating, r.favorite,
-           r.prep_minutes, r.cook_minutes, r.last_cooked_at, r.cook_count, r.tags
+    SELECT r.*
       FROM recipes r
      WHERE ${where.join(' AND ')}
      ORDER BY r.updated_at DESC
@@ -85,8 +100,7 @@ function _evalSmartFilter(userId, filter) {
       return tagFilter.every(t => have.has(t));
     });
   }
-  // Strip the raw tags JSON before returning.
-  return rows.map(r => { const { tags, ...rest } = r; return rest; });
+  return rows;
 }
 
 // userClause variant for an aliased table (the JOIN paths below).
@@ -199,9 +213,12 @@ router.get('/:id', wrap((req, res) => {
     try { filter = cb.smart_filter_json ? JSON.parse(cb.smart_filter_json) : null; } catch {}
     recipes = _evalSmartFilter(cb.user_id, filter || {});
   } else {
+    // Full row (not the old narrow column list) so hydrateRecipe below
+    // can resolve category / tags / ingredients the same as every
+    // other recipe-card surface. link_order still rides along for
+    // locked-placeholder sort stability.
     recipes = db.prepare(
-      `SELECT r.id, r.user_id, r.name, r.description, r.img_url, r.servings, r.rating, r.favorite,
-              r.prep_minutes, r.cook_minutes, r.last_cooked_at, r.cook_count, l.sort_order AS link_order
+      `SELECT r.*, l.sort_order AS link_order
          FROM recipe_cookbook_links l
          JOIN recipes r ON r.id = l.recipe_id
         WHERE l.cookbook_id = ? AND r.deleted_at IS NULL
@@ -230,6 +247,18 @@ router.get('/:id', wrap((req, res) => {
     }
   }
 
+  // Category map is scoped to the cookbook OWNER (cb.user_id), not the
+  // current viewer — recipe.category_id always points into the
+  // owner's own recipe_categories table, regardless of who's reading.
+  // pantry_match only makes sense for the owner's own read: "N of M
+  // ingredients you have" needs to mean the current viewer's pantry,
+  // and for a shared-cookbook read that's a different person's pantry
+  // than the recipe owner's — so, matching how /recipes/shared-with-me
+  // already handles this (it omits pantry_match entirely rather than
+  // guess whose stock to check), only compute it when isOwner.
+  const catMap = buildCategoryMap(cb.user_id);
+  const stockSet = isOwner ? buildStockSet(cb.user_id) : null;
+
   const hydratedRecipes = recipes.map(r => {
     if (accessible && !accessible.has(r.id)) {
       // Locked — expose enough to render a placeholder row (name + id
@@ -241,8 +270,9 @@ router.get('/:id', wrap((req, res) => {
         locked: true,
       };
     }
-    const { user_id, ...rest } = r;
-    return { ...rest, favorite: !!r.favorite };
+    const hydrated = hydrateRecipe(r, catMap);
+    if (stockSet) hydrated.pantry_match = matchSummary(hydrated.ingredients, stockSet);
+    return hydrated;
   });
 
   res.json({

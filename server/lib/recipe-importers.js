@@ -14,7 +14,19 @@
  */
 import * as zlib from 'node:zlib';
 import { promisify } from 'node:util';
+import { randomUUID } from 'node:crypto';
 import JSZip from 'jszip';
+
+// Stable per-ingredient id — same shape the editor stamps client-side
+// (crypto.randomUUID) so per-step refIds work end-to-end. Only used
+// by importers that carry step→ingredient adjacency in the source
+// (Tandoor today; more later if we add them). Fallback for hardened
+// runtimes without crypto.randomUUID (should never fire on Node
+// >=15 but keeps the code robust).
+function _ingId() {
+  try { return randomUUID(); }
+  catch { return 'ing_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
+}
 import {
   extractRecipeFromHtml,
   normaliseSchemaOrgRecipe,
@@ -229,24 +241,41 @@ function _mealieNutrition(n) {
 // ── Tandoor format ──────────────────────────────────────────────────────────
 function _importTandoor(r) {
   const groups = [];
+  // source-step reference → array of ingredient ids created from it.
+  // Used a WeakMap so the mapping doesn't outlive the source object.
+  // Populated in the same loop that builds ingredient groups; consumed
+  // when we build the steps array below so the CT step gains a refIds
+  // pointing at the ingredients its source step listed. Preserves the
+  // step→ingredient adjacency Tandoor carries in its export (issue
+  // #40's whole point on the import side).
+  const refsByStep = new WeakMap();
   for (const step of (r.steps || [])) {
     const items = (step.ingredients || []).map(rec => ({
+      id: _ingId(),
       qty: rec.amount != null ? String(rec.amount) : '',
       unit: rec.unit?.name || '',
       name: rec.food?.name || rec.original_text || '',
       note: rec.note || '',
     })).filter(i => i.name);
-    if (items.length) groups.push({ name: step.name || '', items });
+    if (items.length) {
+      groups.push({ name: step.name || '', items });
+      refsByStep.set(step, items.map(i => i.id));
+    }
   }
   // If only a single unnamed group, flatten
   const ingredients = groups.length === 1 && !groups[0].name
     ? [{ name: '', items: groups[0].items }]
     : groups;
 
-  const steps = (r.steps || []).map(s => ({
-    title: s.name || '',
-    text: (s.instruction || '').trim(),
-  })).filter(s => s.text);
+  const steps = (r.steps || []).map(s => {
+    const built = {
+      title: s.name || '',
+      text: (s.instruction || '').trim(),
+    };
+    const refIds = refsByStep.get(s);
+    if (refIds && refIds.length > 0) built.refIds = refIds;
+    return built;
+  }).filter(s => s.text);
 
   return {
     name: r.name || 'Imported recipe',

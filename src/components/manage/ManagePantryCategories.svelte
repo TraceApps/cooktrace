@@ -26,6 +26,12 @@
   let newDefaultAisle = '';
   let creating = false;
 
+  let filter = '';
+  $: filtered = filter.trim()
+    ? categories.filter(c => c.name.toLowerCase().includes(filter.trim().toLowerCase()))
+    : categories;
+  $: filteredEmpty = categories.length > 0 && filtered.length === 0;
+
   async function load() {
     loading = true;
     try { categories = await NtApi.getPantryCategories(); }
@@ -141,8 +147,12 @@
   {:else if categories.length === 0}
     <p class="empty">No categories yet. Add one below.</p>
   {:else}
+    <input class="input filter" type="search" placeholder="Filter…" bind:value={filter} />
+    {#if filteredEmpty}
+      <p class="empty">No items match "{filter}".</p>
+    {:else}
     <ul class="row-list">
-      {#each categories as c (c.id)}
+      {#each filtered as c (c.id)}
         <li class="row"
           class:dragging={draggingId === c.id}
           class:drag-over={dragOverId === c.id}
@@ -194,6 +204,7 @@
         </li>
       {/each}
     </ul>
+    {/if}
   {/if}
 
   <div class="add-row">
@@ -213,12 +224,32 @@
   .mgr-desc { margin: 0; color: var(--text-3); font-size: 13px; }
   .empty { color: var(--text-3); font-size: 13px; }
 
+  .filter { width: 100%; box-sizing: border-box; }
+
   .row-list { list-style: none; margin: 0; padding: 0; }
   .row {
     display: flex; align-items: center; gap: 12px;
     padding: 12px 0; border-top: 1px solid var(--border);
   }
   .row:first-child { border-top: none; }
+
+  /* Wide screens — collapse the single-column stack into a responsive
+     card grid so we don't waste the horizontal real estate. Each row
+     turns into a compact self-contained card. */
+  @media (min-width: 1200px) {
+    .row-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 4px 24px;
+    }
+    .row, .row:first-child {
+      border-top: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      background: var(--surface-1);
+    }
+  }
   .row[draggable=true] { cursor: grab; }
   .row.dragging { opacity: 0.4; }
   .row.drag-over { background: color-mix(in srgb, var(--accent) 10%, transparent); }

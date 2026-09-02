@@ -27,6 +27,7 @@
   import { showSuccess, showError } from '../../stores/toast.js';
   import { portal } from '../../lib/portal.js';
   import { callAI, TOOLS, AI_DEFAULT_MODELS } from '../../lib/aiChat.js';
+  import { mutatingAuthHeaders } from '../../lib/api.js';
 
   export let open = false;
   export let envLocked = false;
@@ -84,7 +85,7 @@
       try {
         await fetch('/api/recipes/bulk-cancel', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...mutatingAuthHeaders() },
           body: JSON.stringify({ cacheUuid: scanResult.cacheUuid }),
           credentials: 'include',
         });
@@ -129,6 +130,7 @@
         method: 'POST',
         body: form,
         credentials: 'include',
+        headers: mutatingAuthHeaders(),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -268,7 +270,7 @@ ${textPayload.text}
     try {
       const res = await fetch('/api/recipes/bulk-commit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...mutatingAuthHeaders() },
         body: JSON.stringify({
           cacheUuid: scanResult.cacheUuid,
           selectedIds: Array.from(selected),

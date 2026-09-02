@@ -102,6 +102,10 @@
   let headerH = 0;
   let stockFilter = 'all'; // 'all' | 'in' | 'out' | 'expiring'
   let categoryFilter = 'all'; // 'all' | <category slug> | 'uncategorized'
+  // Track orphaned category slugs already warned about this page load
+  // so the reactive groupedSections block doesn't spam duplicates on
+  // every re-render (search keystrokes, filter clicks, sort changes).
+  const _warnedOrphanSlugs = new Set();
   // Sort key — applies after the category/stock filters. Defaults to
   // 'name' to preserve the existing alphabetical-by-name behaviour.
   let sortKey = 'name';      // 'name' | 'updated' | 'usage'
@@ -329,12 +333,16 @@
   // 'All' chip or via multi-mode which flips searchSource to 'all').
   // Pantry match uses matchesSearch() so brand-variant search works too
   // (mirrors what the local pantry render already does).
+  // Flatten into the shape the render expects (fields on top-level, source
+  // tag as `_source`). Wrapping as {source, item} broke every field access
+  // in the all-mode row template — rows showed only the source badge with
+  // no name / brand / barcode / thumbnail.
   $: _allModeItems = searchSource !== 'all' ? [] : [
     ...(_isSourceActive('local')
-      ? (items || []).filter(f => query.trim() ? matchesSearch(f, query, buildVariantsByParent(items)) : false).map(item => ({ source: 'local', item }))
+      ? (items || []).filter(f => query.trim() ? matchesSearch(f, query, buildVariantsByParent(items)) : false).map(f => ({ ...f, _source: 'local' }))
       : []),
-    ...(_isSourceActive('off')  ? offVisible.map(item  => ({ source: 'off',  item })) : []),
-    ...(_isSourceActive('usda') ? usdaVisible.map(item => ({ source: 'usda', item })) : []),
+    ...(_isSourceActive('off')  ? offVisible.map(f  => ({ ...f, _source: 'off'  })) : []),
+    ...(_isSourceActive('usda') ? usdaVisible.map(f => ({ ...f, _source: 'usda' })) : []),
   ];
   function pickExternalResult(r) {
     // Open the sheet in create mode with the external-search result as
@@ -392,10 +400,20 @@
   // Items match a category by either:
   //   - new `category_id` (resolved against pantryCategories on the server) OR
   //   - legacy `category` slug (kept in sync on every write).
-  // `categoryFilter` holds a slug, so we compare against `i.category` first
-  // and fall back to the resolved slug from pantryCategories[item.category_id].
+  // Historically `item.category` was a slug string on both client writes and
+  // server response, but the server hydrate (pantry.js) now spreads the raw
+  // row AND then overwrites `.category` with a resolved category OBJECT
+  // ({id, name, slug, icon, color}). Any item that has been round-tripped
+  // through a server fetch carries the object shape; freshly-created client
+  // items still carry the string slug. Handle both shapes here so grouping,
+  // filtering, and the orphan-slug guard work regardless of origin. Fixes
+  // the regression where every pantry item landed under Uncategorized
+  // because Map.get(objectKey) never matched the pantryCategories string
+  // slugs (#41 follow-up from @xiaojwus).
   function _itemSlug(item) {
-    if (item?.category) return item.category;
+    const cat = item?.category;
+    if (typeof cat === 'string' && cat) return cat;
+    if (cat && typeof cat === 'object' && typeof cat.slug === 'string' && cat.slug) return cat.slug;
     if (item?.category_id) {
       const c = pantryCategories.find(x => x.id === item.category_id);
       return c?.slug || null;
@@ -543,6 +561,35 @@
     });
   }).length;
 
+  // Expiring-soon spotlight (wide-screen ribbon). Sorted by earliest
+  // effective expiry so the most urgent items come first. Cap at 8 so
+  // the ribbon stays a horizontal strip instead of a wall.
+  $: expiringSoonItems = topItems
+    .map(i => ({ item: i, exp: _effectiveExpiry(i, (variantsByParent.get(i.id) || []).length > 0) }))
+    .filter(x => {
+      if (!x.exp) return false;
+      const s = _expiryStatus(x.exp);
+      return s === 'warn' || s === 'past';
+    })
+    .sort((a, b) => (a.exp || '').localeCompare(b.exp || ''))
+    .slice(0, 8);
+
+  function _daysUntil(dateStr) {
+    if (!dateStr) return null;
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const then = new Date(dateStr + 'T00:00:00');
+    const days = Math.round((then - now) / 86400000);
+    return days;
+  }
+  function _expiryLabel(dateStr) {
+    const d = _daysUntil(dateStr);
+    if (d == null) return '';
+    if (d < 0)  return `${Math.abs(d)}d past`;
+    if (d === 0) return 'today';
+    if (d === 1) return '1d left';
+    return `${d}d left`;
+  }
+
   // Grouping: when "All categories" is selected AND no search query,
   // bucket the filtered items by category so each renders under its
   // own heading. Otherwise return a single flat bucket.
@@ -559,12 +606,46 @@
       buckets.get(slug).push(it);
     }
     const ordered = [];
+    const emitted = new Set();
     for (const cat of pantryCategories) {
       const arr = buckets.get(cat.slug);
-      if (arr && arr.length) ordered.push({ key: cat.slug, label: cat.name, icon: cat.icon || 'kitchen', items: arr });
+      if (arr && arr.length) {
+        ordered.push({ key: cat.slug, label: cat.name, icon: cat.icon || 'kitchen', items: arr });
+        emitted.add(cat.slug);
+      }
     }
-    const unc = buckets.get('__uncategorized__');
-    if (unc && unc.length) ordered.push({ key: '__uncategorized__', label: 'Uncategorized', icon: 'help', items: unc });
+    // Fallback bucket: any item whose category slug doesn't match a known
+    // pantryCategories entry (renamed/deleted category, cross-locale slug
+    // mismatch, imported data referencing a foreign catalog) would
+    // otherwise get silently dropped from the output when this grouping
+    // path runs (sort=name + no filter + no query). Land them under
+    // Uncategorized so items are never invisible. Fixes #41 where items
+    // with Chinese category names disappeared on A-Z sort because their
+    // slug didn't match anything in the current pantry-categories catalog.
+    const unc = buckets.get('__uncategorized__') || [];
+    const orphaned = [];
+    for (const [slug, arr] of buckets) {
+      if (slug === '__uncategorized__' || emitted.has(slug)) continue;
+      orphaned.push(...arr);
+      // Dedupe warns: this branch sits inside a reactive block that
+      // re-runs on every keystroke / filter change; without the Set
+      // gate a user with 3 orphan-slug items would see the warning
+      // spam the console tens of times per typed word, drowning out
+      // real diagnostics. Log each unique orphan slug once per page
+      // lifetime instead.
+      if (!_warnedOrphanSlugs.has(slug)) {
+        _warnedOrphanSlugs.add(slug);
+        console.warn(`[pantry] item slug "${slug}" not in pantryCategories catalog; grouping under Uncategorized (${arr.length} item${arr.length === 1 ? '' : 's'})`);
+      }
+    }
+    if (unc.length || orphaned.length) {
+      ordered.push({
+        key: '__uncategorized__',
+        label: 'Uncategorized',
+        icon: 'help',
+        items: [...unc, ...orphaned],
+      });
+    }
     return ordered;
   })();
 
@@ -945,16 +1026,64 @@
               <option value="usage">{$_('pantry_page.sort_usage')}</option>
             </select>
           </label>
-          <div class="view-toggle" role="group" aria-label="View mode">
-            <button class="seg seg-icon" class:active={$pantryView === 'grid'}
-              on:click={() => pantryView.set('grid')} title="Grid view" aria-pressed={$pantryView === 'grid'}>
-              <span class="material-symbols-rounded" style="font-size:16px">grid_view</span>
+          <!-- Grid vs list only applies to the local pantry render. External
+               OFF / USDA / All source chips use a single-column search-
+               result layout that doesn't respond to this toggle, so hide
+               it when the pantry list itself is hidden (source != local
+               with an active query). -->
+          {#if searchSource === 'local' || !query.trim()}
+            <div class="view-toggle" role="group" aria-label="View mode">
+              <button class="seg seg-icon" class:active={$pantryView === 'grid'}
+                on:click={() => pantryView.set('grid')} title="Grid view" aria-pressed={$pantryView === 'grid'}>
+                <span class="material-symbols-rounded" style="font-size:16px">grid_view</span>
+              </button>
+              <button class="seg seg-icon" class:active={$pantryView === 'list'}
+                on:click={() => pantryView.set('list')} title="List view" aria-pressed={$pantryView === 'list'}>
+                <span class="material-symbols-rounded" style="font-size:16px">view_list</span>
+              </button>
+            </div>
+          {/if}
+        </div>
+      </div>
+    {/if}
+
+    <!-- Expiring-soon spotlight (wide-screen only). A horizontal strip
+         of the most urgent items so the "use these up first" set is
+         visible without switching to the Expiring Soon filter chip.
+         Only renders when there's actually anything expiring and only
+         at >=1200px (mobile already has the filter chip). Clicking a
+         tile opens the item; clicking the "See all" tail jumps to the
+         Expiring Soon filter. -->
+    {#if expiringSoonItems.length > 0}
+      <div class="expiring-spotlight" role="region" aria-label="Expiring soon">
+        <div class="spotlight-head">
+          <span class="material-symbols-rounded">schedule</span>
+          <span class="spotlight-title">Expiring soon</span>
+          <span class="spotlight-count">{expiringSoonCount}</span>
+          <button class="spotlight-all" on:click={() => { stockFilter = 'expiring'; }}>
+            See all
+            <span class="material-symbols-rounded" style="font-size:14px">chevron_right</span>
+          </button>
+        </div>
+        <div class="spotlight-strip">
+          {#each expiringSoonItems as x (x.item.id)}
+            {@const past = _expiryStatus(x.exp) === 'past'}
+            <button class="spotlight-tile" class:past
+              on:click={() => onRowClick(x.item)}
+              title={`${x.item.name} — ${_expiryLabel(x.exp)}`}>
+              <div class="spotlight-photo">
+                {#if x.item.img_url}
+                  <img src={x.item.img_url} alt="" loading="lazy" />
+                {:else}
+                  <span class="material-symbols-rounded">{_catIconBySlug(_itemSlug(x.item))}</span>
+                {/if}
+              </div>
+              <div class="spotlight-body">
+                <span class="spotlight-name">{x.item.name}</span>
+                <span class="spotlight-days">{_expiryLabel(x.exp)}</span>
+              </div>
             </button>
-            <button class="seg seg-icon" class:active={$pantryView === 'list'}
-              on:click={() => pantryView.set('list')} title="List view" aria-pressed={$pantryView === 'list'}>
-              <span class="material-symbols-rounded" style="font-size:16px">view_list</span>
-            </button>
-          </div>
+          {/each}
         </div>
       </div>
     {/if}
@@ -989,6 +1118,12 @@
         <p>{$_('routes.pantry.empty_desc')}</p>
         <button class="btn btn-primary" on:click={startCreate}>{$_('routes.pantry.add_item')}</button>
       </div>
+    {:else if searchSource !== 'local' && query.trim()}
+      <!-- Pantry list intentionally hidden: OFF / USDA / All source chip
+           with an active query is a filter-to-external, not "pantry PLUS
+           external". The external-results block below renders the chosen
+           source(s). Users get the pantry-first view back by picking the
+           Pantry (local) chip or clearing the query. -->
     {:else if filtered.length === 0}
       {#if searchSource === 'local'}
         <div class="state empty">
@@ -997,7 +1132,16 @@
         </div>
       {/if}
     {:else}
+      <!-- Groups grid: single column on mobile, masonry auto-fill at
+           wide widths so all category sections fit on one screen
+           instead of stacking full-width. Only kicks in when we're
+           actually grouped (sort=name + filter=all + no query);
+           .flat-mode disables it so search/filter results stay one
+           continuous grid. Same shell Shopping uses. -->
+      <div class="pantry-groups-grid"
+        class:flat-mode={groupedSections.length === 1 && !groupedSections[0]?.label}>
       {#each groupedSections as section (section.key)}
+        <section class="pantry-group">
         {#if section.label}
           <h3 class="section-heading">
             <span class="material-symbols-rounded">{section.icon || 'help'}</span>
@@ -1019,6 +1163,7 @@
               class:in-stock={inStockDisplay}
               class:selected={isSelected}
               class:generic={isGen}
+              class:expanded={isGen && expanded}
               on:click={() => onRowClick(it)}
               use:longpress
               on:longpress={() => onRowLongPress(it)}
@@ -1155,7 +1300,9 @@
             {/if}
           {/each}
         </div>
+        </section>
       {/each}
+      </div>
     {/if}
 
     {#if searchSource === 'all' && query.trim()}
@@ -1488,37 +1635,79 @@
   .source-chip, .source-chip-caret {
     user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   }
+  /* Split-chip architecture:
+     - .source-chip-wrap owns the entire pill's border, background,
+       hover state, and active state. Both children draw inside it.
+     - .source-chip-split (label + optional dot) and .source-chip-caret
+       (chevron) have zero border/background so hover on either half
+       lights up the whole pill.
+     - A subtle .source-chip-caret::before divider marks the split
+       without introducing per-child hover targets.
+     - Solid state (not per-layered): removed the earlier per-child
+       .active + :has() combo that produced half-lit pills when a
+       hover landed on only one child. */
   .source-chip-wrap {
     display: inline-flex; align-items: stretch; gap: 0;
+    background: var(--surface-2);
+    color: var(--text-2);
+    border: 1px solid var(--border);
     border-radius: var(--radius-full, 99px);
     overflow: hidden;
+    cursor: pointer;
+    transition: all var(--dur-fast);
+    /* Set the shared type on the wrap so children inherit consistently.
+       Don't put `font: inherit` on the children — it's a shorthand that
+       resets size/weight/family together, which reads as unset browser
+       defaults and makes the split pills render larger than the
+       non-split .source-chip pills. */
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .source-chip-wrap:hover { border-color: var(--accent); color: var(--text-1); }
+  .source-chip-wrap:has(.active) {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  /* Children: pure content areas, no borders/backgrounds. Inherit font
+     from the wrap (see the note there) — do NOT set `font: inherit`,
+     which is a shorthand and would clobber the intended size/weight. */
+  .source-chip-wrap .source-chip-split,
+  .source-chip-wrap .source-chip-caret {
+    background: transparent;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    transition: none;
   }
   .source-chip-split {
-    border-top-right-radius: 0; border-bottom-right-radius: 0;
-    border-right: none; padding-right: 8px;
+    padding: 5px 8px 5px 14px;
     display: inline-flex; align-items: center; gap: 5px;
   }
   .source-chip-caret {
-    background: var(--surface-2); color: var(--text-2);
-    border: 1px solid var(--border);
-    border-top-left-radius: 0; border-bottom-left-radius: 0;
-    border-top-right-radius: var(--radius-full, 99px);
-    border-bottom-right-radius: var(--radius-full, 99px);
     padding: 0 6px 0 4px;
     display: inline-flex; align-items: center;
-    cursor: pointer;
-    transition: all var(--dur-fast);
+    position: relative;
+  }
+  /* Divider between the two halves — subtle vertical line, not a
+     border on either child (which would make hover/active per-half). */
+  .source-chip-caret::before {
+    content: '';
+    width: 1px;
+    align-self: stretch;
+    background: var(--border);
+    margin-right: 4px;
+    opacity: 0.6;
+  }
+  .source-chip-wrap:has(.active) .source-chip-caret::before {
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
   }
   .source-chip-caret .material-symbols-rounded {
     font-size: 16px;
     transition: transform var(--dur-fast);
   }
   .source-chip-caret.open .material-symbols-rounded { transform: rotate(180deg); }
-  .source-chip-caret:hover { border-color: var(--accent); color: var(--text-1); }
-  .source-chip-caret.active {
-    background: var(--accent-dim); color: var(--accent);
-    border-color: color-mix(in srgb, var(--accent) 30%, transparent);
-  }
   .tier-active-dot {
     width: 6px; height: 6px; border-radius: 50%;
     background: var(--accent, #4caf50);
@@ -1682,12 +1871,126 @@
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 12px;
   }
+  /* Ultrawide: shrink the min column so more cards fit per row on
+     a 1920px+ monitor without changing the card design. Trade-off
+     is slightly tighter cards; net win is 30-50% more items in view. */
+  @media (min-width: 1600px) {
+    .card-grid:not(.list) {
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 14px;
+    }
+  }
+
+  /* Expiring-soon spotlight — wide-screen only ribbon that surfaces
+     the most urgent items horizontally at the top of the pantry so
+     they're visible without switching filters. Tiles are small photo
+     + name + "3d left" pill. Past-expiry tiles pick up a red tint. */
+  .expiring-spotlight { display: none; }
+  @media (min-width: 1200px) {
+    .expiring-spotlight {
+      display: block;
+      margin: 8px 0 14px;
+      padding: 10px 12px;
+      background: color-mix(in srgb, var(--warning, #f59e0b) 8%, var(--surface-1));
+      border: 1px solid color-mix(in srgb, var(--warning, #f59e0b) 30%, var(--border));
+      border-radius: var(--radius-lg);
+    }
+    .spotlight-head {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 8px;
+    }
+    .spotlight-head .material-symbols-rounded { font-size: 18px; color: var(--warning, #f59e0b); }
+    .spotlight-title { font-size: 13px; font-weight: 700; color: var(--text-1); }
+    .spotlight-count {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: color-mix(in srgb, var(--warning, #f59e0b) 20%, transparent);
+      color: var(--warning, #f59e0b);
+      padding: 2px 8px; border-radius: 999px;
+    }
+    .spotlight-all {
+      margin-left: auto;
+      display: inline-flex; align-items: center; gap: 2px;
+      background: transparent; border: none; cursor: pointer;
+      color: var(--text-3); font: inherit; font-size: 12px; font-weight: 600;
+      padding: 4px 8px; border-radius: var(--radius-sm);
+    }
+    .spotlight-all:hover { color: var(--text-1); background: var(--surface-2); }
+    .spotlight-strip {
+      display: flex; gap: 10px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-bottom: 2px;
+    }
+    .spotlight-strip::-webkit-scrollbar { display: none; }
+    .spotlight-tile {
+      flex: 0 0 auto;
+      display: flex; align-items: center; gap: 8px;
+      width: 220px;
+      padding: 6px 10px 6px 6px;
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: transform var(--dur-fast), border-color var(--dur-fast);
+      text-align: left;
+    }
+    .spotlight-tile:hover { transform: translateY(-1px); border-color: var(--accent-dim); }
+    .spotlight-tile.past { border-color: color-mix(in srgb, var(--danger, #ef4444) 45%, var(--border)); }
+    .spotlight-photo {
+      width: 40px; height: 40px; flex-shrink: 0;
+      background: var(--surface-2); border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+    .spotlight-photo img { width: 100%; height: 100%; object-fit: cover; }
+    .spotlight-photo .material-symbols-rounded { font-size: 20px; color: var(--accent); opacity: 0.7; }
+    .spotlight-body {
+      display: flex; flex-direction: column; gap: 2px; min-width: 0;
+    }
+    .spotlight-name {
+      font-size: 13px; font-weight: 600; color: var(--text-1);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 150px;
+    }
+    .spotlight-days {
+      font-size: 11px; font-weight: 600;
+      color: var(--warning, #f59e0b);
+    }
+    .spotlight-tile.past .spotlight-days { color: var(--danger, #ef4444); }
+  }
+  /* Category sections stack full-width and each section's inner
+     .card-grid stays a fluid auto-fill row so items get maximum
+     density across the whole page. (An earlier revision tiled the
+     sections themselves into a masonry — that made cards huge
+     because each section was capped at a 420px column with a
+     single-item-per-row inside. Reverted to the original behavior;
+     sections stack, items breathe.) */
+  .pantry-groups-grid { display: block; }
+  .pantry-group { margin-bottom: 20px; }
+
   /* List mode — dense horizontal-row layout at every viewport. A
      thumbnail (72px desktop / 64px mobile) on the left, name + brand
      + meta stacked on the right. Grid mode keeps the vertical cards. */
   .card-grid.list {
     grid-template-columns: 1fr;
     gap: 6px;
+  }
+  /* On very wide viewports list mode takes 2 columns so a 1500px
+     wide row per item doesn't feel like empty space. */
+  @media (min-width: 1400px) {
+    .card-grid.list {
+      grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+    }
+  }
+
+  /* Expanded generic anchors its whole row in the grid so its
+     variant siblings flow directly below it instead of landing next
+     to unrelated items. Grid mode only. */
+  @media (min-width: 1200px) {
+    .card-grid:not(.list) .pcard.generic.expanded {
+      grid-column: 1 / -1;
+    }
   }
   .card-grid.list .pcard {
     flex-direction: row;
@@ -2042,7 +2345,11 @@
   }
   .item:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
   .item:active { background: var(--surface-2); }
-  .item:not(.in-stock) { opacity: 0.6; }
+  /* .in-stock only applies to local pantry rows — external OFF/USDA search
+     results share the .item class but never get .in-stock (they aren't in
+     your pantry), so exclude .ext-item to keep search results at full
+     opacity instead of reading as "out of stock". */
+  .item:not(.in-stock):not(.ext-item) { opacity: 0.6; }
   .item-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .cat-pill {
     display: inline-flex; align-items: center; gap: 3px;
@@ -2057,9 +2364,21 @@
     overflow-x: auto;
     flex-wrap: nowrap;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
   }
   .category-chips::-webkit-scrollbar { display: none; }
   .category-chips .seg { flex-shrink: 0; }
+  /* Wide viewports: show every category chip at once instead of the
+     mobile horizontal scroller. Wrap into rows so the whole taxonomy
+     is scannable without swiping. */
+  @media (min-width: 1200px) {
+    .category-chips {
+      overflow-x: visible;
+      flex-wrap: wrap;
+      touch-action: auto;
+    }
+    .category-chips .seg { flex-shrink: 1; }
+  }
 
   /* Advanced (nutrition) section in the edit modal */
   .adv-toggle {

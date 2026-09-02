@@ -9,6 +9,24 @@
 
 import { isNative, getServerUrl, getAuthToken, resolveAssetUrl, apiUrl } from './platform.js';
 
+// Build the auth-related headers a mutating request needs. Callers
+// that bypass NtApi._fetch (multipart FormData uploads via a raw
+// fetch(), like the file-import dialogs) still need Bearer on native
+// AND X-CSRF-Token on PWA — dropping either produces "Invalid CSRF
+// token" 403s on the PWA (issue #43) or 401s on native standalone.
+// Prefer this helper over hand-rolling the pattern per call site.
+function _mutatingAuthHeaders() {
+  const h = {};
+  if (isNative && getServerUrl()) {
+    const token = getAuthToken();
+    if (token) h['Authorization'] = `Bearer ${token}`;
+  } else if (!isNative) {
+    const csrf = typeof localStorage !== 'undefined' ? localStorage.getItem('ct:csrf') : null;
+    if (csrf) h['X-CSRF-Token'] = csrf;
+  }
+  return h;
+}
+
 const _CtApiHttp = {
   async _fetch(method, path, body, isUpload = false) {
     const headers = {};
@@ -469,3 +487,8 @@ export const NtApi = new Proxy({}, {
 
 // Alias for the new name. Existing call sites use NtApi; new code can use CtApi.
 export const CtApi = NtApi;
+
+// Public re-export for callers that need to hand-roll a fetch() (e.g.
+// multipart uploads that can't ride through NtApi._fetch). Use this
+// instead of duplicating the CSRF / Bearer pattern per call site.
+export const mutatingAuthHeaders = _mutatingAuthHeaders;

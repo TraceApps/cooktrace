@@ -282,6 +282,42 @@
     } catch (e) { showError($_('settings.users.err_could_not_reach_server')); }
   }
 
+  // Inline edit-user state. Only one row edits at a time. Username +
+  // role + avatar are edited elsewhere; this form is scoped to
+  // full_name + email (the two fields that need the most fixing when
+  // a signup typo happens or someone's contact address changes).
+  let editingUserId = null;
+  let editUserForm = { full_name: '', email: '' };
+  function startEditUser(u) {
+    editingUserId = u.id;
+    editUserForm = {
+      full_name: u.full_name || '',
+      email: u.email || '',
+    };
+  }
+  function cancelEditUser() {
+    editingUserId = null;
+    editUserForm = { full_name: '', email: '' };
+  }
+  async function saveEditUser(u) {
+    try {
+      const res = await fetch(apiUrl(`/api/auth/users/${u.id}`), {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: _csrfHeaders(),
+        body: JSON.stringify({
+          full_name: editUserForm.full_name.trim(),
+          email: editUserForm.email.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showError(data?.error || 'Could not update user'); return; }
+      cancelEditUser();
+      await loadUsers();
+      showSuccess('User updated');
+    } catch (e) { showError($_('settings.users.err_could_not_reach_server')); }
+  }
+
   async function resetUserPassword(u) {
     const name = u.full_name || u.username;
     const pw = prompt($_('settings.users.reset_password_prompt', { values: { name } }));
@@ -430,7 +466,7 @@
 
           <div class="um-user-list">
             {#each umUsers as u}
-              <div class="um-user-row">
+              <div class="um-user-row" class:editing={editingUserId === u.id}>
                 <div class="um-user-avatar">
                   {#if u.avatar_url}
                     <img src={resolveAssetUrl(u.avatar_url)} alt={u.username} />
@@ -438,30 +474,59 @@
                     <span class="material-symbols-rounded">person</span>
                   {/if}
                 </div>
-                <div class="um-user-info">
-                  <div class="um-user-name">{u.nickname || u.full_name || u.username}</div>
-                  <div class="um-user-sub">@{u.username}</div>
-                  <div class="um-user-role">
-                    {#if u.id === $currentUser?.id}
-                      <span class="um-role-self">{u.role} {$_('settings.users.role_self_suffix')}</span>
-                    {:else}
-                      <select class="um-role-select" value={u.role}
-                        on:change={e => changeUserRole(u, e.target.value)}>
-                        <option value="user">user</option>
-                        <option value="admin">admin</option>
-                      </select>
-                    {/if}
+                {#if editingUserId === u.id}
+                  <div class="um-user-edit">
+                    <label class="um-edit-field">
+                      <span>Full name</span>
+                      <input class="input um-edit-input" type="text"
+                        bind:value={editUserForm.full_name}
+                        placeholder="Full name" />
+                    </label>
+                    <label class="um-edit-field">
+                      <span>Email</span>
+                      <input class="input um-edit-input" type="email"
+                        bind:value={editUserForm.email}
+                        placeholder="name@example.com"
+                        autocomplete="off" />
+                    </label>
+                    <div class="um-edit-actions">
+                      <button class="btn btn-secondary tiny" on:click={cancelEditUser}>Cancel</button>
+                      <button class="btn btn-primary tiny" on:click={() => saveEditUser(u)}>Save</button>
+                    </div>
+                    <div class="um-edit-note">@{u.username} <span class="muted">(username can't be changed)</span></div>
                   </div>
-                </div>
-                {#if u.id !== $currentUser?.id}
-                  <button class="btn btn-ghost um-del-btn" title={$_('settings.users.reset_password')}
-                    on:click={() => resetUserPassword(u)}>
-                    <span class="material-symbols-rounded" style="font-size:18px;color:var(--text-3)">lock_reset</span>
+                {:else}
+                  <div class="um-user-info">
+                    <div class="um-user-name">{u.nickname || u.full_name || u.username}</div>
+                    <div class="um-user-sub">
+                      @{u.username}{#if u.email} · {u.email}{/if}
+                    </div>
+                    <div class="um-user-role">
+                      {#if u.id === $currentUser?.id}
+                        <span class="um-role-self">{u.role} {$_('settings.users.role_self_suffix')}</span>
+                      {:else}
+                        <select class="um-role-select" value={u.role}
+                          on:change={e => changeUserRole(u, e.target.value)}>
+                          <option value="user">user</option>
+                          <option value="admin">admin</option>
+                        </select>
+                      {/if}
+                    </div>
+                  </div>
+                  <button class="btn btn-ghost um-del-btn" title="Edit name / email"
+                    on:click={() => startEditUser(u)}>
+                    <span class="material-symbols-rounded" style="font-size:18px;color:var(--text-3)">edit</span>
                   </button>
-                  <button class="btn btn-ghost um-del-btn" title={$_('settings.users.delete')}
-                    on:click={() => deleteUser(u)}>
-                    <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger)">person_remove</span>
-                  </button>
+                  {#if u.id !== $currentUser?.id}
+                    <button class="btn btn-ghost um-del-btn" title={$_('settings.users.reset_password')}
+                      on:click={() => resetUserPassword(u)}>
+                      <span class="material-symbols-rounded" style="font-size:18px;color:var(--text-3)">lock_reset</span>
+                    </button>
+                    <button class="btn btn-ghost um-del-btn" title={$_('settings.users.delete')}
+                      on:click={() => deleteUser(u)}>
+                      <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger)">person_remove</span>
+                    </button>
+                  {/if}
                 {/if}
               </div>
             {/each}
@@ -762,6 +827,23 @@
     outline: none; cursor: pointer;
   }
   .um-role-select:focus { border-color: var(--accent); }
+
+  /* Inline edit-user form: replaces the info block when editingUserId
+     matches this row. Two labelled inputs stacked, then a small
+     action row with Cancel / Save. Row background bumps to surface-3
+     so the edit state is visually distinct. */
+  .um-user-row.editing { background: var(--surface-3, var(--surface-2)); align-items: flex-start; }
+  .um-user-edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .um-edit-field { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--text-3); font-weight: 600; }
+  .um-edit-input {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 6px 10px; color: var(--text-1);
+    font-size: 13px; font-family: inherit; outline: none; width: 100%; box-sizing: border-box;
+  }
+  .um-edit-input:focus { border-color: var(--accent); }
+  .um-edit-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 2px; }
+  .um-edit-note { font-size: 11px; color: var(--text-3); }
+  .um-edit-note .muted { opacity: 0.7; }
 
   /* Secondary 'Add user manually' toggle — quieter than a button, leads
      into the escape-hatch direct-add form. */

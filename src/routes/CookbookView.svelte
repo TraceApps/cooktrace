@@ -11,6 +11,7 @@
   import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
+  import { flip } from 'svelte/animate';
   import { push } from 'svelte-spa-router';
   import { formatDuration } from '../lib/duration.js';
   import { NtApi } from '../lib/api.js';
@@ -19,6 +20,8 @@
   import { resolveAssetUrl } from '../lib/platform.js';
   import { portal } from '../lib/portal.js';
   import Spinner from '../components/ui/Spinner.svelte';
+  import ImagePicker from '../components/ui/ImagePicker.svelte';
+  import { dragHandleZone, dragHandle } from 'svelte-dnd-action';
 
   export let params = {};
   $: id = parseInt(params.id, 10);
@@ -92,19 +95,92 @@
     }
   }
 
-  // Reorder via ↑/↓ buttons. Smart cookbooks are computed and don't
-  // honor manual order, so the buttons are hidden in that mode.
-  async function reorderRecipe(r, direction) {
-    if (!cookbook || cookbook.is_smart) return;
-    const list = cookbook.recipes || [];
-    const idx = list.findIndex(x => x.id === r.id);
-    const target = direction === 'up' ? idx - 1 : idx + 1;
-    if (idx < 0 || target < 0 || target >= list.length) return;
-    const next = [...list];
-    [next[idx], next[target]] = [next[target], next[idx]];
+  // Search + sort for the cookbook's own recipe grid. View-only — the
+  // underlying cookbook.recipes array (the manually-curated order the
+  // ↑/↓ reorder buttons operate on) is never touched by these. A
+  // cookbook with 30+ recipes has no way to find one otherwise.
+  let cbQuery = '';
+  let cbSort = 'manual'; // 'manual' | 'alpha' | 'fav'
+  // Note: intentionally NOT gated on !cookbook.is_smart — smart
+  // cookbooks can still be searched, and need the "no matches" empty
+  // state below to fire correctly. Reorder buttons are independently
+  // protected by their own !cookbook.is_smart check where they render.
+  $: cbFilterActive = !!(cbQuery.trim() || cbSort !== 'manual');
+  $: displayRecipes = (() => {
+    if (!cookbook) return [];
+    let list = cookbook.recipes || [];
+    const q = cbQuery.trim().toLowerCase();
+    if (q) list = list.filter(r => (r.name || '').toLowerCase().includes(q));
+    if (cbSort === 'alpha') {
+      list = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    } else if (cbSort === 'fav') {
+      list = [...list].sort((a, b) => (b.favorite === true) - (a.favorite === true) || (a.name || '').localeCompare(b.name || ''));
+    }
+    return list;
+  })();
+  // Reorder buttons only make sense against the true manual order —
+  // when a search or non-manual sort is active, the visible list's
+  // position no longer matches cookbook.recipes indices, so ↑/↓ would
+  // silently reorder against the wrong neighbors. Hide them (remove /
+  // move stay available — those are id-based, always safe).
+  $: cbReorderable = !cbFilterActive;
+
+  // Drag-and-drop reorder via svelte-dnd-action (same library Shopping
+  // uses for its aisle groups). Only active when cbReorderable — the
+  // grid is showing cookbook.recipes' true order (no search, sort =
+  // Manual). The pickup target is the whole card (image, name,
+  // description, everything inside .card-clickable) rather than a
+  // small dedicated handle — see maybeDragHandle below for how that's
+  // wired without fighting the card's own click-to-open button or the
+  // remove/move buttons, which sit as later siblings on top of it and
+  // so keep receiving their own clicks untouched.
+  //
+  // Bound directly to cookbook.recipes (not displayRecipes) because
+  // dndzone needs a real array it can mutate live during a drag,
+  // not the read-only sort/filter derivation. displayRecipes is a
+  // reactive `$:` off cookbook.recipes, so it picks up every consider
+  // update automatically and the grid's {#each displayRecipes} stays
+  // in sync with the live drag.
+  const FLIP_MS = 180;
+  function handleDndConsider(e) {
+    cookbook = { ...cookbook, recipes: e.detail.items };
+  }
+  async function handleDndFinalize(e) {
+    // svelte-dnd-action strips shadow items before finalize, but
+    // guard anyway in case a future version changes that (matches
+    // the defensive filter Shopping.svelte uses).
+    const next = e.detail.items.filter(r => !r?.isDndShadowItem);
     cookbook = { ...cookbook, recipes: next };
     try { await NtApi.reorderCookbookRecipes(cookbook.id, next.map(x => x.id)); }
-    catch (e) { showError(e.message || 'Could not save order'); }
+    catch (e2) { showError(e2.message || 'Could not save order'); }
+  }
+
+  // Wraps svelte-dnd-action's own `dragHandle` action so it can be
+  // attached/detached reactively instead of only via structural
+  // {#if}. The zone's own `dragDisabled: !cbReorderable` (above)
+  // already blocks an actual drag from starting whenever reordering
+  // isn't valid, but leaving the handle itself always mounted would
+  // leave a stray role="button" + tabindex sitting on every card in
+  // non-reorderable views (search active, sort != Manual) — a false
+  // affordance for screen readers. Detaching it entirely when
+  // `enabled` is false keeps that clean, same as the old dedicated
+  // handle span did with its {#if cbReorderable} guard.
+  function maybeDragHandle(node, enabled) {
+    let handle = null;
+    function attach() { if (!handle) handle = dragHandle(node); }
+    function detach() {
+      if (!handle) return;
+      handle.destroy();
+      handle = null;
+      node.removeAttribute('role');
+      node.removeAttribute('tabindex');
+      node.style.cursor = '';
+    }
+    if (enabled) attach();
+    return {
+      update(next) { next ? attach() : detach(); },
+      destroy: detach,
+    };
   }
 
   async function openMoveDialog(r) {
@@ -170,6 +246,30 @@
     }
   }
 
+  // Cookbook cover image picker. Server already supports
+  // cover_image_url on create/update (server/routes/cookbooks.js) —
+  // there was just no client UI to set it. Reuses the shared
+  // ImagePicker + the same header-X modal shell the Step Photo
+  // picker in RecipeEditor uses.
+  let coverSheetOpen = false;
+  let coverDraft = '';
+  function openCoverSheet() {
+    if (!cookbook || cookbook.is_smart || cookbook.shared_with_me) return;
+    coverDraft = cookbook.cover_image_url || '';
+    coverSheetOpen = true;
+  }
+  function closeCoverSheet() { coverSheetOpen = false; }
+  async function saveCover() {
+    try {
+      const updated = await NtApi.updateCookbook(cookbook.id, { cover_image_url: coverDraft || null });
+      cookbook = { ...cookbook, cover_image_url: updated.cover_image_url };
+      coverSheetOpen = false;
+      showSuccess('Cover updated');
+    } catch (e) {
+      showError(e.message || 'Could not update cover');
+    }
+  }
+
   function totalMinutes(r) {
     if (r?.total_minutes != null) return r.total_minutes;
     return (r?.prep_minutes || 0) + (r?.cook_minutes || 0) + (r?.rest_minutes || 0);
@@ -214,13 +314,27 @@
       </div>
     {:else if cookbook}
       <header class="cb-hero">
-        <div class="cb-cover">
-          {#if cookbook.cover_image_url}
-            <img src={resolveAssetUrl(cookbook.cover_image_url)} alt="" />
-          {:else}
-            <span class="material-symbols-rounded">auto_stories</span>
-          {/if}
-        </div>
+        {#if !cookbook.is_smart && !cookbook.shared_with_me}
+          <button class="cb-cover cb-cover-editable" on:click={openCoverSheet}
+            aria-label="Set cookbook cover" title="Set cookbook cover">
+            {#if cookbook.cover_image_url}
+              <img src={resolveAssetUrl(cookbook.cover_image_url)} alt="" />
+            {:else}
+              <span class="material-symbols-rounded">auto_stories</span>
+            {/if}
+            <span class="cb-cover-edit-overlay">
+              <span class="material-symbols-rounded">photo_camera</span>
+            </span>
+          </button>
+        {:else}
+          <div class="cb-cover">
+            {#if cookbook.cover_image_url}
+              <img src={resolveAssetUrl(cookbook.cover_image_url)} alt="" />
+            {:else}
+              <span class="material-symbols-rounded">auto_stories</span>
+            {/if}
+          </div>
+        {/if}
         <div class="cb-meta">
           <div class="cb-name-row">
             <h1 class="cb-name">{cookbook.name}</h1>
@@ -259,9 +373,48 @@
           {/if}
         </div>
       {:else}
-        <div class="grid">
-          {#each cookbook.recipes as r, i (r.id)}
-            {#if r.locked}
+        {#if cookbook.recipes.length > 1}
+          <!-- Search + sort for the cookbook's own recipe list. View-
+               only: never touches the manually-curated order the ↑/↓
+               buttons operate on. Reorder buttons hide themselves
+               below whenever this view differs from the true order
+               (see cbReorderable). -->
+          <div class="cb-search-row">
+            <div class="cb-search">
+              <span class="material-symbols-rounded">search</span>
+              <input type="search" placeholder="Search this cookbook…" bind:value={cbQuery} />
+              {#if cbQuery}
+                <button class="cb-search-clear" on:click={() => cbQuery = ''} aria-label="Clear search">
+                  <span class="material-symbols-rounded">close</span>
+                </button>
+              {/if}
+            </div>
+            {#if !cookbook.is_smart}
+              <select class="cb-sort" bind:value={cbSort} title="Sort">
+                <option value="manual">Manual Order</option>
+                <option value="alpha">A → Z</option>
+                <option value="fav">Favorites First</option>
+              </select>
+            {/if}
+          </div>
+        {/if}
+
+        {#if cbFilterActive && displayRecipes.length === 0}
+          <div class="state empty">
+            <span class="material-symbols-rounded empty-icon">search_off</span>
+            <h2>No recipes match "{cbQuery}"</h2>
+            <button class="btn btn-secondary" on:click={() => { cbQuery = ''; cbSort = 'manual'; }}>Clear search</button>
+          </div>
+        {:else}
+        <div class="grid"
+          use:dragHandleZone={{ items: displayRecipes, flipDurationMs: FLIP_MS, dropTargetStyle: {}, type: 'cookbook-recipes', dragDisabled: !cbReorderable }}
+          on:consider={handleDndConsider}
+          on:finalize={handleDndFinalize}>
+          {#each displayRecipes as r (r.id)}
+          <div class="cb-grid-item" animate:flip={{ duration: FLIP_MS }}>
+            {#if r?.isDndShadowItem}
+              <div class="card recipe-card dnd-shadow" aria-hidden="true"></div>
+            {:else if r.locked}
               <!-- Locked placeholder — the reader doesn't have their
                    own access to this recipe. Show the name so they
                    know what's here + a hint about how to unlock it,
@@ -277,7 +430,10 @@
                 </div>
               </div>
             {:else}
-            <div class="card recipe-card">
+            <div class="card recipe-card"
+              class:has-cat={!!r.category?.color}
+              style={r.category?.color ? `--cat-color:${r.category.color}` : ''}>
+              <div class="card-drag-wrap" use:maybeDragHandle={cbReorderable && !cookbook.is_smart && !cookbook.shared_with_me}>
               <button class="card-clickable" on:click={() => push(`/recipes/${r.id}`)}>
                 <div class="card-image">
                   {#if r.imgUrl}
@@ -290,7 +446,28 @@
                   {/if}
                 </div>
                 <div class="card-body">
+                  <!-- Same field set as the Recipes tab's own card
+                       (category, rating, tags, pantry-match) — a
+                       cookbook recipe now carries identical info to
+                       its counterpart on the Recipes tab. Was a
+                       thinner card here before: the server only
+                       pulled a narrow column list with no category/
+                       tags/pantry_match. See server/lib/
+                       recipe-hydrate.js. -->
+                  {#if r.category}
+                    <span class="card-category"
+                      style={r.category.color ? `--cat-color:${r.category.color}` : ''}>
+                      {r.category.name}
+                    </span>
+                  {/if}
                   <h3 class="card-name">{r.name}</h3>
+                  {#if r.rating}
+                    <div class="card-rating" aria-label={`Rated ${r.rating} of 5`}>
+                      {#each [1,2,3,4,5] as n}
+                        <span class="material-symbols-rounded star" class:filled={n <= r.rating}>{n <= r.rating ? 'star' : 'star_border'}</span>
+                      {/each}
+                    </div>
+                  {/if}
                   {#if r.description}<p class="card-desc">{r.description}</p>{/if}
                   <div class="card-meta">
                     {#if totalMinutes(r) > 0}
@@ -299,9 +476,22 @@
                     {#if r.servings}
                       <span class="meta-pill"><span class="material-symbols-rounded">restaurant</span>{r.servings}</span>
                     {/if}
+                    {#if r.pantry_match && r.pantry_match.need > 0}
+                      {@const pct = r.pantry_match.have / r.pantry_match.need}
+                      <span class="meta-pill" class:full={pct === 1} class:partial={pct > 0 && pct < 1} class:none={pct === 0}>
+                        <span class="material-symbols-rounded">kitchen</span>
+                        {r.pantry_match.have}/{r.pantry_match.need}
+                      </span>
+                    {/if}
+                    {#if r.tags?.length}
+                      {#each r.tags.slice(0, 2) as tag}
+                        <span class="meta-pill tag">{tag}</span>
+                      {/each}
+                    {/if}
                   </div>
                 </div>
               </button>
+              </div>
               {#if !cookbook.is_smart && !cookbook.shared_with_me}
                 <button class="remove-btn" on:click={() => removeRecipe(r)}
                   aria-label={`Remove ${r.name}`} title="Remove from cookbook">
@@ -311,27 +501,36 @@
                   aria-label={`Move or copy ${r.name}`} title="Move / copy to another cookbook">
                   <span class="material-symbols-rounded">drive_file_move</span>
                 </button>
-                <div class="reorder-row">
-                  <button class="reorder-btn" on:click={() => reorderRecipe(r, 'up')}
-                    aria-label="Move up" title="Move up"
-                    disabled={i === 0}>
-                    <span class="material-symbols-rounded">keyboard_arrow_left</span>
-                  </button>
-                  <button class="reorder-btn" on:click={() => reorderRecipe(r, 'down')}
-                    aria-label="Move down" title="Move down"
-                    disabled={i === cookbook.recipes.length - 1}>
-                    <span class="material-symbols-rounded">keyboard_arrow_right</span>
-                  </button>
-                </div>
               {/if}
             </div>
             {/if}
+          </div>
           {/each}
         </div>
+        {/if}
       {/if}
     {/if}
   </div>
 </div>
+
+{#if coverSheetOpen}
+  <div use:portal class="modal-backdrop" on:click={closeCoverSheet}>
+    <div class="modal" on:click|stopPropagation style="max-width:420px">
+      <header class="modal-head">
+        <h3>Cookbook Cover</h3>
+        <button class="btn-icon" on:click={closeCoverSheet} aria-label="Close" title="Close">
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </header>
+      <div class="modal-body">
+        <ImagePicker bind:value={coverDraft} aspect="1 / 1" placeholder="Add a Cover Image" />
+      </div>
+      <footer class="modal-actions">
+        <button class="btn btn-primary" on:click={saveCover}>{$_('recipe_editor_ct.done')}</button>
+      </footer>
+    </div>
+  </div>
+{/if}
 
 {#if moveOpen && moveDialogRecipe}
   <div use:portal class="modal-backdrop" on:click={closeMoveDialog}>
@@ -347,6 +546,7 @@
       </div>
       <div style="padding: 12px 16px;">
         <div class="seg-radio">
+          <div class="seg-thumb" class:move={moveAction === 'move'}></div>
           <label class:on={moveAction === 'copy'}>
             <input type="radio" bind:group={moveAction} value="copy" />
             <span>{@html $_('cookbook_view_ct.copy_label_html')}</span>
@@ -455,10 +655,21 @@
 
   .editor-content {
     padding: 16px var(--page-px) 32px;
+    /* Was a flat 1180px cap at every viewport width — the same class
+       of bug Manage.svelte had before its wide-screen pass. The
+       .grid below is repeat(auto-fill, minmax(220px, 1fr)), so it
+       already flows more columns automatically once the wrapper has
+       room; it just never got the room. */
     max-width: 1180px;
     margin: 0 auto;
     width: 100%;
     box-sizing: border-box;
+  }
+  @media (min-width: 1280px) {
+    .editor-content { max-width: 1440px; }
+  }
+  @media (min-width: 1600px) {
+    .editor-content { max-width: 1760px; }
   }
 
   .state {
@@ -488,6 +699,23 @@
   }
   .cb-cover img { width: 100%; height: 100%; object-fit: cover; }
   .cb-cover .material-symbols-rounded { font-size: 56px; color: var(--accent); opacity: 0.6; }
+  .cb-cover-editable {
+    position: relative;
+    padding: 0; border: 1px solid var(--border); cursor: pointer;
+    font-family: inherit;
+  }
+  .cb-cover-edit-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    transition: opacity var(--dur-fast);
+  }
+  .cb-cover-editable:hover .cb-cover-edit-overlay,
+  .cb-cover-editable:focus-visible .cb-cover-edit-overlay { opacity: 1; }
+  .cb-cover-edit-overlay .material-symbols-rounded {
+    font-size: 28px; color: white; opacity: 1;
+  }
   .cb-meta { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   .cb-name-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .cb-name { margin: 0; font-size: 28px; font-weight: 700; color: var(--text-1); line-height: 1.2; }
@@ -516,26 +744,199 @@
     font-weight: 600;
   }
 
+  /* Search + sort for the cookbook's own recipe grid. */
+  .cb-search-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin: 4px 0 16px;
+    flex-wrap: wrap;
+  }
+  .cb-search {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 9px 12px;
+  }
+  .cb-search .material-symbols-rounded { font-size: 18px; color: var(--text-3); flex-shrink: 0; }
+  .cb-search input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text-1);
+    font-size: 14px;
+    min-width: 0;
+  }
+  .cb-search-clear {
+    background: transparent; border: none; cursor: pointer;
+    color: var(--text-3);
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .cb-search-clear:hover { color: var(--text-1); background: var(--surface-2); }
+  .cb-sort {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 9px 12px;
+    color: var(--text-1);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .cb-sort:focus { outline: 2px solid var(--accent-dim); border-color: var(--accent); }
+
   /* Recipe grid (mirrors Recipes page) */
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+  }
+  /* Transparent pass-through wrapper — the actual grid item and the
+     element animate:flip targets. Svelte requires animate: to sit on
+     the single direct child of a keyed {#each}, but each recipe can
+     render one of three different top-level elements (shadow /
+     locked / normal card) depending on state, so the animation has
+     to live one level up on a wrapper instead of on each branch. No
+     box styling of its own so .recipe-card inside still looks and
+     sizes exactly as if it were the direct grid child.
+
+     Smooth drag-reorder: this wrapper is what actually gets the CSS
+     transform applied — both svelte-dnd-action's own drag animation
+     AND Svelte's animate:flip on the other cards making room animate
+     THIS element, not .recipe-card inside it. Without compositor
+     hints here the browser re-layouts/repaints every image-heavy
+     card from scratch each frame instead of doing pure GPU transform
+     work, which read as choppy (especially on Android WebView, less
+     GPU compositing headroom than desktop Chrome). will-change
+     promotes each item to its own layer up front; contain: paint
+     isolates its repaint cost so animating one doesn't force the
+     browser to reconsider its neighbors. */
+  /* Grid's default align-items: stretch equalizes THIS wrapper's
+     height across a row, but the card inside it (its one child —
+     shadow / locked / normal, whichever the {#if} renders) doesn't
+     inherit that automatically: a plain block child sizes to its own
+     content, so taller cards (a wrapped 2-line title, a category
+     badge, more tag pills) end up visibly taller than their row
+     neighbors. display: flex + the card's own flex: 1 below is what
+     actually stretches it to match, so every card in a row ends up
+     the same height — matching the Recipes tab, whose card IS the
+     direct grid item with nothing in the way. */
+  .cb-grid-item {
+    min-width: 0;
+    will-change: transform;
+    contain: paint;
+    display: flex;
+    flex-direction: column;
   }
   .card.recipe-card {
     position: relative;
+    flex: 1;
     background: var(--surface-1);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     overflow: hidden;
   }
+  /* Subtle category-color stripe along the left edge, matching the
+     Recipes tab's own card treatment. Only applied when the recipe
+     has a category with a color set. */
+  .card.recipe-card.has-cat { border-left: 3px solid var(--cat-color); }
+  @media (hover: hover) {
+    .card.recipe-card.has-cat:hover {
+      border-color: color-mix(in srgb, var(--cat-color) 35%, var(--border));
+      border-left-color: var(--cat-color);
+    }
+  }
+  .card-category {
+    align-self: flex-start;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+    color: var(--cat-color, var(--accent));
+    background: color-mix(in srgb, var(--cat-color, var(--accent)) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--cat-color, var(--accent)) 35%, transparent);
+  }
+  .card-rating {
+    display: inline-flex;
+    gap: 1px;
+    margin-top: -2px;
+  }
+  .card-rating .star {
+    font-size: 13px;
+    color: var(--text-3);
+    font-variation-settings: 'FILL' 0;
+  }
+  .card-rating .star.filled {
+    color: var(--accent);
+    font-variation-settings: 'FILL' 1;
+  }
+  .meta-pill.tag { background: var(--accent-dim); color: var(--accent); }
+  .meta-pill.full {
+    background: color-mix(in srgb, var(--success, #22c55e) 18%, transparent);
+    color: var(--success, #22c55e);
+  }
+  .meta-pill.partial {
+    background: color-mix(in srgb, #f59e0b 16%, transparent);
+    color: #f59e0b;
+  }
+  .meta-pill.none {
+    background: transparent;
+    color: var(--text-3);
+    border: 1px solid var(--border);
+  }
+  /* The actively-dragged item, id-targeted by svelte-dnd-action
+     (DRAGGED_ELEMENT_ID). The library marks .cb-grid-item itself
+     (the true dnd-zone child) with this id — that wrapper has no
+     border-radius of its own, so the lifted shadow targets the
+     .recipe-card nested inside it instead, matching the card's
+     rounded corners. Pointer-events disabled on the whole dragged
+     subtree so hover/focus recalculation doesn't compete with the
+     drag gesture for a frame budget. */
+  :global(#dnd-action-dragged-el .recipe-card) {
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  }
+  :global(#dnd-action-dragged-el) {
+    cursor: grabbing;
+    /* contain: paint on .cb-grid-item clips anything painted past its
+       own border-box — including the lifted shadow above, since the
+       wrapper is sized identically to its single child. Drop
+       containment on just the one actively-dragged item so its
+       shadow renders in full; every other (non-dragged) card keeps
+       the containment benefit, which is where the FLIP-reflow jank
+       actually was. */
+    contain: none;
+  }
+  :global(#dnd-action-dragged-el *) {
+    pointer-events: none;
+  }
+  /* No box of its own (display: contents) so it adds zero layout
+     footprint around .card-clickable — it exists purely so
+     maybeDragHandle has a DOM node to mark as the drag pickup target
+     that's an ANCESTOR of (not the same element as) the button, which
+     keeps the button's native keyboard semantics (Enter/Space =
+     click) from colliding with the handle's own Enter/Space =
+     pick-up-for-keyboard-reorder behavior. Pointer events still
+     bubble through a display:contents node normally, so pressing
+     anywhere on the card (including the button) still reaches it. */
+  .card-drag-wrap { display: contents; }
   .card-clickable {
     background: none; border: none; padding: 0; width: 100%;
     text-align: left; cursor: pointer; color: inherit;
     display: flex; flex-direction: column;
   }
   .card-image {
-    aspect-ratio: 4 / 3;
+    aspect-ratio: 16 / 10;
     background: var(--surface-2);
     overflow: hidden;
     position: relative;
@@ -543,7 +944,7 @@
   .card-image img { width: 100%; height: 100%; object-fit: cover; }
   .card-image-fallback {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    font-size: 48px; color: var(--text-3); opacity: 0.4;
+    font-size: 56px; color: var(--text-3); opacity: 0.4;
   }
   .card-fav {
     position: absolute; top: 8px; right: 8px;
@@ -601,14 +1002,31 @@
   .move-btn:hover { background: rgba(0, 0, 0, 0.78); }
   .move-btn .material-symbols-rounded { font-size: 16px; }
 
-  /* Segmented radio for the move/copy choice */
+  /* Segmented radio for the move/copy choice. One sliding thumb
+     behind the two labels (rather than each label painting its own
+     background) so switching selection animates as a slide instead
+     of an instant pop between positions. */
   .seg-radio {
+    position: relative;
     display: flex; gap: 4px;
     background: var(--surface-2);
     padding: 4px;
     border-radius: var(--radius-md);
   }
+  .seg-thumb {
+    position: absolute;
+    top: 4px; left: 4px;
+    width: calc(50% - 6px);
+    height: calc(100% - 8px);
+    background: var(--surface-1);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: transform var(--dur-fast);
+  }
+  .seg-thumb.move { transform: translateX(calc(100% + 4px)); }
   .seg-radio label {
+    position: relative;
+    z-index: 1;
     flex: 1;
     display: flex; align-items: center; justify-content: center; gap: 6px;
     padding: 8px 10px;
@@ -616,39 +1034,20 @@
     cursor: pointer;
     font-size: 13px; font-weight: 600;
     color: var(--text-3);
-    transition: background var(--dur-fast), color var(--dur-fast);
+    transition: color var(--dur-fast);
   }
-  .seg-radio label.on {
-    background: var(--surface-1);
-    color: var(--accent);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
+  .seg-radio label.on { color: var(--accent); }
   .seg-radio input { display: none; }
-  .seg-radio small { color: var(--text-3); font-weight: 500; }
 
-  /* ←/→ reorder buttons (bottom-right of card on hover) */
-  .reorder-row {
-    position: absolute;
-    bottom: 6px;
-    right: 6px;
-    display: flex;
-    gap: 4px;
-    opacity: 0;
-    transition: opacity var(--dur-fast);
+
+  /* Placeholder card svelte-dnd-action renders in the gap left by
+     the item currently being dragged. Same footprint as a real
+     card so the grid doesn't jump; dashed border reads as a slot. */
+  .dnd-shadow {
+    background: var(--surface-2);
+    border: 1.5px dashed var(--border);
+    aspect-ratio: 3 / 4;
   }
-  .recipe-card:hover .reorder-row { opacity: 1; }
-  .reorder-btn {
-    background: rgba(0, 0, 0, 0.55);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 26px; height: 26px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-  }
-  .reorder-btn:hover:not(:disabled) { background: rgba(0, 0, 0, 0.75); }
-  .reorder-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-  .reorder-btn .material-symbols-rounded { font-size: 14px; }
 
   /* Modal */
   .modal-backdrop {

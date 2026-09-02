@@ -7,6 +7,7 @@ import { signToken, sessionMaxAge, userMgmtActive, requireAuth, requireAdmin } f
 import { listProviders as oidcListProviders, publicProvider as oidcPublicProvider, isPasswordLoginEnabled, listUserLinks } from '../lib/oidc.js';
 import { sendPasswordReset, sendInvite, isEmailConfigured } from '../email.js';
 import { estimate as estimatePasswordStrength, STRONG_MIN_SCORE } from '../lib/password-strength.js';
+import { claimAnonymousData, purgeUnreferencedUserData, purgeUserRows } from '../lib/claim-anonymous-data.js';
 
 const router = Router();
 
@@ -175,13 +176,7 @@ router.post('/register', wrap((req, res) => {
   // First user: claim any pre-existing rows that were inserted before user_mgmt
   // existed (user_id IS NULL). Stays scoped to CookTrace's own tables.
   if (isFirst) {
-    db.prepare('UPDATE recipes      SET user_id = ? WHERE user_id IS NULL').run(user.id);
-    db.prepare('UPDATE pantry_items SET user_id = ? WHERE user_id IS NULL').run(user.id);
-    db.prepare('UPDATE cook_diary   SET user_id = ? WHERE user_id IS NULL').run(user.id);
-    db.prepare('UPDATE shopping_list SET user_id = ? WHERE user_id IS NULL').run(user.id);
-    // Clear single_user_mode flag if a prior DELETE /management or
-    // POST /recover set it. Re-enabling user management implicitly here.
-    db.prepare(`DELETE FROM app_config WHERE key = 'single_user_mode'`).run();
+    claimAnonymousData(user.id);
     res.cookie('ct_token', signToken(user), COOKIE_OPTS);
   }
 
@@ -228,10 +223,17 @@ router.put('/password', requireAuth, wrap((req, res) => {
 // Only exposed when sharing is enabled — otherwise instance-wide user enumeration
 // is unnecessary and leaks membership to every account.
 router.get('/users/list', requireAuth, wrap((req, res) => {
-  const cfg = db.prepare("SELECT value FROM app_config WHERE key = 'sharing_enabled'").get();
-  if (cfg?.value !== 'true' && cfg?.value !== '1') return res.json([]);
+  // Available when EITHER recipe sharing OR multi-user mode is on.
+  // Kitchens (invite-a-member) only makes sense in multi-user mode
+  // and needs this list for autocomplete, so gating on sharing_enabled
+  // alone left the Kitchen invite picker empty on instances that use
+  // multi-user without recipe sharing. Any Kitchen already exposes
+  // its members' usernames in the member list, so no new leakage.
+  // Single-user instances (no user management) still get [] since
+  // there are no peers to list.
+  if (!userMgmtActive()) return res.json([]);
   const peers = db.prepare('SELECT id, full_name, username FROM users WHERE id != ? ORDER BY full_name, username').all(req.user.id);
-  res.json(peers.map(u => ({ id: u.id, name: u.full_name || u.username })));
+  res.json(peers.map(u => ({ id: u.id, name: u.full_name || u.username, username: u.username })));
 }));
 
 // ── Admin: list users ──────────────────────────────────────────────────────
@@ -250,6 +252,8 @@ router.delete('/me', requireAuth, wrap((req, res) => {
     return res.status(400).json({ error: 'Cannot delete the only admin account. Transfer admin to another user first.' });
   }
   // CASCADE handles foods, meals, diary, settings, wellness_data, ai_chat_history, etc.
+  // Tables with no FK to users(id) do not cascade — clear this user's rows.
+  purgeUserRows(userId);
   db.prepare('DELETE FROM users WHERE id = ?').run(userId);
   res.clearCookie('ct_token');
   res.json({ ok: true });
@@ -259,6 +263,8 @@ router.delete('/me', requireAuth, wrap((req, res) => {
 router.delete('/users/:id', requireAuth, requireAdmin, wrap((req, res) => {
   const id = parseInt(req.params.id);
   if (id === req.user.id) return res.status(400).json({ error: 'Cannot delete yourself' });
+  // Tables with no FK to users(id) do not cascade — clear this user's rows.
+  purgeUserRows(id);
   db.prepare('DELETE FROM users WHERE id = ?').run(id);
   res.json({ ok: true });
 }));
@@ -270,6 +276,39 @@ router.put('/users/:id/password', requireAuth, requireAdmin, wrap((req, res) => 
   { const pwErr = validatePassword(new_password); if (pwErr) return res.status(400).json({ error: pwErr }); }
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(new_password, 12), id);
   res.json({ ok: true });
+}));
+
+// ── Admin: patch another user's profile (name / email) ────────────────────
+// Username is intentionally NOT editable here — it's the stable identifier
+// kitchens invite by and sharing grants reference. Password is a separate
+// endpoint (see /users/:id/password); role is a separate endpoint
+// (see /users/:id/role).
+router.patch('/users/:id', requireAuth, requireAdmin, wrap((req, res) => {
+  const id = parseInt(req.params.id);
+  const target = db.prepare('SELECT id, full_name, email FROM users WHERE id = ?').get(id);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const patch = {};
+  if ('full_name' in body) {
+    const v = (body.full_name || '').toString().trim();
+    patch.full_name = v || null;
+  }
+  if ('email' in body) {
+    const raw = (body.email || '').toString().trim().toLowerCase();
+    if (raw) {
+      // Simple format check — must contain @ and at least one dot after it.
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) return res.status(400).json({ error: 'Invalid email address' });
+      const dup = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(raw, id);
+      if (dup) return res.status(409).json({ error: 'That email is already in use' });
+    }
+    patch.email = raw || null;
+  }
+  if (Object.keys(patch).length === 0) return res.json({ ok: true });
+  const sets = Object.keys(patch).map(k => `${k} = ?`).join(', ');
+  const vals = Object.values(patch);
+  db.prepare(`UPDATE users SET ${sets} WHERE id = ?`).run(...vals, id);
+  const updated = db.prepare('SELECT id, username, full_name, email, role, created_at FROM users WHERE id = ?').get(id);
+  res.json({ ok: true, user: updated });
 }));
 
 // ── Admin: change another user's role (user | admin) ──────────────────────
@@ -295,6 +334,8 @@ router.put('/users/:id/role', requireAuth, requireAdmin, wrap((req, res) => {
 // ── Admin: disable user management (delete all users) ─────────────────────
 router.delete('/management', requireAuth, requireAdmin, wrap((req, res) => {
   db.prepare('DELETE FROM users').run();
+  // Tables without an FK to users(id) survive the cascade — clear them too.
+  purgeUnreferencedUserData();
   // Persist intent: this was an explicit disable, not a fresh install.
   // /status uses this to keep setup_required=false so the client doesn't
   // re-route to the wizard on every load. Cleared by the next /register.
@@ -318,6 +359,8 @@ router.post('/recover', rateLimitLogin, wrap((req, res) => {
     return res.status(403).json({ error: 'Invalid recovery token.' });
   }
   db.prepare('DELETE FROM users').run();
+  // Tables without an FK to users(id) survive the cascade — clear them too.
+  purgeUnreferencedUserData();
   // Same single_user_mode flag as DELETE /management — recovery is an
   // intentional disable, not a fresh install.
   db.prepare(`INSERT INTO app_config (key, value) VALUES ('single_user_mode', '1')
@@ -352,7 +395,8 @@ router.post('/forgot-password', rateLimitLogin, wrap(async (req, res) => {
   const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
   db.prepare('INSERT INTO password_reset_tokens (token, user_id, expires_at) VALUES (?, ?, ?)').run(token, user.id, expires);
 
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0].trim();
+  const baseUrl = `${proto}://${req.headers['x-forwarded-host'] || req.get('host')}`;
   try {
     await sendPasswordReset(user.email, `${baseUrl}/#/reset-password?token=${token}`);
   } catch (e) {
@@ -401,7 +445,8 @@ router.post('/invite', requireAuth, requireAdmin, wrap(async (req, res) => {
   db.prepare('INSERT INTO invite_tokens (token, email, role, created_by, expires_at) VALUES (?, ?, ?, ?, ?)')
     .run(token, email ? email.trim().toLowerCase() : null, role, req.user.id, expires);
 
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0].trim();
+  const baseUrl = `${proto}://${req.headers['x-forwarded-host'] || req.get('host')}`;
   const inviteUrl = `${baseUrl}/#/accept-invite?token=${token}`;
 
   if (email && isEmailConfigured()) {

@@ -37,7 +37,12 @@ export default defineConfig({
   plugins: [
     svelte(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' downloads new bundles but WAITS for the app to
+      // call updateSW(true) before activating. That's what lets us
+      // show a "Reload" banner instead of swapping the page out from
+      // under the user with no warning. See src/lib/pwa-update.js
+      // for the Svelte-side bridge.
+      registerType: 'prompt',
       workbox: {
         globPatterns: ['offline.html'],
         navigateFallback: null,

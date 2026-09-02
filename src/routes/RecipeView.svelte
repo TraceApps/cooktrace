@@ -1,5 +1,17 @@
 <script>
   import { push } from 'svelte-spa-router';
+
+  // Close: always navigates to /recipes. An earlier revision tried to
+  // use window.history.back() so opening from Diary / Cookbook would
+  // return there instead of dumping on the Recipes tab, but that
+  // interacted badly with the App.svelte {#key $location} page-
+  // transition remount + iOS hash-history quirks and could trap the
+  // user in a close-loop. Reverted to a plain push so nav is
+  // predictable regardless of origin. A proper route-history store is
+  // the right way to bring "back to origin" back — future pass.
+  function _closeRecipe() {
+    push('/recipes');
+  }
   import { fade } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
   import { formatDuration } from '../lib/duration.js';
@@ -270,6 +282,30 @@
       else    localStorage.removeItem(`ct:cookmode:${rid}`);
     } catch {}
   }
+  // Resolve a step's ref_ids → the actual ingredient objects from the
+  // recipe's grouped-ingredients tree. Returns in refIds order so the
+  // author controls the order. Each entry carries `checkKey` = the
+  // same `${gi}-${ii}` the top ingredients list uses so ingChecks
+  // stays in one place — tap-to-check syncs both surfaces. Silently
+  // drops dangling refs (removed ingredient, save race, foreign edit).
+  function _resolveStepIngs(refIds) {
+    if (!recipe || !Array.isArray(recipe.ingredients)) return [];
+    const byId = new Map();
+    for (let gi = 0; gi < recipe.ingredients.length; gi++) {
+      const g = recipe.ingredients[gi];
+      const items = g?.items || [];
+      for (let ii = 0; ii < items.length; ii++) {
+        const it = items[ii];
+        if (it?.id) byId.set(it.id, { it, checkKey: `${gi}-${ii}` });
+      }
+    }
+    const out = [];
+    for (const id of refIds) {
+      const hit = byId.get(id);
+      if (hit) out.push({ ...hit.it, checkKey: hit.checkKey });
+    }
+    return out;
+  }
   function toggleIng(key) {
     if (!cookMode) return; // checks only mutate during an active cook session
     if (ingChecks.has(key)) ingChecks.delete(key);
@@ -279,10 +315,35 @@
   }
   function toggleStep(idx) {
     if (!cookMode) return; // see toggleIng
-    if (stepChecks.has(idx)) stepChecks.delete(idx);
-    else stepChecks.add(idx);
+    const willCheck = !stepChecks.has(idx);
+    if (willCheck) stepChecks.add(idx);
+    else stepChecks.delete(idx);
     stepChecks = stepChecks;
     _saveChecks(id, 'step', stepChecks);
+    // Marking a step done also marks off its linked ingredients as
+    // used. Users who worked straight through the step without
+    // checking each ingredient individually get the same end state as
+    // if they had. One-way only: un-checking the step does NOT
+    // un-check ingredients (those ingredients may have been used by
+    // other steps too). Skip when the step has no linked refs.
+    if (willCheck) {
+      const step = recipe?.steps?.[idx];
+      const refIds = (typeof step === 'string' || !Array.isArray(step?.refIds)) ? [] : step.refIds;
+      if (refIds.length > 0) {
+        const linked = _resolveStepIngs(refIds);
+        let touched = false;
+        for (const ing of linked) {
+          if (!ingChecks.has(ing.checkKey)) {
+            ingChecks.add(ing.checkKey);
+            touched = true;
+          }
+        }
+        if (touched) {
+          ingChecks = ingChecks;
+          _saveChecks(id, 'ing', ingChecks);
+        }
+      }
+    }
   }
   function toggleTool(idx) {
     if (!cookMode) return; // see toggleIng
@@ -699,7 +760,7 @@
           </button>
         {/if}
       {/if}
-      <button class="btn-icon close-btn" on:click={() => push('/recipes')} aria-label="Close" title="Close">
+      <button class="btn-icon close-btn" on:click={_closeRecipe} aria-label="Close" title="Close">
         <span class="material-symbols-rounded">close</span>
       </button>
     {/if}
@@ -1022,6 +1083,8 @@
                 {@const text  = typeof step === 'string' ? step : (step.text || '')}
                 {@const stepImg = typeof step === 'string' ? null : (step.imgUrl || null)}
                 {@const parts = splitWithTimes(text)}
+                {@const stepRefIds = (typeof step === 'string' || !Array.isArray(step.refIds)) ? [] : step.refIds}
+                {@const stepIngs = stepRefIds.length > 0 ? _resolveStepIngs(stepRefIds) : []}
                 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
                 <li class="step" class:checked={stepChecks.has(i)} id={`step-${i}`}
                   on:click={(e) => {
@@ -1053,6 +1116,42 @@
                       <span class="step-heading">
                         <span class="step-title">{title}</span>
                       </span>
+                    {/if}
+                    {#if stepIngs.length > 0}
+                      <!-- Per-step linked ingredients (issue #40). Small
+                           inline list so users don't scroll back to the
+                           top ingredients section during Cook Mode.
+                           Tap in cook mode toggles the SAME check state
+                           as the top ingredients list — check off "1 cup
+                           rice" here and it strikes through up top too. -->
+                      <ul class="step-ings" aria-label={`Ingredients for step ${i + 1}`}>
+                        {#each stepIngs as ing (ing.id)}
+                          {@const _checked = ingChecks.has(ing.checkKey)}
+                          <li class="step-ing" class:checked={_checked} class:tappable={cookMode}>
+                            {#if cookMode}
+                              <button type="button" class="step-ing-btn"
+                                on:click|stopPropagation={() => toggleIng(ing.checkKey)}
+                                aria-pressed={_checked}
+                                title={_checked ? 'Uncheck ingredient' : 'Mark ingredient used'}>
+                                <span class="step-ing-check material-symbols-rounded">
+                                  {_checked ? 'check_box' : 'check_box_outline_blank'}
+                                </span>
+                                {#if ing.qty || ing.unit}
+                                  <span class="step-ing-qty">{ing.qty || ''}{ing.qty && ing.unit ? ' ' : ''}{ing.unit || ''}</span>
+                                {/if}
+                                <span class="step-ing-name">{ing.name}</span>
+                                {#if ing.note}<span class="step-ing-note">{ing.note}</span>{/if}
+                              </button>
+                            {:else}
+                              {#if ing.qty || ing.unit}
+                                <span class="step-ing-qty">{ing.qty || ''}{ing.qty && ing.unit ? ' ' : ''}{ing.unit || ''}</span>
+                              {/if}
+                              <span class="step-ing-name">{ing.name}</span>
+                              {#if ing.note}<span class="step-ing-note">{ing.note}</span>{/if}
+                            {/if}
+                          </li>
+                        {/each}
+                      </ul>
                     {/if}
                     {#if stepImg}
                       <img class="step-image" src={resolveAssetUrl(stepImg)} alt={`Step ${i + 1}`} loading="lazy" />
@@ -1422,6 +1521,9 @@
   }
   @media (min-width: 1280px) {
     .body { max-width: 1440px; }
+  }
+  @media (min-width: 1600px) {
+    .body { max-width: 1760px; }
   }
 
   /* Layout grid:
@@ -2243,6 +2345,68 @@
     color: var(--text-1);
   }
   .step-text { color: var(--text-1); line-height: 1.5; font-size: 15px; }
+
+  /* Per-step linked ingredients (issue #40) — small inline list so
+     users don't scroll back to the top ingredients section during
+     Cook Mode. Sits between the step heading and the step text /
+     image so the quantities read as part of the step context. */
+  .step-ings {
+    list-style: none;
+    margin: 4px 0 6px;
+    padding: 8px 12px;
+    display: flex; flex-direction: column; gap: 4px;
+    background: color-mix(in srgb, var(--accent) 6%, var(--surface-2));
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+    border-radius: var(--radius-md);
+  }
+  .step-ing {
+    display: flex; align-items: baseline; gap: 6px;
+    font-size: 13px; color: var(--text-2); line-height: 1.4;
+  }
+  /* Tap-to-check button variant used in cook mode. Wraps the whole
+     row content so the entire strip is a target. */
+  .step-ing-btn {
+    all: unset;
+    display: flex; align-items: baseline; gap: 6px;
+    width: 100%;
+    cursor: pointer;
+    padding: 2px 0;
+    border-radius: 4px;
+  }
+  .step-ing-btn:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  .step-ing-check {
+    font-size: 18px; color: var(--text-3);
+    flex-shrink: 0;
+    transition: color var(--dur-fast);
+    align-self: center;
+  }
+  .step-ing.checked .step-ing-check { color: var(--accent); }
+  .step-ing-qty {
+    font-weight: 700; color: var(--accent);
+    min-width: 70px;
+    font-variant-numeric: tabular-nums;
+  }
+  .step-ing-name { color: var(--text-1); font-weight: 500; }
+  .step-ing-note { color: var(--text-3); font-style: italic; font-size: 12px; }
+  /* Checked state: strike through name + qty, fade unit / note, so
+     it visually mirrors the top ingredients list's .ingredient.checked
+     treatment. */
+  .step-ing.checked .step-ing-qty,
+  .step-ing.checked .step-ing-name,
+  .step-ing.checked .step-ing-note {
+    color: var(--text-3);
+    text-decoration: line-through;
+    text-decoration-color: color-mix(in srgb, var(--text-3) 60%, transparent);
+  }
+  /* Cook mode scales the inline list to match the surrounding step
+     text (17px / 1.55) so quantities read at arm's length. */
+  .cook-mode .step-ing { font-size: 16px; line-height: 1.5; }
+  .cook-mode .step-ing-qty { min-width: 90px; font-size: 16px; }
+  .cook-mode .step-ing-note { font-size: 14px; }
+  .cook-mode .step-ing-check { font-size: 20px; }
+  /* When the step itself is checked done, fade the whole inline
+     block to match the muted .step-text / .step-title treatment. */
+  .step.checked .step-ings { opacity: 0.55; }
   .step-image {
     display: block;
     width: 100%;

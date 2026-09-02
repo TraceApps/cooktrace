@@ -18,6 +18,16 @@ body {
   line-height: 1.5;
   min-height: 100%;
   overflow-x: hidden;
+  /* iOS Safari + PWA lock: only accept vertical panning at the
+     document level so horizontal touch drag can never move the page.
+     Inner horizontal scrollers (Shopping group-chips, Manage mobile
+     rail, Recipes vt-toggle strip, Pantry filter strip, CookHeatmap
+     row) opt back in with `touch-action: pan-x` on their own class
+     so they still scroll sideways. Combined with overscroll-behavior
+     none this stops the rubber-band-to-background feel iOS users
+     reported. */
+  overscroll-behavior: none;
+  touch-action: pan-y;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
