@@ -14,6 +14,7 @@
   import RichTextEditor from '../components/ui/RichTextEditor.svelte';
   import MarkdownToolbar from '../components/ui/MarkdownToolbar.svelte';
   import Combobox from '../components/ui/Combobox.svelte';
+  import IngredientNameField from '../components/recipe/IngredientNameField.svelte';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS } from '../lib/nutriments.js';
   import { visibleNutriments } from '../stores/settings.js';
@@ -1055,12 +1056,6 @@
           <!-- Ingredients (grouped) -->
           <section class="section editor-col-ing">
             <h2 class="section-title">{$_('recipe_editor_ct.ingredients')}</h2>
-            <!-- Datalist of known pantry items — populates as you type into
-                 the ingredient name field. New names auto-create pantry
-                 rows on save (server-side). -->
-            <datalist id="pantry-names">
-              {#each pantryNames as n}<option value={n}></option>{/each}
-            </datalist>
 
             {#each ingredientGroups as group, gi (gi)}
               <div class="ing-group">
@@ -1100,8 +1095,7 @@
                     <UnitPicker bind:value={ing.unit} placeholder="unit"
                       on:change={() => ing.qty = _normaliseQtyForUnit(ing.qty, ing.unit)} />
                     <div class="ing-name-wrap">
-                      <input class="input ing-name" type="text" bind:value={ing.name} placeholder="flour"
-                        list="pantry-names" autocomplete="off" />
+                      <IngredientNameField bind:value={ing.name} suggestions={pantryNames} placeholder="flour" />
                       <!-- Mobile state indicators: signal linked-pantry
                            and has-note state on the primary row so the
                            user sees what's stashed behind the kebab
@@ -1792,7 +1786,6 @@
     align-items: center;
     min-width: 0;
   }
-  .ing-name-wrap .ing-name { width: 100%; padding-right: 8px; }
   .ing-indicators {
     display: none; /* desktop */
     position: absolute;
@@ -1854,7 +1847,6 @@
     .ing-row .desktop-only-btn { display: none; }
     .ing-row .ing-kebab { display: inline-flex; }
     .ing-indicators { display: inline-flex; }
-    .ing-name-wrap .ing-name { padding-right: 46px; }
     .ing-note-row { display: block; }
   }
 
