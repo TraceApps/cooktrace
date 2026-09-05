@@ -163,6 +163,7 @@
     kitchens:      { titleKey: 'settings.kitchens.section',          icon: 'group' },
     users:         { titleKey: 'settings.users.section',             icon: 'group' },
     auth:          { titleKey: 'settings.authentication.section',    icon: 'shield_person' },
+    apitokens:     { titleKey: 'settings.apitokens.section',         icon: 'key' },
     serverconn:    { titleKey: 'settings.server.section',            icon: 'cloud' },
     updates:       { titleKey: 'settings.updates.section',           icon: 'system_update' },
     diagnostics:   { titleKey: 'settings.diagnostics.section',       icon: 'troubleshoot' },
