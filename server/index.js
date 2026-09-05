@@ -33,6 +33,8 @@ import cookbooksRoutes    from './routes/cookbooks.js';
 import shareRoutes        from './routes/share.js';
 import kitchensRoutes     from './routes/kitchens.js';
 import updatesRoutes      from './routes/updates.js';
+import apiTokensRoutes    from './routes/api-tokens.js';
+import mcpRoutes          from './routes/mcp.js';
 import { logger }   from './logger.js';
 import { authenticate, userMgmtActive } from './middleware/auth.js';
 import { csrfProtect } from './middleware/csrf.js';
@@ -181,6 +183,8 @@ router.use('/api/notify',       notifyRoutes);
 router.use('/api/units',        unitsRoutes);
 router.use('/api/cookbooks',    cookbooksRoutes);
 router.use('/api/kitchens',     kitchensRoutes);
+router.use('/api/admin/api-tokens', apiTokensRoutes);
+router.use('/api/mcp',          mcpRoutes);
 router.use('/api/r',            shareRoutes);   // public share-link reads
 router.get('/api/health', (req, res) => res.json({ ok: true }));
 

@@ -43,6 +43,7 @@
   import SettingsDiagnostics     from '../components/settings/SettingsDiagnostics.svelte';
   import SettingsUserManagement  from '../components/settings/SettingsUserManagement.svelte';
   import SettingsAuth            from '../components/settings/SettingsAuth.svelte';
+  import SettingsApiTokens       from '../components/settings/SettingsApiTokens.svelte';
   import SettingsEmail           from '../components/settings/SettingsEmail.svelte';
   import SettingsAbout           from '../components/settings/SettingsAbout.svelte';
   import Profile                 from './Profile.svelte';
@@ -190,6 +191,7 @@
     kitchens:      SettingsKitchens,
     users:         SettingsUserManagement,
     auth:          SettingsAuth,
+    apitokens:     SettingsApiTokens,
     serverconn:    SettingsServerConnection,
     updates:       SettingsUpdates,
     diagnostics:   SettingsDiagnostics,
@@ -217,6 +219,7 @@
     kitchens:      ['kitchens','kitchen','household','household members','share','sharing','family','roommates','crew','group','members','auto-share','auto share','auto sharing','share recipes','share cookbook','cookbook sharing','via kitchen'],
     users:         ['users','user management','accounts','login','admin','register','invite'],
     auth:          ['authentication','auth','sso','single sign-on','single sign on','oidc','openid','authentik','keycloak','authelia','password login'],
+    apitokens:     ['api tokens','api token','personal access token','pat','mcp','model context protocol','claude desktop','cursor','codex','agent','ai agent','bearer token','scopes','revoke token'],
     serverconn:    ['server','connection','sync','connect','disconnect','local mode','offline','standalone','android','native','url','login'],
     updates:       ['updates','update','upgrade','version','new version','changelog','release','releases','apk','install','download','check for updates','auto-check','channel','stable','dev','dev-latest','beta','github','server update','docker','compose','docker-compose','check frequency','check interval','how often','hourly','daily','manual','manual only','cadence','banner','notification'],
     diagnostics:   ['diagnostics','logs','verbose','console','export','bug','report','troubleshoot','crash'],
@@ -498,6 +501,11 @@
       <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'auth')} class:active={currentSection === 'auth'} aria-current={currentSection === 'auth' ? 'page' : undefined} on:click={() => toggleSection('auth')}>
         <span class="material-symbols-rounded si">vpn_key</span>
         <span>{$_('settings.authentication.section')}</span>
+        <span class="material-symbols-rounded chevron">expand_more</span>
+      </button>
+      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'apitokens')} class:active={currentSection === 'apitokens'} aria-current={currentSection === 'apitokens' ? 'page' : undefined} on:click={() => toggleSection('apitokens')}>
+        <span class="material-symbols-rounded si">key</span>
+        <span>{$_('settings.apitokens.section')}</span>
         <span class="material-symbols-rounded chevron">expand_more</span>
       </button>
     {/if}

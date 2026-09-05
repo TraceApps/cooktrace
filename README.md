@@ -60,6 +60,7 @@ Third app in the Trace family alongside [NutriTrace](https://github.com/traceapp
 ### AI + Federation
 - **Trace AI.** Reads your recipes, pantry, diary, and cookbooks; can log a cook, plan a meal, add to shopping, or import a recipe from a URL, all conversationally. 19 tools total. Multi-provider (Claude / OpenAI / Gemini / any OpenAI-compatible endpoint). Smart Log voice, image attach, cook-mode voice control. → [full guide](https://traceapps.github.io/docs/cooktrace/trace/)
 - **NutriTrace federation.** Pull food data per-user with a Bearer token; log cooks back to the NT diary. → [full guide](https://traceapps.github.io/docs/cooktrace/nt-federation/)
+- **Model Context Protocol (MCP).** Expose your recipes, pantry, shopping list, and cook diary to external AI agents (Claude Desktop, Cursor, Codex) via the standard MCP Streamable HTTP transport. Off by default; opt in with `MCP_ENABLED=1`. Read, write, and destructive tool tiers, each independently gated by its own env flag and token scope. → [full guide](https://traceapps.github.io/docs/cooktrace/mcp/)
 
 ### Accounts + platforms
 - **Multi-user + OIDC SSO.** Authentik, Keycloak, Pocket ID, Authelia, Auth0, Google. Auto-link verified emails, optional auto-register, admin-group claims, RP-initiated logout. → [full guide](https://traceapps.github.io/docs/auth/oidc/)

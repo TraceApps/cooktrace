@@ -54,6 +54,23 @@ db.exec(`
     expires_at TEXT NOT NULL,
     used       INTEGER DEFAULT 0
   );
+
+  -- Personal access tokens. Currently the auth mechanism for the MCP
+  -- endpoint (/api/mcp); a general-purpose token store so a future
+  -- federation-style API can reuse it without a schema change. Raw
+  -- token value is never stored, only its SHA-256 hash.
+  CREATE TABLE IF NOT EXISTS api_tokens (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name         TEXT NOT NULL,
+    token_hash   TEXT NOT NULL UNIQUE,
+    scopes       TEXT NOT NULL DEFAULT '[]',  -- JSON array of scope strings
+    expires_at   TEXT,                         -- NULL = never expires
+    last_used_at TEXT,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id);
+  CREATE INDEX IF NOT EXISTS idx_api_tokens_hash ON api_tokens(token_hash);
 `);
 
 // ── AI assistant chat history (per user) ───────────────────────────────────
