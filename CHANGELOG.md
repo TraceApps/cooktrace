@@ -7,6 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Model Context Protocol (MCP) server.** CookTrace now exposes a read + write + destructive MCP endpoint at `/api/mcp` so Claude Desktop, Cursor, Codex, and other MCP-aware agents can search recipes, browse the pantry and shopping list, log a cook, and (with the right scope) create recipes or pantry items directly. Fourteen tools across three independently-gated tiers (`mcp:read` / `mcp:write` / `mcp:destroy`), each requiring both a server-side env flag and a matching token scope. Off by default. See [docs/cooktrace/mcp.md](https://traceapps.github.io/docs/cooktrace/mcp/) for setup.
+- **Personal access tokens.** New Settings → API Tokens section (admin, multi-user mode) to mint, scope, and revoke tokens. Currently the sole consumer is MCP; built as a general-purpose token store for future API surfaces.
+
 ---
 
 ## [1.2.0] - 2026-09-02

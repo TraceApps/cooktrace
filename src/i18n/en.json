@@ -205,6 +205,7 @@
       "subtitle_empty":  "Tap to add your name and photo"
     },
     "authentication":     { "section": "Authentication" },
+    "apitokens":          { "section": "API Tokens" },
     "users":              {
       "section":              "Users",
       "users_heading":        "Users",
@@ -993,6 +994,60 @@
     "cancel":                        "Cancel",
     "allow_password_login":          "Allow Password Login",
     "env_locked_html":               "<br /><em>Locked by <code>OIDC_ENABLE_EMAIL_PASSWORD_LOGIN</code> environment variable.</em>"
+  },
+  "settings_api_tokens_ct": {
+    "intro_before":    "Personal access tokens for external agents (Claude Desktop, Cursor, Codex",
+    "intro_dev":       "and other Model Context Protocol clients",
+    "intro_middle":    ") that connect to",
+    "intro_see":       "See",
+    "just_created": {
+      "title":   "Token created:",
+      "warn":    "Copy this now. It won't be shown again.",
+      "copy":    "Copy",
+      "saved":   "I've saved it"
+    },
+    "empty": {
+      "title": "No tokens yet",
+      "desc":  "Create one to let an MCP client (Claude Desktop, Cursor, Codex) read or update your recipes, pantry, shopping list, and cook diary."
+    },
+    "row": {
+      "scopes_label":  "Scopes:",
+      "scopes_none":   "none",
+      "never":         "never",
+      "just_now":      "just now",
+      "min_ago":       "{n}m ago",
+      "hr_ago":        "{n}h ago",
+      "day_ago":       "{n}d ago",
+      "last_used":     "last used {when}",
+      "expires":       "expires {when}",
+      "revoke_title":  "Revoke token"
+    },
+    "form": {
+      "new_token":     "New Token",
+      "name":          "Name",
+      "name_ph":       "e.g. claude-desktop",
+      "scopes":        "Scopes",
+      "expires_label": "Expires After (Days)",
+      "expires_ph":    "never",
+      "cancel":        "Cancel",
+      "create":        "Create",
+      "creating":      "Creating…"
+    },
+    "confirm": {
+      "revoke_title":   "Revoke \"{name}\"?",
+      "revoke_msg":     "Any client using this token will immediately lose access.",
+      "revoke_confirm": "Revoke"
+    },
+    "toast": {
+      "load_failed":     "Could not load tokens",
+      "scope_required":  "Pick at least one scope",
+      "name_required":   "Name is required",
+      "create_failed":   "Could not create token",
+      "revoke_failed":   "Could not revoke token",
+      "revoked":         "Token revoked",
+      "copied":          "Copied to clipboard",
+      "copy_failed":     "Could not copy"
+    }
   },
   "settings_server_conn": {
     "toast": {
