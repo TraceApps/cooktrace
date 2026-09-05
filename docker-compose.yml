@@ -74,6 +74,14 @@ services:
       # - BACKUP_RETENTION=${BACKUP_RETENTION:-}  # backups to keep (older purged)
       # Optional — Cap session length in hours (default 8760 = 1 year)
       # - MAX_SESSION_HOURS=${MAX_SESSION_HOURS:-}
+      # Optional — Model Context Protocol server at /api/mcp, for external AI
+      # agents (Claude Desktop, Cursor, Codex). Off by default. Mint a token
+      # under Settings → API Tokens (multi-user mode, admin) after enabling.
+      # See https://traceapps.github.io/docs/cooktrace/mcp/
+      # - MCP_ENABLED=${MCP_ENABLED:-}
+      # - MCP_WRITE_ENABLED=${MCP_WRITE_ENABLED:-}
+      # - MCP_DESTROY_ENABLED=${MCP_DESTROY_ENABLED:-}
+      # - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}    # only needed for browser-based MCP clients
       # Optional — OIDC Single Sign-On declared in env instead of the Settings UI.
       # Single-provider shorthand (`OIDC_*` is an alias for `OIDC_PROVIDER_1_*`):
       # - OIDC_ISSUER=${OIDC_ISSUER:-}
