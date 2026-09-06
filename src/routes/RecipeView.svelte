@@ -24,7 +24,7 @@
   import CookLogDialog from '../components/recipe/CookLogDialog.svelte';
   import { relativeTime, shortDate } from '../lib/relative-time.js';
   import { formatDate, formatUpdated, domainFromUrl } from '../lib/format.js';
-  import { dateFormat, ntFederationEnabled, ntInstanceUrl } from '../stores/settings.js';
+  import { dateFormat } from '../stores/settings.js';
   import { scaleQty, displayQty, displayQtyParts, parseQty } from '../lib/qty.js';
   import { convertWithinFamily, convertQty, unitFamily } from '../lib/recipe-nutrition.js';
   import { resolveAssetUrl, isNative, getServerUrl } from '../lib/platform.js';
@@ -700,79 +700,6 @@
     }
   }
 
-  // ── Push to NutriTrace (Phase 1 federation) ──────────────────────────
-  // Sends this recipe to the user's configured NutriTrace instance as a
-  // recipe entry (is_recipe=1 in NT's meals table). Idempotent per
-  // (user, source_app, source_external_id): a re-push after a CT edit
-  // updates the same NT row.
-  //
-  // Nutrition totals rely on the client's own computeRecipeNutrition
-  // rollup so that skipped-ingredient reasons flow through verbatim
-  // into the NT recipe row's import_warnings. If the user hasn't run
-  // Recompute yet we run it silently so the pushed payload isn't just
-  // whatever stale sum happens to be stored on the row.
-  let pushBusy = false;
-  let pushOpen = false;
-  let pushResult = null;      // { nt_meal_id, updated, url, warnings_sent }
-  let pushSkipped = [];       // preview of ingredients missing nutrition
-  async function openPushSheet() {
-    pushOpen = true;
-    pushResult = null;
-    pushSkipped = [];
-    // Reuse existing rollup if the user already Recomputed; otherwise
-    // silently run it so the skipped list matches what would land in NT.
-    try {
-      if (!recomputeResult) {
-        const pantry = await NtApi.getPantry();
-        const byId = new Map(pantry.map(p => [p.id, p]));
-        const byLowerName = new Map(pantry.map(p => [p.name.toLowerCase(), p]));
-        const stamped = (recipe?.ingredients || []).map(g => ({
-          ...g,
-          items: (g.items || []).map(it => {
-            if (it.pantry_item_id) return it;
-            const m = byLowerName.get((it.name || '').toLowerCase());
-            return m ? { ...it, pantry_item_id: m.id } : it;
-          }),
-        }));
-        const r = computeRecipeNutrition(stamped, byId);
-        pushSkipped = r.skipped || [];
-      } else {
-        pushSkipped = recomputeResult.skipped || [];
-      }
-    } catch (e) {
-      pushSkipped = [];
-    }
-  }
-  async function confirmPush() {
-    if (!recipe || pushBusy) return;
-    pushBusy = true;
-    try {
-      const res = await fetch('/api/nt-federation/push-recipe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          recipe_id: recipe.id,
-          skipped_ingredients: (pushSkipped || []).map(s => ({ name: s.name, reason: s.reason })),
-        }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        showError(body?.error || `Push failed: ${res.status}`);
-        return;
-      }
-      const url = body?.nt_meal_id && $ntInstanceUrl
-        ? `${$ntInstanceUrl.replace(/\/$/, '')}/#/meals/edit/${body.nt_meal_id}`
-        : null;
-      pushResult = { ...body, url };
-      showSuccess(body?.updated ? 'Recipe updated on NutriTrace' : 'Recipe pushed to NutriTrace');
-    } catch (e) {
-      showError(e.message || 'Push failed');
-    } finally {
-      pushBusy = false;
-    }
-  }
-
   // Per-row: set the missing density on a pantry item and re-run.
   // Prefers the built-in density table; falls back to leaving it for
   // the user to set via Trace if there's no match.
@@ -1351,19 +1278,6 @@
               </div>
             {/if}
           </div>
-          {#if $ntFederationEnabled && $ntInstanceUrl}
-            <!-- Push-to-NutriTrace card. Only surfaces when the user has
-                 NT federation configured and enabled; otherwise the
-                 card is invisible so casual users don't see an integration
-                 they haven't set up. -->
-            <div class="recompute-card">
-              <button class="btn btn-secondary recompute-btn" on:click={openPushSheet} disabled={pushBusy}>
-                <span class="material-symbols-rounded">upload</span>
-                Push to NutriTrace
-              </button>
-              <p class="recompute-hint">Publish this recipe to your NutriTrace instance as a recipe entry. Re-pushing after edits updates the same row.</p>
-            </div>
-          {/if}
         </section>
         </div><!-- /.col-right -->
         </div><!-- /.layout -->
@@ -1447,65 +1361,6 @@
   on:select={onShareSelect}
 />
 
-<!-- Push-to-NutriTrace confirmation. Runs the rollup silently on open
-     (or reuses recomputeResult) so the skipped-ingredient list shown
-     matches what actually goes to NT as import_warnings. -->
-{#if pushOpen}
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div use:portal class="pt-backdrop" on:click={() => { if (!pushBusy) pushOpen = false; }}
-    in:fade={{ duration: 140 }} out:fade={{ duration: 120 }}>
-    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="pt-panel" on:click|stopPropagation>
-      <div class="pt-header">
-        <h3>Push to NutriTrace</h3>
-        <button class="pt-close" on:click={() => pushOpen = false} disabled={pushBusy} aria-label="Close">
-          <span class="material-symbols-rounded">close</span>
-        </button>
-      </div>
-      {#if !pushResult}
-        <div class="pt-body">
-          <p class="pt-recipe-name">{recipe?.name || ''}</p>
-          <p class="pt-hint">This will publish the recipe (with per-ingredient nutrition and totals) to your NutriTrace instance as a recipe entry. Re-pushing after edits updates the same row.</p>
-          {#if pushSkipped.length > 0}
-            <div class="pt-warn">
-              <span class="material-symbols-rounded">warning</span>
-              <div>
-                <strong>{pushSkipped.length} ingredient{pushSkipped.length === 1 ? '' : 's'} without nutrition data</strong>
-                <p>The pushed totals may be underestimated. Missing ingredients:</p>
-                <ul class="pt-skip-list">
-                  {#each pushSkipped.slice(0, 8) as row (row.name + row.reason)}
-                    <li><span class="pt-skip-name">{row.name}</span> <span class="pt-skip-reason">{row.reason}</span></li>
-                  {/each}
-                  {#if pushSkipped.length > 8}<li class="pt-skip-more">+{pushSkipped.length - 8} more</li>{/if}
-                </ul>
-              </div>
-            </div>
-          {/if}
-        </div>
-        <div class="pt-footer">
-          <button class="btn btn-secondary" on:click={() => pushOpen = false} disabled={pushBusy}>Cancel</button>
-          <button class="btn btn-primary" on:click={confirmPush} disabled={pushBusy}>
-            {pushBusy ? 'Pushing…' : 'Push to NutriTrace'}
-          </button>
-        </div>
-      {:else}
-        <div class="pt-body pt-success">
-          <span class="material-symbols-rounded pt-success-icon">check_circle</span>
-          <p><strong>{pushResult.updated ? 'Updated on NutriTrace' : 'Pushed to NutriTrace'}</strong></p>
-          {#if pushResult.url}
-            <a class="btn btn-secondary" href={pushResult.url} target="_blank" rel="noopener noreferrer">
-              <span class="material-symbols-rounded">open_in_new</span>
-              Open in NutriTrace
-            </a>
-          {/if}
-        </div>
-        <div class="pt-footer">
-          <button class="btn btn-primary" on:click={() => pushOpen = false}>Done</button>
-        </div>
-      {/if}
-    </div>
-  </div>
-{/if}
 
 <!-- Photo lightbox for cook-history thumbs (click any thumb to zoom). -->
 <svelte:window on:keydown={onLightboxKey} />
@@ -2193,61 +2048,6 @@
   }
 
   /* ── Lightbox ─────────────────────────────────────────────────────── */
-  /* Push-to-NutriTrace modal. Portaled to body via use:portal so the
-     backdrop covers the whole viewport regardless of the recipe view's
-     own stacking context. */
-  :global(.pt-backdrop) {
-    position: fixed; inset: 0;
-    background: rgba(0, 0, 0, 0.55);
-    z-index: 200;
-    display: flex; align-items: center; justify-content: center;
-    padding: 16px;
-  }
-  :global(.pt-panel) {
-    background: var(--surface-1); color: var(--text-1);
-    border-radius: 14px;
-    max-width: 480px; width: 100%;
-    max-height: 90vh; overflow: auto;
-    box-shadow: 0 24px 64px rgba(0,0,0,0.35);
-    display: flex; flex-direction: column;
-  }
-  :global(.pt-header) {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 18px; border-bottom: 1px solid var(--border);
-  }
-  :global(.pt-header h3) { margin: 0; font-size: 16px; }
-  :global(.pt-close) {
-    background: none; border: none; color: var(--text-3);
-    cursor: pointer; padding: 4px;
-    display: flex; align-items: center;
-  }
-  :global(.pt-body) { padding: 16px 18px; }
-  :global(.pt-recipe-name) { font-weight: 600; margin: 0 0 6px 0; }
-  :global(.pt-hint) { color: var(--text-3); font-size: 13px; margin: 0 0 12px 0; }
-  :global(.pt-warn) {
-    display: flex; gap: 10px; align-items: flex-start;
-    padding: 12px; border-radius: 10px;
-    background: color-mix(in srgb, var(--warning, #f59e0b) 12%, transparent);
-    color: var(--text-1);
-  }
-  :global(.pt-warn > span.material-symbols-rounded) { color: var(--warning, #f59e0b); flex-shrink: 0; }
-  :global(.pt-warn strong) { display: block; margin-bottom: 4px; }
-  :global(.pt-warn p) { margin: 0 0 8px 0; font-size: 13px; color: var(--text-3); }
-  :global(.pt-skip-list) { list-style: none; margin: 0; padding: 0; font-size: 13px; }
-  :global(.pt-skip-list li) { padding: 3px 0; }
-  :global(.pt-skip-name) { font-weight: 500; }
-  :global(.pt-skip-reason) { color: var(--text-3); margin-left: 6px; }
-  :global(.pt-skip-more) { color: var(--text-3); font-style: italic; }
-  :global(.pt-footer) {
-    display: flex; gap: 10px; justify-content: flex-end;
-    padding: 14px 18px; border-top: 1px solid var(--border);
-  }
-  :global(.pt-success) {
-    display: flex; flex-direction: column; align-items: center;
-    gap: 8px; padding: 24px 18px; text-align: center;
-  }
-  :global(.pt-success-icon) { font-size: 48px; color: var(--success, #10b981); }
-
   .lb-backdrop {
     position: fixed; inset: 0;
     background: rgba(0, 0, 0, 0.92);

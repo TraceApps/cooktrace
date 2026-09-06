@@ -1008,7 +1008,7 @@
     },
     "empty": {
       "title": "No tokens yet",
-      "desc":  "Create one to let an MCP client (Claude Desktop, Cursor, Codex) read or update your recipes, pantry, shopping list, and cook diary."
+      "desc":  "Create one to let NutriTrace pull your recipes (read:recipes), or to let an MCP client (Claude Desktop, Cursor, Codex) read or update your recipes, pantry, shopping list, and cook diary."
     },
     "row": {
       "scopes_label":  "Scopes:",
