@@ -256,6 +256,171 @@ router.post('/import-foods', wrap(async (req, res) => {
   res.status(201).json({ count: created.length, created, skipped });
 }));
 
+/**
+ * POST /push-recipe
+ *
+ * Push a completed CT recipe into NT as an is_recipe=1 meals row.
+ *
+ * Client sends a pre-computed rollup because computeRecipeNutrition
+ * lives in src/lib/recipe-nutrition.js on the client and already
+ * knows how to resolve variants-of-generics + unit conversions + the
+ * skipped-ingredients bookkeeping. Server just:
+ *   1. Verifies the recipe belongs to the caller.
+ *   2. Loads referenced pantry items to pick up nt_food_id linkage
+ *      per ingredient (so imported NT foods get freshened on the NT
+ *      side rather than living as stale snapshots).
+ *   3. Builds the NT /api/v1/recipes wire payload.
+ *   4. POSTs to NT with the stored bearer token.
+ *   5. Records the returned NT meal_id on the CT recipes row so a
+ *      re-push updates the same row instead of duplicating.
+ *
+ * Request:
+ *   {
+ *     recipe_id: 42,                              // required
+ *     skipped_ingredients: [                      // optional, from client rollup
+ *       { name: "Turmeric", reason: "no nutrition data" }
+ *     ]
+ *   }
+ *
+ * Response:
+ *   { ok: true, nt_meal_id: 87, updated: false }
+ */
+router.post('/push-recipe', wrap(async (req, res) => {
+  const u = uid(req);
+  const cfg = _config(u);
+  if (!cfg || !cfg.enabled) {
+    return res.status(503).json({ error: 'NutriTrace federation is not enabled. Configure it in Settings > Integrations.' });
+  }
+  const recipeId = Number(req.body?.recipe_id);
+  if (!Number.isFinite(recipeId) || recipeId <= 0) {
+    return res.status(400).json({ error: 'recipe_id required' });
+  }
+
+  // Ownership check + load.
+  const recipe = u == null
+    ? db.prepare(`SELECT * FROM recipes WHERE id = ? AND user_id IS NULL AND deleted_at IS NULL`).get(recipeId)
+    : db.prepare(`SELECT * FROM recipes WHERE id = ? AND user_id = ? AND deleted_at IS NULL`).get(recipeId, u);
+  if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
+
+  let ingredients = [];
+  try { ingredients = JSON.parse(recipe.ingredients || '[]'); } catch { ingredients = []; }
+  let recipeNutrition = {};
+  try { recipeNutrition = JSON.parse(recipe.nutrition || '{}'); } catch { recipeNutrition = {}; }
+
+  // Collect pantry ids referenced so we can batch-load with nt_food_id.
+  const pantryIds = new Set();
+  for (const group of ingredients) {
+    for (const it of (group?.items || [])) {
+      if (Number.isFinite(Number(it?.pantry_item_id))) {
+        pantryIds.add(Number(it.pantry_item_id));
+      }
+    }
+  }
+  let pantryById = new Map();
+  if (pantryIds.size) {
+    const placeholders = Array.from(pantryIds).map(() => '?').join(',');
+    const rows = u == null
+      ? db.prepare(`SELECT id, name, brand, serving_size, serving_unit, nutrition, nt_food_id, generic_parent_id, nutrition_source_variant_id FROM pantry_items WHERE id IN (${placeholders}) AND user_id IS NULL AND deleted_at IS NULL`).all(...Array.from(pantryIds))
+      : db.prepare(`SELECT id, name, brand, serving_size, serving_unit, nutrition, nt_food_id, generic_parent_id, nutrition_source_variant_id FROM pantry_items WHERE id IN (${placeholders}) AND user_id = ? AND deleted_at IS NULL`).all(...Array.from(pantryIds), u);
+    for (const r of rows) pantryById.set(r.id, r);
+  }
+
+  // Flatten to per-ingredient item entries for NT. NT's items[] is
+  // display data on the recipe row (not the diary log), so we prefer
+  // richer names/brands from the pantry row when a pantry link exists
+  // and fall back to the free-text ingredient name otherwise.
+  const items = [];
+  for (const group of ingredients) {
+    for (const it of (group?.items || [])) {
+      if (!it || !it.name) continue;
+      const pantry = pantryById.get(Number(it.pantry_item_id));
+      const item = {
+        name: pantry?.name || String(it.name).slice(0, 200),
+        brand: pantry?.brand || '',
+        quantity: Number.isFinite(Number(it.qty)) ? Number(it.qty) : 1,
+        unit: String(it.unit || pantry?.serving_unit || 'g').slice(0, 16),
+        portion: Number.isFinite(Number(pantry?.serving_size)) ? Number(pantry.serving_size) : 100,
+      };
+      if (pantry?.nt_food_id != null) {
+        item.food_server_id = Number(pantry.nt_food_id);
+      }
+      if (pantry?.nutrition) {
+        let n;
+        try { n = JSON.parse(pantry.nutrition); } catch { n = null; }
+        if (n && typeof n === 'object') item.nutrition = n;
+      }
+      items.push(item);
+    }
+  }
+
+  if (items.length === 0) {
+    return res.status(400).json({ error: 'Recipe has no ingredients to push' });
+  }
+
+  // Client-supplied skipped-ingredient list (from computeRecipeNutrition
+  // on RecipeView). Convert to a compact string list for NT's
+  // import_warnings column.
+  const skipped = Array.isArray(req.body?.skipped_ingredients) ? req.body.skipped_ingredients : [];
+  const warnings = [];
+  if (skipped.length) {
+    const names = skipped.map(s => s?.name).filter(Boolean).slice(0, 5).join(', ');
+    const remainder = skipped.length > 5 ? ` (+${skipped.length - 5} more)` : '';
+    warnings.push(
+      `${skipped.length} ingredient${skipped.length === 1 ? '' : 's'} without nutrition data: ${names}${remainder}. Totals may be underestimated.`
+    );
+  }
+
+  // Absolute self-URL for the source_url so the NT side can deep-link
+  // back to this recipe. Best-effort: origin comes from the config we
+  // already know CT is reachable at, taken from the request headers.
+  const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0].trim();
+  const host  = req.headers['x-forwarded-host'] || req.get('host') || '';
+  const sourceUrl = host ? `${proto}://${host}/#/recipes/${recipeId}` : null;
+
+  const wire = {
+    source_app: 'cooktrace',
+    source_external_id: `recipe:${recipeId}`,
+    source_url: sourceUrl,
+    name: recipe.name,
+    items,
+    nutrition: recipeNutrition,
+    servings: Number.isFinite(Number(recipe.servings)) ? Number(recipe.servings) : 1,
+    img_url: recipe.img_url || null,
+    import_warnings: warnings,
+  };
+
+  let ntRes;
+  try {
+    ntRes = await _ntFetch(cfg, '/api/v1/recipes', {
+      method: 'POST',
+      body: JSON.stringify(wire),
+    });
+  } catch (e) {
+    return res.status(502).json({ error: e.message || 'Federation request failed' });
+  }
+
+  if (!ntRes.ok) {
+    const text = await ntRes.text().catch(() => '');
+    return res.status(502).json({
+      error: `NutriTrace returned ${ntRes.status} ${ntRes.statusText || ''}`.trim()
+        + (text && text.length < 240 ? `: ${text}` : ''),
+    });
+  }
+
+  const body = await ntRes.json().catch(() => ({}));
+  const ntMealId = Number(body?.meal_id);
+  if (Number.isFinite(ntMealId) && ntMealId > 0) {
+    db.prepare(`UPDATE recipes SET nt_meal_id = ? WHERE id = ?`).run(ntMealId, recipe.id);
+  }
+
+  res.json({
+    ok: true,
+    nt_meal_id: ntMealId || null,
+    updated: !!body?.updated,
+    warnings_sent: warnings.length,
+  });
+}));
+
 router.post('/log-meal', wrap(async (req, res) => {
   const u = uid(req);
   const cfg = _config(u);
