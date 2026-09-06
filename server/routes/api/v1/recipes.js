@@ -100,7 +100,7 @@ router.get('/', wrap((req, res) => {
   const total = db.prepare(`SELECT COUNT(*) AS n FROM recipes WHERE ${whereSql}`).get(...args).n;
 
   const rows = db.prepare(
-    `SELECT id, name, img_url, servings, portion, unit, nutrition, updated_at
+    `SELECT id, name, img_url, servings, nutrition, updated_at
        FROM recipes WHERE ${whereSql}
        ORDER BY updated_at DESC, id DESC
        LIMIT ? OFFSET ?`
@@ -111,8 +111,8 @@ router.get('/', wrap((req, res) => {
     name: r.name,
     img_url: r.img_url || null,
     servings: Number.isFinite(Number(r.servings)) ? Number(r.servings) : 1,
-    portion: Number.isFinite(Number(r.portion)) ? Number(r.portion) : null,
-    unit: r.unit || 'g',
+    portion: null,
+    unit: 'g',
     nutrition: _safeJson(r.nutrition, {}),
     source_url: _sourceUrl(req, r.id),
     updated_at: r.updated_at || null,
@@ -186,8 +186,8 @@ router.get('/:id', wrap((req, res) => {
     name: row.name,
     img_url: row.img_url || null,
     servings: Number.isFinite(Number(row.servings)) ? Number(row.servings) : 1,
-    portion: Number.isFinite(Number(row.portion)) ? Number(row.portion) : null,
-    unit: row.unit || 'g',
+    portion: null,
+    unit: 'g',
     nutrition,
     items,
     source_url: _sourceUrl(req, row.id),
