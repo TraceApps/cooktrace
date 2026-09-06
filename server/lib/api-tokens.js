@@ -23,12 +23,19 @@ const TOKEN_BYTES = 32;  // 256-bit secret
  * is a bug the wiring test catches on load.
  */
 export const SCOPE_DESCRIPTIONS = {
+  'read:recipes': "Read the token owner's recipes catalog. Used by NutriTrace federation to search and import CookTrace recipes into NT's meals catalog.",
   'mcp:read':    'MCP: read recipes, pantry, shopping list, and cook diary (6 tools).',
   'mcp:write':   'MCP: log a cook, manage the shopping list, update pantry stock (4 additive tools). Requires MCP_WRITE_ENABLED=1 on the server.',
   'mcp:destroy': 'MCP: create recipes, add pantry items, delete diary entries and shopping items (4 tools). Requires MCP_DESTROY_ENABLED=1 AND every call to include confirm=true.',
 };
 
 export const KNOWN_SCOPES = new Set([
+  // read:recipes unlocks GET /api/v1/recipes and GET /api/v1/recipes/:id.
+  // Used by NutriTrace federation so NT can search and import CT recipes
+  // into its meals catalog (same shape as NT's Mealie integration:
+  // client-initiated pull, opens the picked recipe in NT's MealEditor as
+  // is_recipe=1 with per-ingredient nutrition snapshots + rollup totals).
+  'read:recipes',
   // mcp:read unlocks the Model Context Protocol read tools, exposed
   // under /api/mcp when MCP_ENABLED=1. Lets a user's own agent (Claude
   // Desktop / Cursor / Codex / etc.) inspect their recipes, pantry,

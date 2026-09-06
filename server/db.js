@@ -260,12 +260,10 @@ if (!columnExists('recipes', 'rest_minutes')) {
   db.exec(`ALTER TABLE recipes ADD COLUMN rest_minutes INTEGER`);
 }
 
-// NT federation: when a recipe has been pushed to NutriTrace via the
-// Push to NutriTrace flow, we record the NT meals row id here so the
-// next push upserts the same row instead of duplicating. Set on the
-// first successful push, cleared if the user manually unlinks. NULL on
-// recipes that were never pushed. See server/routes/nt-federation.js
-// push-recipe endpoint and the /api/v1/recipes upsert on the NT side.
+// Legacy column from an earlier push-to-NT flow that was reverted in
+// favor of NT-side pull (mirroring the Mealie pattern). Kept in place
+// so re-adding the column on migrated instances is a no-op; nothing
+// reads or writes it today. Safe to drop in a future major.
 if (!columnExists('recipes', 'nt_meal_id')) {
   db.exec(`ALTER TABLE recipes ADD COLUMN nt_meal_id INTEGER`);
 }
