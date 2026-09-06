@@ -56,6 +56,38 @@ function _sourceUrl(req, id) {
   return origin ? `${origin}/#/recipes/${id}` : null;
 }
 
+// Absolutize a possibly-relative CT img_url so NT (on a different origin)
+// can load it directly via <img>. Absolute URLs pass through unchanged.
+function _absImg(req, u) {
+  if (!u) return null;
+  const s = String(u);
+  if (/^https?:\/\//i.test(s) || /^data:/i.test(s)) return s;
+  const origin = _selfOrigin(req);
+  if (!origin) return s;
+  return origin + (s.startsWith('/') ? '' : '/') + s;
+}
+
+// Parse CT ingredient qty strings: '2', '1/2', '1 1/2', '0.75', 'to taste'.
+// Returns a positive Number or null. Whole-plus-fraction and pure fraction
+// forms both handled since CT stores freeform text.
+function _parseQty(s) {
+  if (s == null) return null;
+  const t = String(s).trim();
+  if (!t) return null;
+  const mMixed = t.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/);
+  if (mMixed) {
+    const n = Number(mMixed[1]) + Number(mMixed[2]) / Number(mMixed[3]);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  const mFrac = t.match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (mFrac) {
+    const n = Number(mFrac[1]) / Number(mFrac[2]);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  const n = Number(t.replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 function _uidFor(req) {
   const id = req.apiUser?.id;
   return id == null || id === 0 ? null : id;
@@ -109,7 +141,7 @@ router.get('/', wrap((req, res) => {
   const items = rows.map(r => ({
     id: r.id,
     name: r.name,
-    img_url: r.img_url || null,
+    img_url: _absImg(req, r.img_url),
     servings: Number.isFinite(Number(r.servings)) ? Number(r.servings) : 1,
     portion: null,
     unit: 'g',
@@ -164,14 +196,31 @@ router.get('/:id', wrap((req, res) => {
   for (const g of ingredients) {
     for (const it of (g?.items || [])) {
       if (!it || !it.name) continue;
+      // Drop section headers: entries with no qty AND no unit AND no
+      // pantry link. Users type these as free-text separators ("FOR THE
+      // PASTRY:") inside the ingredient list; they carry no measurement
+      // and would look wrong showing as 100g rows on the NT side.
+      const rawQty = it.qty == null ? '' : String(it.qty).trim();
+      const rawUnit = it.unit == null ? '' : String(it.unit).trim();
+      const hasPantry = pantryById.has(Number(it.pantry_item_id));
+      if (!rawQty && !rawUnit && !hasPantry) continue;
+
       const pantry = pantryById.get(Number(it.pantry_item_id));
+      const parsedQty = _parseQty(rawQty);
+      const unit = rawUnit || pantry?.serving_unit || '';
+
       const item = {
         name: pantry?.name || String(it.name).slice(0, 200),
         brand: pantry?.brand || '',
-        quantity: Number.isFinite(Number(it.qty)) ? Number(it.qty) : 1,
-        unit: String(it.unit || pantry?.serving_unit || 'g').slice(0, 16),
-        portion: Number.isFinite(Number(pantry?.serving_size)) ? Number(pantry.serving_size) : 100,
+        // quantity = numeric factor NT MealEditor multiplies nutrition by.
+        // portion + unit = the ingredient's own serving size, shown as
+        // the row's "portion" text. Prefer parsed qty and CT unit so the
+        // NT row reads e.g. "2 cup" or "0.5 tsp" instead of "100 g".
+        quantity: 1,
+        portion: parsedQty ?? 1,
+        unit: String(unit).slice(0, 16),
       };
+      if (rawQty && !parsedQty) item.qty_text = rawQty.slice(0, 40);
       if (pantry?.barcode) item.barcode = String(pantry.barcode);
       if (pantry?.nutrition) {
         const n = _safeJson(pantry.nutrition, null);
@@ -184,7 +233,7 @@ router.get('/:id', wrap((req, res) => {
   res.json({
     id: row.id,
     name: row.name,
-    img_url: row.img_url || null,
+    img_url: _absImg(req, row.img_url),
     servings: Number.isFinite(Number(row.servings)) ? Number(row.servings) : 1,
     portion: null,
     unit: 'g',
