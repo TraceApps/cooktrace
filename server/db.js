@@ -260,6 +260,16 @@ if (!columnExists('recipes', 'rest_minutes')) {
   db.exec(`ALTER TABLE recipes ADD COLUMN rest_minutes INTEGER`);
 }
 
+// NT federation: when a recipe has been pushed to NutriTrace via the
+// Push to NutriTrace flow, we record the NT meals row id here so the
+// next push upserts the same row instead of duplicating. Set on the
+// first successful push, cleared if the user manually unlinks. NULL on
+// recipes that were never pushed. See server/routes/nt-federation.js
+// push-recipe endpoint and the /api/v1/recipes upsert on the NT side.
+if (!columnExists('recipes', 'nt_meal_id')) {
+  db.exec(`ALTER TABLE recipes ADD COLUMN nt_meal_id INTEGER`);
+}
+
 // ai_chat_history was originally append-only with just created_at, but
 // /api/sync/pull SELECTs updated_at on every table in TABLES (including
 // this one). Without the column, the pull SQL errors with "no such
