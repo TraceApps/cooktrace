@@ -192,6 +192,25 @@ router.get('/:id', wrap((req, res) => {
     for (const r of rows) pantryById.set(r.id, r);
   }
 
+  // Name fallback map. Imported recipes (Mealie/Paprika/text/URL) and
+  // freshly typed ingredients often have no pantry_item_id, but the
+  // user's pantry usually has an entry with the same name. Load every
+  // non-deleted pantry row with nutrition once, key by lowercased name,
+  // and use it whenever the id-based lookup misses. Mirrors the pattern
+  // CT's own client uses when recompute stamps missing links.
+  const pantryByName = new Map();
+  try {
+    const nameRows = db.prepare(
+      `SELECT id, name, brand, serving_size, serving_unit, nutrition, barcode
+         FROM pantry_items
+        WHERE ${_whereUser(u)} AND deleted_at IS NULL AND nutrition IS NOT NULL AND nutrition != '{}'`
+    ).all(..._userArgs(u));
+    for (const r of nameRows) {
+      const key = String(r.name || '').trim().toLowerCase();
+      if (key && !pantryByName.has(key)) pantryByName.set(key, r);
+    }
+  } catch { /* absent-table safety, though pantry_items always exists */ }
+
   const items = [];
   for (const g of ingredients) {
     for (const it of (g?.items || [])) {
@@ -205,7 +224,13 @@ router.get('/:id', wrap((req, res) => {
       const hasPantry = pantryById.has(Number(it.pantry_item_id));
       if (!rawQty && !rawUnit && !hasPantry) continue;
 
-      const pantry = pantryById.get(Number(it.pantry_item_id));
+      // Prefer explicit pantry_item_id link; fall back to name match
+      // so recipes with un-linked ingredients still get nutrition.
+      let pantry = pantryById.get(Number(it.pantry_item_id));
+      if (!pantry) {
+        const nameKey = String(it.name || '').trim().toLowerCase();
+        if (nameKey) pantry = pantryByName.get(nameKey) || null;
+      }
       const parsedQty = _parseQty(rawQty);
       const unit = rawUnit || pantry?.serving_unit || '';
 
