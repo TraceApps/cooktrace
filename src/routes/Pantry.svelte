@@ -1986,10 +1986,26 @@
 
   /* Expanded generic anchors its whole row in the grid so its
      variant siblings flow directly below it instead of landing next
-     to unrelated items. Grid mode only. */
+     to unrelated items. Grid mode only.
+
+     Spanning the full row width means the card's own width jumps
+     from one grid column (~220px+) to the whole row (1000px+ on a
+     wide monitor). The default vertical layout's photo is `width:
+     100%; aspect-ratio: 4/3`, so left alone it scales its HEIGHT
+     right along with that width, ballooning into a huge block.
+     Switch to a horizontal layout with a fixed-size photo instead,
+     same fix list mode already uses for its own full-width rows. */
   @media (min-width: 1200px) {
     .card-grid:not(.list) .pcard.generic.expanded {
       grid-column: 1 / -1;
+      flex-direction: row;
+      align-items: center;
+    }
+    .card-grid:not(.list) .pcard.generic.expanded .pcard-photo {
+      width: 100px;
+      height: 100px;
+      aspect-ratio: 1 / 1;
+      flex-shrink: 0;
     }
   }
   .card-grid.list .pcard {
