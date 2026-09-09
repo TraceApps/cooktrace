@@ -185,11 +185,49 @@ router.get('/:id', wrap((req, res) => {
   if (pantryIds.size) {
     const placeholders = Array.from(pantryIds).map(() => '?').join(',');
     const rows = db.prepare(
-      `SELECT id, name, brand, serving_size, serving_unit, nutrition, barcode
+      `SELECT id, name, brand, serving_size, serving_unit, nutrition, barcode,
+              generic_parent_id, nutrition_source_variant_id
          FROM pantry_items
         WHERE id IN (${placeholders}) AND ${_whereUser(u)} AND deleted_at IS NULL`
     ).all(...Array.from(pantryIds), ..._userArgs(u));
     for (const r of rows) pantryById.set(r.id, r);
+    // Variant follow-up: any pantry row that inherits nutrition from a
+    // child variant (nutrition_source_variant_id) needs the variant row
+    // loaded too, or the resolver below cannot follow the chain. Query
+    // the missing ids in a second batch and add them to the same map.
+    const variantIds = [];
+    for (const r of rows) {
+      if (r.nutrition_source_variant_id != null && !pantryById.has(r.nutrition_source_variant_id)) {
+        variantIds.push(r.nutrition_source_variant_id);
+      }
+    }
+    if (variantIds.length) {
+      const p2 = variantIds.map(() => '?').join(',');
+      const more = db.prepare(
+        `SELECT id, name, brand, serving_size, serving_unit, nutrition, barcode,
+                generic_parent_id, nutrition_source_variant_id
+           FROM pantry_items
+          WHERE id IN (${p2}) AND ${_whereUser(u)} AND deleted_at IS NULL`
+      ).all(...variantIds, ..._userArgs(u));
+      for (const r of more) pantryById.set(r.id, r);
+    }
+  }
+
+  // Mirror of CT's client _resolveNutritionSource: when the linked
+  // pantry row is a generic that inherits nutrition from a specific
+  // variant (Issue #4 on the CT side), return that variant's row so
+  // callers see real nutrition instead of the empty generic. Defensive:
+  // the source variant must still exist AND still be a child of the
+  // linked row, otherwise fall back to the originally linked row.
+  function _resolveNutritionSource(pantryItemId) {
+    if (pantryItemId == null) return null;
+    const own = pantryById.get(Number(pantryItemId));
+    if (!own) return null;
+    const sourceId = own.nutrition_source_variant_id;
+    if (sourceId == null) return own;
+    const sourceRow = pantryById.get(sourceId);
+    if (!sourceRow || sourceRow.generic_parent_id !== own.id) return own;
+    return sourceRow;
   }
 
   // Name fallback map. Imported recipes (Mealie/Paprika/text/URL) and
@@ -231,6 +269,12 @@ router.get('/:id', wrap((req, res) => {
         const nameKey = String(it.name || '').trim().toLowerCase();
         if (nameKey) pantry = pantryByName.get(nameKey) || null;
       }
+      // Variant resolver: a generic pantry item with no own nutrition
+      // may inherit from a specific variant. Do this AFTER the pantry
+      // row is chosen so both id-based and name-based hits get the
+      // variant follow-up. Nutrition falls through if the linked row
+      // already has its own nutrition (sourceId will be null).
+      const nutritionRow = pantry ? _resolveNutritionSource(pantry.id) : null;
       const parsedQty = _parseQty(rawQty);
       const unit = rawUnit || pantry?.serving_unit || '';
 
@@ -247,8 +291,12 @@ router.get('/:id', wrap((req, res) => {
       };
       if (rawQty && !parsedQty) item.qty_text = rawQty.slice(0, 40);
       if (pantry?.barcode) item.barcode = String(pantry.barcode);
-      if (pantry?.nutrition) {
-        const n = _safeJson(pantry.nutrition, null);
+      // Nutrition comes from the resolved row (variant when applicable),
+      // then falls through to the linked row's own nutrition if the
+      // resolver returned the same row (no inheritance in play).
+      const nutritionSrc = nutritionRow || pantry;
+      if (nutritionSrc?.nutrition) {
+        const n = _safeJson(nutritionSrc.nutrition, null);
         if (n && typeof n === 'object' && !Array.isArray(n)) item.nutrition = n;
       }
       items.push(item);
