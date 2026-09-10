@@ -373,20 +373,6 @@ router.get('/:id', wrap((req, res) => {
           item.nutrition = _deriveCalories(raw);
         }
       }
-      // Temporary diagnostic block: surfaces which pantry rows the
-      // resolver visited so we can see WHY a variant-backed ingredient
-      // ends up with empty nutrition. Cheap to leave in during the
-      // dial-in phase; strip once the pull is verified end-to-end.
-      item._debug = {
-        pantry_item_id_in: it.pantry_item_id ?? null,
-        linked_id: pantry?.id ?? null,
-        linked_name: pantry?.name ?? null,
-        linked_has_own_nutrition: pantry ? _hasRealNutrition(pantry) : false,
-        linked_generic_parent_id: pantry?.generic_parent_id ?? null,
-        linked_nutrition_source_variant_id: pantry?.nutrition_source_variant_id ?? null,
-        resolved_id: nutritionSrc?.id ?? null,
-        resolved_has_nutrition: !!(nutritionSrc?.nutrition && nutritionSrc.nutrition !== '{}'),
-      };
       items.push(item);
     }
   }
