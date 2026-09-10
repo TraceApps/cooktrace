@@ -154,7 +154,6 @@
     cooking:       { titleKey: 'settings.cooking.section',           icon: 'restaurant' },
     nutrition:     { titleKey: 'settings.nutrition.section',         icon: 'science' },
     ai:            { titleKey: 'settings.ai.section',                icon: 'bolt' },
-    federation:    { titleKey: 'settings.federation.section',        icon: 'link' },
     foodsources:   { titleKey: 'settings.connected_services.section',icon: 'restaurant_menu' },
     notifications: { titleKey: 'settings.notifications.section',     icon: 'notifications' },
     email:         { titleKey: 'settings.email.section',             icon: 'mail' },
@@ -181,9 +180,10 @@
     cooking:       SettingsCooking,
     nutrition:     SettingsNutrition,
     ai:            SettingsTrace,
-    // federation is a two-component render (federation + import-from-NT)
-    // — handled as a special case in the markup below.
-    federation:    SettingsFederation,
+    // foodsources is a three-component render (food sources + the
+    // NutriTrace federation connection + its import-foods picker), all
+    // now grouped here since NT federation is currently used purely as
+    // another food source. Handled as a special case in the markup below.
     foodsources:   SettingsFoodSources,
     notifications: SettingsNotifications,
     email:         SettingsEmail,
@@ -210,8 +210,7 @@
     regional:      ['regional','language','translation','locale','date','time','12h','24h','units','energy','kcal','kj','calories','kilojoules','imperial','metric','measurement system'],
     cooking:       ['cooking','servings','default servings','yield','recipe','recipes','url import','url import engine','scraper','recipe scrapers','recipe-scrapers','enhanced','smart','json-ld','schema.org','parser','auto add ingredients','auto-create pantry','pantry catalog','shopping','shopping list','aisle','aisles','group by','grouping','checked','hide checked','sort','reorder','shared recipes','main list','kitchen recipes','mixed view'],
     nutrition:     ['nutrition','nutrients','nutriments','vitamins','minerals','visible nutriments','fda'],
-    federation:    ['federation','nutritrace','nt','linked','share','token','instance','foods','pull foods','import foods','sync foods'],
-    foodsources:   ['food sources','open food facts','off','usda','fooddata central','api key','barcode','scanner','beep','flashlight','search','language','country','contribute','default source','default search','my pantry','pantry search'],
+    foodsources:   ['food sources','open food facts','off','usda','fooddata central','api key','barcode','scanner','beep','flashlight','search','language','country','contribute','default source','default search','my pantry','pantry search','federation','nutritrace','nt','linked','share','token','instance','pull foods','import foods','sync foods'],
     ai:            ['ai','trace','assistant','provider','model','custom model','model id','api key','chat','claude','openai','gemini','sonnet','opus','haiku','gpt','gemini 3','base url','artificial intelligence','smart log','smartlog','quick log','voice','dictate','hold to record','mic'],
     notifications: ['notifications','reminders','cook day','thaw','alerts','push','apprise','gotify','ntfy','expiration','expiry','expires','expiring','pantry expiry','digest','weekly summary','shopping nudge'],
     email:         ['email','smtp','mail','password reset','invite','from address','tls','outgoing','send test','test email','recipient','test recipient','connection status','change password','change smtp'],
@@ -441,11 +440,6 @@
     <span>{$_('settings.ai.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'federation')} class:active={currentSection === 'federation'} aria-current={currentSection === 'federation' ? 'page' : undefined} on:click={() => toggleSection('federation')}>
-    <span class="material-symbols-rounded si">hub</span>
-    <span>{$_('settings.federation.section')}</span>
-    <span class="material-symbols-rounded chevron">expand_more</span>
-  </button>
   <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'foodsources')} class:active={currentSection === 'foodsources'} aria-current={currentSection === 'foodsources' ? 'page' : undefined} on:click={() => toggleSection('foodsources')}>
     <span class="material-symbols-rounded si">qr_code_scanner</span>
     <span>{$_('settings.connected_services.section')}</span>
@@ -603,10 +597,13 @@
                 <SettingsTrace {envLocks} />
               {:else if currentSection === 'email'}
                 <SettingsEmail {envLocks} />
-              {:else if currentSection === 'federation'}
-                <!-- Federation drills-in show BOTH the federation
-                     connection card and the Import-from-NT card. -->
+              {:else if currentSection === 'foodsources'}
+                <!-- Food Sources drills-in show the source toggles plus
+                     the NutriTrace federation connection card and its
+                     Import-from-NT card, since NT federation is
+                     currently used purely as another food source. -->
                 <div class="section-body">
+                  <SettingsFoodSources />
                   <SettingsFederation />
                   <SettingsImportFromNT />
                 </div>
