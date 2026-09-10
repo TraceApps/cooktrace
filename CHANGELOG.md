@@ -7,13 +7,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.3.0-dev.01] - 2026-09-10 (pre-release)
+
+NutriTrace can now pull a user's CookTrace recipes and pantry directly
+through a new read-only federation API, CookTrace gets a Model
+Context Protocol server for AI agents, and NutriTrace joins Open Food
+Facts and USDA as a fourth Pantry search source. Plus a pantry
+display bug fix and dependency security bumps.
+
 ### Added
 
-- **NutriTrace federation: pantry-read endpoint.** New `GET /api/v1/pantry` returns every leaf pantry row for the token owner (standalone items and variants), shaped for direct POST into NutriTrace's foods library. Generic parents that have variants are deliberately skipped: their leaf variants carry the real nutrition, and a placeholder next to the leaves in NT's foods list would be misleading. Variant rows carry the parent name in the display name ("Flour, Bread") so they read cleanly on the NT side. Uses the same 4-level nutrition resolver `/api/v1/recipes` uses, and derives calories from carbs / protein / fat via Atwater factors when a pantry row only stored macros. Backs the new Import Pantry Items action in NutriTrace's Connected Services settings. Gated by the new `read:pantry` scope (independent of `read:recipes` so users can grant just one).
-- **`/api/v1/pantry` gains `q`, `limit`, and `offset`.** Backs NutriTrace's new Foods-tab CookTrace source chip (search-and-pick a single pantry row). Omitting `q` still returns everything, which is what the bulk Import Pantry action uses. Filtering and paging both run after the leaf-only pass, so `total` always counts importable rows rather than raw pantry rows. `q` matches the composed display name (plus brand and category), so a variant stored as "Bread" under a "Flour" generic is still found by typing `flour`; matching the raw column would have made every variant unreachable by its generic's word once the parent is filtered out.
-- **`read:pantry` API-token scope.** Grants read access to the token owner's pantry catalog through `/api/v1/pantry`. Ticked at token-creation time in Settings, API Tokens, New Token; independent of `read:recipes` and the MCP scopes.
+- **NutriTrace can pull CookTrace recipes.** New `GET /api/v1/recipes` (search) and `GET /api/v1/recipes/:id` (full detail) let a connected NutriTrace instance search and import a recipe as an NT meal: servings, portion/unit, image, the stored nutrition rollup, and a per-ingredient nutrition snapshot resolved through variant/generic inheritance (an ingredient linked to a generic whose variants each carry their own numbers still ships real values instead of a blank). Gated by a new `read:recipes` token scope, independent of the MCP scopes.
+- **NutriTrace federation: pantry-read endpoint.** New `GET /api/v1/pantry` returns every leaf pantry row for the token owner (standalone items and variants), shaped for direct POST into NutriTrace's foods library. Generic parents that have variants are deliberately skipped: their leaf variants carry the real nutrition, and a placeholder next to the leaves in NT's foods list would be misleading. Variant rows carry the parent name in the display name ("Flour, Bread") so they read cleanly on the NT side. Uses the same 4-level nutrition resolver `/api/v1/recipes` uses, and derives calories from carbs / protein / fat via Atwater factors when a pantry row only stored macros. Gated by the new `read:pantry` scope (independent of `read:recipes` so users can grant just one).
+- **`/api/v1/pantry` gains `q`, `limit`, and `offset`.** Backs NutriTrace's Foods-tab CookTrace source chip (search-and-pick a single pantry row). Omitting `q` still returns everything, which is what a bulk import uses. Filtering and paging both run after the leaf-only pass, so `total` always counts importable rows rather than raw pantry rows. `q` matches the composed display name (plus brand and category), so a variant stored as "Bread" under a "Flour" generic is still found by typing `flour`.
+- **`read:pantry` and `read:recipes` API-token scopes.** Ticked at token-creation time in Settings, API Tokens, New Token; independent of the MCP scopes and of each other.
 - **Model Context Protocol (MCP) server.** CookTrace now exposes a read + write + destructive MCP endpoint at `/api/mcp` so Claude Desktop, Cursor, Codex, and other MCP-aware agents can search recipes, browse the pantry and shopping list, log a cook, and (with the right scope) create recipes or pantry items directly. Fourteen tools across three independently-gated tiers (`mcp:read` / `mcp:write` / `mcp:destroy`), each requiring both a server-side env flag and a matching token scope. Off by default. See [docs/cooktrace/mcp.md](https://traceapps.github.io/docs/cooktrace/mcp/) for setup.
-- **Personal access tokens.** New Settings → API Tokens section (admin, multi-user mode) to mint, scope, and revoke tokens. Currently the sole consumer is MCP; built as a general-purpose token store for future API surfaces.
+- **Personal access tokens.** New Settings → API Tokens section (admin, multi-user mode) to mint, scope, and revoke tokens. Currently the sole consumer is MCP and NutriTrace federation; built as a general-purpose token store for future API surfaces.
+- **NutriTrace joins the Pantry search chips.** A connected NutriTrace instance's food catalog is now a fourth search source alongside Open Food Facts and USDA when adding a pantry item, picked the same way (chip, long-press to pin, included in "All" mode).
+- **Food Sources settings reorganized.** NutriTrace Federation now lives inside Settings → Food Sources under its own "NutriTrace" sub-heading (between USDA and Barcode Scanner) instead of a separate top-level section, since federation is currently used purely as another food source.
+
+### Fixed
+
+- **Pantry "Expiring Soon" spotlight showed already-expired items as still counting down** on wide screens (for example "63d past" instead of "Expired"). The ribbon deliberately lists both soon-to-expire and already-expired items together, so it's now titled "Expiring & Expired" and the day-count label reads "Expired" once a date has passed.
+- **Expanded generic pantry item's photo ballooned to a huge size on desktop** when it had variants. A full-row grid span wasn't being respected by the photo's own full-width sizing.
+
+### Security
+
+- **multer** bumped 2.2.0 → 2.3.0, closes a HIGH advisory (denial of service via aborted uploads holding file handles open).
+- **nodemailer** bumped 9.0.3 → 9.1.1 (root and server), closes a moderate advisory (recipient-header validation bypass).
 
 ---
 
