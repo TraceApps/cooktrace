@@ -177,7 +177,6 @@
     },
     "cooking":            { "section": "Cooking" },
     "nutrition":          { "section": "Nutrition" },
-    "federation":         { "section": "NutriTrace Federation" },
     "server_connection":  { "section": "Server Connection" },
     "email":              { "section": "Email (SMTP)" },
     "backup":             { "section": "Backup & Restore" },
