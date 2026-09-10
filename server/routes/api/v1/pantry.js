@@ -105,12 +105,23 @@ function _makeResolver(pantryById) {
   };
 }
 
-// GET /api/v1/pantry
-// Returns { items: [...] } shaped for direct POST to NutriTrace's
+// GET /api/v1/pantry?q=&limit=&offset=
+// Returns { items: [...], total } shaped for direct POST to NutriTrace's
 // /api/foods endpoint. NT dedups on (source_app, source_external_id)
 // so re-runs are safe.
+//
+// `q` powers NT's Foods-tab CookTrace source chip (search-and-pick a
+// single pantry row); omitting it returns everything, which is what the
+// bulk Import Pantry action uses. Filtering and paging both happen after
+// the leaf-only pass below, because whether a row is a leaf depends on
+// the whole set, so `total` always reflects importable rows only.
 router.get('/', wrap((req, res) => {
   const userId = req.apiUser.id;
+  const q = String(req.query.q || '').trim().toLowerCase();
+  const rawLimit = Number(req.query.limit);
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : null;
+  const rawOffset = Number(req.query.offset);
+  const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? rawOffset : 0;
 
   const all = db.prepare(`
     SELECT id, name, brand, category, barcode, in_stock, quantity, unit,
@@ -178,10 +189,23 @@ router.get('/', wrap((req, res) => {
       source_external_id: `pantry:${row.id}`,
       source_url: origin ? `${origin}/#/pantry/${row.id}` : null,
       updated_at: row.updated_at,
+      // Local-only search haystack, stripped before the response. Includes
+      // the composed display name, so a variant literally named "Bread"
+      // under a "Flour" generic is still found by typing "flour". Without
+      // that, hiding the generic parent would make its variants
+      // unreachable by the word people actually search for.
+      _haystack: [displayName, row.name, row.brand, row.category]
+        .filter(Boolean).join(' ').toLowerCase(),
     });
   }
 
-  res.json({ items, total: items.length });
+  const matched = q ? items.filter(it => it._haystack.includes(q)) : items;
+  const total = matched.length;
+  const page = limit != null ? matched.slice(offset, offset + limit) : matched.slice(offset);
+  res.json({
+    items: page.map(({ _haystack, ...rest }) => rest),
+    total,
+  });
 }));
 
 export default router;
