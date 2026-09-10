@@ -30,7 +30,8 @@
   } from '../lib/pantry-variants.js';
   import * as OFF from '../lib/off.js';
   import * as USDA from '../lib/usda.js';
-  import { offEnabled, usdaEnabled, usdaApiKey, offSearchLanguage, offSearchCountry, pantryDefaultSource } from '../stores/settings.js';
+  import * as NT from '../lib/nt-foods.js';
+  import { offEnabled, usdaEnabled, usdaApiKey, ntFederationEnabled, offSearchLanguage, offSearchCountry, pantryDefaultSource } from '../stores/settings.js';
   import { offCountryTagToFlag, offCountryTagToName } from '../lib/off-country-flag.js';
   import { portal } from '../lib/portal.js';
   import { slide } from 'svelte/transition';
@@ -124,15 +125,17 @@
   let searchSource = pantryDefaultSource.get() || 'local';
   let offResults = [];
   let usdaResults = [];
+  let ntResults = [];
   let externalLoading = false;
   let _searchTimer = null;
-  // 'all' is only offered when at least 2 external sources are enabled —
+  // 'all' is only offered when at least 2 external sources are enabled,
   // otherwise it's not meaningfully different from just picking that one
   // source. Mirrors NutriTrace's availableSources shape.
   $: _perSourceOptions = [
     { value: 'local', label: 'Pantry' },
     ...($offEnabled  ? [{ value: 'off',  label: 'OFF'  }] : []),
     ...($usdaEnabled && $usdaApiKey ? [{ value: 'usda', label: 'USDA' }] : []),
+    ...($ntFederationEnabled ? [{ value: 'nt', label: 'NutriTrace' }] : []),
   ];
   $: availableSources = _perSourceOptions.length >= 2
     ? [{ value: 'all', label: 'All' }, ..._perSourceOptions]
@@ -147,24 +150,29 @@
     clearTimeout(_searchTimer);
     offResults = [];
     usdaResults = [];
+    ntResults = [];
     if (src === 'local' || !q.trim()) return;
     // In all-mode (or multi), fetch every source the user has enabled.
     // In single-source mode, fetch only that source.
     const wantOff  = ($offEnabled  && (src === 'off'  || src === 'all'));
     const wantUsda = ($usdaEnabled && $usdaApiKey && (src === 'usda' || src === 'all'));
-    if (!wantOff && !wantUsda) return;
+    const wantNt   = ($ntFederationEnabled && (src === 'nt' || src === 'all'));
+    if (!wantOff && !wantUsda && !wantNt) return;
     externalLoading = true;
     _searchTimer = setTimeout(async () => {
       try {
-        const [offR, usdaR] = await Promise.all([
+        const [offR, usdaR, ntR] = await Promise.all([
           wantOff  ? OFF.searchByName(q.trim())               : Promise.resolve([]),
           wantUsda ? USDA.searchByName(q.trim(), 1, $usdaApiKey) : Promise.resolve([]),
+          wantNt   ? NT.searchByName(q.trim())                : Promise.resolve([]),
         ]);
         offResults  = offR  || [];
         usdaResults = usdaR || [];
+        ntResults   = ntR   || [];
       } catch (e) {
         offResults = [];
         usdaResults = [];
+        ntResults = [];
         showError(e.message || 'Search failed');
       } finally {
         externalLoading = false;
@@ -177,6 +185,7 @@
   // doesn't need to know about the new fan-out plumbing.
   $: externalResults = searchSource === 'off' ? offResults
                      : searchSource === 'usda' ? usdaResults
+                     : searchSource === 'nt' ? ntResults
                      : [];
 
   // ── Per-source quality-tier filters (OFF completeness + USDA data type) ──
@@ -224,6 +233,9 @@
                                      : offResults;
   $: usdaVisible = usdaTiersFiltered ? usdaResults.filter(f => usdaTiersActive.has(f.dataType || 'unknown'))
                                      : usdaResults;
+  // NT has no quality-tier concept (no completeness score, no data-type
+  // taxonomy), so its "visible" list is just its results, unfiltered.
+  $: ntVisible = ntResults;
 
   // Dropdown open handlers — position via getBoundingClientRect from the
   // caret + close the other so only one is open at a time.
@@ -315,6 +327,7 @@
     local:  pinnedSources.size > 0 ? pinnedSources.has('local')  : searchSource === 'local',
     off:    pinnedSources.size > 0 ? pinnedSources.has('off')    : searchSource === 'off',
     usda:   pinnedSources.size > 0 ? pinnedSources.has('usda')   : searchSource === 'usda',
+    nt:     pinnedSources.size > 0 ? pinnedSources.has('nt')     : searchSource === 'nt',
     all:    pinnedSources.size === 0 && searchSource === 'all',
   };
   function _onChipTap(sourceValue) {
@@ -343,6 +356,7 @@
       : []),
     ...(_isSourceActive('off')  ? offVisible.map(f  => ({ ...f, _source: 'off'  })) : []),
     ...(_isSourceActive('usda') ? usdaVisible.map(f => ({ ...f, _source: 'usda' })) : []),
+    ...(_isSourceActive('nt')   ? ntVisible.map(f   => ({ ...f, _source: 'nt'   })) : []),
   ];
   function pickExternalResult(r) {
     // Open the sheet in create mode with the external-search result as
@@ -972,6 +986,21 @@
                       <span class="material-symbols-rounded">expand_more</span>
                     </button>
                   </div>
+                {:else if src.value === 'nt'}
+                  <!-- No tier-filter caret (NT foods have no completeness
+                       / data-type concept like OFF / USDA), but still
+                       long-press-pinnable into an all-mode fan-out same
+                       as the other two external sources. -->
+                  <button class="source-chip"
+                          class:active={activeChips.nt}
+                          on:click={() => _onChipTap('nt')}
+                          on:contextmenu|preventDefault={() => _toggleChipInMulti('nt')}
+                          on:touchstart|passive={(e) => _startChipLongPress('nt', e)}
+                          on:touchmove|passive={_maybeCancelChipLongPress}
+                          on:touchend={_cancelChipLongPress}
+                          on:touchcancel={_cancelChipLongPress}>
+                    {src.label}
+                  </button>
                 {:else}
                   <button class="source-chip"
                           class:active={activeChips[src.value]}
@@ -1331,7 +1360,7 @@
                 {/if}
                 <div class="item-body">
                   <div class="item-name">
-                    <span class="src-badge src-{r._source}">{r._source === 'off' ? 'OFF' : 'USDA'}</span>
+                    <span class="src-badge src-{r._source}">{r._source === 'off' ? 'OFF' : r._source === 'usda' ? 'USDA' : 'NT'}</span>
                     {r.name}
                     {#if r._source === 'off' && r.completeness != null}
                       <span class="completeness-dot" class:high={r.completeness >= 0.85}
@@ -1359,9 +1388,9 @@
         {/if}
       </div>
     {:else if searchSource !== 'local' && query.trim()}
-      {@const _srcLabel = searchSource === 'off' ? 'OFF' : 'USDA'}
-      {@const _visibleResults = searchSource === 'off' ? offVisible : usdaVisible}
-      {@const _tiersFilteredHere = searchSource === 'off' ? offTiersFiltered : usdaTiersFiltered}
+      {@const _srcLabel = searchSource === 'off' ? 'OFF' : searchSource === 'usda' ? 'USDA' : 'NutriTrace'}
+      {@const _visibleResults = searchSource === 'off' ? offVisible : searchSource === 'usda' ? usdaVisible : ntVisible}
+      {@const _tiersFilteredHere = searchSource === 'off' ? offTiersFiltered : searchSource === 'usda' ? usdaTiersFiltered : false}
       <div class="ext-results">
         {#if externalLoading}
           <div class="loading-row">
@@ -1795,6 +1824,7 @@
   }
   .src-badge.src-off  { background: #2e7d32; color: #fff; }
   .src-badge.src-usda { background: #1565c0; color: #fff; }
+  .src-badge.src-nt   { background: #6a1b9a; color: #fff; }
 
   /* External-search results — no heading since the active source-chip
      already labels which API is being queried. */
