@@ -598,7 +598,13 @@
   function _expiryLabel(dateStr) {
     const d = _daysUntil(dateStr);
     if (d == null) return '';
-    if (d < 0)  return `${Math.abs(d)}d past`;
+    // Matches _expiryShortLabel's wording for the past case (was its
+    // own separate "Nd past" text before, which read as still-upcoming
+    // on an already-expired item, e.g. "63d past" under an "Expiring
+    // Soon" heading). Kept as its own function rather than merged into
+    // _expiryShortLabel because the warn-case wording here is shorter,
+    // meant for this compact spotlight tile rather than a meta-pill.
+    if (d < 0)  return 'Expired';
     if (d === 0) return 'today';
     if (d === 1) return '1d left';
     return `${d}d left`;
@@ -1081,16 +1087,16 @@
          visible without switching to the Expiring Soon filter chip.
          Only renders when there's actually anything expiring and only
          at >=1200px (mobile already has the filter chip). Clicking a
-         tile opens the item; clicking the "See all" tail jumps to the
+         tile opens the item; clicking the "See All" tail jumps to the
          Expiring Soon filter. -->
     {#if expiringSoonItems.length > 0}
-      <div class="expiring-spotlight" role="region" aria-label="Expiring soon">
+      <div class="expiring-spotlight" role="region" aria-label="Expiring & Expired">
         <div class="spotlight-head">
           <span class="material-symbols-rounded">schedule</span>
-          <span class="spotlight-title">Expiring soon</span>
+          <span class="spotlight-title">Expiring & Expired</span>
           <span class="spotlight-count">{expiringSoonCount}</span>
           <button class="spotlight-all" on:click={() => { stockFilter = 'expiring'; }}>
-            See all
+            See All
             <span class="material-symbols-rounded" style="font-size:14px">chevron_right</span>
           </button>
         </div>
@@ -1099,7 +1105,7 @@
             {@const past = _expiryStatus(x.exp) === 'past'}
             <button class="spotlight-tile" class:past
               on:click={() => onRowClick(x.item)}
-              title={`${x.item.name} — ${_expiryLabel(x.exp)}`}>
+              title={`${x.item.name}: ${_expiryLabel(x.exp)}`}>
               <div class="spotlight-photo">
                 {#if x.item.img_url}
                   <img src={x.item.img_url} alt="" loading="lazy" />
