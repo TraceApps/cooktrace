@@ -24,6 +24,7 @@ const TOKEN_BYTES = 32;  // 256-bit secret
  */
 export const SCOPE_DESCRIPTIONS = {
   'read:recipes': "Read the token owner's recipes catalog. Used by NutriTrace federation to search and import CookTrace recipes into NT's meals catalog.",
+  'read:pantry':  "Read the token owner's pantry catalog. Used by NutriTrace federation to bulk-import CookTrace pantry items (variants and standalone rows) into NT's foods library.",
   'mcp:read':    'MCP: read recipes, pantry, shopping list, and cook diary (6 tools).',
   'mcp:write':   'MCP: log a cook, manage the shopping list, update pantry stock (4 additive tools). Requires MCP_WRITE_ENABLED=1 on the server.',
   'mcp:destroy': 'MCP: create recipes, add pantry items, delete diary entries and shopping items (4 tools). Requires MCP_DESTROY_ENABLED=1 AND every call to include confirm=true.',
@@ -36,6 +37,11 @@ export const KNOWN_SCOPES = new Set([
   // client-initiated pull, opens the picked recipe in NT's MealEditor as
   // is_recipe=1 with per-ingredient nutrition snapshots + rollup totals).
   'read:recipes',
+  // read:pantry unlocks GET /api/v1/pantry. Used by NutriTrace federation
+  // to bulk-import CT pantry items into NT's foods library. Deliberately
+  // skips generic parents that have variants (their leaf variants carry
+  // the real nutrition), pulls standalone items and variant leaves only.
+  'read:pantry',
   // mcp:read unlocks the Model Context Protocol read tools, exposed
   // under /api/mcp when MCP_ENABLED=1. Lets a user's own agent (Claude
   // Desktop / Cursor / Codex / etc.) inspect their recipes, pantry,
