@@ -213,6 +213,23 @@ router.get('/:id', wrap((req, res) => {
     }
   }
 
+  // Derive calories from macros (Atwater factors: 4/4/9 kcal per gram
+  // of protein / carbs / fat) when a nutrition blob has usable macros
+  // but no stored calories field. Honey and similar pantry entries that
+  // only carry carbs + sugars would otherwise ship as 0 kcal on the NT
+  // side even though the caloric value is unambiguously computable.
+  // Never overrides an explicit calories value; only fills the gap.
+  function _deriveCalories(n) {
+    if (!n || typeof n !== 'object') return n;
+    if (n.calories != null && Number.isFinite(Number(n.calories))) return n;
+    const p = Number(n.proteins) || 0;
+    const c = Number(n.carbohydrates) || 0;
+    const f = Number(n.fat) || 0;
+    if (p === 0 && c === 0 && f === 0) return n;
+    const kcal = Math.round((p * 4 + c * 4 + f * 9) * 10) / 10;
+    return { ...n, calories: kcal };
+  }
+
   // Cheap non-empty check for a stored nutrition JSON blob. "{}" and
   // NULL both count as empty; a blob with any populated key wins.
   function _hasRealNutrition(row) {
@@ -347,8 +364,14 @@ router.get('/:id', wrap((req, res) => {
       // resolver returned the same row (no inheritance in play).
       const nutritionSrc = nutritionRow || pantry;
       if (nutritionSrc?.nutrition) {
-        const n = _safeJson(nutritionSrc.nutrition, null);
-        if (n && typeof n === 'object' && !Array.isArray(n)) item.nutrition = n;
+        const raw = _safeJson(nutritionSrc.nutrition, null);
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+          // Fill missing calories from macros so pantry entries with
+          // partial nutrition (e.g. Honey with just carbs + sugars) do
+          // not ship as 0 kcal to NT even when the caloric value is
+          // trivially derivable.
+          item.nutrition = _deriveCalories(raw);
+        }
       }
       // Temporary diagnostic block: surfaces which pantry rows the
       // resolver visited so we can see WHY a variant-backed ingredient
