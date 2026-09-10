@@ -229,23 +229,25 @@ router.get('/:id', wrap((req, res) => {
   }
 
   // Resolve which pantry row supplies nutrition for a given linked item.
+  // The explicit designation (nutrition_source_variant_id on a generic)
+  // ALWAYS wins over the generic's own partial nutrition, because the
+  // user set that field precisely to say "the variant is authoritative,
+  // ignore anything I typed on the parent". Without this priority a
+  // generic with a stray carb value would short-circuit the walk and
+  // ship partial nutrition instead of the variant's full profile.
+  //
   // Order:
-  //   1. If own row has nutrition, use it (fastest, most common case).
-  //   2. Generic->variant: own is a generic with nutrition_source_variant_id
-  //      set; return the referenced variant row (CT client's behavior).
-  //   3. Variant->generic (reverse): own is a variant (generic_parent_id
-  //      set) that itself has no meaningful nutrition; return the generic
-  //      parent's row when it has usable values. Handles pantries where
-  //      the user maintained nutrition on the generic and let variants
-  //      inherit implicitly rather than through the explicit link.
-  //   4. Nothing usable found: return own so the caller can decide to
-  //      omit the field.
+  //   1. Generic -> designated variant (explicit source wins).
+  //   2. Own row's nutrition (variant or flat with populated values).
+  //   3. Variant -> generic parent fallback (variant has no own values,
+  //      but the parent generic holds them, or points at a different
+  //      variant whose values fill in).
+  //   4. Nothing usable: return own so the caller can decide to omit.
   function _resolveNutritionSource(pantryItemId) {
     if (pantryItemId == null) return null;
     const own = pantryById.get(Number(pantryItemId));
     if (!own) return null;
-    if (_hasRealNutrition(own)) return own;
-    // Generic -> designated variant.
+    // Generic -> designated variant, before falling back to own.
     const sourceId = own.nutrition_source_variant_id;
     if (sourceId != null) {
       const sourceRow = pantryById.get(sourceId);
@@ -253,6 +255,7 @@ router.get('/:id', wrap((req, res) => {
         return sourceRow;
       }
     }
+    if (_hasRealNutrition(own)) return own;
     // Variant -> generic parent fallback.
     if (own.generic_parent_id != null) {
       const parent = pantryById.get(own.generic_parent_id);
