@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { bearerAuth } from '../../../middleware/bearer-auth.js';
 import meRouter from './me.js';
 import recipesRouter from './recipes.js';
+import pantryRouter from './pantry.js';
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use(bearerAuth);
 
 router.use('/me', meRouter);
 router.use('/recipes', recipesRouter);
+router.use('/pantry', pantryRouter);
 
 export default router;
