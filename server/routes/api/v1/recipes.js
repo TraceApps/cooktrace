@@ -185,7 +185,7 @@ router.get('/:id', wrap((req, res) => {
   if (pantryIds.size) {
     const placeholders = Array.from(pantryIds).map(() => '?').join(',');
     const rows = db.prepare(
-      `SELECT id, name, brand, serving_size, serving_unit, nutrition, barcode,
+      `SELECT id, name, brand, serving_size, serving_unit, nutrition, barcode, img_url,
               generic_parent_id, nutrition_source_variant_id
          FROM pantry_items
         WHERE id IN (${placeholders}) AND ${_whereUser(u)} AND deleted_at IS NULL`
@@ -204,7 +204,7 @@ router.get('/:id', wrap((req, res) => {
     if (variantIds.length) {
       const p2 = variantIds.map(() => '?').join(',');
       const more = db.prepare(
-        `SELECT id, name, brand, serving_size, serving_unit, nutrition, barcode,
+        `SELECT id, name, brand, serving_size, serving_unit, nutrition, barcode, img_url,
                 generic_parent_id, nutrition_source_variant_id
            FROM pantry_items
           WHERE id IN (${p2}) AND ${_whereUser(u)} AND deleted_at IS NULL`
@@ -302,7 +302,7 @@ router.get('/:id', wrap((req, res) => {
   const pantryByName = new Map();
   try {
     const nameRows = db.prepare(
-      `SELECT id, name, brand, serving_size, serving_unit, nutrition, barcode,
+      `SELECT id, name, brand, serving_size, serving_unit, nutrition, barcode, img_url,
               generic_parent_id, nutrition_source_variant_id
          FROM pantry_items
         WHERE ${_whereUser(u)} AND deleted_at IS NULL`
@@ -359,6 +359,11 @@ router.get('/:id', wrap((req, res) => {
       };
       if (rawQty && !parsedQty) item.qty_text = rawQty.slice(0, 40);
       if (pantry?.barcode) item.barcode = String(pantry.barcode);
+      // Per-ingredient thumbnail from the linked pantry row. Absolutized
+      // so NT (a different origin) can fetch it server-side and self-host
+      // it. Without this every imported ingredient renders as NT's grey
+      // placeholder icon even when the CT pantry row has a photo.
+      if (pantry?.img_url) item.img_url = _absImg(req, pantry.img_url);
       // Nutrition comes from the resolved row (variant when applicable),
       // then falls through to the linked row's own nutrition if the
       // resolver returned the same row (no inheritance in play).
