@@ -1,8 +1,10 @@
 <script>
-  // Food Sources section — extracted from Settings.svelte. Houses the
+  // Food Sources section, extracted from Settings.svelte. Houses the
   // Pantry Search default-source picker, the Open Food Facts block
   // (toggle + language + country + upload + optional account creds),
-  // the USDA block (toggle + API key), and the Barcode Scanner block
+  // the USDA block (toggle + API key), the NutriTrace federation block
+  // (connection + Import-from-NT, since NT federation is currently
+  // used purely as another food source), and the Barcode Scanner block
   // (beep + web-only flashlight override).
   import { _ } from 'svelte-i18n';
   import { isNative } from '../../lib/platform.js';
@@ -13,6 +15,8 @@
     barcodeBeep, barcodeFlashlight,
     pantryDefaultSource,
   } from '../../stores/settings.js';
+  import SettingsFederation from './SettingsFederation.svelte';
+  import SettingsImportFromNT from './SettingsImportFromNT.svelte';
 
   const OFF_LANGUAGE_OPTS = [
     ['en','English'],['fr','French'],['de','German'],['es','Spanish'],['it','Italian'],
@@ -133,6 +137,10 @@
       </div>
     {/if}
   </div>
+
+  <p class="sub-label">{$_('settings_page.nutritrace.section')}</p>
+  <SettingsFederation />
+  <SettingsImportFromNT />
 
   <p class="sub-label">{$_('settings_page.scanner.section')}</p>
   <div class="card settings-card">
