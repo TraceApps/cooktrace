@@ -807,6 +807,9 @@
       "api_key":                "API Key",
       "api_key_ph":             "Paste your USDA API key here"
     },
+    "nutritrace": {
+      "section":                "NutriTrace"
+    },
     "scanner": {
       "section":                "Barcode Scanner",
       "beep_on_scan":           "Beep on Scan"

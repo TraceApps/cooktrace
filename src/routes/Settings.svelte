@@ -31,8 +31,6 @@
   import SettingsCooking         from '../components/settings/SettingsCooking.svelte';
   import SettingsNutrition       from '../components/settings/SettingsNutrition.svelte';
   import SettingsTrace           from '../components/settings/SettingsTrace.svelte';
-  import SettingsFederation      from '../components/settings/SettingsFederation.svelte';
-  import SettingsImportFromNT    from '../components/settings/SettingsImportFromNT.svelte';
   import SettingsFoodSources     from '../components/settings/SettingsFoodSources.svelte';
   import SettingsServerConnection from '../components/settings/SettingsServerConnection.svelte';
   import SettingsNotifications   from '../components/settings/SettingsNotifications.svelte';
@@ -597,16 +595,6 @@
                 <SettingsTrace {envLocks} />
               {:else if currentSection === 'email'}
                 <SettingsEmail {envLocks} />
-              {:else if currentSection === 'foodsources'}
-                <!-- Food Sources drills-in show the source toggles plus
-                     the NutriTrace federation connection card and its
-                     Import-from-NT card, since NT federation is
-                     currently used purely as another food source. -->
-                <div class="section-body">
-                  <SettingsFoodSources />
-                  <SettingsFederation />
-                  <SettingsImportFromNT />
-                </div>
               {:else}
                 <svelte:component this={SECTION_COMPONENTS[currentSection]} />
               {/if}
