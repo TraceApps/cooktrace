@@ -213,37 +213,85 @@ router.get('/:id', wrap((req, res) => {
     }
   }
 
-  // Mirror of CT's client _resolveNutritionSource: when the linked
-  // pantry row is a generic that inherits nutrition from a specific
-  // variant (Issue #4 on the CT side), return that variant's row so
-  // callers see real nutrition instead of the empty generic. Defensive:
-  // the source variant must still exist AND still be a child of the
-  // linked row, otherwise fall back to the originally linked row.
+  // Cheap non-empty check for a stored nutrition JSON blob. "{}" and
+  // NULL both count as empty; a blob with any populated key wins.
+  function _hasRealNutrition(row) {
+    if (!row?.nutrition) return false;
+    try {
+      const n = JSON.parse(row.nutrition);
+      if (!n || typeof n !== 'object') return false;
+      for (const [k, v] of Object.entries(n)) {
+        if (k === '_derived') continue;
+        if (v != null && !(typeof v === 'object' && Object.keys(v).length === 0)) return true;
+      }
+      return false;
+    } catch { return false; }
+  }
+
+  // Resolve which pantry row supplies nutrition for a given linked item.
+  // Order:
+  //   1. If own row has nutrition, use it (fastest, most common case).
+  //   2. Generic->variant: own is a generic with nutrition_source_variant_id
+  //      set; return the referenced variant row (CT client's behavior).
+  //   3. Variant->generic (reverse): own is a variant (generic_parent_id
+  //      set) that itself has no meaningful nutrition; return the generic
+  //      parent's row when it has usable values. Handles pantries where
+  //      the user maintained nutrition on the generic and let variants
+  //      inherit implicitly rather than through the explicit link.
+  //   4. Nothing usable found: return own so the caller can decide to
+  //      omit the field.
   function _resolveNutritionSource(pantryItemId) {
     if (pantryItemId == null) return null;
     const own = pantryById.get(Number(pantryItemId));
     if (!own) return null;
+    if (_hasRealNutrition(own)) return own;
+    // Generic -> designated variant.
     const sourceId = own.nutrition_source_variant_id;
-    if (sourceId == null) return own;
-    const sourceRow = pantryById.get(sourceId);
-    if (!sourceRow || sourceRow.generic_parent_id !== own.id) return own;
-    return sourceRow;
+    if (sourceId != null) {
+      const sourceRow = pantryById.get(sourceId);
+      if (sourceRow && sourceRow.generic_parent_id === own.id && _hasRealNutrition(sourceRow)) {
+        return sourceRow;
+      }
+    }
+    // Variant -> generic parent fallback.
+    if (own.generic_parent_id != null) {
+      const parent = pantryById.get(own.generic_parent_id);
+      if (parent && _hasRealNutrition(parent)) return parent;
+      // The generic might itself inherit from a different variant; follow
+      // one more hop so a recipe linking to variant A of generic G whose
+      // designated source is variant B still picks up B's values.
+      if (parent?.nutrition_source_variant_id != null) {
+        const sibling = pantryById.get(parent.nutrition_source_variant_id);
+        if (sibling && sibling.generic_parent_id === parent.id && _hasRealNutrition(sibling)) {
+          return sibling;
+        }
+      }
+    }
+    return own;
   }
 
   // Name fallback map. Imported recipes (Mealie/Paprika/text/URL) and
   // freshly typed ingredients often have no pantry_item_id, but the
-  // user's pantry usually has an entry with the same name. Load every
-  // non-deleted pantry row with nutrition once, key by lowercased name,
-  // and use it whenever the id-based lookup misses. Mirrors the pattern
-  // CT's own client uses when recompute stamps missing links.
+  // user's pantry usually has an entry with the same name. Load EVERY
+  // non-deleted pantry row (including generics whose own nutrition is
+  // empty because they inherit from a variant, and including variants
+  // whose own nutrition is empty because their generic holds the
+  // values) so the resolver below can walk the chain in either
+  // direction. Filtering by nutrition IS NOT NULL here would drop
+  // exactly those inheriting rows and mask the fix.
   const pantryByName = new Map();
   try {
     const nameRows = db.prepare(
-      `SELECT id, name, brand, serving_size, serving_unit, nutrition, barcode
+      `SELECT id, name, brand, serving_size, serving_unit, nutrition, barcode,
+              generic_parent_id, nutrition_source_variant_id
          FROM pantry_items
-        WHERE ${_whereUser(u)} AND deleted_at IS NULL AND nutrition IS NOT NULL AND nutrition != '{}'`
+        WHERE ${_whereUser(u)} AND deleted_at IS NULL`
     ).all(..._userArgs(u));
     for (const r of nameRows) {
+      // Fold every row into the byId map too so the resolver can walk
+      // generic->variant and variant->generic without needing another
+      // round trip. Duplicate loads are harmless (Map dedups by key).
+      pantryById.set(r.id, r);
       const key = String(r.name || '').trim().toLowerCase();
       if (key && !pantryByName.has(key)) pantryByName.set(key, r);
     }
@@ -299,6 +347,20 @@ router.get('/:id', wrap((req, res) => {
         const n = _safeJson(nutritionSrc.nutrition, null);
         if (n && typeof n === 'object' && !Array.isArray(n)) item.nutrition = n;
       }
+      // Temporary diagnostic block: surfaces which pantry rows the
+      // resolver visited so we can see WHY a variant-backed ingredient
+      // ends up with empty nutrition. Cheap to leave in during the
+      // dial-in phase; strip once the pull is verified end-to-end.
+      item._debug = {
+        pantry_item_id_in: it.pantry_item_id ?? null,
+        linked_id: pantry?.id ?? null,
+        linked_name: pantry?.name ?? null,
+        linked_has_own_nutrition: pantry ? _hasRealNutrition(pantry) : false,
+        linked_generic_parent_id: pantry?.generic_parent_id ?? null,
+        linked_nutrition_source_variant_id: pantry?.nutrition_source_variant_id ?? null,
+        resolved_id: nutritionSrc?.id ?? null,
+        resolved_has_nutrition: !!(nutritionSrc?.nutrition && nutritionSrc.nutrition !== '{}'),
+      };
       items.push(item);
     }
   }
