@@ -34,6 +34,7 @@ import shareRoutes        from './routes/share.js';
 import kitchensRoutes     from './routes/kitchens.js';
 import updatesRoutes      from './routes/updates.js';
 import apiTokensRoutes    from './routes/api-tokens.js';
+import webhooksRoutes     from './routes/webhooks.js';
 import mcpRoutes          from './routes/mcp.js';
 import v1ApiRoutes        from './routes/api/v1/index.js';
 import { logger }   from './logger.js';
@@ -185,6 +186,7 @@ router.use('/api/units',        unitsRoutes);
 router.use('/api/cookbooks',    cookbooksRoutes);
 router.use('/api/kitchens',     kitchensRoutes);
 router.use('/api/admin/api-tokens', apiTokensRoutes);
+router.use('/api/admin/webhooks', webhooksRoutes);
 router.use('/api/mcp',          mcpRoutes);
 router.use('/api/v1',           v1ApiRoutes);
 router.use('/api/r',            shareRoutes);   // public share-link reads

@@ -90,6 +90,9 @@ Optional integrations:
   Keycloak, Auth0). Multi-provider supported.
 - `AI_*` — Trace assistant config (Phase 5+).
 
+- `PUBLIC_API_ENABLED` / `PUBLIC_API_WRITE_ENABLED`: general-purpose REST routes for your own scripts and automations. See `docs/public-api.md`.
+- `WEBHOOKS_ENABLED` / `ALLOW_PRIVATE_WEBHOOK_URLS`: outgoing webhooks. See `docs/webhooks.md`.
+
 ## Reverse proxy
 
 CookTrace listens on port 3001 inside the container, exposed on host port

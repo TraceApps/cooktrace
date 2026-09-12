@@ -9,6 +9,48 @@
 import { z } from 'zod';
 import db from '../../../db.js';
 import { toolResult, toolError } from '../_util.js';
+import { dispatchWebhookEvent } from '../../webhooks.js';
+
+/**
+ * Core write, shared by the MCP tool below and the public REST API at
+ * PATCH /api/v1/pantry/:id/stock. Throws a plain Error on bad input.
+ * Dispatches pantry.out_of_stock itself on an in-stock-to-out-of-stock
+ * transition (routes/pantry.js's own PATCH /:id/stock and PUT /:id have
+ * their own separate, duplicate dispatch since they don't call this
+ * function). previous_in_stock is also returned so any future caller
+ * can see the prior state without a second query.
+ */
+export function updatePantryStockCore(userId, { item_id, in_stock, quantity } = {}) {
+  const existing = db.prepare(
+    `SELECT id, name, in_stock, quantity FROM pantry_items WHERE id = ? AND user_id = ? AND deleted_at IS NULL`
+  ).get(item_id, userId);
+  if (!existing) throw new Error(`item_id ${item_id} not found in your pantry.`);
+  if (in_stock === undefined && quantity === undefined) {
+    throw new Error('Provide at least one of in_stock or quantity to update.');
+  }
+
+  const nextInStock = in_stock === undefined ? existing.in_stock : (in_stock ? 1 : 0);
+  const nextQuantity = quantity === undefined ? existing.quantity : quantity;
+
+  db.prepare(
+    `UPDATE pantry_items SET in_stock = ?, quantity = ?, updated_at = datetime('now') WHERE id = ?`
+  ).run(nextInStock, nextQuantity, item_id);
+
+  if (existing.in_stock === 1 && nextInStock === 0) {
+    try {
+      dispatchWebhookEvent(userId, 'pantry.out_of_stock', { pantry_item_id: item_id, name: existing.name });
+    } catch (e) { /* never let a webhook failure block the save */ }
+  }
+
+  return {
+    ok: true,
+    item_id,
+    name: existing.name,
+    in_stock: !!nextInStock,
+    quantity: nextQuantity,
+    previous_in_stock: !!existing.in_stock,
+  };
+}
 
 export function registerUpdatePantryStock(server, { userId }) {
   server.registerTool(
@@ -26,28 +68,11 @@ export function registerUpdatePantryStock(server, { userId }) {
       },
     },
     async ({ item_id, in_stock, quantity }) => {
-      const existing = db.prepare(
-        `SELECT id, name, in_stock, quantity FROM pantry_items WHERE id = ? AND user_id = ? AND deleted_at IS NULL`
-      ).get(item_id, userId);
-      if (!existing) return toolError(`item_id ${item_id} not found in your pantry.`);
-      if (in_stock === undefined && quantity === undefined) {
-        return toolError('Provide at least one of in_stock or quantity to update.');
+      try {
+        return toolResult(updatePantryStockCore(userId, { item_id, in_stock, quantity }));
+      } catch (e) {
+        return toolError(e.message);
       }
-
-      const nextInStock = in_stock === undefined ? existing.in_stock : (in_stock ? 1 : 0);
-      const nextQuantity = quantity === undefined ? existing.quantity : quantity;
-
-      db.prepare(
-        `UPDATE pantry_items SET in_stock = ?, quantity = ?, updated_at = datetime('now') WHERE id = ?`
-      ).run(nextInStock, nextQuantity, item_id);
-
-      return toolResult({
-        ok: true,
-        item_id,
-        name: existing.name,
-        in_stock: !!nextInStock,
-        quantity: nextQuantity,
-      });
     }
   );
 }

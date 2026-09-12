@@ -25,8 +25,8 @@ const TOKEN_BYTES = 32;  // 256-bit secret
 export const SCOPE_DESCRIPTIONS = {
   'read:recipes': "Read the token owner's recipes catalog. Used by NutriTrace federation to search and import CookTrace recipes into NT's meals catalog.",
   'read:pantry':  "Read the token owner's pantry catalog. Used by NutriTrace federation to bulk-import CookTrace pantry items (variants and standalone rows) into NT's foods library.",
-  'mcp:read':    'MCP: read recipes, pantry, shopping list, and cook diary (6 tools).',
-  'mcp:write':   'MCP: log a cook, manage the shopping list, update pantry stock (4 additive tools). Requires MCP_WRITE_ENABLED=1 on the server.',
+  'mcp:read':    'MCP: read recipes, pantry, shopping list, and cook diary (6 tools). Also unlocks the equivalent /api/v1 read routes when PUBLIC_API_ENABLED=1.',
+  'mcp:write':   'MCP: log a cook, manage the shopping list, update pantry stock (4 additive tools). Requires MCP_WRITE_ENABLED=1 on the server. Also unlocks the equivalent /api/v1 write routes when PUBLIC_API_WRITE_ENABLED=1.',
   'mcp:destroy': 'MCP: create recipes, add pantry items, delete diary entries and shopping items (4 tools). Requires MCP_DESTROY_ENABLED=1 AND every call to include confirm=true.',
 };
 

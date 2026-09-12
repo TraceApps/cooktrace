@@ -10,6 +10,7 @@ import { Router } from 'express';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
+import { dispatchWebhookEvent } from '../lib/webhooks.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -241,6 +242,27 @@ router.patch('/:id/check', wrap((req, res) => {
   }
   const next = req.body?.checked ? 1 : 0;
   db.prepare(`UPDATE shopping_list SET checked = ?, updated_at = datetime('now') WHERE id = ?`).run(next, id);
+
+  // Only a genuine 0-to-1 transition can newly complete the list; a
+  // redundant re-check of an already-checked item (double-click, retry,
+  // multi-tab) must not re-fire the webhook even though the aggregate
+  // "fully checked" state still holds.
+  if (next === 1 && existing.checked !== 1) {
+    try {
+      const where = u == null ? 'user_id IS NULL' : 'user_id = ?';
+      const args = u == null ? [] : [u];
+      const remaining = db.prepare(
+        `SELECT COUNT(*) AS n FROM shopping_list WHERE ${where} AND deleted_at IS NULL AND checked = 0`
+      ).get(...args);
+      const total = db.prepare(
+        `SELECT COUNT(*) AS n FROM shopping_list WHERE ${where} AND deleted_at IS NULL`
+      ).get(...args);
+      if (remaining.n === 0 && total.n > 0) {
+        dispatchWebhookEvent(u, 'shopping_list.completed', { items_count: total.n });
+      }
+    } catch (e) { /* never let a webhook failure block the save */ }
+  }
+
   res.json({ ok: true, checked: !!next });
 }));
 

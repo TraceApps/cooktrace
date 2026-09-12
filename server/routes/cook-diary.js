@@ -16,6 +16,7 @@ import { Router } from 'express';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
+import { dispatchWebhookEvent } from '../lib/webhooks.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -182,6 +183,15 @@ router.post('/', wrap((req, res) => {
   if (kind === 'cooked') recomputeRecipeAggregates(recipeId);
 
   const row = db.prepare(`SELECT * FROM cook_diary WHERE id = ?`).get(result.lastInsertRowid);
+
+  if (kind === 'cooked') {
+    try {
+      dispatchWebhookEvent(u, 'meal.cooked', {
+        date, recipe_id: recipeId, recipe_name: recipe.name, kind, servings, rating, meal_type: mealType,
+      });
+    } catch (e) { /* never let a webhook failure block the save */ }
+  }
+
   res.status(201).json(row);
 }));
 

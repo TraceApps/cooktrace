@@ -42,6 +42,7 @@
   import SettingsUserManagement  from '../components/settings/SettingsUserManagement.svelte';
   import SettingsAuth            from '../components/settings/SettingsAuth.svelte';
   import SettingsApiTokens       from '../components/settings/SettingsApiTokens.svelte';
+  import SettingsWebhooks        from '../components/settings/SettingsWebhooks.svelte';
   import SettingsEmail           from '../components/settings/SettingsEmail.svelte';
   import SettingsAbout           from '../components/settings/SettingsAbout.svelte';
   import Profile                 from './Profile.svelte';
@@ -161,6 +162,7 @@
     users:         { titleKey: 'settings.users.section',             icon: 'group' },
     auth:          { titleKey: 'settings.authentication.section',    icon: 'shield_person' },
     apitokens:     { titleKey: 'settings.apitokens.section',         icon: 'key' },
+    webhooks:      { titleKey: 'settings.webhooks.section',          icon: 'webhook' },
     serverconn:    { titleKey: 'settings.server.section',            icon: 'cloud' },
     updates:       { titleKey: 'settings.updates.section',           icon: 'system_update' },
     diagnostics:   { titleKey: 'settings.diagnostics.section',       icon: 'troubleshoot' },
@@ -191,6 +193,7 @@
     users:         SettingsUserManagement,
     auth:          SettingsAuth,
     apitokens:     SettingsApiTokens,
+    webhooks:      SettingsWebhooks,
     serverconn:    SettingsServerConnection,
     updates:       SettingsUpdates,
     diagnostics:   SettingsDiagnostics,
@@ -218,6 +221,7 @@
     users:         ['users','user management','accounts','login','admin','register','invite'],
     auth:          ['authentication','auth','sso','single sign-on','single sign on','oidc','openid','authentik','keycloak','authelia','password login'],
     apitokens:     ['api tokens','api token','personal access token','pat','mcp','model context protocol','claude desktop','cursor','codex','agent','ai agent','bearer token','scopes','revoke token'],
+    webhooks:      ['webhooks','webhook','automation','n8n','home assistant','ifttt','push','event','integration','integrations','http post','callback url','signature','hmac','secret'],
     serverconn:    ['server','connection','sync','connect','disconnect','local mode','offline','standalone','android','native','url','login'],
     updates:       ['updates','update','upgrade','version','new version','changelog','release','releases','apk','install','download','check for updates','auto-check','channel','stable','dev','dev-latest','beta','github','server update','docker','compose','docker-compose','check frequency','check interval','how often','hourly','daily','manual','manual only','cadence','banner','notification'],
     diagnostics:   ['diagnostics','logs','verbose','console','export','bug','report','troubleshoot','crash'],
@@ -499,6 +503,11 @@
       <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'apitokens')} class:active={currentSection === 'apitokens'} aria-current={currentSection === 'apitokens' ? 'page' : undefined} on:click={() => toggleSection('apitokens')}>
         <span class="material-symbols-rounded si">key</span>
         <span>{$_('settings.apitokens.section')}</span>
+        <span class="material-symbols-rounded chevron">expand_more</span>
+      </button>
+      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'webhooks')} class:active={currentSection === 'webhooks'} aria-current={currentSection === 'webhooks' ? 'page' : undefined} on:click={() => toggleSection('webhooks')}>
+        <span class="material-symbols-rounded si">webhook</span>
+        <span>{$_('settings.webhooks.section')}</span>
         <span class="material-symbols-rounded chevron">expand_more</span>
       </button>
     {/if}
