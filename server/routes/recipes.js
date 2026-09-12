@@ -680,7 +680,12 @@ router.get('/:id/cooks', wrap((req, res) => {
   const recipe = db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(id);
   if (!recipe) return res.status(404).json({ error: 'Not found' });
   const isOwner = (u == null && recipe.user_id == null) || recipe.user_id === u;
-  if (!isOwner && recipe.visibility !== 'group') {
+  let isShared = false;
+  if (!isOwner && u != null) {
+    const s = db.prepare(`SELECT 1 FROM recipe_shares WHERE recipe_id = ? AND grantee_id = ?`).get(id, u);
+    isShared = !!s;
+  }
+  if (!isOwner && !isShared && recipe.visibility !== 'group') {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -2252,7 +2257,12 @@ router.get('/:id/comments', wrap((req, res) => {
   const recipe = db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(id);
   if (!recipe) return res.status(404).json({ error: 'Not found' });
   const isOwner = (u == null && recipe.user_id == null) || recipe.user_id === u;
-  if (!isOwner && recipe.visibility !== 'group') {
+  let isShared = false;
+  if (!isOwner && u != null) {
+    const s = db.prepare(`SELECT 1 FROM recipe_shares WHERE recipe_id = ? AND grantee_id = ?`).get(id, u);
+    isShared = !!s;
+  }
+  if (!isOwner && !isShared && recipe.visibility !== 'group') {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -2276,6 +2286,15 @@ router.post('/:id/comments', wrap((req, res) => {
   // to user_id=NULL and a generic display name.
   const recipe = db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(id);
   if (!recipe) return res.status(404).json({ error: 'Not found' });
+  const isOwner = (u == null && recipe.user_id == null) || recipe.user_id === u;
+  let isShared = false;
+  if (!isOwner && u != null) {
+    const s = db.prepare(`SELECT 1 FROM recipe_shares WHERE recipe_id = ? AND grantee_id = ?`).get(id, u);
+    isShared = !!s;
+  }
+  if (!isOwner && !isShared && recipe.visibility !== 'group') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
 
   const body = (req.body?.body || '').toString().trim();
   if (!body) return res.status(400).json({ error: 'body required' });
