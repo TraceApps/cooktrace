@@ -12,6 +12,7 @@ import { Router } from 'express';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
+import { dispatchWebhookEvent } from '../lib/webhooks.js';
 import { ensurePantryItems } from './pantry.js';
 import { scrapeRecipe, fetchRecipeHtml, extractFromHtml } from '../lib/recipe-scraper.js';
 import { aiExtractRecipe } from '../lib/recipe-ai-fallback.js';
@@ -668,6 +669,13 @@ router.post('/:id/cooked', wrap((req, res) => {
 
   _recomputeCookAggregates(id);
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(id);
+
+  try {
+    dispatchWebhookEvent(u, 'meal.cooked', {
+      date, recipe_id: id, recipe_name: existing.name, kind: 'cooked', servings: null, rating, meal_type: mealType,
+    });
+  } catch (e) { /* never let a webhook failure block the save */ }
+
   res.json(_withCreatorAvatar(_hydrate(row), row));
 }));
 

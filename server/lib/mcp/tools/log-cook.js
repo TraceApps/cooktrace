@@ -10,8 +10,58 @@ import { z } from 'zod';
 import db from '../../../db.js';
 import { DATE_RE, todayLocal, toolResult, toolError } from '../_util.js';
 import { recomputeRecipeAggregates } from '../../../routes/cook-diary.js';
+import { dispatchWebhookEvent } from '../../webhooks.js';
 
 const MEAL_TYPES = new Set(['breakfast', 'lunch', 'dinner', 'snack']);
+
+/**
+ * Core write, shared by the MCP tool below and the public REST API at
+ * POST /api/v1/cook-diary. Throws a plain Error on bad input or a
+ * recipe the caller can't see.
+ */
+export function logCookCore(userId, { recipe_id, date, servings, notes, meal_type, rating } = {}) {
+  const recipe = db.prepare(
+    `SELECT id, name, user_id, visibility FROM recipes WHERE id = ? AND deleted_at IS NULL`
+  ).get(recipe_id);
+  if (!recipe) throw new Error(`recipe_id ${recipe_id} not found.`);
+  if (recipe.user_id !== userId && recipe.visibility !== 'group') {
+    throw new Error(`recipe_id ${recipe_id} isn't yours and isn't shared with your Kitchen.`);
+  }
+
+  const day = date || todayLocal();
+  if (!DATE_RE.test(day)) throw new Error(`Invalid date '${day}'; expected YYYY-MM-DD.`);
+  const mealType = meal_type && MEAL_TYPES.has(meal_type) ? meal_type : null;
+  const cleanRating = Number.isInteger(rating) ? Math.max(0, Math.min(5, rating)) || null : null;
+
+  const result = db.prepare(
+    `INSERT INTO cook_diary (user_id, recipe_id, date, kind, servings, notes, meal_type, rating)
+     VALUES (?, ?, ?, 'cooked', ?, ?, ?, ?)`
+  ).run(userId, recipe_id, day, servings ?? null, notes || null, mealType, cleanRating);
+
+  recomputeRecipeAggregates(recipe_id);
+  const updated = db.prepare(`SELECT cook_count, last_cooked_at FROM recipes WHERE id = ?`).get(recipe_id);
+
+  try {
+    dispatchWebhookEvent(userId, 'meal.cooked', {
+      date: day, recipe_id, recipe_name: recipe.name, kind: 'cooked', servings: servings ?? null, rating: cleanRating, meal_type: mealType,
+    });
+  } catch (e) { /* never let a webhook failure block the save */ }
+
+  return {
+    ok: true,
+    logged: {
+      entry_id: result.lastInsertRowid,
+      recipe_id,
+      recipe_name: recipe.name,
+      date: day,
+      servings: servings ?? null,
+      meal_type: mealType,
+      rating: cleanRating,
+    },
+    recipe_cook_count: updated?.cook_count ?? null,
+    recipe_last_cooked_at: updated?.last_cooked_at ?? null,
+  };
+}
 
 export function registerLogCook(server, { userId }) {
   server.registerTool(
@@ -32,41 +82,11 @@ export function registerLogCook(server, { userId }) {
       },
     },
     async ({ recipe_id, date, servings, notes, meal_type, rating }) => {
-      const recipe = db.prepare(
-        `SELECT id, name, user_id, visibility FROM recipes WHERE id = ? AND deleted_at IS NULL`
-      ).get(recipe_id);
-      if (!recipe) return toolError(`recipe_id ${recipe_id} not found.`);
-      if (recipe.user_id !== userId && recipe.visibility !== 'group') {
-        return toolError(`recipe_id ${recipe_id} isn't yours and isn't shared with your Kitchen.`);
+      try {
+        return toolResult(logCookCore(userId, { recipe_id, date, servings, notes, meal_type, rating }));
+      } catch (e) {
+        return toolError(e.message);
       }
-
-      const day = date || todayLocal();
-      if (!DATE_RE.test(day)) return toolError(`Invalid date '${day}'; expected YYYY-MM-DD.`);
-      const mealType = meal_type && MEAL_TYPES.has(meal_type) ? meal_type : null;
-      const cleanRating = Number.isInteger(rating) ? Math.max(0, Math.min(5, rating)) || null : null;
-
-      const result = db.prepare(
-        `INSERT INTO cook_diary (user_id, recipe_id, date, kind, servings, notes, meal_type, rating)
-         VALUES (?, ?, ?, 'cooked', ?, ?, ?, ?)`
-      ).run(userId, recipe_id, day, servings ?? null, notes || null, mealType, cleanRating);
-
-      recomputeRecipeAggregates(recipe_id);
-      const updated = db.prepare(`SELECT cook_count, last_cooked_at FROM recipes WHERE id = ?`).get(recipe_id);
-
-      return toolResult({
-        ok: true,
-        logged: {
-          entry_id: result.lastInsertRowid,
-          recipe_id,
-          recipe_name: recipe.name,
-          date: day,
-          servings: servings ?? null,
-          meal_type: mealType,
-          rating: cleanRating,
-        },
-        recipe_cook_count: updated?.cook_count ?? null,
-        recipe_last_cooked_at: updated?.last_cooked_at ?? null,
-      });
     }
   );
 }

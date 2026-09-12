@@ -7,6 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **General-purpose public REST API** at `/api/v1/cook-diary`, `/api/v1/shopping`, and a pantry stock write route, for your own scripts and automations rather than the NutriTrace federation contract the rest of `/api/v1` documents. Off by default (`PUBLIC_API_ENABLED=1`; `PUBLIC_API_WRITE_ENABLED=1` additionally unlocks logging a cook, checking a shopping item, and updating pantry stock). Reuses the `mcp:read`/`mcp:write` token scopes MCP already defines, one token works for both interfaces. See `docs/public-api.md`.
+- **Outgoing webhooks.** Configure a target URL in Settings, Webhooks and CookTrace fires a signed HTTP POST the instant a recipe is logged as cooked, the shopping list is fully checked off, or a pantry item runs out of stock. Off by default (`WEBHOOKS_ENABLED=1`). HMAC-SHA256 signed, 3 delivery attempts with backoff, a "send test event" button to verify a target without waiting for a real event. Target URLs are validated against a shared SSRF guard (blocks loopback/private/link-local/cloud-metadata addresses unless `ALLOW_PRIVATE_WEBHOOK_URLS=1`), the same guard image-localizer.js now uses internally for its own external-image downloads. See `docs/webhooks.md`.
+
 ---
 
 ## [1.3.0-dev.01] - 2026-09-10 (pre-release)

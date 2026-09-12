@@ -9,6 +9,24 @@ import { z } from 'zod';
 import db from '../../../db.js';
 import { toolResult } from '../_util.js';
 
+/**
+ * Core lookup, shared by the MCP tool below and the public REST API at
+ * GET /api/v1/shopping.
+ */
+export function listShoppingListCore(userId, { include_checked } = {}) {
+  const clauses = ['user_id = ?', 'deleted_at IS NULL'];
+  const args = [userId];
+  if (!include_checked) clauses.push('checked = 0');
+  const rows = db.prepare(
+    `SELECT id, name, quantity, unit, aisle, checked
+       FROM shopping_list
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY checked ASC, COALESCE(aisle, 'zzz') ASC, name COLLATE NOCASE ASC`
+  ).all(...args);
+  const items = rows.map(r => ({ ...r, checked: !!r.checked }));
+  return { count: items.length, items };
+}
+
 export function registerListShoppingList(server, { userId }) {
   server.registerTool(
     'list_shopping_list',
@@ -22,17 +40,7 @@ export function registerListShoppingList(server, { userId }) {
       },
     },
     async ({ include_checked }) => {
-      const clauses = ['user_id = ?', 'deleted_at IS NULL'];
-      const args = [userId];
-      if (!include_checked) clauses.push('checked = 0');
-      const rows = db.prepare(
-        `SELECT id, name, quantity, unit, aisle, checked
-           FROM shopping_list
-          WHERE ${clauses.join(' AND ')}
-          ORDER BY checked ASC, COALESCE(aisle, 'zzz') ASC, name COLLATE NOCASE ASC`
-      ).all(...args);
-      const items = rows.map(r => ({ ...r, checked: !!r.checked }));
-      return toolResult({ count: items.length, items });
+      return toolResult(listShoppingListCore(userId, { include_checked }));
     }
   );
 }

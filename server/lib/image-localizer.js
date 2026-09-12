@@ -10,6 +10,7 @@ import crypto from 'crypto';
 import dns from 'dns/promises';
 import net from 'net';
 import { logger } from '../logger.js';
+import { isLinkLocalOrCloudMeta, isPrivateOrLoopback } from './ssrf-guard.js';
 
 const UPLOADS_DIR = process.env.UPLOADS_PATH || './uploads';
 
@@ -17,31 +18,18 @@ const UPLOADS_DIR = process.env.UPLOADS_PATH || './uploads';
  * SSRF protection: block private/loopback/link-local IP ranges so an authed
  * user can't trick the server into fetching internal admin panels or cloud
  * metadata endpoints (169.254.169.254). Note: there's a TOCTOU window between
- * resolution and fetch — for higher-assurance environments, switch to a
+ * resolution and fetch, for higher-assurance environments, switch to a
  * pinned-IP HTTP agent.
+ *
+ * IP-range classification now lives in the shared server/lib/ssrf-guard.js
+ * (also used by outgoing webhooks) so a bypass fix only needs to happen in
+ * one place. This function's own flow (check every resolved address, treat
+ * a DNS failure as unsafe) is unchanged, only the per-address classifier
+ * call is delegated.
  */
 function _isPrivateIP(ip) {
   if (!net.isIP(ip)) return false;
-  if (net.isIPv4(ip)) {
-    const o = ip.split('.').map(Number);
-    return (
-      o[0] === 0 ||                                // 0.0.0.0/8
-      o[0] === 10 ||                               // 10.0.0.0/8
-      o[0] === 127 ||                              // 127.0.0.0/8 loopback
-      (o[0] === 100 && o[1] >= 64 && o[1] <= 127) || // 100.64.0.0/10 CGNAT
-      (o[0] === 169 && o[1] === 254) ||            // 169.254.0.0/16 link-local + cloud metadata
-      (o[0] === 172 && o[1] >= 16 && o[1] <= 31) ||// 172.16.0.0/12
-      (o[0] === 192 && o[1] === 168)               // 192.168.0.0/16
-    );
-  }
-  // IPv6
-  const lower = ip.toLowerCase();
-  if (lower === '::' || lower === '::1') return true;
-  if (lower.startsWith('fc') || lower.startsWith('fd')) return true;       // fc00::/7 ULA
-  if (lower.startsWith('fe80:') || lower.startsWith('fe9') ||
-      lower.startsWith('fea') || lower.startsWith('feb')) return true;     // fe80::/10
-  if (lower.startsWith('::ffff:')) return _isPrivateIP(lower.slice(7));    // IPv4-mapped
-  return false;
+  return isLinkLocalOrCloudMeta(ip) || isPrivateOrLoopback(ip);
 }
 
 async function _hostnameResolvesPrivate(hostname) {
@@ -51,7 +39,7 @@ async function _hostnameResolvesPrivate(hostname) {
     const addrs = await dns.lookup(hostname, { all: true });
     return addrs.some(a => _isPrivateIP(a.address));
   } catch {
-    return true;  // DNS failure → treat as unsafe
+    return true;  // DNS failure, treat as unsafe
   }
 }
 

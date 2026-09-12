@@ -13,6 +13,34 @@ import { DATE_RE, toolResult, toolError } from '../_util.js';
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 20;
 
+/**
+ * Core lookup, shared by the MCP tool below and the public REST API at
+ * GET /api/v1/cook-diary. Throws a plain Error on bad input.
+ */
+export function listCookDiaryCore(userId, { date_from, date_to, kind, limit } = {}) {
+  if (date_from && !DATE_RE.test(date_from)) throw new Error(`Invalid date_from '${date_from}'; expected YYYY-MM-DD.`);
+  if (date_to && !DATE_RE.test(date_to)) throw new Error(`Invalid date_to '${date_to}'; expected YYYY-MM-DD.`);
+  const cap = Math.min(MAX_LIMIT, Math.max(1, Number(limit) || DEFAULT_LIMIT));
+
+  const clauses = ['cd.user_id = ?', 'cd.deleted_at IS NULL'];
+  const args = [userId];
+  if (date_from) { clauses.push('cd.date >= ?'); args.push(date_from); }
+  if (date_to)   { clauses.push('cd.date <= ?'); args.push(date_to); }
+  if (kind)      { clauses.push('cd.kind = ?');  args.push(kind); }
+  args.push(cap);
+
+  const rows = db.prepare(
+    `SELECT cd.id, cd.recipe_id, r.name AS recipe_name, cd.date, cd.kind,
+            cd.servings, cd.notes, cd.meal_type, cd.rating
+       FROM cook_diary cd
+       LEFT JOIN recipes r ON r.id = cd.recipe_id
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY cd.date DESC, cd.created_at DESC
+      LIMIT ?`
+  ).all(...args);
+  return { count: rows.length, limit: cap, items: rows };
+}
+
 export function registerListCookDiary(server, { userId }) {
   server.registerTool(
     'list_cook_diary',
@@ -31,27 +59,11 @@ export function registerListCookDiary(server, { userId }) {
       },
     },
     async ({ date_from, date_to, kind, limit }) => {
-      if (date_from && !DATE_RE.test(date_from)) return toolError(`Invalid date_from '${date_from}'; expected YYYY-MM-DD.`);
-      if (date_to && !DATE_RE.test(date_to)) return toolError(`Invalid date_to '${date_to}'; expected YYYY-MM-DD.`);
-      const cap = Math.min(MAX_LIMIT, Math.max(1, Number(limit) || DEFAULT_LIMIT));
-
-      const clauses = ['cd.user_id = ?', 'cd.deleted_at IS NULL'];
-      const args = [userId];
-      if (date_from) { clauses.push('cd.date >= ?'); args.push(date_from); }
-      if (date_to)   { clauses.push('cd.date <= ?'); args.push(date_to); }
-      if (kind)      { clauses.push('cd.kind = ?');  args.push(kind); }
-      args.push(cap);
-
-      const rows = db.prepare(
-        `SELECT cd.id, cd.recipe_id, r.name AS recipe_name, cd.date, cd.kind,
-                cd.servings, cd.notes, cd.meal_type, cd.rating
-           FROM cook_diary cd
-           LEFT JOIN recipes r ON r.id = cd.recipe_id
-          WHERE ${clauses.join(' AND ')}
-          ORDER BY cd.date DESC, cd.created_at DESC
-          LIMIT ?`
-      ).all(...args);
-      return toolResult({ count: rows.length, limit: cap, items: rows });
+      try {
+        return toolResult(listCookDiaryCore(userId, { date_from, date_to, kind, limit }));
+      } catch (e) {
+        return toolError(e.message);
+      }
     }
   );
 }
