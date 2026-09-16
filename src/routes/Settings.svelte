@@ -152,7 +152,7 @@
     regional:      { titleKey: 'settings.regional.section',          icon: 'public' },
     cooking:       { titleKey: 'settings.cooking.section',           icon: 'restaurant' },
     nutrition:     { titleKey: 'settings.nutrition.section',         icon: 'science' },
-    ai:            { titleKey: 'settings.ai.section',                icon: 'bolt' },
+    ai:            { titleKey: 'settings.ai.section',                icon: 'smart_toy' },
     foodsources:   { titleKey: 'settings.connected_services.section',icon: 'restaurant_menu' },
     notifications: { titleKey: 'settings.notifications.section',     icon: 'notifications' },
     email:         { titleKey: 'settings.email.section',             icon: 'mail' },
