@@ -20,8 +20,8 @@
  * blocked, since isPrivateOrLoopback below is a superset covering both
  * its old ranges and LiftTrace's/NutriTrace's.
  *
- * `assertSafeUrl` is new: a throwing, single-resolution guard for
- * outgoing webhooks, parameterized so a self-hoster can opt a specific
+ * `assertSafeUrl` is new: a throwing guard for outgoing webhooks that
+ * requires every resolved address to pass, parameterized so a self-hoster can opt a specific
  * feature into allowing private/loopback targets (a same-Docker-network
  * Home Assistant instance) without loosening image-localizer.js's own,
  * always-strict guard.
@@ -95,17 +95,22 @@ export async function assertSafeUrl(url, { allowPrivate = false, allowPrivateEnv
   if (!['http:', 'https:'].includes(parsed.protocol)) {
     throw new Error('Only http and https URLs are allowed');
   }
-  let address;
+  // Every address the host resolves to has to pass, not just the first
+  // one: the fetch that follows resolves independently and may pick any
+  // of them, so a host publishing one public and one private record
+  // would otherwise sail through this check and then connect privately.
+  let addresses;
   try {
-    const r = await dns.lookup(parsed.hostname, { all: false });
-    address = r.address;
+    const r = await dns.lookup(parsed.hostname, { all: true });
+    addresses = (Array.isArray(r) ? r : [r]).map(a => a.address).filter(Boolean);
   } catch {
     throw new Error('Could not resolve host');
   }
-  if (isLinkLocalOrCloudMeta(address)) {
+  if (addresses.length === 0) throw new Error('Could not resolve host');
+  if (addresses.some(isLinkLocalOrCloudMeta)) {
     throw new Error('Link-local / cloud-metadata addresses are not allowed');
   }
-  if (!allowPrivate && isPrivateOrLoopback(address)) {
+  if (!allowPrivate && addresses.some(isPrivateOrLoopback)) {
     throw new Error(`Private / loopback addresses are blocked. Set ${allowPrivateEnvHint}=1 to enable LAN targets.`);
   }
   return parsed;

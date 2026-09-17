@@ -25,6 +25,22 @@ const uploadsPath = process.env.UPLOADS_PATH || './uploads';
 const PRIVATE_SUBDIRS = ['backups'];
 
 /**
+ * Absolute directories the static handler must never serve, lowercased.
+ *
+ * The default 'backups' subdir is always listed, and a custom BACKUPS_PATH
+ * is added whenever it resolves inside UPLOADS_PATH: full-backup.js writes
+ * archives wherever BACKUPS_PATH points, so guarding only the default name
+ * left a relocated backup directory served unauthenticated.
+ */
+function _privateDirs() {
+  const root = path.resolve(uploadsPath);
+  const dirs = PRIVATE_SUBDIRS.map((sub) => path.join(root, sub));
+  const backups = path.resolve(process.env.BACKUPS_PATH || path.join(uploadsPath, 'backups'));
+  if (backups === root || backups.startsWith(root + path.sep)) dirs.push(backups);
+  return [...new Set(dirs.map((d) => d.toLowerCase()))];
+}
+
+/**
  * True when a request path under the /uploads mount would land inside a
  * private subdirectory.
  *
@@ -56,10 +72,7 @@ export function isPrivateUploadPath(reqPath) {
   // NTFS a request for /BACKUPS/x.zip resolves to the same file, and a
   // case-sensitive guard would wave it through to express.static.
   const lower = abs.toLowerCase();
-  return PRIVATE_SUBDIRS.some((sub) => {
-    const dir = path.join(root, sub).toLowerCase();
-    return lower === dir || lower.startsWith(dir + path.sep);
-  });
+  return _privateDirs().some((dir) => lower === dir || lower.startsWith(dir + path.sep));
 }
 
 // ── Safe file names for uploads ─────────────────────────────────────────────
