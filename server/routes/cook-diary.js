@@ -222,6 +222,20 @@ router.put('/:id', wrap((req, res) => {
 
   // Recompute aggregates if cooked-state or recipe changed.
   if (existing.kind !== kind || existing.recipe_id) recomputeRecipeAggregates(existing.recipe_id);
+
+  // Flipping a planned entry to cooked is the Diary's main "I cooked
+  // this" path, so it fires meal.cooked the same as a fresh cooked row.
+  if (existing.kind !== 'cooked' && kind === 'cooked') {
+    try {
+      const recipe = existing.recipe_id
+        ? db.prepare(`SELECT name FROM recipes WHERE id = ?`).get(existing.recipe_id)
+        : null;
+      dispatchWebhookEvent(u, 'meal.cooked', {
+        date, recipe_id: existing.recipe_id, recipe_name: recipe?.name ?? null,
+        kind, servings, rating, meal_type: mealType,
+      });
+    } catch (e) { /* never let a webhook failure block the save */ }
+  }
   res.json({ ok: true });
 }));
 

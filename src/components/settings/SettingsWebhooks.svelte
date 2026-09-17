@@ -17,7 +17,7 @@
   import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
-  import { apiUrl } from '../../lib/platform.js';
+  import { apiUrl, isNative, getServerUrl, getAuthToken } from '../../lib/platform.js';
   import { showSuccess, showError } from '../../stores/toast.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
   import Spinner from '../ui/Spinner.svelte';
@@ -42,11 +42,26 @@
   let justCreatedSecret = '';
   let justCreatedUrl = '';
 
+  // Mutating calls need the CSRF header on web and a Bearer token on
+  // native, same as SettingsApiTokens. Without it every create / toggle
+  // / delete / test came back 403.
+  function _csrfHeaders(extra = {}) {
+    const h = { 'Content-Type': 'application/json', ...extra };
+    if (isNative && getServerUrl()) {
+      const t = getAuthToken();
+      if (t) h['Authorization'] = `Bearer ${t}`;
+    } else {
+      const csrf = localStorage.getItem('ct:csrf');
+      if (csrf) h['X-CSRF-Token'] = csrf;
+    }
+    return h;
+  }
+
   async function load() {
     loading = true;
     try {
       const r = await fetch(apiUrl('/api/admin/webhooks'), {
-        credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', headers: _csrfHeaders(),
       });
       if (!r.ok) throw new Error($_('settings_webhooks.toast.load_failed'));
       const data = await r.json();
@@ -78,7 +93,7 @@
     try {
       const r = await fetch(apiUrl('/api/admin/webhooks'), {
         method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: _csrfHeaders(),
         body: JSON.stringify({
           url: newUrl.trim(),
           events: Array.from(newEvents),
@@ -111,7 +126,7 @@
     })) return;
     try {
       const r = await fetch(apiUrl(`/api/admin/webhooks/${w.id}`), {
-        method: 'DELETE', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        method: 'DELETE', credentials: 'include', headers: _csrfHeaders(),
       });
       if (!r.ok) {
         const data = await r.json().catch(() => ({}));
@@ -128,7 +143,7 @@
     try {
       const r = await fetch(apiUrl(`/api/admin/webhooks/${w.id}`), {
         method: 'PUT', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: _csrfHeaders(),
         body: JSON.stringify({ enabled: !w.enabled }),
       });
       const data = await r.json();
@@ -144,7 +159,7 @@
     testingId = w.id;
     try {
       const r = await fetch(apiUrl(`/api/admin/webhooks/${w.id}/test`), {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', credentials: 'include', headers: _csrfHeaders(),
       });
       const data = await r.json();
       if (!r.ok) { showError(data.error || $_('settings_webhooks.toast.test_failed')); return; }
