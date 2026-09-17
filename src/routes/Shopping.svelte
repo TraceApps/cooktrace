@@ -9,7 +9,7 @@
     shoppingGroupBy, shoppingCheckedBehavior,
   } from '../stores/settings.js';
   import { NtApi } from '../lib/api.js';
-  import { showError, showSuccess } from '../stores/toast.js';
+  import { showError, showSuccess, showUndo } from '../stores/toast.js';
   import { confirmDialog } from '../stores/confirmDialog.js';
   import UnitPicker from '../components/ui/UnitPicker.svelte';
   import Combobox from '../components/ui/Combobox.svelte';
@@ -86,11 +86,46 @@
   let pickerOnlyMissing = true;
   let pickerBusy = false;
 
-  $: checkedCount = items.filter(i => i.checked).length;
-  $: uncheckedCount = items.length - checkedCount;
+  // Same-item merge. The database keeps one row per recipe (so By Recipe
+  // view and "remove this recipe's items" stay exact), but in By Aisle
+  // and Flat views rows with the same name, unit and checked state show
+  // as one: quantities summed, recipe names collected. A merged row
+  // carries `members` (the real rows); every action fans out to them.
+  function _norm(s) { return String(s ?? '').trim().toLowerCase(); }
+  function _mergeKey(it, byAisle) {
+    const base = `${_norm(it.name)}|${_norm(it.unit)}|${it.checked ? 1 : 0}`;
+    return byAisle ? `${base}|${String(it.aisle || '').trim()}` : base;
+  }
+  function _hasQty(it) {
+    return it.quantity != null && it.quantity !== '' && Number.isFinite(Number(it.quantity));
+  }
+  function _mergeRows(rows, byAisle = false) {
+    const map = new Map();
+    for (const it of rows) {
+      const k = _mergeKey(it, byAisle);
+      if (map.has(k)) map.get(k).push(it);
+      else map.set(k, [it]);
+    }
+    return [...map.values()].map(members => {
+      if (members.length === 1) return members[0];
+      // Any member without a quantity makes the total unknown; showing
+      // no number beats showing a wrong one.
+      const quantity = members.every(_hasQty)
+        ? Math.round(members.reduce((s, m) => s + Number(m.quantity), 0) * 100) / 100
+        : null;
+      const recipe_names = [...new Set(members.map(m => m.recipe_name).filter(Boolean))];
+      return { ...members[0], quantity, recipe_names, members };
+    });
+  }
+  function _memberIds(it) { return (it.members || [it]).map(m => m.id); }
+
+  $: mergeOn = $shoppingGroupBy !== 'recipe';
+  $: displayRows = mergeOn ? _mergeRows(items, $shoppingGroupBy === 'aisle') : items;
+  $: checkedCount = displayRows.filter(i => i.checked).length;
+  $: uncheckedCount = displayRows.length - checkedCount;
   $: hideChecked = $shoppingCheckedBehavior === 'hide' && !showCheckedOverride;
 
-  // Visible items — filter out checked when hiding.
+  // Visible items: drop checked ones when hiding.
   $: visibleItems = hideChecked ? items.filter(i => !i.checked) : items;
 
   // Group builder — three modes, one shape. Each group carries { key,
@@ -101,7 +136,7 @@
   $: grouped = (() => {
     const mode = $shoppingGroupBy;
     if (mode === 'flat') {
-      const sorted = [...visibleItems].sort(_defaultCmp);
+      const sorted = _mergeRows([...visibleItems].sort(_defaultCmp));
       return [{ key: 'all', title: null, rows: sorted, sortable: true, aisle: null, recipeId: null }];
     }
     if (mode === 'recipe') {
@@ -138,7 +173,7 @@
       }
       map.get(key).rows.push(it);
     }
-    for (const g of map.values()) g.rows.sort(_defaultCmp);
+    for (const g of map.values()) g.rows = _mergeRows(g.rows.sort(_defaultCmp));
     return [...map.values()].sort((a, b) => {
       // Uncategorized last, everything else alpha.
       if (a.key === UNCATEGORIZED) return 1;
@@ -216,16 +251,17 @@
 
   async function toggleCheck(it) {
     const next = !it.checked;
-    items = items.map(i => i.id === it.id ? { ...i, checked: next } : i);
-    try { await NtApi.toggleShoppingChecked(it.id, next); }
+    const ids = new Set(_memberIds(it));
+    items = items.map(i => ids.has(i.id) ? { ...i, checked: next } : i);
+    try { await Promise.all([...ids].map(id => NtApi.toggleShoppingChecked(id, next))); }
     catch (e) {
-      items = items.map(i => i.id === it.id ? { ...i, checked: !next } : i);
       showError(e.message || 'Could not update');
+      await load();
     }
   }
 
   async function toggleGroupChecked(group, next) {
-    const targets = group.rows.filter(r => r.checked !== next);
+    const targets = group.rows.flatMap(r => r.members || [r]).filter(r => r.checked !== next);
     if (targets.length === 0) return;
     const ids = new Set(targets.map(r => r.id));
     items = items.map(i => ids.has(i.id) ? { ...i, checked: next } : i);
@@ -238,8 +274,9 @@
   }
 
   async function remove(it) {
-    items = items.filter(i => i.id !== it.id);
-    try { await NtApi.deleteShoppingItem(it.id); }
+    const ids = _memberIds(it);
+    items = items.filter(i => !ids.includes(i.id));
+    try { for (const id of ids) await NtApi.deleteShoppingItem(id); }
     catch (e) {
       await load();
       showError(e.message || 'Delete failed');
@@ -256,13 +293,13 @@
       dangerous: true,
     });
     if (!ok) return;
-    const removedIds = new Set(g.rows.map(r => r.id));
+    const removedIds = new Set(g.rows.flatMap(_memberIds));
     items = items.filter(i => !removedIds.has(i.id));
     try {
       if (g.recipeId != null) {
         await NtApi.clearShoppingByRecipe(g.recipeId);
       } else {
-        for (const r of g.rows) await NtApi.deleteShoppingItem(r.id);
+        for (const id of removedIds) await NtApi.deleteShoppingItem(id);
       }
       showSuccess(`Removed ${n} ${n === 1 ? 'item' : 'items'}`);
     } catch (e) {
@@ -271,22 +308,140 @@
     }
   }
 
+  // ── Clear checked + restock pantry ─────────────────────────────
+  // Clearing what you bought offers to mark the matching pantry items
+  // back in stock. Matching is deliberately strict: the row's pantry
+  // link, else an exact (case-insensitive) name that fits exactly one
+  // pantry item. No match or an ambiguous one means the item is simply
+  // not offered, so nothing in the pantry changes by guesswork.
+  let clearOpen = false;
+  let clearBusy = false;
+  let clearCount = 0;
+  let restockRows = [];          // { key, label, options|null, selectedId, enabled }
+  let restockPantry = new Map(); // id -> pantry row snapshot, for patch + undo
+
+  async function _buildRestockRows() {
+    let pantry = [];
+    try { pantry = (await NtApi.getPantry()) || []; } catch { return []; }
+    const byId = new Map(pantry.map(p => [p.id, p]));
+    const byName = new Map();
+    const childrenOf = new Map();
+    for (const p of pantry) {
+      const k = _norm(p.name);
+      byName.set(k, [...(byName.get(k) || []), p]);
+      if (p.generic_parent_id != null) {
+        childrenOf.set(p.generic_parent_id, [...(childrenOf.get(p.generic_parent_id) || []), p]);
+      }
+    }
+    restockPantry = byId;
+
+    const rows = [];
+    const seen = new Set();
+    for (const it of items.filter(i => i.checked)) {
+      let p = it.pantry_id != null ? byId.get(it.pantry_id) : null;
+      if (!p) {
+        const matches = byName.get(_norm(it.name)) || [];
+        if (matches.length === 1) p = matches[0];
+      }
+      if (!p) continue;
+      const kids = (childrenOf.get(p.id) || [])
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+      if (kids.length > 0) {
+        // A generic reads as in stock when any variant is, so restocking
+        // means picking a variant: its designated one, else the first.
+        if (kids.some(k => k.in_stock)) continue;
+        const key = `g${p.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const designated = kids.find(k => k.id === p.nutrition_source_variant_id);
+        rows.push({
+          key, label: p.name,
+          options: kids.map(k => ({ id: k.id, name: k.name })),
+          selectedId: (designated || kids[0]).id,
+          enabled: true,
+        });
+      } else {
+        if (p.in_stock) continue;
+        const key = `p${p.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const parent = p.generic_parent_id != null ? byId.get(p.generic_parent_id) : null;
+        rows.push({
+          key, label: parent ? `${parent.name}, ${p.name}` : p.name,
+          options: null, selectedId: p.id, enabled: true,
+        });
+      }
+    }
+    return rows;
+  }
+
   async function clearChecked() {
     if (checkedCount === 0) return;
-    const ok = await confirmDialog({
-      title: `Clear ${checkedCount} checked ${checkedCount === 1 ? 'item' : 'items'}?`,
-      message: 'They\'ll be removed from the list.',
-      confirmText: 'Clear',
-      dangerous: true,
-    });
-    if (!ok) return;
+    clearCount = checkedCount;
+    restockRows = await _buildRestockRows();
+    clearOpen = true;
+  }
+
+  function closeClear() {
+    if (clearBusy) return;
+    clearOpen = false;
+    restockRows = [];
+  }
+
+  async function confirmClear() {
+    clearBusy = true;
     try {
       await NtApi.clearCheckedShopping();
       items = items.filter(i => !i.checked);
-      showSuccess($_('shopping_page.toast.cleared'));
     } catch (e) {
+      clearBusy = false;
       showError(e.message || 'Clear failed');
+      return;
     }
+    const picks = restockRows.filter(r => r.enabled);
+    clearBusy = false;
+    clearOpen = false;
+    restockRows = [];
+    if (picks.length === 0) {
+      showSuccess($_('shopping_page.toast.cleared'));
+      return;
+    }
+
+    const done = [];
+    for (const r of picks) {
+      const p = restockPantry.get(Number(r.selectedId));
+      if (!p) continue;
+      const patch = { in_stock: 1 };
+      const prev = { in_stock: p.in_stock ? 1 : 0 };
+      // Pantry treats quantity 0 as out of stock, so clear it too.
+      if (p.quantity != null && Number(p.quantity) === 0) {
+        patch.quantity = null;
+        prev.quantity = p.quantity;
+      }
+      try {
+        await NtApi.updatePantryItem(p.id, patch);
+        done.push({ id: p.id, prev });
+      } catch { /* reported below */ }
+    }
+    loadPantry();
+    if (done.length < picks.length) {
+      showError($_('shopping_page.toast.restock_failed', { values: { n: picks.length - done.length } }));
+    }
+    if (done.length === 0) return;
+    showUndo(
+      $_('shopping_page.toast.cleared_restocked', { values: { n: done.length } }),
+      async () => {
+        try {
+          for (const d of done) await NtApi.updatePantryItem(d.id, d.prev);
+          showSuccess($_('shopping_page.toast.restock_undone'));
+        } catch (e) {
+          showError(e.message || 'Could not undo');
+        }
+        loadPantry();
+      },
+      $_('shopping_page.undo'),
+    );
   }
 
   // ── Long-press action sheet on a row ───────────────────────────
@@ -341,11 +496,32 @@
     };
     editSheetOpen = false;
     editTarget = null;
-    // Optimistic — mirror update into `items` so the row reflects the
-    // change before the network round-trip lands.
-    items = items.map(i => i.id === it.id ? { ...i, ...payload } : i);
-    try { await NtApi.updateShoppingItem(it.id, payload); }
-    catch (e) {
+    const members = it.members || [it];
+    const shownQty = it.quantity != null && it.quantity !== '' ? Number(it.quantity) : null;
+    const enteredQty = editQty === '' || editQty == null ? null : Number(editQty);
+    // A merged row's quantity is a total across rows. Changing it folds
+    // them into the first row with the new amount; leaving it alone just
+    // renames / re-units every row and keeps each recipe's own amount.
+    const fold = members.length > 1 && shownQty !== enteredQty;
+    try {
+      if (members.length === 1) {
+        items = items.map(i => i.id === it.id ? { ...i, ...payload } : i);
+        await NtApi.updateShoppingItem(it.id, payload);
+      } else if (fold) {
+        const [keep, ...rest] = members;
+        const restIds = new Set(rest.map(m => m.id));
+        items = items
+          .filter(i => !restIds.has(i.id))
+          .map(i => i.id === keep.id ? { ...i, ...payload } : i);
+        await NtApi.updateShoppingItem(keep.id, payload);
+        for (const id of restIds) await NtApi.deleteShoppingItem(id);
+      } else {
+        const nameUnit = { name: payload.name, unit: payload.unit };
+        const ids = new Set(members.map(m => m.id));
+        items = items.map(i => ids.has(i.id) ? { ...i, ...nameUnit } : i);
+        for (const id of ids) await NtApi.updateShoppingItem(id, nameUnit);
+      }
+    } catch (e) {
       showError(e.message || 'Could not save');
       await load();
     }
@@ -360,8 +536,9 @@
   }
   async function setAisleFor(it, next) {
     const nextTrim = (next || '').trim() || null;
-    items = items.map(i => i.id === it.id ? { ...i, aisle: nextTrim } : i);
-    try { await NtApi.updateShoppingItem(it.id, { aisle: nextTrim }); }
+    const ids = new Set(_memberIds(it));
+    items = items.map(i => ids.has(i.id) ? { ...i, aisle: nextTrim } : i);
+    try { for (const id of ids) await NtApi.updateShoppingItem(id, { aisle: nextTrim }); }
     catch (e) {
       showError(e.message || 'Could not update');
       await load();
@@ -415,11 +592,11 @@
     // guard anyway in case a future version changes that.
     const finalRows = e.detail.items.filter(r => !r?.isDndShadowItem);
     const targetAisle = $shoppingGroupBy === 'aisle' ? g.aisle : null;
-    const patched = finalRows.map((r, idx) => ({
-      id: r.id,
+    const patched = finalRows.flatMap((r, idx) => (r.members || [r]).map(m => ({
+      id: m.id,
       sort_order: idx,
-      aisle: $shoppingGroupBy === 'aisle' ? targetAisle : (r.aisle ?? null),
-    }));
+      aisle: $shoppingGroupBy === 'aisle' ? targetAisle : (m.aisle ?? null),
+    })));
     const patchMap = new Map(patched.map(p => [p.id, p]));
     items = items.map(i => {
       const p = patchMap.get(i.id);
@@ -474,7 +651,7 @@
   async function shareAsImage() {
     showSuccess($_('shopping_page.toast.preparing_share'));
     try {
-      const { svg, width, height } = buildShoppingCardSvg(items);
+      const { svg, width, height } = buildShoppingCardSvg(_mergeRows(items, true));
       const blob = await svgToPngBlob(svg, width, height);
       const fname = `shopping-list-${new Date().toISOString().slice(0,10)}.png`;
       const res = await shareBlob(blob, fname, 'Shopping List');
@@ -486,7 +663,7 @@
   }
   async function shareAsText() {
     try {
-      const text = buildShoppingText(items);
+      const text = buildShoppingText(_mergeRows(items, true));
       const res = await shareText(text, 'Shopping List');
       if (res.copied) showSuccess($_('shopping_page.toast.copied'));
     } catch (e) {
@@ -654,7 +831,7 @@
           {#if checkedCount > 0}
             <button class="btn btn-secondary tiny" on:click={clearChecked}>
               <span class="material-symbols-rounded">delete_sweep</span>
-              Clear checked
+              Clear Checked
             </button>
           {/if}
         </div>
@@ -663,10 +840,10 @@
            toolbar. Grows as items get checked, visible on every
            viewport, satisfying and always in view. -->
       <div class="shopping-progress" role="progressbar"
-        aria-valuemin="0" aria-valuemax={items.length} aria-valuenow={checkedCount}
+        aria-valuemin="0" aria-valuemax={displayRows.length} aria-valuenow={checkedCount}
         aria-label="Shopping progress">
         <div class="shopping-progress-fill"
-          style="width: {items.length > 0 ? (checkedCount / items.length) * 100 : 0}%"></div>
+          style="width: {displayRows.length > 0 ? (checkedCount / displayRows.length) * 100 : 0}%"></div>
       </div>
     {/if}
     </div>
@@ -775,10 +952,12 @@
                     {#if $shoppingGroupBy !== 'aisle' && it.aisle}
                       <span class="row-aisle-pill" title="Aisle">{it.aisle}</span>
                     {/if}
-                    {#if $shoppingGroupBy === 'aisle' && it.recipe_name}
-                      <span class="row-recipe-pill" title="Recipe">
-                        <span class="material-symbols-rounded">menu_book</span>{it.recipe_name}
-                      </span>
+                    {#if $shoppingGroupBy === 'aisle'}
+                      {#each (it.recipe_names || (it.recipe_name ? [it.recipe_name] : [])) as rn}
+                        <span class="row-recipe-pill" title="Recipe">
+                          <span class="material-symbols-rounded">menu_book</span>{rn}
+                        </span>
+                      {/each}
                     {/if}
                   </div>
                   <button class="btn-icon small" on:click={() => openAislePicker(it)}
@@ -806,6 +985,57 @@
   actions={SHARE_ACTIONS}
   on:select={onShareSelect}
 />
+
+<!-- Clear Checked, with the option to restock matching pantry items. -->
+{#if clearOpen}
+  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+  <div class="modal-backdrop" on:click|self={closeClear} transition:fade={{ duration: 160 }}>
+    <div class="modal modal-clear" role="dialog" aria-modal="true" aria-labelledby="clear-title">
+      <header class="modal-header">
+        <h2 id="clear-title">{$_('shopping_page.clear_title', { values: { n: clearCount } })}</h2>
+        <button class="btn-icon" on:click={closeClear} aria-label={$_('shopping_page.cancel')}>
+          <span class="material-symbols-rounded">close</span>
+        </button>
+      </header>
+      <div class="modal-body">
+        <p class="plan-help">{$_('shopping_page.clear_desc')}</p>
+        {#if restockRows.length > 0}
+          <div class="restock">
+            <div class="restock-head">
+              <span class="field-label">{$_('shopping_page.restock_label')}</span>
+              <span class="restock-hint">{$_('shopping_page.restock_hint')}</span>
+            </div>
+            <ul class="restock-list">
+              {#each restockRows as r (r.key)}
+                <li class="restock-row" class:off={!r.enabled}>
+                  <label class="restock-check">
+                    <input type="checkbox" bind:checked={r.enabled} />
+                    <span class="restock-name">{r.label}</span>
+                  </label>
+                  {#if r.options}
+                    <select class="input restock-select" bind:value={r.selectedId}
+                      disabled={!r.enabled}
+                      aria-label={$_('shopping_page.restock_variant', { values: { name: r.label } })}>
+                      {#each r.options as o (o.id)}
+                        <option value={o.id}>{o.name}</option>
+                      {/each}
+                    </select>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+      </div>
+      <footer class="modal-footer">
+        <button class="btn btn-secondary" on:click={closeClear} disabled={clearBusy}>{$_('shopping_page.cancel')}</button>
+        <button class="btn btn-danger" on:click={confirmClear} disabled={clearBusy}>
+          {clearBusy ? $_('shopping_page.clearing') : $_('shopping_page.clear')}
+        </button>
+      </footer>
+    </div>
+  </div>
+{/if}
 
 <!-- Long-press row action sheet — Edit / Change Aisle / Delete. -->
 <ActionSheet
@@ -1379,6 +1609,31 @@
   }
 
   /* Aisle picker */
+  .modal-footer { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--border); }
+
+  /* Clear Checked + restock */
+  .modal-clear { max-width: 440px; }
+  .restock { display: flex; flex-direction: column; gap: 8px; }
+  .restock-head { display: flex; flex-direction: column; gap: 2px; }
+  .restock-hint { font-size: 12px; color: var(--text-3); line-height: 1.4; }
+  .restock-list {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column;
+    border: 1px solid var(--border); border-radius: var(--radius-md, 10px);
+    overflow: hidden;
+  }
+  .restock-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+  }
+  .restock-row:first-child { border-top: none; }
+  .restock-row.off .restock-name { color: var(--text-3); }
+  .restock-check { display: flex; align-items: center; gap: 10px; flex: 1 1 160px; min-width: 0; cursor: pointer; }
+  .restock-check input { width: 18px; height: 18px; accent-color: var(--accent); flex-shrink: 0; }
+  .restock-name { font-size: 14px; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .restock-select { flex: 1 1 140px; min-width: 0; padding: 6px 8px; font-size: 13px; }
+
   .modal-aisle { max-width: 480px; }
   .aisle-help { margin: 0; color: var(--text-3); font-size: 13px; line-height: 1.45; }
   .aisle-input-row { display: flex; gap: 8px; }
