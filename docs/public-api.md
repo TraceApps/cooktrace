@@ -37,6 +37,21 @@ routes the same way: a token with `mcp:read` can read via either
 interface, `mcp:write` unlocks the write routes on either interface
 too. There is no separate REST-only scope to create.
 
+## Sister apps: the `shopping` scope
+
+A token with the `shopping` scope gets its own version of
+`/api/v1/shopping`, always on, with no `PUBLIC_API_*` or MCP switch. It is
+what NoteTrace uses to send items and show the list. It reaches nothing
+but the token owner's shopping list. A token without `shopping` sees the
+public routes on this page exactly as before.
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| GET | `/api/v1/shopping?include_checked=true` | | `{count, items}` sorted like the Shopping page: unchecked first, by aisle, then your order. Each item has `id, name, quantity, unit, aisle, checked, pantry_id, recipe_id, recipe_name, sort_order, updated_at`. Checked items are included unless `include_checked=false`. |
+| POST | `/api/v1/shopping` | `{items: [{name, quantity?, unit?, aisle?}]}` or one item | `201 {added, skipped}`. Names are title-cased like the app. A name matching a pantry item links it and takes its aisle. An item already on the list unchecked is skipped, not added twice. Up to 200 at a time. |
+| PATCH | `/api/v1/shopping/:id/check` | `{checked}` | `{ok, item_id, name, checked}`. Checking off the last item fires the `shopping_list.completed` webhook, as in the app. |
+| DELETE | `/api/v1/shopping/checked` | | `{removed}`: clears checked items. |
+
 ## Rate limiting
 
 Each token is limited to 60 requests per minute by default

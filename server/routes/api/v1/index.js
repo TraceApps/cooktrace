@@ -13,6 +13,7 @@ import pantryRouter from './pantry.js';
 import pantryWriteRouter from './pantry-write.js';
 import cookDiaryRouter from './cook-diary.js';
 import shoppingRouter from './shopping.js';
+import shoppingFedRouter from './shopping-fed.js';
 
 const router = Router();
 
@@ -31,6 +32,10 @@ router.use('/pantry', pantryRouter);
 // through to pantry-write.js.
 router.use('/pantry', pantryWriteRouter);
 router.use('/cook-diary', cookDiaryRouter);
+// A token with the `shopping` scope (a sister app such as NoteTrace) is served by
+// shopping-fed.js with no server switch; any other token falls through to the
+// general public API router below, unchanged.
+router.use('/shopping', shoppingFedRouter);
 router.use('/shopping', shoppingRouter);
 
 export default router;
