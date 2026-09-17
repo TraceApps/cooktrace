@@ -468,7 +468,11 @@ router.put('/:id', wrap((req, res) => {
     body.brand !== undefined ? (body.brand?.toString().trim() || null) : existing.brand,
     body.barcode !== undefined ? (body.barcode?.toString().trim() || null) : existing.barcode,
     nextInStock,
-    body.quantity != null ? (body.quantity === '' ? null : Number(body.quantity)) : existing.quantity,
+    // An explicit null or '' clears the quantity; only an absent key keeps
+    // the stored one. Sending null used to fall through to "keep", so
+    // marking an item back in stock left quantity 0, which still reads as
+    // out of stock everywhere quantity is the source of truth.
+    body.quantity !== undefined ? (body.quantity === '' || body.quantity === null ? null : Number(body.quantity)) : existing.quantity,
     body.unit !== undefined ? (body.unit || null) : existing.unit,
     body.expires_on !== undefined ? (body.expires_on || null) : existing.expires_on,
     body.nt_food_id !== undefined ? (body.nt_food_id || null) : existing.nt_food_id,
