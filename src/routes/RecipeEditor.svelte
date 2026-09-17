@@ -1567,11 +1567,11 @@
   }
   .btn-icon:hover { background: var(--surface-2); }
   .btn-icon.close-btn:hover {
-    background: color-mix(in srgb, var(--error, #ef4444) 18%, transparent);
-    color: var(--error, #ef4444);
+    background: color-mix(in srgb, var(--danger) 18%, transparent);
+    color: var(--danger);
   }
   .btn-icon.small { width: 34px; height: 34px; }
-  .btn-icon.small:hover { color: var(--error, #f87171); }
+  .btn-icon.small:hover { color: var(--danger); }
   /* Pantry-swap button: muted by default, accent-tinted when the row
      is already linked to a Pantry item so users can see at a glance
      which ingredients carry their stocked-brand metadata. */
@@ -1951,8 +1951,8 @@
   .pp-name  { flex: 1; color: var(--text-1); font-weight: 600; font-size: 14px; }
   .pp-brand { color: var(--text-3); font-size: 11px; }
   .pp-out   {
-    background: color-mix(in srgb, var(--error, #f87171) 18%, transparent);
-    color: var(--error, #f87171);
+    background: color-mix(in srgb, var(--danger) 18%, transparent);
+    color: var(--danger);
     padding: 1px 8px;
     border-radius: 999px;
     font-size: 10px;

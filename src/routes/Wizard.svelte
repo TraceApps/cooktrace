@@ -499,16 +499,16 @@
     border-radius: var(--radius-full, 99px);
     transition: width var(--dur-base), background var(--dur-fast);
   }
-  .pw-strength.s-0 .pw-fill, .pw-strength.s-1 .pw-fill { background: var(--error, #ef4444); }
+  .pw-strength.s-0 .pw-fill, .pw-strength.s-1 .pw-fill { background: var(--danger); }
   .pw-strength.s-2 .pw-fill { background: #f59e0b; }
   .pw-strength.s-3 .pw-fill { background: var(--accent); }
   .pw-strength.s-4 .pw-fill { background: var(--success, #22c55e); }
   .pw-label { font-size: 12px; color: var(--text-3); font-weight: 600; min-width: 80px; text-align: right; }
-  .pw-strength.s-0 .pw-label, .pw-strength.s-1 .pw-label { color: var(--error, #ef4444); }
+  .pw-strength.s-0 .pw-label, .pw-strength.s-1 .pw-label { color: var(--danger); }
   .pw-strength.s-2 .pw-label { color: #f59e0b; }
   .pw-strength.s-3 .pw-label { color: var(--accent); }
   .pw-strength.s-4 .pw-label { color: var(--success, #22c55e); }
-  .pw-mismatch { font-size: 12px; color: var(--error, #ef4444); margin-top: 4px; }
+  .pw-mismatch { font-size: 12px; color: var(--danger); margin-top: 4px; }
 
   .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
   .field > span { font-size: 13px; color: var(--text-2); font-weight: 500; }
@@ -573,10 +573,10 @@
   .check input { width: 18px; height: 18px; accent-color: var(--accent); }
 
   .error {
-    color: var(--error, #f87171);
+    color: var(--danger);
     font-size: 13px;
-    background: color-mix(in srgb, var(--error, #f87171) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--error, #f87171) 25%, transparent);
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent);
     padding: 8px 12px;
     border-radius: var(--radius-sm);
   }

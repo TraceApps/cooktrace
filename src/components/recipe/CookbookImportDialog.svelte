@@ -478,8 +478,8 @@ Rules:
   }
   .state .material-symbols-rounded { font-size: 36px; color: var(--accent); }
   .state.busy .spin { font-size: 32px; animation: spin 1.2s linear infinite; }
-  .state.error .material-symbols-rounded { color: var(--error, #f87171); }
-  .state.error p { color: var(--error, #f87171); }
+  .state.error .material-symbols-rounded { color: var(--danger); }
+  .state.error p { color: var(--danger); }
   .state.done h4 { margin: 4px 0 0; color: var(--text-1); font-size: 16px; }
   .state.done p  { margin: 0; }
   .state.done .done-icon { color: var(--success, #4ade80); }

@@ -1620,9 +1620,9 @@ When you write to the user's data, summarise what you did briefly and concretely
   .attach-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .attach-btn .material-symbols-rounded { font-size: 20px; }
   .mic-btn.recording {
-    background: color-mix(in srgb, var(--error, #ef4444) 18%, transparent);
-    border-color: var(--error, #ef4444);
-    color: var(--error, #ef4444);
+    background: color-mix(in srgb, var(--danger) 18%, transparent);
+    border-color: var(--danger);
+    color: var(--danger);
     animation: micPulse 1.2s ease-in-out infinite;
   }
   /* Smart Log session — same red ring but accented so it's distinct
@@ -1634,8 +1634,8 @@ When you write to the user's data, summarise what you did briefly and concretely
     animation: smartLogPulse 1.2s ease-in-out infinite;
   }
   @keyframes micPulse {
-    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--error, #ef4444) 50%, transparent); }
-    50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--error, #ef4444) 0%, transparent); }
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 50%, transparent); }
+    50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--danger) 0%, transparent); }
   }
   @keyframes smartLogPulse {
     0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); }

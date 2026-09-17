@@ -1985,11 +1985,11 @@
   }
   .expires-row.warn .material-symbols-rounded { color: var(--warning, #f59e0b); }
   .expires-row.past {
-    background: color-mix(in srgb, var(--error, #f87171) 12%, var(--surface-1));
-    border-color: color-mix(in srgb, var(--error, #f87171) 35%, var(--border));
-    color: var(--error, #f87171);
+    background: color-mix(in srgb, var(--danger) 12%, var(--surface-1));
+    border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+    color: var(--danger);
   }
-  .expires-row.past .material-symbols-rounded { color: var(--error, #f87171); }
+  .expires-row.past .material-symbols-rounded { color: var(--danger); }
   .field-hint-inline { color: var(--text-3); font-weight: 400; font-size: 11px; margin-left: 6px; }
 
   .expires-hint-row {

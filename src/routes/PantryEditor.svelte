@@ -740,9 +740,9 @@
     color: var(--text-3);
     margin-bottom: 4px;
   }
-  .editor-card-title.danger { color: var(--error, #f87171); }
-  .danger-card { border-color: color-mix(in srgb, var(--error, #ef4444) 30%, transparent); }
-  .danger-btn { color: var(--error, #f87171); justify-content: center; }
+  .editor-card-title.danger { color: var(--danger); }
+  .danger-card { border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+  .danger-btn { color: var(--danger); justify-content: center; }
   .danger-btn .material-symbols-rounded { margin-right: 6px; }
 
   .card-hint { font-size: 12px; color: var(--text-3); margin: 0; line-height: 1.5; }

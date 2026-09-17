@@ -408,7 +408,7 @@
     border-radius: var(--radius-sm);
     transition: color var(--dur-fast), background var(--dur-fast);
   }
-  .icon-btn:hover { color: var(--error, #f87171); background: color-mix(in srgb, var(--error, #ef4444) 12%, transparent); }
+  .icon-btn:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
   .icon-btn .material-symbols-rounded { font-size: 22px; }
 
   .cl-body {
@@ -572,7 +572,7 @@
     display: flex; align-items: center; justify-content: center;
     z-index: 2;
   }
-  .photo-remove:hover { background: var(--error, #ef4444); }
+  .photo-remove:hover { background: var(--danger); }
   .photo-remove .material-symbols-rounded { font-size: 14px; }
 
   /* ── Lightbox ─────────────────────────────────────────────────────── */
