@@ -22,8 +22,14 @@
   import {
     aiEnabled, aiEffectivelyEnabled, envLocks, aiAssistantName, aiProvider, aiApiKey, aiModel, aiBaseUrl,
     aiKeyVerified, energyUnit, measurementSystem, dateFormat, smartLogEnabled,
-    traceChefHat,
+    traceChefHat, smartLogVoiceLang,
   } from '../../stores/settings.js';
+  // Voice input language from Settings; 'auto' means the device locale.
+  function _resolveVoiceLang() {
+    const v = smartLogVoiceLang.get();
+    if (v && v !== 'auto') return v;
+    return navigator.language || 'en-US';
+  }
   // Pick the right mascot variant based on the per-user toggle. Reactive
   // so flipping it in Settings updates every avatar immediately.
   $: Mascot = $traceChefHat ? TraceFaceChef : TraceFace;
@@ -843,7 +849,7 @@ When you write to the user's data, summarise what you did briefly and concretely
       const rec = new SR();
       rec.continuous = false;
       rec.interimResults = true;   // live update while speaking for snappy feedback
-      rec.lang = navigator.language || 'en-US';
+      rec.lang = _resolveVoiceLang();
       rec.onresult = (e) => {
         let text = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
