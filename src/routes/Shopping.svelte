@@ -388,6 +388,22 @@
   const FLIP_MS = 180;
   let dndOverride = new Map();
 
+  // svelte-dnd-action moves its shadow placeholder's id from a fixed
+  // sentinel to the real dragged item's id a frame after drag-start
+  // (so lookups by id resolve). If a fast pointer move fires another
+  // consider before that mutation and our resulting re-render have
+  // settled, the array we're handed can briefly hold both the shadow
+  // and the real row under the same id, and Svelte's keyed #each
+  // throws on the repeat instead of just rendering one. Collapsing to
+  // one entry per id right before render (keeping the latest data,
+  // original position) sidesteps the race without fighting the
+  // library's internal timing.
+  function _dedupeRows(rows) {
+    const map = new Map();
+    for (const r of rows) map.set(r.id, r);
+    return [...map.values()];
+  }
+
   function handleDndConsider(g, e) {
     const next = new Map(dndOverride);
     next.set(g.key, e.detail.items);
@@ -680,7 +696,7 @@
            sections. Each group becomes a self-contained card. -->
       <div class="groups-grid" class:flat-mode={$shoppingGroupBy === 'flat'}>
       {#each grouped as g (g.key)}
-        {@const rows = dndOverride.get(g.key) ?? g.rows}
+        {@const rows = _dedupeRows(dndOverride.get(g.key) ?? g.rows)}
         {@const realRows = rows.filter(r => !r?.isDndShadowItem)}
         {@const allChecked = realRows.length > 0 && realRows.every(r => r.checked)}
         {@const checkedCt = realRows.filter(r => r.checked).length}
