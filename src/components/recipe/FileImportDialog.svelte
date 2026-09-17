@@ -682,8 +682,8 @@ ${parseResult.text}
     color: var(--warning, #f59e0b);
   }
   .confidence-pill.low {
-    background: color-mix(in srgb, var(--error, #f87171) 14%, transparent);
-    color: var(--error, #f87171);
+    background: color-mix(in srgb, var(--danger) 14%, transparent);
+    color: var(--danger);
   }
   .pages-meta { color: var(--text-3); font-size: 12px; }
   .parsed-title {
@@ -710,8 +710,8 @@ ${parseResult.text}
     border-radius: var(--radius-md);
   }
   .state.busy .spin { font-size: 32px; animation: spin 1.2s linear infinite; }
-  .state.error .material-symbols-rounded { color: var(--error, #f87171); }
-  .state.error p { color: var(--error, #f87171); }
+  .state.error .material-symbols-rounded { color: var(--danger); }
+  .state.error p { color: var(--danger); }
   .state.done h4 { margin: 4px 0 0; color: var(--text-1); font-size: 16px; }
   .state.done p  { margin: 0; }
   .state.done .done-icon { color: var(--success, #4ade80); }

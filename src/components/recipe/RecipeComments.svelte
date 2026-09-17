@@ -498,8 +498,8 @@
   }
   .btn-icon:hover { background: var(--surface-2); color: var(--text-1); }
   .btn-icon.danger:hover {
-    background: color-mix(in srgb, var(--error, #ef4444) 18%, transparent);
-    color: var(--error, #ef4444);
+    background: color-mix(in srgb, var(--danger) 18%, transparent);
+    color: var(--danger);
   }
   .btn-icon .material-symbols-rounded { font-size: 16px; }
 

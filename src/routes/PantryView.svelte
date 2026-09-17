@@ -303,7 +303,7 @@
     border-radius: var(--radius-sm);
   }
   .btn-icon:hover { background: var(--surface-2); color: var(--text-1); }
-  .btn-icon.danger:hover { color: var(--error, #f87171); }
+  .btn-icon.danger:hover { color: var(--danger); }
   .btn-icon .material-symbols-rounded { font-size: 22px; }
 
   .view-content {
@@ -459,7 +459,7 @@
     padding: 80px 16px;
     color: var(--text-3);
   }
-  .state.error { color: var(--error, #f87171); }
+  .state.error { color: var(--danger); }
   .state .spin { font-size: 32px; color: var(--accent); animation: spin 1.2s linear infinite; }
   .spin.tiny { font-size: 13px; animation: spin 1.2s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }

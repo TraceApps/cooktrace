@@ -275,7 +275,7 @@
     display: flex; align-items: center; justify-content: center;
     backdrop-filter: blur(4px);
   }
-  .preview-clear:hover { background: var(--error, #ef4444); }
+  .preview-clear:hover { background: var(--danger); }
   .preview-clear .material-symbols-rounded { font-size: 18px; }
 
   /* Button row mirrors NT's photo-btn-row: 3 equal-width ghost buttons,
@@ -360,7 +360,7 @@
     padding: 4px;
     border-radius: var(--radius-sm);
   }
-  .btn-icon:hover { color: var(--error, #f87171); background: color-mix(in srgb, var(--error, #ef4444) 12%, transparent); }
+  .btn-icon:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
   .btn-icon .material-symbols-rounded { font-size: 22px; }
 
   .cam-video {

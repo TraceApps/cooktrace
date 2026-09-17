@@ -445,7 +445,7 @@
   .state-body { flex: 1; min-width: 0; }
   .state-title { font-weight: 700; font-size: 15px; color: var(--text-1); }
   .state-sub { font-size: 12px; color: var(--text-3); margin-top: 2px; word-break: break-all; }
-  .state-error { font-size: 12px; color: var(--error, #ef4444); margin-top: 4px; }
+  .state-error { font-size: 12px; color: var(--danger); margin-top: 4px; }
   .sync-row { justify-content: space-between; gap: 12px; }
   .sync-row .row-label { font-size: 13px; font-weight: 600; color: var(--text-1); }
   .sync-row .row-value { font-size: 12px; color: var(--text-3); margin-top: 2px; }
@@ -458,11 +458,11 @@
   .actions .btn { display: inline-flex; align-items: center; gap: 6px; }
   .actions .btn .material-symbols-rounded { font-size: 16px; }
   .btn.danger {
-    color: var(--error, #ef4444);
-    border-color: color-mix(in srgb, var(--error, #ef4444) 30%, var(--border));
+    color: var(--danger);
+    border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
   }
   .btn.danger:hover {
-    background: color-mix(in srgb, var(--error, #ef4444) 14%, transparent);
+    background: color-mix(in srgb, var(--danger) 14%, transparent);
   }
 
   .form { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
@@ -510,7 +510,7 @@
     margin: 0 0 14px;
   }
   .merge-counts-title { font-size: 12px; font-weight: 700; color: var(--text-2); margin-bottom: 6px; }
-  .merge-counts-title.err { color: var(--error, #ef4444); }
+  .merge-counts-title.err { color: var(--danger); }
   .merge-counts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 13px; color: var(--text-2); }
   .merge-counts-grid strong { color: var(--accent); }
   .merge-options { display: flex; flex-direction: column; gap: 8px; }

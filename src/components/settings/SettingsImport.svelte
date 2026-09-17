@@ -634,15 +634,15 @@
     color: var(--text-3);
     margin-top: 2px;
   }
-  .summary-sub.error { color: var(--error, #f87171); }
+  .summary-sub.error { color: var(--danger); }
 
   .failed {
     list-style: none;
     margin: 0 0 16px;
     padding: 8px 12px;
-    border: 1px solid var(--error, #f87171);
+    border: 1px solid var(--danger);
     border-radius: var(--radius-md);
-    background: color-mix(in srgb, var(--error, #f87171) 6%, transparent);
+    background: color-mix(in srgb, var(--danger) 6%, transparent);
     font-size: 12px;
     max-height: 180px;
     overflow-y: auto;

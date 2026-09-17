@@ -74,8 +74,8 @@
    goes green. Idle state is the neutral .btn-icon background. */
 .btn-icon.danger:hover,
 .btn-icon.close-btn:hover {
-  background: color-mix(in srgb, var(--error, #ef4444) 18%, transparent);
-  color: var(--error, #ef4444);
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
 }
 .btn-icon.success:hover {
   background: color-mix(in srgb, var(--success, #4caf50) 22%, transparent);

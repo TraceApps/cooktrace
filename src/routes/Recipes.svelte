@@ -1864,7 +1864,7 @@
   }
   .state h2 { color: var(--text-1); margin: 12px 0 0; font-size: 20px; }
   .state p { margin: 4px 0 8px; }
-  .state.error { color: var(--error, #f87171); }
+  .state.error { color: var(--danger); }
   .spin {
     font-size: 32px;
     animation: spin 1.2s linear infinite;
@@ -2004,7 +2004,7 @@
     top: 8px;
     right: 8px;
     font-size: 22px;
-    color: var(--error, #f87171);
+    color: var(--danger);
     font-variation-settings: 'FILL' 1;
     text-shadow: 0 2px 6px rgba(0,0,0,0.45);
   }
@@ -2151,7 +2151,7 @@
     background: transparent; border: none; cursor: pointer;
     color: var(--text-3); padding: 4px; border-radius: var(--radius-sm);
   }
-  .btn-icon:hover { color: var(--error, #f87171); background: color-mix(in srgb, var(--error, #ef4444) 12%, transparent); }
+  .btn-icon:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
   .btn-icon .material-symbols-rounded { font-size: 22px; }
 
   /* Add-to-Cookbook dialog */
@@ -2257,7 +2257,7 @@
     font-size: 12px;
   }
   .link-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  .btn.danger-text { color: var(--error, #f87171); }
+  .btn.danger-text { color: var(--danger); }
 
   /* Shared-with-me badge on recipe cards */
   .shared-badge {

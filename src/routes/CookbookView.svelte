@@ -650,7 +650,7 @@
     border-radius: var(--radius-sm);
   }
   .btn-icon:hover { background: var(--surface-2); color: var(--text-1); }
-  .btn-icon.danger:hover { color: var(--error, #f87171); }
+  .btn-icon.danger:hover { color: var(--danger); }
   .btn-icon .material-symbols-rounded { font-size: 22px; }
 
   .editor-content {

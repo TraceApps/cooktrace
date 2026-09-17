@@ -1894,7 +1894,7 @@
   .state { text-align: center; padding: 60px 16px; color: var(--text-3); display: flex; flex-direction: column; align-items: center; gap: 10px; }
   .state.empty .empty-icon { font-size: 64px; color: var(--accent); opacity: 0.6; }
   .state h2 { color: var(--text-1); margin: 12px 0 0; font-size: 20px; }
-  .state.error { color: var(--error, #f87171); }
+  .state.error { color: var(--danger); }
   .spin { font-size: 32px; animation: spin 1.2s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -2346,10 +2346,10 @@
   }
   .pcard-pill.expiry-pill .material-symbols-rounded { color: var(--warning, #f59e0b); }
   .pcard-pill.expiry-pill.past {
-    background: color-mix(in srgb, var(--error, #f87171) 14%, transparent);
-    color: var(--error, #f87171);
+    background: color-mix(in srgb, var(--danger) 14%, transparent);
+    color: var(--danger);
   }
-  .pcard-pill.expiry-pill.past .material-symbols-rounded { color: var(--error, #f87171); }
+  .pcard-pill.expiry-pill.past .material-symbols-rounded { color: var(--danger); }
 
   /* ── Phone layout: flip the card to a compact horizontal row ───────
      On a phone the 4:3 photo + stacked body makes each card 180px+
@@ -2505,7 +2505,7 @@
     transition: color var(--dur-fast), background var(--dur-fast);
   }
   .btn-icon:hover { color: var(--text-1); background: var(--surface-2); }
-  .btn-icon.danger:hover { color: var(--error, #f87171); }
+  .btn-icon.danger:hover { color: var(--danger); }
   .btn-icon.small .material-symbols-rounded { font-size: 18px; }
 
   /* Modal editor */

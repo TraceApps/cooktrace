@@ -1021,14 +1021,14 @@
     border-radius: var(--radius-sm);
   }
   .btn-icon:hover { color: var(--text-1); background: var(--surface-2); }
-  .btn-icon.danger:hover { color: var(--error, #f87171); }
+  .btn-icon.danger:hover { color: var(--danger); }
   .btn-icon.small { width: 30px; height: 30px; }
   .btn-icon.small .material-symbols-rounded { font-size: 18px; }
 
   .state { text-align: center; padding: 60px 16px; color: var(--text-3); display: flex; flex-direction: column; align-items: center; gap: 10px; }
   .state.empty .empty-icon { font-size: 64px; color: var(--accent); opacity: 0.6; }
   .state h2 { color: var(--text-1); margin: 12px 0 0; font-size: 20px; }
-  .state.error { color: var(--error, #f87171); }
+  .state.error { color: var(--danger); }
   .spin { font-size: 32px; animation: spin 1.2s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
