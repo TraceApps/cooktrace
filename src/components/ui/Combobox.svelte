@@ -67,7 +67,18 @@
 
   $: filtered = (() => {
     const q = _norm(typed);
-    const list = (options || []).map(o => typeof o === 'string' ? { name: o } : (o || {}));
+    // Rows are keyed by name, and callers like the pantry list can hold
+    // two items with the same name (a variant and a standalone "Bread").
+    // Picking either sets the same value, so keep the first and drop repeats.
+    const seen = new Set();
+    const list = (options || [])
+      .map(o => typeof o === 'string' ? { name: o } : (o || {}))
+      .filter(o => {
+        const k = _norm(o.name);
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
     if (!q) return list.slice(0, maxResults);
     return list
       .filter(o => _norm(o.name).includes(q))
