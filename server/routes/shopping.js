@@ -11,6 +11,7 @@ import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { dispatchWebhookEvent } from '../lib/webhooks.js';
+import { titleCaseName as _titleCaseName, aisleForPantry as _aisleForPantry } from '../lib/shopping-items.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -22,56 +23,6 @@ const userArgs   = (u) => u == null ? [] : [u];
 function _hydrate(row) {
   if (!row) return null;
   return { ...row, checked: !!row.checked };
-}
-
-// Title-case a shopping item name. Mealie stores its canonical food
-// names lowercase ("fresh lemon juice"), so anything copied from a
-// recipe's stored ingredient JSON arrives that way. This normalises at
-// the shopping-list write boundary so every row in the user's list
-// follows the project's caps rule regardless of upstream source.
-//
-// Chicago-style minor-word exceptions: keep articles, short conjunctions,
-// and short prepositions lowercase UNLESS they're the first word. Already
-// uppercase words (acronyms, brand names) pass through.
-const _MINOR_WORDS = new Set([
-  'a','an','and','as','at','but','by','for','if','in','nor','of','on','or','the','to','up','via',
-]);
-function _titleCaseName(raw) {
-  if (raw == null) return raw;
-  const s = String(raw).trim();
-  if (!s) return s;
-  // Don't touch strings already mixed-case (likely user-typed manual entry).
-  if (s !== s.toLowerCase() && s !== s.toUpperCase()) return s;
-  // Split on whitespace but preserve internal punctuation (hyphens etc.)
-  // by mapping word-by-word.
-  return s.split(/(\s+)/).map((tok, i, arr) => {
-    if (!tok.trim()) return tok;
-    // Hyphenated word: title-case each segment ("all-purpose" → "All-Purpose").
-    return tok.split('-').map((seg, segIdx) => {
-      const lower = seg.toLowerCase();
-      const isFirstToken = arr.slice(0, i).every(t => !t.trim());
-      const isFirstSeg   = segIdx === 0;
-      // Lowercase minor words except when they start the whole string.
-      if (_MINOR_WORDS.has(lower) && !(isFirstToken && isFirstSeg)) return lower;
-      return lower.charAt(0).toUpperCase() + lower.slice(1);
-    }).join('-');
-  }).join('');
-}
-
-// Aisle auto-lookup: linked pantry item → its category's default_aisle,
-// falling back to the category name, then null. Used by every insert path
-// (single-item POST, /from-recipe, /from-plan) so the shopping list groups
-// itself without the user having to tag each row.
-function _aisleForPantry(pantryId) {
-  if (!pantryId) return null;
-  const cat = db.prepare(
-    `SELECT c.default_aisle, c.name
-       FROM pantry_items p
-       LEFT JOIN pantry_categories c ON c.id = p.category_id
-      WHERE p.id = ?`
-  ).get(pantryId);
-  if (!cat) return null;
-  return (cat.default_aisle && cat.default_aisle.trim()) || cat.name || null;
 }
 
 // ── GET / — list shopping items ────────────────────────────────────────

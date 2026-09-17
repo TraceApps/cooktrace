@@ -24,6 +24,7 @@ const TOKEN_BYTES = 32;  // 256-bit secret
  */
 export const SCOPE_DESCRIPTIONS = {
   'read:recipes': "Read the token owner's recipes catalog. Used by NutriTrace federation to search and import CookTrace recipes into NT's meals catalog.",
+  'shopping':     "View, add to, check off, and clear the token owner's shopping list through /api/v1/shopping, with no server switch needed. Used by NoteTrace's Send to CookTrace and its Shopping view.",
   'read:pantry':  "Read the token owner's pantry catalog. Used by NutriTrace federation to bulk-import CookTrace pantry items (variants and standalone rows) into NT's foods library.",
   'mcp:read':    'MCP: read recipes, pantry, shopping list, and cook diary (6 tools). Also unlocks the equivalent /api/v1 read routes when PUBLIC_API_ENABLED=1.',
   'mcp:write':   'MCP: log a cook, manage the shopping list, update pantry stock (4 additive tools). Requires MCP_WRITE_ENABLED=1 on the server. Also unlocks the equivalent /api/v1 write routes when PUBLIC_API_WRITE_ENABLED=1.',
@@ -42,6 +43,11 @@ export const KNOWN_SCOPES = new Set([
   // skips generic parents that have variants (their leaf variants carry
   // the real nutrition), pulls standalone items and variant leaves only.
   'read:pantry',
+  // shopping unlocks the sister-app shopping routes in
+  // server/routes/api/v1/shopping-fed.js (list, add, check, clear checked).
+  // Used by NoteTrace. Deliberately narrow: it reaches nothing but the
+  // token owner's shopping list, so it needs no PUBLIC_API or MCP switch.
+  'shopping',
   // mcp:read unlocks the Model Context Protocol read tools, exposed
   // under /api/mcp when MCP_ENABLED=1. Lets a user's own agent (Claude
   // Desktop / Cursor / Codex / etc.) inspect their recipes, pantry,
