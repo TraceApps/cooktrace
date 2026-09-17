@@ -135,6 +135,8 @@ test('every dispatchWebhookEvent( call site across the modified routes has a mat
   const combined = cookDiaryJs + recipesJs + shoppingJs + pantryJs;
   const dispatchCount = (combined.match(/dispatchWebhookEvent\(/g) || []).length;
   const guardCatchCount = (combined.match(/catch \(e\) \{ \/\* never let a webhook failure block the save \*\/ \}/g) || []).length;
-  assert.equal(dispatchCount, 5, 'expected 5 dispatchWebhookEvent call sites total (1 + 1 + 1 + 2)');
-  assert.equal(guardCatchCount, 5, 'expected each dispatchWebhookEvent call site to have a matching never-block-the-save catch');
+  // cook-diary 2 (POST, plus PUT flipping planned to cooked) + recipes 1
+  // + shopping 1 + pantry 2.
+  assert.equal(dispatchCount, 6, 'expected 6 dispatchWebhookEvent call sites total (2 + 1 + 1 + 2)');
+  assert.equal(guardCatchCount, 6, 'expected each dispatchWebhookEvent call site to have a matching never-block-the-save catch');
 });
