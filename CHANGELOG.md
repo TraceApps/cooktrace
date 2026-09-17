@@ -7,22 +7,51 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.3.0-dev.02] - 2026-09-17 (pre-release)
+
+Second dev pre-release of the 1.3.0 minor. Outgoing webhooks and a
+general public REST API, a shopping API for sister apps, shopping-list
+items that combine and can restock the pantry, plus a batch of fixes
+found in a review of everything since dev.01.
+
 ### Added
 
-- **General-purpose public REST API** at `/api/v1/cook-diary`, `/api/v1/shopping`, and a pantry stock write route, for your own scripts and automations rather than the NutriTrace federation contract the rest of `/api/v1` documents. Off by default (`PUBLIC_API_ENABLED=1`; `PUBLIC_API_WRITE_ENABLED=1` additionally unlocks logging a cook, checking a shopping item, and updating pantry stock). Reuses the `mcp:read`/`mcp:write` token scopes MCP already defines, one token works for both interfaces. See `docs/public-api.md`.
 - **Outgoing webhooks.** Configure a target URL in Settings, Webhooks and CookTrace fires a signed HTTP POST the instant a recipe is logged as cooked, the shopping list is fully checked off, or a pantry item runs out of stock. Off by default (`WEBHOOKS_ENABLED=1`). HMAC-SHA256 signed, 3 delivery attempts with backoff, a "send test event" button to verify a target without waiting for a real event. Target URLs are validated against a shared SSRF guard (blocks loopback/private/link-local/cloud-metadata addresses unless `ALLOW_PRIVATE_WEBHOOK_URLS=1`), the same guard image-localizer.js now uses internally for its own external-image downloads. See `docs/webhooks.md`.
-
----
+- **General-purpose public REST API** at `/api/v1/cook-diary`, `/api/v1/shopping`, and a pantry stock write route, for your own scripts and automations rather than the NutriTrace federation contract the rest of `/api/v1` documents. Off by default (`PUBLIC_API_ENABLED=1`; `PUBLIC_API_WRITE_ENABLED=1` additionally unlocks logging a cook, checking a shopping item, and updating pantry stock). Reuses the `mcp:read`/`mcp:write` token scopes MCP already defines, one token works for both interfaces. See `docs/public-api.md`.
+- **Shopping API for sister apps.** A `shopping` token scope covering list, add, check, and clear, so a sister app (NoteTrace) can drive the list without the general public API switch.
+- **The shopping list combines duplicate items.** In By Aisle and Flat views, items with the same name and unit show as a single row with the amounts added up and a pill for each recipe they came from. Checking, removing, dragging or re-aisling that row applies to every copy behind it; editing the amount folds them into one item, while editing just the name or unit keeps each recipe's own amount. Different units stay separate, and a copy with no amount makes the row show none rather than a wrong total. By Recipe view still lists each recipe's own items, and nothing changed in the database, sync, or the Android app's storage.
+- **Clear Checked can restock your pantry.** The confirmation now lists the matching pantry items that are currently out of stock, ticked by default, so what you bought goes back in stock without a second trip through the Pantry tab. An item is only offered when the row is linked to a pantry item or its name matches exactly one, a generic like Bread gets a dropdown to pick the variant, and the toast has an Undo.
+- **Support the iOS fund.** The README and Settings, About name what the fund covers (both developer accounts, tax and fees included).
 
 ### Changed
 
 - **Trace settings now match NutriTrace.** The Base URL and API Key fields save when you leave them (or press Enter) instead of through a Save button beside each field, which on a phone in portrait sat past the edge of the screen; the connection is only re-tested when the value changed. On a server where AI is configured through environment variables, the section now says so at the top, shows the provider and model the server actually uses (rather than your own settings, greyed out), and hides the base URL and API key fields since the server holds them. Smart Log gains a Voice Input Language setting for when you speak a different language than your device is set to.
 - **Claude Fable 5.1 in Trace's model list.** It is now the most capable Claude option; Fable 5 stays selectable, marked as previous.
+- **Sync status pill in the sidebar**, with one colour rule for sync state across the app.
+- Toasts can now carry an action button, which the restock flow uses for Undo.
+
+### Fixed
+
+- **The shopping list froze mid-drag.** Reordering threw `each_key_duplicate` and left the page unresponsive: svelte-dnd-action renames its placeholder to the dragged row's own id one frame after a drag starts, so a fast pointer move could hand Svelte the same id twice.
+- **Shopping search crashed when two pantry items shared a name.** Suggestions are now deduplicated by name inside the shared picker, which also protects the seven other screens that use it (recipe category, tags, tools, pantry category, cookbook tags, Kitchens invite).
+- **Cook history and comments returned 403 on a recipe shared with you.** Both reads checked only ownership or group visibility and ignored the kitchen share that granted access to the recipe itself.
+- **Marking a planned meal as cooked never fired `meal.cooked`.** The webhook was wired into the two insert paths but not into the update that flips a planned entry, which is how the Diary does it.
+- **`PATCH /api/v1/pantry/:id/stock` returned 403 for a write-scoped token.** The read-only federation router gated every method on `read:pantry`, so the documented write route was unreachable.
+- **Settings, Webhooks could not save anything.** Its requests carried no CSRF header (or Bearer token on native), so create, enable/disable, delete and test all came back 403.
+- **Marking a pantry item back in stock left its quantity at 0**, so it still read as out of stock and could not be toggled out again. An explicit `null` quantity now clears the stored value instead of being treated as "leave unchanged".
 
 ### Security
 
-- **Backup archives are no longer reachable from the public uploads directory.** `BACKUPS_PATH` defaults to a directory inside `UPLOADS_PATH`, and `/uploads` is served ahead of the auth middleware so an Android WebView `<img>` can load images without an `Authorization` header. A full-backup ZIP sitting in that directory was therefore fetchable by URL, while every `/api/full-backup` route is admin-only. It now returns 404 like anything else outside the served set. Scheduled backups are off by default, so an install that never enabled them and never created one by hand had nothing there to reach; there is no directory listing either, so a filename had to be known or guessed. The archive holds a full database dump, so if yours has been internet-facing with backups enabled, a look through your access log for `/uploads/backups/` will settle it either way. The exclusion tests the resolved filesystem path rather than the request URL, since `express.static` percent-decodes a path before opening the file while a route prefix matches the raw one, and the two disagree on exactly the inputs an attacker would pick.
+- **Comments could be posted to any recipe by ID.** `POST /api/recipes/:id/comments` had no ownership, share, or visibility check at all; it now requires the same access reading comments does.
+- **MCP read tools were handed to a `mcp:write`-only token.** Read tools registered unconditionally, so only two of the three advertised tiers were really enforced. Each tier now requires its own scope.
+- **Backup archives are no longer reachable from the public uploads directory.** `BACKUPS_PATH` defaults to a directory inside `UPLOADS_PATH`, and `/uploads` is served ahead of the auth middleware so an Android WebView `<img>` can load images without an `Authorization` header. A full-backup ZIP sitting in that directory was therefore fetchable by URL, while every `/api/full-backup` route is admin-only. It now returns 404 like anything else outside the served set. Scheduled backups are off by default, so an install that never enabled them and never created one by hand had nothing there to reach; there is no directory listing either, so a filename had to be known or guessed. The archive holds a full database dump, so if yours has been internet-facing with backups enabled, a look through your access log for `/uploads/backups/` will settle it either way. The exclusion tests the resolved filesystem path rather than the request URL, since `express.static` percent-decodes a path before opening the file while a route prefix matches the raw one, and the two disagree on exactly the inputs an attacker would pick. A custom `BACKUPS_PATH` pointing somewhere else inside the uploads directory is now covered too, rather than only the default `backups` name.
+- **The SSRF guard classified only the first resolved address.** A host publishing both a public and a private record could pass the check and then be connected to privately, since the request that follows resolves independently. Every resolved address must now pass.
+- **adm-zip** bumped 0.6.0 → 0.6.1, closing the symlink-extraction advisory (no fixed release existed when this was last reviewed).
+- **Uploads** are served from a sandboxed set of safe extensions.
 
+---
 
 ## [1.3.0-dev.01] - 2026-09-10 (pre-release)
 
