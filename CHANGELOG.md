@@ -16,7 +16,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
-- **Trace settings now match NutriTrace.** The Base URL and API Key fields save when you leave them (or press Enter) instead of through a Save button beside each field, which on a phone in portrait sat past the edge of the screen; the connection is only re-tested when the value changed. On a server where AI is configured through environment variables, the section now says so at the top, the model and base URL are locked, and the API key field is hidden since the server holds it. Smart Log gains a Voice Input Language setting for when you speak a different language than your device is set to.
+- **Trace settings now match NutriTrace.** The Base URL and API Key fields save when you leave them (or press Enter) instead of through a Save button beside each field, which on a phone in portrait sat past the edge of the screen; the connection is only re-tested when the value changed. On a server where AI is configured through environment variables, the section now says so at the top, shows the provider and model the server actually uses (rather than your own settings, greyed out), and hides the base URL and API key fields since the server holds them. Smart Log gains a Voice Input Language setting for when you speak a different language than your device is set to.
 - **Claude Fable 5.1 in Trace's model list.** It is now the most capable Claude option; Fable 5 stays selectable, marked as previous.
 
 ### Security

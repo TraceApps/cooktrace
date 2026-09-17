@@ -923,6 +923,7 @@
     "env_lock_banner":           "Configured via environment variables, changes are disabled.",
     "enable_desc":               "Floating chat button on every page. Uses your own AI provider key, never shared.",
     "enable_desc_locked":        "Floating chat button on every page. The server provides the AI.",
+    "server_default":            "Server default",
     "smart_log":                 "Smart Log",
     "voice_lang":                "Voice Input Language",
     "voice_lang_desc":           "Language the microphone listens for. Defaults to your device language, override if you speak a different language than your device is set to.",
