@@ -33,6 +33,8 @@ export const USER_PREFS = new Set([
   'traceChefHat',
   // Smart Log (hold-to-record on the FAB → AI parses spoken intent → tool execution)
   'smartLogEnabled',
+  // Language the Smart Log microphone listens for ('auto' = device locale)
+  'smartLogVoiceLang',
   // URL Import Engine — 'standard' | 'enhanced' (recipe-scrapers) | 'smart' (AI)
   'urlImportEngine','urlImportFallback',
   // Pantry view mode — 'grid' (default photo cards) | 'list' (compact rows)
@@ -429,6 +431,8 @@ export const traceChefHat   = createSettingStore('traceChefHat',   false);
 // runs tools (cook a recipe, add to pantry, log to diary, etc.).
 // Defaults off; user enables explicitly in Settings → Trace.
 export const smartLogEnabled = createSettingStore('smartLogEnabled', false);
+// Language the Smart Log microphone listens for. 'auto' follows the device locale.
+export const smartLogVoiceLang = createSettingStore('smartLogVoiceLang', 'auto');
 
 // URL Import Engine — which parser tier the scrape route tries first.
 // 'standard' = JSON-LD only (always works, ~85% of sites)

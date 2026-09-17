@@ -1,6 +1,6 @@
 <script>
   import { _ } from 'svelte-i18n';
-  import { aiEnabled, aiProvider, aiApiKey, aiModel, aiBaseUrl, aiAssistantName, aiKeyVerified, smartLogEnabled, traceChefHat, envLocks as envLocksStore } from '../../stores/settings.js';
+  import { aiEnabled, aiProvider, aiApiKey, aiModel, aiBaseUrl, aiAssistantName, aiKeyVerified, smartLogEnabled, smartLogVoiceLang, traceChefHat, envLocks as envLocksStore } from '../../stores/settings.js';
   import { AI_PROVIDERS, AI_DEFAULT_MODELS, AI_MODELS, AI_MODEL_CUSTOM, callAI, callAIProxy } from '../../lib/aiChat.js';
   import { showError, showSuccess } from '../../stores/toast.js';
   import ConnectionStatus from './ConnectionStatus.svelte';
@@ -13,6 +13,11 @@
   // var, not the per-user store (which stays empty under env-lock because
   // user_settings doesn't pick up server-wide env values).
   $: _displayedAiEnabled = envLocks.ai ? !!envLocks.ai_enabled : $aiEnabled;
+
+  // Smart Log voice-input language options, the same list as NutriTrace.
+  const VOICE_LANG_CODES = ['auto', 'en-US', 'en-GB', 'it-IT', 'es-ES', 'es-MX', 'fr-FR', 'de-DE', 'pt-BR', 'pt-PT',
+    'nl-NL', 'pl-PL', 'ru-RU', 'sv-SE', 'da-DK', 'nb-NO', 'fi-FI', 'cs-CZ', 'tr-TR', 'ja-JP', 'ko-KR', 'zh-CN', 'zh-TW', 'hi-IN', 'ar-SA'];
+  $: VOICE_LANGS = VOICE_LANG_CODES.map(value => ({ value, label: $_(`settings_trace_ct.voice_langs.${value.replace('-', '_')}`) }));
 
   let showKey = false;
   let testing = false;
@@ -31,8 +36,6 @@
   // for any user trying to update their key or base URL. (Issue #5.)
   let aiApiKeyDraft  = $aiApiKey  || '';
   let aiBaseUrlDraft = $aiBaseUrl || '';
-  let aiKeySaved     = false;
-  let aiBaseUrlSaved = false;
   let _aiApiKeySynced  = $aiApiKey;
   let _aiBaseUrlSynced = $aiBaseUrl;
   $: if ($aiApiKey !== _aiApiKeySynced) {
@@ -49,17 +52,19 @@
   // the toast tells them why and aiKeyVerified stays off. This
   // collapses the previous "Save then click Test separately" flow
   // into one action, and removes the dedicated Test row entirely.
+  // Saved when the field is left (or on Enter), as in NutriTrace, with no
+  // Save button beside it: on a phone in portrait that button ran off the
+  // edge of the screen. Unchanged values don't re-test.
   async function saveAiKey() {
+    if (aiApiKeyDraft === ($aiApiKey || '')) return;
     aiApiKey.set(aiApiKeyDraft);
-    aiKeySaved = true;
-    setTimeout(() => aiKeySaved = false, 2000);
-    await testConnection({ silentOk: false });
+    if (canTest) await testConnection({ silentOk: false });
   }
   async function saveAiBaseUrl() {
-    aiBaseUrl.set(aiBaseUrlDraft.trim());
-    aiBaseUrlSaved = true;
-    setTimeout(() => aiBaseUrlSaved = false, 2000);
-    await testConnection({ silentOk: false });
+    const next = aiBaseUrlDraft.trim();
+    if (next === ($aiBaseUrl || '')) return;
+    aiBaseUrl.set(next);
+    if (canTest) await testConnection({ silentOk: false });
   }
 
   $: providerModels = AI_MODELS[$aiProvider] || [];
@@ -176,6 +181,12 @@
   }
 </script>
 
+{#if envLocks.ai}
+  <div class="env-lock-banner">
+    <span class="material-symbols-rounded">lock</span>
+    {$_('settings_trace_ct.env_lock_banner')}
+  </div>
+{/if}
 <div class="card settings-card">
   {#if _displayedAiEnabled}
     {@const _provider = AI_PROVIDERS.find(p => p.id === $aiProvider)}
@@ -191,7 +202,9 @@
   <div class="setting-row">
     <div>
       <span class="setting-label">{$_('settings_trace_ct.enable_assistant')}</span>
-      <span class="setting-desc">Floating chat button on every page. Uses your own AI provider key — never shared.</span>
+      <span class="setting-desc">{envLocks.ai
+        ? $_('settings_trace_ct.enable_desc_locked')
+        : $_('settings_trace_ct.enable_desc')}</span>
     </div>
     <input type="checkbox" class="toggle-cb" checked={_displayedAiEnabled} on:change={e => { if (!envLocks.ai) aiEnabled.set(e.target.checked); }} disabled={envLocks.ai} />
   </div>
@@ -216,10 +229,9 @@
         <div class="key-row">
           <input class="input" type="url" bind:value={aiBaseUrlDraft}
             placeholder="https://api.example.com/v1"
-            on:input={_invalidate} />
-          <button class="btn btn-primary save-btn" on:click={saveAiBaseUrl}>
-            {#if aiBaseUrlSaved}<span class="material-symbols-rounded">check</span>{:else}Save{/if}
-          </button>
+            aria-label={$_('settings_trace_ct.base_url')} disabled={envLocks.ai}
+            on:input={_invalidate} on:blur={saveAiBaseUrl}
+            on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
         </div>
       </div>
     {/if}
@@ -229,13 +241,14 @@
       <span class="setting-label">{$_('settings_trace_ct.model')}</span>
       {#if providerModels.length > 0 && $aiProvider !== 'custom'}
         <div class="select-wrap" style="width:220px">
-          <select class="select sel-sm" bind:value={aiModelSelectVal} on:change={_syncModelFromSelect}>
+          <select class="select sel-sm" bind:value={aiModelSelectVal} on:change={_syncModelFromSelect} disabled={envLocks.ai}>
             {#each providerModels as m}<option value={m}>{_modelLabel(m)}</option>{/each}
           </select>
         </div>
       {:else}
         <input class="input" type="text" style="width:220px" value={$aiModel}
           placeholder={AI_DEFAULT_MODELS[$aiProvider] || ''}
+          disabled={envLocks.ai}
           on:change={e => { aiModel.set(e.target.value); _invalidate(); }} />
       {/if}
     </div>
@@ -258,34 +271,25 @@
       </div>
     {/if}
 
+    {#if !envLocks.ai}
     <div class="setting-divider"></div>
     <div class="setting-row stack">
-      <span class="setting-label">API Key {envLocks.ai ? '(locked by env var)' : ''}</span>
+      <span class="setting-label">API Key</span>
       <div class="key-row">
-        {#if showKey}
-          <input class="input" type="text"
-            bind:value={aiApiKeyDraft}
-            placeholder={envLocks.ai ? '(set on server)' : 'sk-…'}
-            disabled={envLocks.ai}
-            on:input={_invalidate} />
-        {:else}
-          <input class="input" type="password"
-            bind:value={aiApiKeyDraft}
-            placeholder={envLocks.ai ? '(set on server)' : 'sk-…'}
-            disabled={envLocks.ai}
-            on:input={_invalidate} />
-        {/if}
-        <button class="key-toggle" on:click={() => showKey = !showKey}
-          aria-label={showKey ? 'Hide' : 'Show'} disabled={envLocks.ai}>
+        <!-- One input whose type flips, so showing or hiding the key
+             mid-edit keeps focus and still saves on blur. -->
+        <input aria-label="API Key" class="input" type={showKey ? 'text' : 'password'}
+          value={aiApiKeyDraft} on:input={e => { aiApiKeyDraft = e.currentTarget.value; _invalidate(); }}
+          placeholder="sk-…"
+          on:blur={saveAiKey}
+          on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
+        <button class="key-toggle" on:mousedown|preventDefault on:click={() => showKey = !showKey}
+          aria-label={showKey ? 'Hide' : 'Show'}>
           <span class="material-symbols-rounded">{showKey ? 'visibility_off' : 'visibility'}</span>
         </button>
-        {#if !envLocks.ai}
-          <button class="btn btn-primary save-btn" on:click={saveAiKey}>
-            {#if aiKeySaved}<span class="material-symbols-rounded">check</span>{:else}Save{/if}
-          </button>
-        {/if}
       </div>
     </div>
+    {/if}
 
     <div class="setting-divider"></div>
     <div class="setting-row stack">
@@ -323,6 +327,21 @@
         checked={$smartLogEnabled}
         on:change={e => smartLogEnabled.set(e.target.checked)} />
     </div>
+    {#if $smartLogEnabled}
+      <div class="setting-divider"></div>
+      <div class="setting-row">
+        <div>
+          <span class="setting-label">{$_('settings_trace_ct.voice_lang')}</span>
+          <span class="setting-desc">{$_('settings_trace_ct.voice_lang_desc')}</span>
+        </div>
+        <div class="select-wrap expand-left" style="width:220px">
+          <select aria-label={$_('settings_trace_ct.voice_lang')} class="select sel-sm" value={$smartLogVoiceLang}
+            on:change={e => smartLogVoiceLang.set(e.currentTarget.value)}>
+            {#each VOICE_LANGS as opt}<option value={opt.value}>{opt.label}</option>{/each}
+          </select>
+        </div>
+      </div>
+    {/if}
 
     <!-- Status row — Save runs the test on each click, so this is a
          The connection status banner at the top of this card is the
@@ -371,16 +390,16 @@
   .key-row { display: flex; gap: 6px; align-items: center; }
   .key-row > * { height: 40px; box-sizing: border-box; }
   .key-row .input { flex: 1; font-family: monospace; }
-  .save-btn {
-    font-size: 13px;
-    white-space: nowrap;
-    padding: 0 14px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
+  /* Same banner the other Trace apps show above an environment-locked section. */
+  .env-lock-banner {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px; padding: 10px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    font-size: 13px; color: var(--text-3);
   }
-  .save-btn .material-symbols-rounded { font-size: 16px; }
+  .env-lock-banner .material-symbols-rounded { font-size: 17px; color: var(--accent); flex-shrink: 0; }
   .key-toggle {
     background: var(--surface-2); border: 1px solid var(--border);
     border-radius: var(--radius-sm); width: 40px;
