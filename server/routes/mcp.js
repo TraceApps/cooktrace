@@ -143,6 +143,7 @@ router.post('/', bearerAuth, requireAnyMcpScope, async (req, res) => {
   // Stamp write / destroy eligibility onto the request for the tool
   // registrar downstream. Server flag AND matching token scope both
   // required, independently.
+  req.mcpReads   = !!req.apiToken?.scopes?.includes('mcp:read');
   req.mcpWrites  = WRITE_ENABLED   && !!req.apiToken?.scopes?.includes('mcp:write');
   req.mcpDestroy = DESTROY_ENABLED && !!req.apiToken?.scopes?.includes('mcp:destroy');
   try {

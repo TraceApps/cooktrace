@@ -35,7 +35,15 @@ import { requireScope } from '../../../middleware/bearer-auth.js';
 
 const router = Router();
 
-router.use(requireScope('read:pantry'));
+// This router is read-only and shares the '/pantry' mount with
+// pantry-write.js, which sits after it. Gating every method on
+// read:pantry would 403 a write-scoped token before it ever reached the
+// write router, so anything that isn't a read falls through instead
+// (same next('router') hand-off shopping-fed.js uses).
+router.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next('router');
+  return requireScope('read:pantry')(req, res, next);
+});
 
 function _selfOrigin(req) {
   const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0].trim();
