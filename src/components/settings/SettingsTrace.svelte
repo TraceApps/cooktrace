@@ -14,6 +14,14 @@
   // user_settings doesn't pick up server-wide env values).
   $: _displayedAiEnabled = envLocks.ai ? !!envLocks.ai_enabled : $aiEnabled;
 
+  // The server names its OpenAI-compatible provider oai-compat, which isn't
+  // one of the picker's ids.
+  const SERVER_PROVIDER_IDS = { 'oai-compat': 'custom' };
+  const providerId = (id) => SERVER_PROVIDER_IDS[id] || id || '';
+  const providerLabel = (id) =>
+    AI_PROVIDERS.find(p => p.id === providerId(id))?.label || id || '';
+  $: lockedProvider = envLocks.ai ? providerId(envLocks.ai_provider) : '';
+
   // Smart Log voice-input language options, the same list as NutriTrace.
   const VOICE_LANG_CODES = ['auto', 'en-US', 'en-GB', 'it-IT', 'es-ES', 'es-MX', 'fr-FR', 'de-DE', 'pt-BR', 'pt-PT',
     'nl-NL', 'pl-PL', 'ru-RU', 'sv-SE', 'da-DK', 'nb-NO', 'fi-FI', 'cs-CZ', 'tr-TR', 'ja-JP', 'ko-KR', 'zh-CN', 'zh-TW', 'hi-IN', 'ar-SA'];
@@ -213,16 +221,24 @@
     <div class="setting-divider"></div>
     <div class="setting-row">
       <span class="setting-label">{$_('settings_trace_ct.provider')}</span>
+      {#if envLocks.ai}
+        <div class="select-wrap expand-left" style="width:220px">
+          <select aria-label={$_('settings_trace_ct.provider')} class="select sel-sm" value={lockedProvider} disabled>
+            <option value={lockedProvider}>{providerLabel(envLocks.ai_provider)}</option>
+          </select>
+        </div>
+      {:else}
       <div class="select-wrap expand-left" style="width:220px">
-        <select class="select sel-sm" value={$aiProvider} on:change={onProviderChange} disabled={envLocks.ai}>
+        <select class="select sel-sm" value={$aiProvider} on:change={onProviderChange}>
           {#each AI_PROVIDERS as p}
             <option value={p.id}>{p.label}</option>
           {/each}
         </select>
       </div>
+      {/if}
     </div>
 
-    {#if $aiProvider === 'custom'}
+    {#if $aiProvider === 'custom' && !envLocks.ai}
       <div class="setting-divider"></div>
       <div class="setting-row stack">
         <span class="setting-label">{$_('settings_trace_ct.base_url')} <span class="setting-desc">{$_('settings_trace_ct.base_url_desc')}</span></span>
@@ -239,7 +255,13 @@
     <div class="setting-divider"></div>
     <div class="setting-row">
       <span class="setting-label">{$_('settings_trace_ct.model')}</span>
-      {#if providerModels.length > 0 && $aiProvider !== 'custom'}
+      {#if envLocks.ai}
+        <div class="select-wrap" style="width:220px">
+          <select aria-label={$_('settings_trace_ct.model')} class="select sel-sm" value="locked" disabled>
+            <option value="locked">{envLocks.ai_model || $_('settings_trace_ct.server_default')}</option>
+          </select>
+        </div>
+      {:else if providerModels.length > 0 && $aiProvider !== 'custom'}
         <div class="select-wrap" style="width:220px">
           <select class="select sel-sm" bind:value={aiModelSelectVal} on:change={_syncModelFromSelect} disabled={envLocks.ai}>
             {#each providerModels as m}<option value={m}>{_modelLabel(m)}</option>{/each}
@@ -252,7 +274,7 @@
           on:change={e => { aiModel.set(e.target.value); _invalidate(); }} />
       {/if}
     </div>
-    {#if aiModelSelectVal === AI_MODEL_CUSTOM && $aiProvider !== 'custom'}
+    {#if aiModelSelectVal === AI_MODEL_CUSTOM && $aiProvider !== 'custom' && !envLocks.ai}
       <div class="setting-divider"></div>
       <div class="setting-row">
         <span class="setting-label">{$_('settings_trace_ct.custom_model_id')}</span>
