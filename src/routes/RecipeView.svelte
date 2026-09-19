@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../lib/back-stack.js';
   import { push } from 'svelte-spa-router';
 
   // Close: always navigates to /recipes. An earlier revision tried to
@@ -1366,7 +1367,7 @@
 <svelte:window on:keydown={onLightboxKey} />
 {#if lightboxIndex >= 0 && lightboxPhotos[lightboxIndex]}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div use:portal class="lb-backdrop" on:click={closeLightbox}
+  <div use:portal class="lb-backdrop" on:click={closeLightbox} use:closeOnBack={closeLightbox}
     in:fade={{ duration: 160 }} out:fade={{ duration: 120 }}>
     <button class="lb-close" on:click|stopPropagation={closeLightbox} aria-label="Close" title="Close (Esc)">
       <span class="material-symbols-rounded">close</span>

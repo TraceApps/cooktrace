@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../lib/back-stack.js';
   import { onMount } from 'svelte';
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
@@ -1489,7 +1490,7 @@
                on:scroll={_closeTierDropdowns} on:resize={_closeTierDropdowns} />
 
 {#if offDropdownOpen}
-  <div class="tier-dropdown-backdrop" use:portal></div>
+  <div class="tier-dropdown-backdrop" use:portal use:closeOnBack={_closeTierDropdowns}></div>
   <div class="tier-dropdown-panel" use:portal
        bind:this={offDropdownPanelEl}
        style="top:{offDropdownPos.top}px; right:{offDropdownPos.right}px"
@@ -1513,7 +1514,7 @@
 {/if}
 
 {#if usdaDropdownOpen}
-  <div class="tier-dropdown-backdrop" use:portal></div>
+  <div class="tier-dropdown-backdrop" use:portal use:closeOnBack={_closeTierDropdowns}></div>
   <div class="tier-dropdown-panel" use:portal
        bind:this={usdaDropdownPanelEl}
        style="top:{usdaDropdownPos.top}px; right:{usdaDropdownPos.right}px"

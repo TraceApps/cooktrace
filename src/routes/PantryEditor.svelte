@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../lib/back-stack.js';
   /**
    * PantryEditor — full-page editor for a pantry item.
    *
@@ -660,7 +661,7 @@
 <BarcodeScanner bind:open={editorScannerOpen} on:scan={onScan} on:close={() => editorScannerOpen = false} />
 
 {#if categoryNewOpen}
-  <div class="cat-modal-backdrop" on:click={() => categoryNewOpen = false}>
+  <div class="cat-modal-backdrop" on:click={() => categoryNewOpen = false} use:closeOnBack={() => categoryNewOpen = false}>
     <div class="cat-modal" on:click|stopPropagation>
       <h3 class="cat-modal-title">{$_('pantry_editor_ct.cat_modal_title')}</h3>
       <label class="field">

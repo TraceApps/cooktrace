@@ -16,6 +16,7 @@
   import { tick, onMount } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
+  import { closeOnBack } from '../../lib/back-stack.js';
   import { _ } from 'svelte-i18n';
   import TraceFace from './TraceFace.svelte';
   import TraceFaceChef from './TraceFaceChef.svelte';
@@ -1042,6 +1043,7 @@ When you write to the user's data, summarise what you did briefly and concretely
     <div
       class="panel-backdrop"
       use:portal
+      use:closeOnBack={() => panelOpen = false}
       transition:fade={{ duration: 200 }}
       on:click={() => panelOpen = false}
       on:keydown={() => {}}

@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../../lib/back-stack.js';
   import { _ } from 'svelte-i18n';
   import { scale, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
@@ -192,7 +193,7 @@
 {#if open}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div use:portal class="cl-backdrop" on:click={cancel}
+  <div use:portal class="cl-backdrop" on:click={cancel} use:closeOnBack={cancel}
     in:fade={{ duration: 180 }} out:fade={{ duration: 140 }}>
     <div
       class="cl-box"
@@ -332,7 +333,7 @@
 <svelte:window on:keydown={onLightboxKey} />
 {#if lightboxIndex >= 0 && photos[lightboxIndex]}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div use:portal class="lb-backdrop" on:click={closeLightbox}
+  <div use:portal class="lb-backdrop" on:click={closeLightbox} use:closeOnBack={closeLightbox}
     in:fade={{ duration: 160 }} out:fade={{ duration: 120 }}>
     <button class="lb-close" on:click|stopPropagation={closeLightbox} aria-label="Close" title="Close (Esc)">
       <span class="material-symbols-rounded">close</span>

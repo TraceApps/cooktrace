@@ -4,6 +4,7 @@
   import { cubicOut } from 'svelte/easing';
   import { portal } from './lib/portal.js';
   import { isPullSyncExempt } from './lib/pull-sync.js';
+  import { handleBack } from './lib/back-stack.js';
   import Router, { location } from 'svelte-spa-router';
 
   import BottomNav from './components/layout/BottomNav.svelte';
@@ -371,6 +372,10 @@
       import('@capacitor/app').then(({ App }) => {
         let lastBack = 0;
         App.addListener('backButton', ({ canGoBack }) => {
+          // An open sheet, dialog or overlay closes first, then the slide-out
+          // sidebar, and only then does back leave the page.
+          if (handleBack()) return;
+          if (sidebarOpen && !sidebarPinned) { sidebarOpen = false; return; }
           if (canGoBack) {
             window.history.back();
           } else {
