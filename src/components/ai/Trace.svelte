@@ -1001,6 +1001,7 @@ When you write to the user's data, summarise what you did briefly and concretely
     class:cancel-preview={_fabCancelPreview}
     style={fabStyle}
     on:pointerdown={startDrag}
+    data-no-pull-sync
     on:click={onFabClick}
     on:keydown={e => e.key === 'Enter' && onFabClick()}
     role="button"

@@ -167,13 +167,16 @@
   // handle span did with its {#if cbReorderable} guard.
   function maybeDragHandle(node, enabled) {
     let handle = null;
-    function attach() { if (!handle) handle = dragHandle(node); }
+    // While reordering is possible the card is a drag handle, so a downward
+    // drag on it must not also start pull-to-refresh (src/lib/pull-sync.js).
+    function attach() { if (!handle) { handle = dragHandle(node); node.setAttribute('data-no-pull-sync', ''); } }
     function detach() {
       if (!handle) return;
       handle.destroy();
       handle = null;
       node.removeAttribute('role');
       node.removeAttribute('tabindex');
+      node.removeAttribute('data-no-pull-sync');
       node.style.cursor = '';
     }
     if (enabled) attach();

@@ -9,6 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Dragging the Trace button or a reorder handle no longer refreshes the page.** In the Android app connected to a server, dragging the Trace button, a shopping list or recipe ingredient handle, or a cookbook card downward while the page was scrolled to the top was treated as pull-to-refresh and synced. Dragging those no longer counts as a pull; pulling down anywhere else still refreshes as before.
 - **Webhooks never fired for changes made in the Android app.** The app saves locally and uploads through sync, and the sync upload ran Kitchen auto-share but no webhook checks, so cooking a recipe, finishing the shopping list, or running out of a pantry item on the phone sent nothing. The upload now fires `meal.cooked`, `shopping_list.completed` and `pantry.out_of_stock` on the same transitions the web routes use, after the write commits, and sends one completion event per upload however many items it checked.
 
 ### Security
