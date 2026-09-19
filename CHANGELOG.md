@@ -7,9 +7,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.3.0-dev.03] - 2026-09-19 (pre-release)
+
+Third dev pre-release of the 1.3.0 minor. **Action needed when you
+update:** the container now listens on port 3003 instead of 3001 (see
+Changed). Also Android fixes for the back button, pull-to-refresh and
+dialog placement, webhooks for changes made in the Android app, and a
+desktop shopping layout that fills the screen.
+
 ### Changed
 
 - **The container now listens on port 3003, the same as the host port. Action needed when you update.** The image used to listen on 3001 inside the container while the sample compose file published it on 3003, so the two numbers never matched, and 3001 was also NutriTrace's port. Both are 3003 now. If your compose file has `"3003:3001"`, change it to `"3003:3003"`; if a reverse proxy or tunnel reaches the container directly (`cooktrace:3001`, or a Traefik `loadbalancer.server.port=3001` label), point it at `3003`. Until you do, CookTrace won't respond after the update. Installs that set `PORT` themselves are not affected, and the host port stays 3003, so bookmarks and the Android app's server address keep working. The weekly summary email's Open CookTrace button, used when no app URL is set, pointed at `localhost:3000` and now points at `localhost:3003`, and running from source starts the server on `:3003`, so it no longer collides with a NutriTrace checkout on the same machine.
+- **The shopping list fills the screen on desktop.** On wide screens the aisle and recipe cards sat in rows as tall as their tallest card, leaving empty space under the short groups. Short groups now stack into that space, so more of the list fits without scrolling, and the cards re-pack as groups collapse, items are checked off, or the window is resized. Phones and Flat view are unchanged.
 
 ### Fixed
 
