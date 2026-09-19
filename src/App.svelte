@@ -3,6 +3,7 @@
   import { fade, fly, slide } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { portal } from './lib/portal.js';
+  import { isPullSyncExempt } from './lib/pull-sync.js';
   import Router, { location } from 'svelte-spa-router';
 
   import BottomNav from './components/layout/BottomNav.svelte';
@@ -102,7 +103,9 @@
 
   function _startPullSync(event) {
     if (!_syncModeActive || _pullRefreshing || sidebarOpen || showNativeSetup) return;
-    if (event.target?.closest?.('[role="dialog"], .sheet-backdrop, .sidebar-panel, .sidebar-backdrop, .bottom-nav')) return;
+    // Dialogs, sheets, sidebars, the bottom bar and anything draggable keep
+    // their own touch handling. See src/lib/pull-sync.js.
+    if (isPullSyncExempt(event.target)) return;
     // Walk up from the touch target to the nearest scrolling ancestor.
     // Handles both editor pages (their own `.page-shell.editor-page`
     // becomes the scroller because it's position: fixed + overflow-y: auto)

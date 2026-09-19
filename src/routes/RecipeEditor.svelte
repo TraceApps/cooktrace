@@ -1084,6 +1084,7 @@
                     <button
                       class="ing-handle"
                       draggable="true"
+                      data-no-pull-sync
                       on:dragstart={(e) => _onDragStart(gi, ii, e)}
                       on:dragend={_onDragEnd}
                       aria-label="Drag to reorder"
@@ -1186,6 +1187,7 @@
                 on:drop={(e) => _onStepDrop(i, e)}>
                 <button class="step-handle"
                   draggable="true"
+                  data-no-pull-sync
                   on:dragstart={(e) => _onStepDragStart(i, e)}
                   on:dragend={_onStepDragEnd}
                   type="button"
