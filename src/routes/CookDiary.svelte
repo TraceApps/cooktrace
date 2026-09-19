@@ -1268,7 +1268,7 @@
   .modal {
     background: var(--surface-1); border: 1px solid var(--border);
     border-radius: var(--radius-lg); width: 100%; max-width: 460px;
-    max-height: calc(100vh - 32px); display: flex; flex-direction: column;
+    max-height: min(calc(100vh - 32px), calc(100dvh - 2 * var(--safe-top) - 16px)); display: flex; flex-direction: column;
     box-shadow: 0 16px 48px rgba(0,0,0,0.4);
   }
   .modal-header {
@@ -1535,7 +1535,7 @@
     border-radius: var(--radius-lg);
     width: 100%;
     max-width: 640px;
-    max-height: calc(100vh - 32px);
+    max-height: min(calc(100vh - 32px), calc(100dvh - 2 * var(--safe-top) - 16px));
     display: flex;
     flex-direction: column;
     overflow: hidden;

@@ -371,7 +371,7 @@
     border-radius: var(--radius-lg);
     width: 100%;
     max-width: 480px;
-    max-height: calc(100vh - 32px);
+    max-height: min(calc(100vh - 32px), calc(100dvh - 2 * var(--safe-top) - 16px));
     overflow-y: auto;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
     display: flex;
