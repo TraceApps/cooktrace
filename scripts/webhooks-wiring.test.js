@@ -140,3 +140,18 @@ test('every dispatchWebhookEvent( call site across the modified routes has a mat
   assert.equal(dispatchCount, 6, 'expected 6 dispatchWebhookEvent call sites total (2 + 1 + 1 + 2)');
   assert.equal(guardCatchCount, 6, 'expected each dispatchWebhookEvent call site to have a matching never-block-the-save catch');
 });
+
+test('the Android sync upload fires the same webhook events as the REST routes', () => {
+  const syncJs = readFileSync(new URL('../server/routes/sync.js', import.meta.url), 'utf8');
+  assert.match(syncJs, /import \{ dispatchWebhookEvent \} from '\.\.\/lib\/webhooks\.js'/);
+  assert.match(syncJs, /'meal\.cooked'/, 'sync.js should build meal.cooked for cooked diary rows');
+  assert.match(syncJs, /'pantry\.out_of_stock'/, 'sync.js should fire pantry.out_of_stock on an in_stock 1 to 0 update');
+  assert.match(syncJs, /'shopping_list\.completed'/, 'sync.js should fire shopping_list.completed when a push finishes the list');
+  // Events are only released after their table's transaction commits, and
+  // sent after the response, so a rolled-back push never announces itself.
+  assert.match(syncJs, /txn\(\);\s*webhookEvents\.push\(\.\.\.tableEvents\)/);
+  const sendAt = syncJs.indexOf('for (const [event, data] of webhookEvents)');
+  const respondAt = syncJs.indexOf('res.json({ tables: results });');
+  assert.ok(respondAt > 0 && sendAt > respondAt, 'webhooks should be dispatched after the push response is built');
+  assert.match(syncJs, /catch \(e\) \{ \/\* never let a webhook failure block the save \*\/ \}/);
+});

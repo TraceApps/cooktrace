@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Webhooks never fired for changes made in the Android app.** The app saves locally and uploads through sync, and the sync upload ran Kitchen auto-share but no webhook checks, so cooking a recipe, finishing the shopping list, or running out of a pantry item on the phone sent nothing. The upload now fires `meal.cooked`, `shopping_list.completed` and `pantry.out_of_stock` on the same transitions the web routes use, after the write commits, and sends one completion event per upload however many items it checked.
+
 ### Security
 
 - **devalue** (pulled in by Svelte) bumped 5.8.1 → 5.9.4, closes [GHSA-9rgm-9g3h-6x36](https://github.com/advisories/GHSA-9rgm-9g3h-6x36) (denial of service via malformed input, moderate).
