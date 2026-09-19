@@ -3,7 +3,7 @@
   DEBUG override (used by assembleDebug only). Resource overlay merging
   swaps this in for debug-signed APKs; release builds use the strict
   config in src/main/res/xml/.
-  - Cleartext permitted: connect to `http://192.168.x.x:3000` and
+  - Cleartext permitted: connect to `http://192.168.x.x:3003` and
     emulator dev servers without HTTPS setup.
   - User CAs trusted: install your own CA for testing self-signed certs.
 -->

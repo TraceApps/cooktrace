@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The container now listens on port 3003, the same as the host port. Action needed when you update.** The image used to listen on 3001 inside the container while the sample compose file published it on 3003, so the two numbers never matched, and 3001 was also NutriTrace's port. Both are 3003 now. If your compose file has `"3003:3001"`, change it to `"3003:3003"`; if a reverse proxy or tunnel reaches the container directly (`cooktrace:3001`, or a Traefik `loadbalancer.server.port=3001` label), point it at `3003`. Until you do, CookTrace won't respond after the update. Installs that set `PORT` themselves are not affected, and the host port stays 3003, so bookmarks and the Android app's server address keep working. The weekly summary email's Open CookTrace button, used when no app URL is set, pointed at `localhost:3000` and now points at `localhost:3003`, and running from source starts the server on `:3003`, so it no longer collides with a NutriTrace checkout on the same machine.
+
 ### Fixed
 
 - **Dragging the Trace button or a reorder handle no longer refreshes the page.** In the Android app connected to a server, dragging the Trace button, a shopping list or recipe ingredient handle, or a cookbook card downward while the page was scrolled to the top was treated as pull-to-refresh and synced. Dragging those no longer counts as a pull; pulling down anywhere else still refreshes as before.

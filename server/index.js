@@ -54,7 +54,7 @@ seedAiFromEnv();
 seedOidcFromEnv();
 
 const app  = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3003;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ── Reverse-proxy / subpath support ───────────────────────────────────────

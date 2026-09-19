@@ -10,7 +10,7 @@ house conventions that aren't obvious from reading the source.
   svelte-spa-router v4 (hash routing)
 - **Server:** Node + Express 5, better-sqlite3
 - **Mobile:** PWA + Capacitor 8 (Android)
-- **Deploy:** `docker compose up -d`, serves on port 3000
+- **Deploy:** `docker compose up -d`, serves on port 3003 (host and container)
 
 ## Layout
 

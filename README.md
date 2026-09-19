@@ -96,7 +96,7 @@ services:
     image: ghcr.io/traceapps/cooktrace:latest
     container_name: cooktrace
     ports:
-      - "3003:3001"
+      - "3003:3003"
     volumes:
       - ./data/db:/data/db
       - ./data/uploads:/data/uploads
@@ -132,7 +132,7 @@ The most-asked knobs. Full list at [docs/self-hosting/env-vars](https://traceapp
 | `JWT_SECRET` | - | Signing key for auth tokens. Required when user management is on. |
 | `DB_PATH` | `/data/db/cooktrace.db` | SQLite file inside the container. |
 | `UPLOADS_PATH` | `/data/uploads` | Uploaded images and server-side backups. |
-| `PORT` | `3001` | Port the server listens on inside the container. |
+| `PORT` | `3003` | Port the server listens on inside the container (3001 before 1.3.0). |
 | `BASE_URL` | - | Mount at a subpath, e.g. `/cooktrace`. |
 | `LOG_LEVEL` | `info` | `error` \| `warn` \| `info` \| `debug`. |
 | `INSECURE_COOKIES` | unset | Set to `1` on plain-HTTP LAN deployments so the auth cookie isn't dropped. See [LAN-HTTP notes](https://traceapps.github.io/docs/getting-started/lan-http/). |

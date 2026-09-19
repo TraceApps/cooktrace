@@ -464,7 +464,7 @@ export async function sendWeeklySummaryEmail(userId, origin) {
         </table>`;
     }
 
-    const appUrl = origin && /^https?:\/\//.test(origin) ? origin : 'http://localhost:3000';
+    const appUrl = origin && /^https?:\/\//.test(origin) ? origin : 'http://localhost:3003';
     const body = `
       ${greeting(name)}
       <p class="nt-heading" style="margin:0 0 4px;font-size:20px;font-weight:700;color:#FFFFFF;line-height:1.3;">

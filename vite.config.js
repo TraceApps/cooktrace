@@ -10,8 +10,8 @@ export default defineConfig({
   base: './',
   server: {
     proxy: {
-      '/api':     'http://localhost:3001',
-      '/uploads': 'http://localhost:3001',
+      '/api':     'http://localhost:3003',
+      '/uploads': 'http://localhost:3003',
     }
   },
   build: {
