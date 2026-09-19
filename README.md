@@ -19,6 +19,11 @@ No accounts, no telemetry, no cloud sync unless you opt in.</p>
   <a href="https://github.com/traceapps/cooktrace/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/traceapps/cooktrace?style=flat"></a>
 </p>
 
+<p align="center">
+  <b>iOS fund:</b> the Trace apps have no iOS app yet, because building one needs a Mac and an iPhone.
+  <a href="https://traceapps.github.io/docs/support/">See the goal</a> or <a href="https://ko-fi.com/traceapps">chip in</a>. Self-hosting stays free either way.
+</p>
+
 ---
 
 **Jump to:** [What it is](#what-cooktrace-is) · [Features](#features) · [Install](#install) · [Env vars](#env-vars) · [Docs](https://traceapps.github.io/docs/cooktrace/)
@@ -175,9 +180,13 @@ Part of the **TraceApps** family. Sister apps: [NutriTrace](https://github.com/t
 
 ## Support
 
-CookTrace is free to self-host and always will be. It's built and maintained by one person; donations help cover real costs (Apple Developer account for an eventual iOS port, hosting, hardware). Starring the repo helps with discoverability and costs nothing.
+CookTrace is free to self-host and always will be. No paid tier, nothing behind a donation, no telemetry. It's built and maintained by one person.
 
-[![Ko-fi](https://img.shields.io/badge/Ko--fi-Buy_me_a_coffee-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/traceapps)
+**The current goal is iOS.** None of the Trace apps run properly on an iPhone, because building and testing for iOS needs Apple hardware, plus the developer accounts for both app stores. That comes to about $1,300, and the itemised breakdown is on the [Support page](https://traceapps.github.io/docs/support/).
+
+Helping doesn't have to cost anything: starring the repo, reporting bugs with detail, and translating all count, and stars are how self-hosted projects get found.
+
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support_the_iOS_fund-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/traceapps)
 
 ## Disclaimer
 
