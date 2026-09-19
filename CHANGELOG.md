@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Security
+
+- **devalue** (pulled in by Svelte) bumped 5.8.1 → 5.9.4, closes [GHSA-9rgm-9g3h-6x36](https://github.com/advisories/GHSA-9rgm-9g3h-6x36) (denial of service via malformed input, moderate).
+
 ---
 
 ## [1.3.0-dev.02] - 2026-09-17 (pre-release)
