@@ -565,6 +565,29 @@
   const FLIP_MS = 180;
   let dndOverride = new Map();
 
+  // Wide-screen masonry. Must match grid-auto-rows and column-gap in the
+  // .groups-grid rule. Only acts while the parent is actually a grid, so
+  // the stacked mobile layout and Flat mode are left alone. A
+  // ResizeObserver re-measures on every height change (collapse, check
+  // off, drag, window resize) and the span follows.
+  const MASONRY_ROW = 4;
+  const MASONRY_GAP = 20;
+  function masonry(node) {
+    const apply = () => {
+      const grid = node.parentElement;
+      if (!grid || getComputedStyle(grid).display !== 'grid') {
+        node.style.gridRowEnd = '';
+        return;
+      }
+      const h = node.getBoundingClientRect().height;
+      node.style.gridRowEnd = `span ${Math.max(1, Math.ceil((h + MASONRY_GAP) / MASONRY_ROW))}`;
+    };
+    const ro = new ResizeObserver(apply);
+    ro.observe(node);
+    apply();
+    return { destroy() { ro.disconnect(); } };
+  }
+
   // svelte-dnd-action moves its shadow placeholder's id from a fixed
   // sentinel to the real dragged item's id a frame after drag-start
   // (so lookups by id resolve). If a fast pointer move fires another
@@ -879,7 +902,7 @@
         {@const checkedCt = realRows.filter(r => r.checked).length}
         {@const hasHead = g.title != null}
         {@const isCollapsed = hasHead && ((allChecked && !expandedComplete.has(g.key)) || collapsed.has(g.key))}
-        <section class="group" class:collapsed={isCollapsed} class:done={allChecked}>
+        <section class="group" class:collapsed={isCollapsed} class:done={allChecked} use:masonry>
           {#if g.title != null}
             <header class="group-head">
               <button class="group-toggle" type="button"
@@ -1327,14 +1350,20 @@
      self-contained card. align-items:start prevents cells stretching
      to the tallest sibling's height. */
   .groups-grid { display: block; }
-  /* Flat mode is a single group with no title — skip the card/grid
-     treatment so it renders as one continuous list, same as it did
-     before the wide-screen polish. */
+  /* Flat mode is a single group with no title, so it skips the card
+     grid and renders as one continuous list.
+     Masonry: the grid is cut into thin MASONRY_ROW-px rows and the
+     masonry action gives each card a row span matching its real height,
+     so short cards stack into the gap under a tall neighbour instead of
+     every row being as tall as its tallest card. Row gap is 0 because
+     the vertical gap is folded into each span. */
   @media (min-width: 1200px) {
     .groups-grid:not(.flat-mode) {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-      gap: 20px;
+      grid-auto-rows: 4px;
+      column-gap: 20px;
+      row-gap: 0;
       align-items: start;
     }
   }
