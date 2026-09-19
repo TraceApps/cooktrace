@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../../lib/back-stack.js';
   /**
    * BulkFileImportDialog — Issue #2 Phase 2.
    *
@@ -312,7 +313,7 @@ ${textPayload.text}
 </script>
 
 {#if open}
-  <div class="backdrop" use:portal on:click={close}
+  <div class="backdrop" use:portal on:click={close} use:closeOnBack={close}
     in:fade={{ duration: 140 }} out:fade={{ duration: 100 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="head">

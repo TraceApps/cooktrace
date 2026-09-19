@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../../lib/back-stack.js';
   /**
    * SettingsEmail — SMTP form. Layout / verbiage / classes match
    * LiftTrace's SettingsEmail 1:1 so TraceApps SMTP settings read
@@ -276,7 +277,7 @@
 </div>
 
 {#if showTestDialog}
-  <div class="test-dialog-overlay" on:click={closeTestDialog}
+  <div class="test-dialog-overlay" on:click={closeTestDialog} use:closeOnBack={closeTestDialog}
     on:keydown={(e) => e.key === 'Escape' && closeTestDialog()}>
     <div class="test-dialog" role="dialog" aria-labelledby="test-dialog-title"
       on:click|stopPropagation>

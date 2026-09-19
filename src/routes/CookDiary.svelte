@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../lib/back-stack.js';
   import { onMount } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { fade, slide } from 'svelte/transition';
@@ -681,7 +682,7 @@
 <!-- Plan-a-cook dialog -->
 {#if planOpen}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="modal-backdrop" on:click|self={() => planOpen = false} transition:fade={{ duration: 160 }}>
+  <div class="modal-backdrop" on:click|self={() => planOpen = false} use:closeOnBack={() => planOpen = false} transition:fade={{ duration: 160 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="modal-header">
         <h2>{$_('cookdiary_page.plan_a_cook')}</h2>
@@ -739,7 +740,7 @@
 <!-- Filter picker — pick a single recipe to scope all 3 views. -->
 {#if filterPickerOpen}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="modal-backdrop" on:click|self={() => filterPickerOpen = false} transition:fade={{ duration: 160 }}>
+  <div class="modal-backdrop" on:click|self={() => filterPickerOpen = false} use:closeOnBack={() => filterPickerOpen = false} transition:fade={{ duration: 160 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="modal-header">
         <h2>{$_('cookdiary_page.filter_by_recipe')}</h2>
@@ -781,7 +782,7 @@
      chevrons. Mirrors NutriTrace's diary photo viewer. -->
 {#if lightboxEntry && lightboxPhoto}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="lightbox-backdrop" on:click|self={closeLightbox} transition:fade={{ duration: 160 }}>
+  <div class="lightbox-backdrop" on:click|self={closeLightbox} use:closeOnBack={closeLightbox} transition:fade={{ duration: 160 }}>
     <div class="lightbox" on:click|stopPropagation>
       <button class="lightbox-close btn-icon" on:click={closeLightbox} aria-label="Close">
         <span class="material-symbols-rounded">close</span>

@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../lib/back-stack.js';
   /**
    * CookbookView — single cookbook detail page.
    *
@@ -517,7 +518,7 @@
 </div>
 
 {#if coverSheetOpen}
-  <div use:portal class="modal-backdrop" on:click={closeCoverSheet}>
+  <div use:portal class="modal-backdrop" on:click={closeCoverSheet} use:closeOnBack={closeCoverSheet}>
     <div class="modal" on:click|stopPropagation style="max-width:420px">
       <header class="modal-head">
         <h3>Cookbook Cover</h3>
@@ -536,7 +537,7 @@
 {/if}
 
 {#if moveOpen && moveDialogRecipe}
-  <div use:portal class="modal-backdrop" on:click={closeMoveDialog}>
+  <div use:portal class="modal-backdrop" on:click={closeMoveDialog} use:closeOnBack={closeMoveDialog}>
     <div class="modal" on:click|stopPropagation style="max-width:420px">
       <header class="modal-head">
         <h3>{$_('cookbook_view_ct.move_or_copy')}</h3>
@@ -583,7 +584,7 @@
 {/if}
 
 {#if addOpen}
-  <div use:portal class="modal-backdrop" on:click={closeAddDialog}>
+  <div use:portal class="modal-backdrop" on:click={closeAddDialog} use:closeOnBack={closeAddDialog}>
     <div class="modal" on:click|stopPropagation>
       <header class="modal-head">
         <h3>{$_('cookbook_view_ct.add_recipes')}</h3>

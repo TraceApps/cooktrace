@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../lib/back-stack.js';
   import { onMount, onDestroy } from 'svelte';
   import { slide } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
@@ -1453,7 +1454,7 @@
      row is written. Confirm calls back into the combobox so its display
      value updates atomically. -->
 {#if pantryPickerOpen}
-  <div class="cat-modal-backdrop" on:click={closePantryPicker}>
+  <div class="cat-modal-backdrop" on:click={closePantryPicker} use:closeOnBack={closePantryPicker}>
     <div class="cat-modal pantry-picker-modal" on:click|stopPropagation>
       <h3 class="cat-modal-title">{pantryPickerMode === 'swap' ? 'Link to a Pantry Item' : 'Add from Pantry'}</h3>
       {#if pantryPickerMode === 'swap'}
@@ -1490,7 +1491,7 @@
 {/if}
 
 {#if categoryNewOpen}
-  <div class="cat-modal-backdrop" on:click={() => categoryNewOpen = false}>
+  <div class="cat-modal-backdrop" on:click={() => categoryNewOpen = false} use:closeOnBack={() => categoryNewOpen = false}>
     <div class="cat-modal" on:click|stopPropagation>
       <h3 class="cat-modal-title">{$_('recipe_editor_ct.cat_modal_title')}</h3>
       <label class="field">
@@ -1524,7 +1525,7 @@
      dialog is just a thin shell that lets us hide the picker until the
      user actually wants to attach a photo to a specific step. -->
 {#if stepPhotoSheetIdx != null && steps[stepPhotoSheetIdx]}
-  <div class="cat-modal-backdrop" on:click={closeStepPhotoSheet}>
+  <div class="cat-modal-backdrop" on:click={closeStepPhotoSheet} use:closeOnBack={closeStepPhotoSheet}>
     <div class="cat-modal" on:click|stopPropagation>
       <header class="step-photo-modal-head">
         <h3 class="cat-modal-title">Step {stepPhotoSheetIdx + 1} Photo</h3>

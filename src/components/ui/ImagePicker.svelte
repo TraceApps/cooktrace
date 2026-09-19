@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../../lib/back-stack.js';
   /**
    * ImagePicker — three-source hero image input (Camera / Upload / URL).
    *
@@ -193,7 +194,7 @@
 </div>
 
 {#if showCamera}
-  <div use:portal class="cam-overlay"
+  <div use:portal class="cam-overlay" use:closeOnBack={stopCamera}
     in:fade={{ duration: 160 }} out:fade={{ duration: 120 }}
     role="dialog" aria-modal="true">
     <div class="cam-popup"

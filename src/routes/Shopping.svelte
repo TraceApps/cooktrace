@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../lib/back-stack.js';
   import { onMount } from 'svelte';
   import { fade, slide } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
@@ -1012,7 +1013,7 @@
 <!-- Clear Checked, with the option to restock matching pantry items. -->
 {#if clearOpen}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="modal-backdrop" on:click|self={closeClear} transition:fade={{ duration: 160 }}>
+  <div class="modal-backdrop" on:click|self={closeClear} use:closeOnBack={closeClear} transition:fade={{ duration: 160 }}>
     <div class="modal modal-clear" role="dialog" aria-modal="true" aria-labelledby="clear-title">
       <header class="modal-header">
         <h2 id="clear-title">{$_('shopping_page.clear_title', { values: { n: clearCount } })}</h2>
@@ -1080,7 +1081,7 @@
      long-press action sheet's "Edit" entry. -->
 {#if editSheetOpen}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="modal-backdrop" on:click|self={() => { editSheetOpen = false; editTarget = null; }} transition:fade={{ duration: 160 }}>
+  <div class="modal-backdrop" on:click|self={() => { editSheetOpen = false; editTarget = null; }} use:closeOnBack={() => { editSheetOpen = false; editTarget = null; }} transition:fade={{ duration: 160 }}>
     <div class="modal modal-edit" on:click|stopPropagation>
       <header class="modal-header">
         <h2>{$_('shopping_page.edit_item')}</h2>
@@ -1116,7 +1117,7 @@
 <!-- Aisle picker modal — pick a known aisle or type a fresh label. -->
 {#if aisleSheetOpen}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="modal-backdrop" on:click|self={() => { aisleSheetOpen = false; aisleTarget = null; }} transition:fade={{ duration: 160 }}>
+  <div class="modal-backdrop" on:click|self={() => { aisleSheetOpen = false; aisleTarget = null; }} use:closeOnBack={() => { aisleSheetOpen = false; aisleTarget = null; }} transition:fade={{ duration: 160 }}>
     <div class="modal modal-aisle" on:click|stopPropagation>
       <header class="modal-header">
         <h2>{$_('routes.shopping.change_aisle')}</h2>
@@ -1151,7 +1152,7 @@
 <!-- Add-from-recipe picker -->
 {#if pickerOpen}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="modal-backdrop" on:click|self={() => pickerOpen = false} transition:fade={{ duration: 160 }}>
+  <div class="modal-backdrop" on:click|self={() => pickerOpen = false} use:closeOnBack={() => pickerOpen = false} transition:fade={{ duration: 160 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="modal-header">
         <h2>{$_('shopping_page.add_from_recipe')}</h2>
@@ -1191,7 +1192,7 @@
 <!-- Add-from-meal-plan import -->
 {#if planImportOpen}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="modal-backdrop" on:click|self={() => planImportOpen = false} transition:fade={{ duration: 160 }}>
+  <div class="modal-backdrop" on:click|self={() => planImportOpen = false} use:closeOnBack={() => planImportOpen = false} transition:fade={{ duration: 160 }}>
     <div class="modal modal-plan" on:click|stopPropagation>
       <header class="modal-header">
         <h2>{$_('shopping_page.add_from_planned')}</h2>

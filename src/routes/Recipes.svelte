@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../lib/back-stack.js';
   import { onMount, tick } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { fade } from 'svelte/transition';
@@ -844,7 +845,7 @@
   <CookbookImportDialog bind:open={cookbookImportOpen} envLocked={aiEnvLocked} />
 
   {#if shareDialogOpen && shareDialogRecipe}
-    <div class="cb-dialog-backdrop" on:click={() => shareDialogOpen = false}>
+    <div class="cb-dialog-backdrop" on:click={() => shareDialogOpen = false} use:closeOnBack={() => shareDialogOpen = false}>
       <div class="cb-dialog share-dialog" on:click|stopPropagation>
         <header class="cb-dialog-head">
           <h3>{$_('recipes_page.share_recipe')}</h3>
@@ -949,7 +950,7 @@
        scoped only. -->
   {#if cookbookShareDialogOpen && cookbookShareTarget}
     <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="cb-dialog-backdrop" on:click={closeCookbookShareDialog}>
+    <div class="cb-dialog-backdrop" on:click={closeCookbookShareDialog} use:closeOnBack={closeCookbookShareDialog}>
       <div class="cb-dialog share-dialog" on:click|stopPropagation>
         <header class="cb-dialog-head">
           <span class="material-symbols-rounded">share</span>
@@ -1017,7 +1018,7 @@
 
   {#if bulkCookbookOpen}
     <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="cb-dialog-backdrop" on:click={() => !bulkCookbookBusy && (bulkCookbookOpen = false)}>
+    <div class="cb-dialog-backdrop" on:click={() => !bulkCookbookBusy && (bulkCookbookOpen = false)} use:closeOnBack={() => !bulkCookbookBusy && (bulkCookbookOpen = false)}>
       <div class="cb-dialog" on:click|stopPropagation>
         <header class="cb-dialog-head">
           <h3>{$_('recipes_page.add_to_cookbook')}</h3>
@@ -1061,7 +1062,7 @@
   {/if}
 
   {#if cookbookDialogOpen && cookbookDialogRecipe}
-    <div class="cb-dialog-backdrop" on:click={() => cookbookDialogOpen = false}>
+    <div class="cb-dialog-backdrop" on:click={() => cookbookDialogOpen = false} use:closeOnBack={() => cookbookDialogOpen = false}>
       <div class="cb-dialog" on:click|stopPropagation>
         <header class="cb-dialog-head">
           <h3>{$_('recipes_page.add_to_cookbook')}</h3>
@@ -1104,7 +1105,7 @@
        JSON exports, Paprika .paprikarecipes / .paprikarecipe archives. -->
   {#if pasteImportOpen}
     <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="modal-backdrop" on:click|self={() => pasteImportOpen = false}>
+    <div class="modal-backdrop" on:click|self={() => pasteImportOpen = false} use:closeOnBack={() => pasteImportOpen = false}>
       <div class="modal" on:click|stopPropagation>
         <header class="modal-header">
           <h2>JSON / HTML Import</h2>
