@@ -2108,13 +2108,17 @@
     background: var(--surface-1); border: 1px solid var(--border);
     border-radius: var(--radius-lg); width: 100%; max-width: 460px;
     box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+    /* Never taller than the screen above the keyboard, and never up under
+       the status bar: the text box scrolls instead (same as NutriTrace #228). */
+    max-height: min(calc(100vh - 32px), calc(100dvh - 2 * var(--safe-top) - 16px));
+    display: flex; flex-direction: column;
   }
   .modal-header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 14px 16px; border-bottom: 1px solid var(--border);
   }
   .modal-header h2 { margin: 0; font-size: 17px; font-weight: 700; color: var(--text-1); }
-  .modal-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .modal-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; overflow-y: auto; }
   .modal-hint { font-size: 13px; color: var(--text-3); margin: 0; line-height: 1.5; }
   .opt-row {
     display: flex; align-items: flex-start; gap: 10px;
@@ -2169,7 +2173,7 @@
     border-radius: var(--radius-lg);
     padding: 0;
     width: 100%; max-width: 460px;
-    max-height: 80vh;
+    max-height: min(80vh, calc(100dvh - 2 * var(--safe-top) - 16px));
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
     display: flex; flex-direction: column;
   }

@@ -1066,7 +1066,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     width: 100%; max-width: 540px;
-    max-height: 80vh;
+    max-height: min(80vh, calc(100dvh - 2 * var(--safe-top) - 16px));
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
     display: flex; flex-direction: column;
   }

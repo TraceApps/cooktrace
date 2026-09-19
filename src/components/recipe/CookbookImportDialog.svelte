@@ -405,7 +405,7 @@ Rules:
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     width: 100%; max-width: 520px;
-    max-height: 88vh;
+    max-height: min(88vh, calc(100dvh - 2 * var(--safe-top) - 16px));
     overflow: hidden;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
     display: flex; flex-direction: column;
