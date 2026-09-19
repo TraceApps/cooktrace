@@ -36,6 +36,7 @@ import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { isEmptyForGuard } from '../lib/recipe-guards.js';
 import { autoShareNewRecipe } from '../lib/auto-share.js';
+import { dispatchWebhookEvent } from '../lib/webhooks.js';
 
 // Option E guard (2026-08-11): the recipe UPDATE path replaces nested
 // JSON fields (ingredients/steps/tags/tools/nutrition) wholesale. A
@@ -168,6 +169,11 @@ router.post('/push', wrap((req, res) => {
 
   const idMaps = {};       // tableName → { client_id: server_id }
   const results = {};
+  // Webhook events seen in this push. Collected per table and only kept
+  // once that table's transaction commits, then sent after the response
+  // is built, so a rolled-back write never announces itself.
+  const webhookEvents = [];
+  let shoppingNewlyChecked = false;
 
   for (const name of PUSH_ORDER) {
     if (!Array.isArray(tables[name])) { results[name] = []; continue; }
@@ -178,11 +184,15 @@ router.post('/push', wrap((req, res) => {
 
     const insertSql = _buildInsertSql(name, spec);
     const updateSql = _buildUpdateSql(name, spec);
+    const tableEvents = [];
+    let tableNewlyChecked = false;
 
     const txn = db.transaction(() => {
       for (const row of rows) {
         const translated = _translateParents(row, spec, idMaps);
         let values = spec.cols.map(c => _coerce(translated[c]));
+        const val = (col) => values[spec.cols.indexOf(col)];
+        const deleted = spec.softDelete && translated.deleted_at != null;
 
         if (row.server_id) {
           // Fetch enough of the existing row to (a) authorize the write
@@ -203,6 +213,18 @@ router.post('/push', wrap((req, res) => {
           );
           results[name].push({ client_id: row.client_id, server_id: row.server_id });
           idMaps[name][row.client_id] = row.server_id;
+          // Same transitions the REST routes fire on. The Android app
+          // saves through this push, so without these its changes never
+          // reached webhooks.
+          if (!deleted) {
+            if (name === 'cook_diary' && existing.kind !== 'cooked' && val('kind') === 'cooked') {
+              tableEvents.push(_mealCookedEvent(val));
+            } else if (name === 'pantry_items' && _on(existing.in_stock) && !_on(val('in_stock'))) {
+              tableEvents.push(['pantry.out_of_stock', { pantry_item_id: row.server_id, name: val('name') ?? existing.name }]);
+            } else if (name === 'shopping_list' && !_on(existing.checked) && _on(val('checked'))) {
+              tableNewlyChecked = true;
+            }
+          }
         } else {
           const info = db.prepare(insertSql).run(
             u,
@@ -222,10 +244,17 @@ router.post('/push', wrap((req, res) => {
             try { autoShareNewRecipe(u, serverId); }
             catch (e) { console.warn('[sync] auto-share fan-out failed for recipe', serverId, e?.message); }
           }
+          if (name === 'cook_diary' && !deleted && val('kind') === 'cooked') {
+            tableEvents.push(_mealCookedEvent(val));
+          }
         }
       }
     });
-    try { txn(); }
+    try {
+      txn();
+      webhookEvents.push(...tableEvents);
+      if (tableNewlyChecked) shoppingNewlyChecked = true;
+    }
     catch (e) { results[name] = { error: e.message || 'push failed' }; }
   }
 
@@ -287,7 +316,38 @@ router.post('/push', wrap((req, res) => {
   }
 
   res.json({ tables: results });
+
+  try {
+    for (const [event, data] of webhookEvents) dispatchWebhookEvent(u, event, data);
+    // One completion event per push, however many items it checked,
+    // and only when the list is now fully checked (as the REST route).
+    if (shoppingNewlyChecked) {
+      const remaining = db.prepare(
+        `SELECT COUNT(*) AS n FROM shopping_list WHERE ${userClause(u)} AND deleted_at IS NULL AND checked = 0`
+      ).get(...userArgs(u));
+      const total = db.prepare(
+        `SELECT COUNT(*) AS n FROM shopping_list WHERE ${userClause(u)} AND deleted_at IS NULL`
+      ).get(...userArgs(u));
+      if (remaining.n === 0 && total.n > 0) {
+        dispatchWebhookEvent(u, 'shopping_list.completed', { items_count: total.n });
+      }
+    }
+  } catch (e) { /* never let a webhook failure block the save */ }
 }));
+
+function _on(v) {
+  return v === 1 || v === true || v === '1' || v === 'true';
+}
+
+function _mealCookedEvent(val) {
+  const recipeId = val('recipe_id') ?? null;
+  const recipe = recipeId != null ? db.prepare(`SELECT name FROM recipes WHERE id = ?`).get(recipeId) : null;
+  return ['meal.cooked', {
+    date: val('date'), recipe_id: recipeId, recipe_name: recipe?.name ?? null,
+    kind: 'cooked', servings: val('servings') ?? null, rating: val('rating') ?? null,
+    meal_type: val('meal_type') ?? null,
+  }];
+}
 
 // ── GET /pull ─────────────────────────────────────────────────────────
 router.get('/pull', wrap((req, res) => {
