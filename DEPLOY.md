@@ -95,10 +95,11 @@ Optional integrations:
 
 ## Reverse proxy
 
-CookTrace listens on port 3001 inside the container, exposed on host port
-3003 by default (family host-port sequence is NutriTrace 3001, LiftTrace
-3002, CookTrace 3003, all avoiding the common `:3000` default). Front with
-Caddy / Nginx / Traefik on 443.
+CookTrace listens on port 3003 inside the container, exposed on host port
+3003 by default (family port sequence is NutriTrace 3001, LiftTrace 3002,
+CookTrace 3003, NoteTrace 3004, all avoiding the common `:3000` default).
+Front with Caddy / Nginx / Traefik on 443. Upgrading from before 1.3.0,
+when the container listened on 3001? See [Updating](#updating).
 
 If hosting at a subpath (e.g. `https://example.com/cooktrace/`), set
 `BASE_URL=/cooktrace` in the environment.
@@ -111,6 +112,13 @@ docker compose up -d
 ```
 
 Always back up `cooktrace.db` before a major version bump.
+
+**Upgrading to 1.3.0 or later from an earlier version:** the container now
+listens on `3003` instead of `3001`. Change the right-hand side of your
+compose mapping from `"3003:3001"` to `"3003:3003"`, and point any reverse
+proxy that talks to the container directly (`cooktrace:3001`, a Traefik
+`loadbalancer.server.port` label) at `3003`. If you set `PORT` yourself, nothing
+changes.
 
 ## Backups
 
