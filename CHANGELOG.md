@@ -9,6 +9,70 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.3.0] - 2026-09-20
+
+Minor release. Big themes: CookTrace opens up to other software (a Model
+Context Protocol server, personal access tokens, outgoing webhooks, a
+public REST API, and NutriTrace federation in both directions), a
+smarter shopping list, and a batch of Android fixes.
+
+**Action needed when you update: the container now listens on port 3003
+instead of 3001.** If your compose file has `"3003:3001"`, change it to
+`"3003:3003"`; if a reverse proxy or tunnel reaches the container
+directly (`cooktrace:3001`, or a Traefik `loadbalancer.server.port=3001`
+label), point it at `3003`. Until you do, CookTrace won't respond after
+the update. Installs that set `PORT` themselves are not affected, and
+the host port stays 3003, so bookmarks and the Android app's server
+address keep working.
+
+### Changed
+
+- **The container now listens on port 3003, the same as the host port. Action needed when you update.** The image used to listen on 3001 inside the container while the sample compose file published it on 3003, so the two numbers never matched, and 3001 was also NutriTrace's port. Both are 3003 now. See the note above for what to change. The weekly summary email's Open CookTrace button, used when no app URL is set, pointed at `localhost:3000` and now points at `localhost:3003`, and running from source starts the server on `:3003`, so it no longer collides with a NutriTrace checkout on the same machine.
+- **Trace settings now match NutriTrace.** The Base URL and API Key fields save when you leave them (or press Enter) instead of through a Save button beside each field, which on a phone in portrait sat past the edge of the screen; the connection is only re-tested when the value changed. On a server where AI is configured through environment variables, the section says so, shows the provider and model the server actually uses, and hides the base URL and API key fields. Smart Log gains a Voice Input Language setting for when you speak a different language than your device is set to.
+- **The shopping list fills the screen on desktop.** On wide screens the aisle and recipe cards sat in rows as tall as their tallest card, leaving empty space under the short groups. Short groups now stack into that space, and the cards re-pack as groups collapse, items are checked off, or the window is resized. Phones and Flat view are unchanged.
+- **Food Sources settings reorganized.** NutriTrace Federation now lives inside Settings, Food Sources under its own "NutriTrace" sub-heading (between USDA and Barcode Scanner) instead of a separate top-level section, since federation is currently used purely as another food source.
+- **Sync status pill in the sidebar**, with one colour rule for sync state across the app.
+- **Claude Fable 5.1 in Trace's model list.** It is now the most capable Claude option; Fable 5 stays selectable, marked as previous.
+
+### Added
+
+- **Model Context Protocol (MCP) server.** CookTrace exposes a read + write + destructive MCP endpoint at `/api/mcp` so Claude Desktop, Cursor, Codex, and other MCP-aware agents can search recipes, browse the pantry and shopping list, log a cook, and (with the right scope) create recipes or pantry items. Fourteen tools across three independently-gated tiers (`mcp:read` / `mcp:write` / `mcp:destroy`), each requiring both a server-side env flag and a matching token scope. Off by default. See [docs/cooktrace/mcp.md](https://traceapps.github.io/docs/cooktrace/mcp/).
+- **Personal access tokens.** New Settings, API Tokens section (admin, multi-user mode) to mint, scope, and revoke tokens. Shared by MCP, the public API, and federation.
+- **Outgoing webhooks.** Configure a target URL in Settings, Webhooks and CookTrace fires a signed HTTP POST the instant a recipe is logged as cooked, the shopping list is fully checked off, or a pantry item runs out of stock. Off by default (`WEBHOOKS_ENABLED=1`). HMAC-SHA256 signed, 3 delivery attempts with backoff, and a "send test event" button. Target URLs are validated against an SSRF guard. See [docs/cooktrace/webhooks.md](https://traceapps.github.io/docs/cooktrace/webhooks/).
+- **General-purpose public REST API** at `/api/v1/cook-diary`, `/api/v1/shopping`, and a pantry stock write route, for your own scripts and automations. Off by default (`PUBLIC_API_ENABLED=1`; `PUBLIC_API_WRITE_ENABLED=1` unlocks the writes). Reuses the `mcp:read`/`mcp:write` token scopes. See [docs/cooktrace/public-api.md](https://traceapps.github.io/docs/cooktrace/public-api/).
+- **NutriTrace federation, both directions.** NutriTrace can now pull your CookTrace recipes (`GET /api/v1/recipes`, with per-ingredient nutrition resolved through variant/generic inheritance) and your pantry (`GET /api/v1/pantry`, leaf rows shaped for NT's foods library, with search and paging). Gated by new `read:recipes` and `read:pantry` token scopes, independent of each other and of MCP.
+- **NutriTrace joins the Pantry search chips.** A connected NutriTrace instance's food catalog is a fourth search source alongside Open Food Facts and USDA when adding a pantry item, picked the same way (chip, long-press to pin, included in "All" mode).
+- **Shopping API for sister apps.** A `shopping` token scope covering list, add, check, and clear, always on and reaching nothing but the shopping list. It is what NoteTrace uses to send a checklist's items across and show the list back.
+- **The shopping list combines duplicate items.** In By Aisle and Flat views, items with the same name and unit show as one row with the amounts added up and a pill for each recipe they came from. Checking, removing, dragging or re-aisling that row applies to every copy behind it. Different units stay separate, and a copy with no amount makes the row show none rather than a wrong total. By Recipe view still lists each recipe's own items, and nothing changed in the database, sync, or the Android app's storage.
+- **Clear Checked can restock your pantry.** The confirmation lists the matching pantry items that are currently out of stock, ticked by default, so what you bought goes back in stock without a second trip through the Pantry tab. An item is only offered when the row is linked to a pantry item or its name matches exactly one; a generic such as Milk gets a dropdown for which variant you bought; the toast has an Undo.
+- **Support the iOS fund.** The README and Settings, About name what the fund covers.
+
+### Fixed
+
+- **The shopping list froze mid-drag.** Reordering threw an `each_key_duplicate` error and left the page unresponsive, because the drag library renames its placeholder to the dragged row's own id one frame after a drag starts, so a fast pointer move could hand Svelte the same id twice.
+- **Shopping search crashed when two pantry items shared a name.** Suggestions are deduplicated by name inside the shared picker, which also protects the seven other screens that use it (recipe category, tags, tools, pantry category, cookbook tags, Kitchens invite).
+- **Cook history and comments returned 403 on a recipe shared with you.** Both reads checked only ownership or group visibility and ignored the kitchen share that granted access to the recipe itself.
+- **Marking a pantry item back in stock left its quantity at 0**, so it still read as out of stock and couldn't be toggled out again. An explicit `null` quantity now clears the stored value instead of being treated as "leave unchanged".
+- **Pantry "Expiring Soon" showed already-expired items as still counting down** on wide screens (for example "63d past" instead of "Expired"). The ribbon lists both soon-to-expire and already-expired items, so it is now titled "Expiring & Expired".
+- **An expanded generic pantry item's photo ballooned to a huge size on desktop** when it had variants.
+- **Android: the back button closes what's open first.** With a sheet, dialog, menu or photo viewer open, back left the page underneath with it still showing. Back now closes the newest sheet, dialog, menu, picker, photo viewer or Trace chat first, one at a time, then the sidebar, then goes back a page.
+- **Android: dragging the Trace button or a reorder handle no longer refreshes the page.** Dragging those while scrolled to the top was treated as pull-to-refresh. Pulling down anywhere else still refreshes.
+- **Android: sheets and dialogs stay below the status bar**, including with the keyboard up, where the JSON import dialog's buttons could sit off the top of the screen. Same fix as NutriTrace [#228](https://github.com/TraceApps/nutritrace/issues/228).
+- **Error and delete colours come from the theme.** Everything used an `--error` token that was never defined, so it fell back to two different hardcoded reds and ignored the light theme. They all use the real `--danger` token now.
+
+### Security
+
+- **Comments could be posted to any recipe by ID.** `POST /api/recipes/:id/comments` had no ownership, share, or visibility check at all; it now requires the same access reading comments does.
+- **Backup archives are no longer reachable from the public uploads directory.** `BACKUPS_PATH` defaults to a directory inside `UPLOADS_PATH`, and `/uploads` is served ahead of the auth middleware so an Android WebView `<img>` can load images without an `Authorization` header. A full-backup ZIP sitting there was fetchable by URL, while every `/api/full-backup` route is admin-only. It now returns 404. Scheduled backups are off by default, so an install that never enabled them and never created one by hand had nothing there to reach, and there is no directory listing, so a filename had to be known or guessed. The archive holds a full database dump, so if yours has been internet-facing with backups enabled, a look through your access log for `/uploads/backups/` will settle it either way. A custom `BACKUPS_PATH` elsewhere inside the uploads directory is covered too.
+- **Uploads** are served from a sandboxed set of safe extensions.
+- **multer** bumped 2.2.0 to 2.3.0, closes a HIGH advisory (denial of service via aborted uploads holding file handles open).
+- **nodemailer** bumped 9.0.3 to 9.1.1 (root and server), closes a moderate advisory (recipient-header validation bypass).
+- **adm-zip** bumped 0.6.0 to 0.6.1, closes the symlink-extraction advisory.
+- **devalue** bumped 5.8.1 to 5.9.4, closes [GHSA-9rgm-9g3h-6x36](https://github.com/advisories/GHSA-9rgm-9g3h-6x36) (denial of service via malformed input, moderate).
+- `npm audit` reports 0 vulnerabilities for the app and the server.
+
+---
+
 ## [1.3.0-dev.03] - 2026-09-19 (pre-release)
 
 Third dev pre-release of the 1.3.0 minor. **Action needed when you
