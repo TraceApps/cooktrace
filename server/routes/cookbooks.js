@@ -6,6 +6,7 @@
  * (with insertion order as the tiebreaker).
  */
 import { Router } from 'express';
+import { localizeDataUrl } from '../lib/image-localizer.js';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
@@ -293,7 +294,8 @@ router.post('/', wrap((req, res) => {
   const name = (req.body?.name || '').toString().trim();
   if (!name) return res.status(400).json({ error: 'name required' });
   const description = req.body?.description ? String(req.body.description).trim() || null : null;
-  const cover_image_url = req.body?.cover_image_url ? String(req.body.cover_image_url).trim() || null : null;
+  // A cover taken with no connection arrives embedded; it becomes a file here.
+  const cover_image_url = req.body?.cover_image_url ? localizeDataUrl(String(req.body.cover_image_url).trim()) || null : null;
   const is_smart = req.body?.is_smart ? 1 : 0;
   // Validate + minify the smart filter. Drop unknown keys so the JSON
   // we store stays clean across schema iterations.

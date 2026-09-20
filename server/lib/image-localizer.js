@@ -132,3 +132,39 @@ function _guessExtension(url) {
 export function isExternalUrl(url) {
   return url && url.startsWith('http');
 }
+
+// ── Photos taken with no connection ───────────────────────────────────
+// The web app can't upload a file when it can't reach the server, so a
+// photo taken offline travels embedded in the row it belongs to, the same
+// way NutriTrace has always carried food photos. Here it becomes a real
+// file under /uploads/ so everything downstream (the apps, exports,
+// backups) sees an ordinary image path.
+const _DATA_URL = /^data:image\/(jpeg|jpg|png|webp|gif|avif);base64,/i;
+const MAX_EMBEDDED_BYTES = 12 * 1024 * 1024;
+
+/** A data: image becomes a file and its path; anything else is untouched. */
+export function localizeDataUrl(img_url) {
+  if (typeof img_url !== 'string' || !_DATA_URL.test(img_url)) return img_url;
+  try {
+    const [head, b64] = img_url.split(',', 2);
+    const ext = head.match(/^data:image\/([a-z]+);/i)?.[1].toLowerCase().replace('jpeg', 'jpg') || 'jpg';
+    const bytes = Buffer.from(b64, 'base64');
+    if (!bytes.length || bytes.length > MAX_EMBEDDED_BYTES) {
+      logger.warn(`[image-localizer] Refusing embedded image of ${bytes.length} bytes`);
+      return null;
+    }
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    const filename = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}.${ext}`;
+    fs.writeFileSync(path.join(UPLOADS_DIR, filename), bytes);
+    return `/uploads/${filename}`;
+  } catch (e) {
+    logger.warn(`[image-localizer] Could not save an embedded image: ${e.message}`);
+    return null;
+  }
+}
+
+/** Every image on a row, embedded ones turned into files. */
+export function localizeDataUrls(value) {
+  if (Array.isArray(value)) return value.map(localizeDataUrl).filter(Boolean);
+  return localizeDataUrl(value);
+}

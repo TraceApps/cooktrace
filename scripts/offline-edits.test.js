@@ -167,3 +167,20 @@ test('a refused change is described the way its author would describe it', () =>
   assert.match(describeOp({ kind: 'recipe-update' }), /recipe you changed/);
   assert.ok(!describeOp({ kind: 'shopping-check' }).includes('/api/'));
 });
+
+test('"I cooked this" from a recipe queues like a diary entry', () => {
+  assert.equal(writeOp('POST', '/api/recipes/4/cooked', { date: '2026-09-20' }).kind, 'diary-create');
+  assert.equal(writeOp('PUT', '/api/recipes/4/cooks/9', {}).kind, 'diary-update');
+  assert.equal(writeOp('DELETE', '/api/recipes/4/cooks/9').kind, 'diary-delete');
+  assert.equal(writeOp('PUT', '/api/recipes/4/cooks/9', {}).key, 'diary:9');
+});
+
+test('a photo taken offline travels inside the row', () => {
+  // The upload endpoint cannot be reached, so the photo is embedded and the
+  // server turns it back into a file (server/lib/image-localizer.js).
+  const body = { photos: ['data:image/jpeg;base64,abc'], date: '2026-09-20' };
+  const queued = writeOp('POST', '/api/recipes/4/cooked', body);
+  assert.equal(queued.kind, 'diary-create');
+  // Uploading itself is never queued: there is nothing to upload to.
+  assert.equal(writeOp('POST', '/api/upload', {}), null);
+});

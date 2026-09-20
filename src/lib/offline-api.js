@@ -347,6 +347,27 @@ export function createOfflineApi(http) {
   _http = http;
   _wire();
   const impl = Object.create(http);
+
+  /**
+   * A photo with no connection to upload it to. Rather than refusing (the
+   * one thing people do in a kitchen), it is scaled down and handed back as
+   * a data URL, so it travels inside whatever row it is attached to and the
+   * server turns it into a file when it arrives.
+   */
+  impl.uploadImage = async (file) => {
+    const ops = await _loadOps();
+    if (_online() && !ops.length) {
+      try {
+        return await http.uploadImage(file);
+      } catch (err) {
+        if (!isOfflineError(err)) throw err;
+        _publish({ online: false });
+      }
+    }
+    const { embeddableDataUrl } = await import('./image-embed.js');
+    return embeddableDataUrl(file);
+  };
+
   impl._fetch = (method, path, body, isUpload) => (
     // An upload carries a file, which is not ours to hold: it goes straight
     // to the server and says it needs a connection if there isn't one.

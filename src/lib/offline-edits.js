@@ -93,6 +93,14 @@ export function writeOp(method, url, body) {
   if (match && m === 'PATCH') return { kind: 'pantry-stock', key: `pantry-stock:${match[1]}`, id: Number(match[1]) };
 
   // ── What you cooked ───────────────────────────────────────────────
+  // "I cooked this" from a recipe, and the diary's own entries, are the same
+  // thing arriving by two doors.
+  match = path.match(/^\/api\/recipes\/(-?\d+)\/cooked$/);
+  if (match && m === 'POST') return { kind: 'diary-create', key: null };
+  match = path.match(/^\/api\/recipes\/(-?\d+)\/cooks\/(-?\d+)$/);
+  if (match && (m === 'PUT' || m === 'DELETE')) {
+    return { kind: m === 'PUT' ? 'diary-update' : 'diary-delete', key: `diary:${match[2]}`, id: Number(match[2]) };
+  }
   if (path === '/api/cook-diary' && m === 'POST') return { kind: 'diary-create', key: null };
   match = path.match(/^\/api\/cook-diary\/(-?\d+)$/);
   if (match && (m === 'PUT' || m === 'DELETE')) {

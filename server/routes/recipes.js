@@ -28,6 +28,7 @@ import fs from 'node:fs';
 import { deriveSodiumSalt } from '../lib/nutrition-derive.js';
 import { notifyCommentReply } from '../lib/push-notify.js';
 import { sendRecipeShared, isEmailConfigured } from '../email.js';
+import { localizeDataUrl, localizeDataUrls } from '../lib/image-localizer.js';
 import { logger } from '../logger.js';
 import multer from 'multer';
 
@@ -133,7 +134,9 @@ function _toStorage(body) {
   return {
     name:         (body.name || '').toString().trim(),
     description:  body.description ?? null,
-    img_url:      body.img_url ?? body.imgUrl ?? null,
+    // A photo taken with no connection arrives embedded in the row; it
+    // becomes a file here, so everything downstream sees a normal path.
+    img_url:      localizeDataUrl(body.img_url ?? body.imgUrl ?? null),
     servings:     body.servings != null ? Math.max(1, parseInt(body.servings, 10) || 1) : null,
     yield_text:   body.yield_text ? String(body.yield_text).trim() || null : null,
     prep_minutes:  body.prep_minutes  != null ? Math.max(0, parseInt(body.prep_minutes,  10) || 0) : null,
@@ -638,11 +641,14 @@ router.post('/:id/cooked', wrap((req, res) => {
   // Accept legacy `photo_url` (single string) AND new `photos` (array
   // of strings). Normalise: photos JSON column gets the array;
   // photo_url mirror keeps photos[0] for backwards compatibility.
+  // A photo taken with no connection arrives embedded in the row rather
+  // than uploaded; it becomes a file here, so everything downstream (the
+  // apps, exports, backups) sees an ordinary /uploads/ path.
   let photos = Array.isArray(req.body?.photos)
-    ? req.body.photos.filter(p => typeof p === 'string' && p.trim()).map(p => p.trim())
+    ? localizeDataUrls(req.body.photos.filter(p => typeof p === 'string' && p.trim()).map(p => p.trim()))
     : [];
   if (photos.length === 0) {
-    const single = req.body?.photo_url ?? req.body?.photoUrl ?? null;
+    const single = localizeDataUrl(req.body?.photo_url ?? req.body?.photoUrl ?? null);
     if (single) photos = [String(single)];
   }
   const photoUrl = photos[0] || null;
@@ -742,9 +748,10 @@ router.put('/:id/cooks/:cookId', wrap((req, res) => {
   // legacy `photo_url` (single), else keep existing.
   let nextPhotos;
   if (Array.isArray(req.body?.photos)) {
-    nextPhotos = req.body.photos.filter(p => typeof p === 'string' && p.trim()).map(p => p.trim());
+    nextPhotos = localizeDataUrls(req.body.photos.filter(p => typeof p === 'string' && p.trim()).map(p => p.trim()));
   } else if (req.body?.photo_url !== undefined) {
-    nextPhotos = req.body.photo_url ? [String(req.body.photo_url)] : [];
+    const one = localizeDataUrl(req.body.photo_url);
+    nextPhotos = one ? [String(one)] : [];
   } else {
     let existingPhotos = [];
     if (existing.photos) { try { existingPhotos = JSON.parse(existing.photos) || []; } catch {} }
