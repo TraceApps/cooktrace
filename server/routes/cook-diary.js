@@ -16,6 +16,7 @@ import { Router } from 'express';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
+import { dispatchWebhookEvent } from '../lib/webhooks.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -179,9 +180,18 @@ router.post('/', wrap((req, res) => {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(u, recipeId, date, kind, servings, notes, photoUrl, mealType, rating);
 
-  if (kind === 'cooked') _recomputeRecipeAggregates(recipeId);
+  if (kind === 'cooked') recomputeRecipeAggregates(recipeId);
 
   const row = db.prepare(`SELECT * FROM cook_diary WHERE id = ?`).get(result.lastInsertRowid);
+
+  if (kind === 'cooked') {
+    try {
+      dispatchWebhookEvent(u, 'meal.cooked', {
+        date, recipe_id: recipeId, recipe_name: recipe.name, kind, servings, rating, meal_type: mealType,
+      });
+    } catch (e) { /* never let a webhook failure block the save */ }
+  }
+
   res.status(201).json(row);
 }));
 
@@ -211,7 +221,21 @@ router.put('/:id', wrap((req, res) => {
   ).run(date, kind, notes, photoUrl, servings, mealType, rating, id);
 
   // Recompute aggregates if cooked-state or recipe changed.
-  if (existing.kind !== kind || existing.recipe_id) _recomputeRecipeAggregates(existing.recipe_id);
+  if (existing.kind !== kind || existing.recipe_id) recomputeRecipeAggregates(existing.recipe_id);
+
+  // Flipping a planned entry to cooked is the Diary's main "I cooked
+  // this" path, so it fires meal.cooked the same as a fresh cooked row.
+  if (existing.kind !== 'cooked' && kind === 'cooked') {
+    try {
+      const recipe = existing.recipe_id
+        ? db.prepare(`SELECT name FROM recipes WHERE id = ?`).get(existing.recipe_id)
+        : null;
+      dispatchWebhookEvent(u, 'meal.cooked', {
+        date, recipe_id: existing.recipe_id, recipe_name: recipe?.name ?? null,
+        kind, servings, rating, meal_type: mealType,
+      });
+    } catch (e) { /* never let a webhook failure block the save */ }
+  }
   res.json({ ok: true });
 }));
 
@@ -226,7 +250,7 @@ router.delete('/:id', wrap((req, res) => {
     return res.status(403).json({ error: 'Forbidden' });
   }
   db.prepare(`UPDATE cook_diary SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).run(id);
-  if (existing.recipe_id) _recomputeRecipeAggregates(existing.recipe_id);
+  if (existing.recipe_id) recomputeRecipeAggregates(existing.recipe_id);
   res.json({ ok: true });
 }));
 
@@ -250,7 +274,7 @@ function _coerceRating(v) {
 // stash MAX(date) as a date-only string. The earlier composite SQL
 // (date || ' ' || COALESCE(created_at, '00:00:00')) produced garbage
 // because created_at is itself a full timestamp.
-function _recomputeRecipeAggregates(recipeId) {
+export function recomputeRecipeAggregates(recipeId) {
   if (!recipeId) return;
   const stats = db.prepare(
     `SELECT COUNT(*) AS n, MAX(date) AS last

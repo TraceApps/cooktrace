@@ -54,6 +54,40 @@ db.exec(`
     expires_at TEXT NOT NULL,
     used       INTEGER DEFAULT 0
   );
+
+  -- Personal access tokens. Currently the auth mechanism for the MCP
+  -- endpoint (/api/mcp); a general-purpose token store so a future
+  -- federation-style API can reuse it without a schema change. Raw
+  -- token value is never stored, only its SHA-256 hash.
+  CREATE TABLE IF NOT EXISTS api_tokens (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name         TEXT NOT NULL,
+    token_hash   TEXT NOT NULL UNIQUE,
+    scopes       TEXT NOT NULL DEFAULT '[]',  -- JSON array of scope strings
+    expires_at   TEXT,                         -- NULL = never expires
+    last_used_at TEXT,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id);
+  CREATE INDEX IF NOT EXISTS idx_api_tokens_hash ON api_tokens(token_hash);
+
+  -- Outgoing webhooks. secret_encrypted is AES-256-GCM (token-crypto.js),
+  -- not hashed like api_tokens.token_hash, because the server needs the
+  -- plaintext back later to compute each delivery's HMAC.
+  CREATE TABLE IF NOT EXISTS webhooks (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id              INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    url                  TEXT NOT NULL,
+    secret_encrypted     TEXT NOT NULL,
+    events               TEXT NOT NULL DEFAULT '[]',  -- JSON array of event names
+    enabled              INTEGER NOT NULL DEFAULT 1,
+    last_delivery_at     TEXT,
+    last_delivery_status TEXT,                        -- 'success' | 'failed' | NULL
+    last_delivery_error  TEXT,
+    created_at           TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_webhooks_user ON webhooks(user_id);
 `);
 
 // ── AI assistant chat history (per user) ───────────────────────────────────
@@ -241,6 +275,14 @@ if (!columnExists('recipes', 'total_minutes')) {
 // override is NULL.
 if (!columnExists('recipes', 'rest_minutes')) {
   db.exec(`ALTER TABLE recipes ADD COLUMN rest_minutes INTEGER`);
+}
+
+// Legacy column from an earlier push-to-NT flow that was reverted in
+// favor of NT-side pull (mirroring the Mealie pattern). Kept in place
+// so re-adding the column on migrated instances is a no-op; nothing
+// reads or writes it today. Safe to drop in a future major.
+if (!columnExists('recipes', 'nt_meal_id')) {
+  db.exec(`ALTER TABLE recipes ADD COLUMN nt_meal_id INTEGER`);
 }
 
 // ai_chat_history was originally append-only with just created_at, but

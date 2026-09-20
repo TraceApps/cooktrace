@@ -31,8 +31,6 @@
   import SettingsCooking         from '../components/settings/SettingsCooking.svelte';
   import SettingsNutrition       from '../components/settings/SettingsNutrition.svelte';
   import SettingsTrace           from '../components/settings/SettingsTrace.svelte';
-  import SettingsFederation      from '../components/settings/SettingsFederation.svelte';
-  import SettingsImportFromNT    from '../components/settings/SettingsImportFromNT.svelte';
   import SettingsFoodSources     from '../components/settings/SettingsFoodSources.svelte';
   import SettingsServerConnection from '../components/settings/SettingsServerConnection.svelte';
   import SettingsNotifications   from '../components/settings/SettingsNotifications.svelte';
@@ -43,6 +41,8 @@
   import SettingsDiagnostics     from '../components/settings/SettingsDiagnostics.svelte';
   import SettingsUserManagement  from '../components/settings/SettingsUserManagement.svelte';
   import SettingsAuth            from '../components/settings/SettingsAuth.svelte';
+  import SettingsApiTokens       from '../components/settings/SettingsApiTokens.svelte';
+  import SettingsWebhooks        from '../components/settings/SettingsWebhooks.svelte';
   import SettingsEmail           from '../components/settings/SettingsEmail.svelte';
   import SettingsAbout           from '../components/settings/SettingsAbout.svelte';
   import Profile                 from './Profile.svelte';
@@ -152,8 +152,7 @@
     regional:      { titleKey: 'settings.regional.section',          icon: 'public' },
     cooking:       { titleKey: 'settings.cooking.section',           icon: 'restaurant' },
     nutrition:     { titleKey: 'settings.nutrition.section',         icon: 'science' },
-    ai:            { titleKey: 'settings.ai.section',                icon: 'bolt' },
-    federation:    { titleKey: 'settings.federation.section',        icon: 'link' },
+    ai:            { titleKey: 'settings.ai.section',                icon: 'smart_toy' },
     foodsources:   { titleKey: 'settings.connected_services.section',icon: 'restaurant_menu' },
     notifications: { titleKey: 'settings.notifications.section',     icon: 'notifications' },
     email:         { titleKey: 'settings.email.section',             icon: 'mail' },
@@ -162,6 +161,8 @@
     kitchens:      { titleKey: 'settings.kitchens.section',          icon: 'group' },
     users:         { titleKey: 'settings.users.section',             icon: 'group' },
     auth:          { titleKey: 'settings.authentication.section',    icon: 'shield_person' },
+    apitokens:     { titleKey: 'settings.apitokens.section',         icon: 'key' },
+    webhooks:      { titleKey: 'settings.webhooks.section',          icon: 'webhook' },
     serverconn:    { titleKey: 'settings.server.section',            icon: 'cloud' },
     updates:       { titleKey: 'settings.updates.section',           icon: 'system_update' },
     diagnostics:   { titleKey: 'settings.diagnostics.section',       icon: 'troubleshoot' },
@@ -179,9 +180,10 @@
     cooking:       SettingsCooking,
     nutrition:     SettingsNutrition,
     ai:            SettingsTrace,
-    // federation is a two-component render (federation + import-from-NT)
-    // — handled as a special case in the markup below.
-    federation:    SettingsFederation,
+    // foodsources is a three-component render (food sources + the
+    // NutriTrace federation connection + its import-foods picker), all
+    // now grouped here since NT federation is currently used purely as
+    // another food source. Handled as a special case in the markup below.
     foodsources:   SettingsFoodSources,
     notifications: SettingsNotifications,
     email:         SettingsEmail,
@@ -190,6 +192,8 @@
     kitchens:      SettingsKitchens,
     users:         SettingsUserManagement,
     auth:          SettingsAuth,
+    apitokens:     SettingsApiTokens,
+    webhooks:      SettingsWebhooks,
     serverconn:    SettingsServerConnection,
     updates:       SettingsUpdates,
     diagnostics:   SettingsDiagnostics,
@@ -207,9 +211,8 @@
     regional:      ['regional','language','translation','locale','date','time','12h','24h','units','energy','kcal','kj','calories','kilojoules','imperial','metric','measurement system'],
     cooking:       ['cooking','servings','default servings','yield','recipe','recipes','url import','url import engine','scraper','recipe scrapers','recipe-scrapers','enhanced','smart','json-ld','schema.org','parser','auto add ingredients','auto-create pantry','pantry catalog','shopping','shopping list','aisle','aisles','group by','grouping','checked','hide checked','sort','reorder','shared recipes','main list','kitchen recipes','mixed view'],
     nutrition:     ['nutrition','nutrients','nutriments','vitamins','minerals','visible nutriments','fda'],
-    federation:    ['federation','nutritrace','nt','linked','share','token','instance','foods','pull foods','import foods','sync foods'],
-    foodsources:   ['food sources','open food facts','off','usda','fooddata central','api key','barcode','scanner','beep','flashlight','search','language','country','contribute','default source','default search','my pantry','pantry search'],
-    ai:            ['ai','trace','assistant','provider','model','custom model','model id','api key','chat','claude','openai','gemini','sonnet','opus','haiku','gpt','gemini 3','base url','artificial intelligence','smart log','smartlog','quick log','voice','dictate','hold to record','mic'],
+    foodsources:   ['food sources','open food facts','off','usda','fooddata central','api key','barcode','scanner','beep','flashlight','search','language','country','contribute','default source','default search','my pantry','pantry search','federation','nutritrace','nt','linked','share','token','instance','pull foods','import foods','sync foods'],
+    ai:            ['ai','trace','assistant','provider','model','custom model','model id','api key','chat','claude','openai','gemini','sonnet','opus','haiku','gpt','gemini 3','base url','artificial intelligence','smart log','smartlog','quick log','voice','dictate','hold to record','mic','voice language','voice input','language'],
     notifications: ['notifications','reminders','cook day','thaw','alerts','push','apprise','gotify','ntfy','expiration','expiry','expires','expiring','pantry expiry','digest','weekly summary','shopping nudge'],
     email:         ['email','smtp','mail','password reset','invite','from address','tls','outgoing','send test','test email','recipient','test recipient','connection status','change password','change smtp'],
     backup:        ['backup','export','import','restore','json','full backup','reset','danger zone'],
@@ -217,6 +220,8 @@
     kitchens:      ['kitchens','kitchen','household','household members','share','sharing','family','roommates','crew','group','members','auto-share','auto share','auto sharing','share recipes','share cookbook','cookbook sharing','via kitchen'],
     users:         ['users','user management','accounts','login','admin','register','invite'],
     auth:          ['authentication','auth','sso','single sign-on','single sign on','oidc','openid','authentik','keycloak','authelia','password login'],
+    apitokens:     ['api tokens','api token','personal access token','pat','mcp','model context protocol','claude desktop','cursor','codex','agent','ai agent','bearer token','scopes','revoke token'],
+    webhooks:      ['webhooks','webhook','automation','n8n','home assistant','ifttt','push','event','integration','integrations','http post','callback url','signature','hmac','secret'],
     serverconn:    ['server','connection','sync','connect','disconnect','local mode','offline','standalone','android','native','url','login'],
     updates:       ['updates','update','upgrade','version','new version','changelog','release','releases','apk','install','download','check for updates','auto-check','channel','stable','dev','dev-latest','beta','github','server update','docker','compose','docker-compose','check frequency','check interval','how often','hourly','daily','manual','manual only','cadence','banner','notification'],
     diagnostics:   ['diagnostics','logs','verbose','console','export','bug','report','troubleshoot','crash'],
@@ -437,11 +442,6 @@
     <span>{$_('settings.ai.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
-  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'federation')} class:active={currentSection === 'federation'} aria-current={currentSection === 'federation' ? 'page' : undefined} on:click={() => toggleSection('federation')}>
-    <span class="material-symbols-rounded si">hub</span>
-    <span>{$_('settings.federation.section')}</span>
-    <span class="material-symbols-rounded chevron">expand_more</span>
-  </button>
   <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'foodsources')} class:active={currentSection === 'foodsources'} aria-current={currentSection === 'foodsources' ? 'page' : undefined} on:click={() => toggleSection('foodsources')}>
     <span class="material-symbols-rounded si">qr_code_scanner</span>
     <span>{$_('settings.connected_services.section')}</span>
@@ -498,6 +498,16 @@
       <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'auth')} class:active={currentSection === 'auth'} aria-current={currentSection === 'auth' ? 'page' : undefined} on:click={() => toggleSection('auth')}>
         <span class="material-symbols-rounded si">vpn_key</span>
         <span>{$_('settings.authentication.section')}</span>
+        <span class="material-symbols-rounded chevron">expand_more</span>
+      </button>
+      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'apitokens')} class:active={currentSection === 'apitokens'} aria-current={currentSection === 'apitokens' ? 'page' : undefined} on:click={() => toggleSection('apitokens')}>
+        <span class="material-symbols-rounded si">key</span>
+        <span>{$_('settings.apitokens.section')}</span>
+        <span class="material-symbols-rounded chevron">expand_more</span>
+      </button>
+      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'webhooks')} class:active={currentSection === 'webhooks'} aria-current={currentSection === 'webhooks' ? 'page' : undefined} on:click={() => toggleSection('webhooks')}>
+        <span class="material-symbols-rounded si">webhook</span>
+        <span>{$_('settings.webhooks.section')}</span>
         <span class="material-symbols-rounded chevron">expand_more</span>
       </button>
     {/if}
@@ -594,13 +604,6 @@
                 <SettingsTrace {envLocks} />
               {:else if currentSection === 'email'}
                 <SettingsEmail {envLocks} />
-              {:else if currentSection === 'federation'}
-                <!-- Federation drills-in show BOTH the federation
-                     connection card and the Import-from-NT card. -->
-                <div class="section-body">
-                  <SettingsFederation />
-                  <SettingsImportFromNT />
-                </div>
               {:else}
                 <svelte:component this={SECTION_COMPONENTS[currentSection]} />
               {/if}

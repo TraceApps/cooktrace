@@ -23,7 +23,7 @@ No accounts, no telemetry, no cloud sync unless you opt in.</p>
 
 <p align="center">
   <b>iOS fund:</b> the Trace apps have no iOS app yet, because building one needs a Mac and an iPhone.
-  <a href="https://traceapps.github.io/docs/support/">See the goal</a> or <a href="https://ko-fi.com/traceapps">chip in</a>. Self-hosting stays free either way.
+  <a href="https://ko-fi.com/traceapps">Chip in on Ko-fi</a>. Self-hosting stays free either way.
 </p>
 
 ---
@@ -67,6 +67,7 @@ Third app in the Trace family alongside [NutriTrace](https://github.com/traceapp
 ### AI + Federation
 - **Trace AI.** Reads your recipes, pantry, diary, and cookbooks; can log a cook, plan a meal, add to shopping, or import a recipe from a URL, all conversationally. 19 tools total. Multi-provider (Claude / OpenAI / Gemini / any OpenAI-compatible endpoint). Smart Log voice, image attach, cook-mode voice control. → [full guide](https://traceapps.github.io/docs/cooktrace/trace/)
 - **NutriTrace federation.** Pull food data per-user with a Bearer token; log cooks back to the NT diary. → [full guide](https://traceapps.github.io/docs/cooktrace/nt-federation/)
+- **Model Context Protocol (MCP).** Expose your recipes, pantry, shopping list, and cook diary to external AI agents (Claude Desktop, Cursor, Codex) via the standard MCP Streamable HTTP transport. Off by default; opt in with `MCP_ENABLED=1`. Read, write, and destructive tool tiers, each independently gated by its own env flag and token scope. → [full guide](https://traceapps.github.io/docs/cooktrace/mcp/)
 
 ### Accounts + platforms
 - **Multi-user + OIDC SSO.** Authentik, Keycloak, Pocket ID, Authelia, Auth0, Google. Auto-link verified emails, optional auto-register, admin-group claims, RP-initiated logout. → [full guide](https://traceapps.github.io/docs/auth/oidc/)
@@ -95,7 +96,7 @@ services:
     image: ghcr.io/traceapps/cooktrace:latest
     container_name: cooktrace
     ports:
-      - "3003:3001"
+      - "3003:3003"
     volumes:
       - ./data/db:/data/db
       - ./data/uploads:/data/uploads
@@ -131,7 +132,7 @@ The most-asked knobs. Full list at [docs/self-hosting/env-vars](https://traceapp
 | `JWT_SECRET` | - | Signing key for auth tokens. Required when user management is on. |
 | `DB_PATH` | `/data/db/cooktrace.db` | SQLite file inside the container. |
 | `UPLOADS_PATH` | `/data/uploads` | Uploaded images and server-side backups. |
-| `PORT` | `3001` | Port the server listens on inside the container. |
+| `PORT` | `3003` | Port the server listens on inside the container (3001 before 1.3.0). |
 | `BASE_URL` | - | Mount at a subpath, e.g. `/cooktrace`. |
 | `LOG_LEVEL` | `info` | `error` \| `warn` \| `info` \| `debug`. |
 | `INSECURE_COOKIES` | unset | Set to `1` on plain-HTTP LAN deployments so the auth cookie isn't dropped. See [LAN-HTTP notes](https://traceapps.github.io/docs/getting-started/lan-http/). |

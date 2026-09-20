@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../lib/back-stack.js';
   import { onMount, tick } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { fade } from 'svelte/transition';
@@ -844,7 +845,7 @@
   <CookbookImportDialog bind:open={cookbookImportOpen} envLocked={aiEnvLocked} />
 
   {#if shareDialogOpen && shareDialogRecipe}
-    <div class="cb-dialog-backdrop" on:click={() => shareDialogOpen = false}>
+    <div class="cb-dialog-backdrop" on:click={() => shareDialogOpen = false} use:closeOnBack={() => shareDialogOpen = false}>
       <div class="cb-dialog share-dialog" on:click|stopPropagation>
         <header class="cb-dialog-head">
           <h3>{$_('recipes_page.share_recipe')}</h3>
@@ -949,7 +950,7 @@
        scoped only. -->
   {#if cookbookShareDialogOpen && cookbookShareTarget}
     <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="cb-dialog-backdrop" on:click={closeCookbookShareDialog}>
+    <div class="cb-dialog-backdrop" on:click={closeCookbookShareDialog} use:closeOnBack={closeCookbookShareDialog}>
       <div class="cb-dialog share-dialog" on:click|stopPropagation>
         <header class="cb-dialog-head">
           <span class="material-symbols-rounded">share</span>
@@ -1017,7 +1018,7 @@
 
   {#if bulkCookbookOpen}
     <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="cb-dialog-backdrop" on:click={() => !bulkCookbookBusy && (bulkCookbookOpen = false)}>
+    <div class="cb-dialog-backdrop" on:click={() => !bulkCookbookBusy && (bulkCookbookOpen = false)} use:closeOnBack={() => !bulkCookbookBusy && (bulkCookbookOpen = false)}>
       <div class="cb-dialog" on:click|stopPropagation>
         <header class="cb-dialog-head">
           <h3>{$_('recipes_page.add_to_cookbook')}</h3>
@@ -1061,7 +1062,7 @@
   {/if}
 
   {#if cookbookDialogOpen && cookbookDialogRecipe}
-    <div class="cb-dialog-backdrop" on:click={() => cookbookDialogOpen = false}>
+    <div class="cb-dialog-backdrop" on:click={() => cookbookDialogOpen = false} use:closeOnBack={() => cookbookDialogOpen = false}>
       <div class="cb-dialog" on:click|stopPropagation>
         <header class="cb-dialog-head">
           <h3>{$_('recipes_page.add_to_cookbook')}</h3>
@@ -1104,7 +1105,7 @@
        JSON exports, Paprika .paprikarecipes / .paprikarecipe archives. -->
   {#if pasteImportOpen}
     <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="modal-backdrop" on:click|self={() => pasteImportOpen = false}>
+    <div class="modal-backdrop" on:click|self={() => pasteImportOpen = false} use:closeOnBack={() => pasteImportOpen = false}>
       <div class="modal" on:click|stopPropagation>
         <header class="modal-header">
           <h2>JSON / HTML Import</h2>
@@ -1864,7 +1865,7 @@
   }
   .state h2 { color: var(--text-1); margin: 12px 0 0; font-size: 20px; }
   .state p { margin: 4px 0 8px; }
-  .state.error { color: var(--error, #f87171); }
+  .state.error { color: var(--danger); }
   .spin {
     font-size: 32px;
     animation: spin 1.2s linear infinite;
@@ -2004,7 +2005,7 @@
     top: 8px;
     right: 8px;
     font-size: 22px;
-    color: var(--error, #f87171);
+    color: var(--danger);
     font-variation-settings: 'FILL' 1;
     text-shadow: 0 2px 6px rgba(0,0,0,0.45);
   }
@@ -2107,13 +2108,17 @@
     background: var(--surface-1); border: 1px solid var(--border);
     border-radius: var(--radius-lg); width: 100%; max-width: 460px;
     box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+    /* Never taller than the screen above the keyboard, and never up under
+       the status bar: the text box scrolls instead (same as NutriTrace #228). */
+    max-height: min(calc(100vh - 32px), calc(100dvh - 2 * var(--safe-top) - 16px));
+    display: flex; flex-direction: column;
   }
   .modal-header {
     display: flex; align-items: center; justify-content: space-between;
     padding: 14px 16px; border-bottom: 1px solid var(--border);
   }
   .modal-header h2 { margin: 0; font-size: 17px; font-weight: 700; color: var(--text-1); }
-  .modal-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .modal-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; overflow-y: auto; }
   .modal-hint { font-size: 13px; color: var(--text-3); margin: 0; line-height: 1.5; }
   .opt-row {
     display: flex; align-items: flex-start; gap: 10px;
@@ -2151,7 +2156,7 @@
     background: transparent; border: none; cursor: pointer;
     color: var(--text-3); padding: 4px; border-radius: var(--radius-sm);
   }
-  .btn-icon:hover { color: var(--error, #f87171); background: color-mix(in srgb, var(--error, #ef4444) 12%, transparent); }
+  .btn-icon:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
   .btn-icon .material-symbols-rounded { font-size: 22px; }
 
   /* Add-to-Cookbook dialog */
@@ -2168,7 +2173,7 @@
     border-radius: var(--radius-lg);
     padding: 0;
     width: 100%; max-width: 460px;
-    max-height: 80vh;
+    max-height: min(80vh, calc(100dvh - 2 * var(--safe-top) - 16px));
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
     display: flex; flex-direction: column;
   }
@@ -2257,7 +2262,7 @@
     font-size: 12px;
   }
   .link-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  .btn.danger-text { color: var(--error, #f87171); }
+  .btn.danger-text { color: var(--danger); }
 
   /* Shared-with-me badge on recipe cards */
   .shared-badge {

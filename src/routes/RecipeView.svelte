@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../lib/back-stack.js';
   import { push } from 'svelte-spa-router';
 
   // Close: always navigates to /recipes. An earlier revision tried to
@@ -1361,11 +1362,12 @@
   on:select={onShareSelect}
 />
 
+
 <!-- Photo lightbox for cook-history thumbs (click any thumb to zoom). -->
 <svelte:window on:keydown={onLightboxKey} />
 {#if lightboxIndex >= 0 && lightboxPhotos[lightboxIndex]}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div use:portal class="lb-backdrop" on:click={closeLightbox}
+  <div use:portal class="lb-backdrop" on:click={closeLightbox} use:closeOnBack={closeLightbox}
     in:fade={{ duration: 160 }} out:fade={{ duration: 120 }}>
     <button class="lb-close" on:click|stopPropagation={closeLightbox} aria-label="Close" title="Close (Esc)">
       <span class="material-symbols-rounded">close</span>
@@ -1400,12 +1402,12 @@
   }
   .btn-icon:hover { background: var(--surface-2); }
   .btn-icon.danger:hover {
-    background: color-mix(in srgb, var(--error, #ef4444) 18%, transparent);
-    color: var(--error, #ef4444);
+    background: color-mix(in srgb, var(--danger) 18%, transparent);
+    color: var(--danger);
   }
   .btn-icon.close-btn:hover {
-    background: color-mix(in srgb, var(--error, #ef4444) 18%, transparent);
-    color: var(--error, #ef4444);
+    background: color-mix(in srgb, var(--danger) 18%, transparent);
+    color: var(--danger);
   }
   /* "Shared" chip in the header — signals read-only view for a
      recipe the current user doesn't own. Text collapses under 480px
@@ -1438,7 +1440,7 @@
     align-items: center;
     gap: 10px;
   }
-  .state.error { color: var(--error, #f87171); }
+  .state.error { color: var(--danger); }
   .spin {
     font-size: 32px;
     animation: spin 1.2s linear infinite;
@@ -1713,7 +1715,7 @@
   }
   .fav-btn .material-symbols-rounded { font-size: 24px; font-variation-settings: 'FILL' 0; }
   .fav-btn.active {
-    color: var(--error, #f87171);
+    color: var(--danger);
   }
   .fav-btn.active .material-symbols-rounded { font-variation-settings: 'FILL' 1; }
   .fav-btn:hover { transform: scale(1.12); }
@@ -2103,7 +2105,7 @@
   .cook-actions { display: flex; gap: 2px; flex-shrink: 0; }
   .cook-actions .btn-icon { color: var(--text-3); }
   .cook-actions .btn-icon:hover { color: var(--text-1); }
-  .cook-actions .btn-icon.danger:hover { color: var(--error, #f87171); }
+  .cook-actions .btn-icon.danger:hover { color: var(--danger); }
 
   .scale-row {
     display: flex;

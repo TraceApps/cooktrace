@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../../lib/back-stack.js';
   /**
    * CookbookImportDialog — Issue #2 Phase 3.
    *
@@ -259,7 +260,7 @@ Rules:
 </script>
 
 {#if open}
-  <div class="backdrop" use:portal on:click={close}
+  <div class="backdrop" use:portal on:click={close} use:closeOnBack={close}
     in:fade={{ duration: 140 }} out:fade={{ duration: 100 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="head">
@@ -404,7 +405,7 @@ Rules:
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     width: 100%; max-width: 520px;
-    max-height: 88vh;
+    max-height: min(88vh, calc(100dvh - 2 * var(--safe-top) - 16px));
     overflow: hidden;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
     display: flex; flex-direction: column;
@@ -478,8 +479,8 @@ Rules:
   }
   .state .material-symbols-rounded { font-size: 36px; color: var(--accent); }
   .state.busy .spin { font-size: 32px; animation: spin 1.2s linear infinite; }
-  .state.error .material-symbols-rounded { color: var(--error, #f87171); }
-  .state.error p { color: var(--error, #f87171); }
+  .state.error .material-symbols-rounded { color: var(--danger); }
+  .state.error p { color: var(--danger); }
   .state.done h4 { margin: 4px 0 0; color: var(--text-1); font-size: 16px; }
   .state.done p  { margin: 0; }
   .state.done .done-icon { color: var(--success, #4ade80); }

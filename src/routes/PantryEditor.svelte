@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../lib/back-stack.js';
   /**
    * PantryEditor — full-page editor for a pantry item.
    *
@@ -660,7 +661,7 @@
 <BarcodeScanner bind:open={editorScannerOpen} on:scan={onScan} on:close={() => editorScannerOpen = false} />
 
 {#if categoryNewOpen}
-  <div class="cat-modal-backdrop" on:click={() => categoryNewOpen = false}>
+  <div class="cat-modal-backdrop" on:click={() => categoryNewOpen = false} use:closeOnBack={() => categoryNewOpen = false}>
     <div class="cat-modal" on:click|stopPropagation>
       <h3 class="cat-modal-title">{$_('pantry_editor_ct.cat_modal_title')}</h3>
       <label class="field">
@@ -740,9 +741,9 @@
     color: var(--text-3);
     margin-bottom: 4px;
   }
-  .editor-card-title.danger { color: var(--error, #f87171); }
-  .danger-card { border-color: color-mix(in srgb, var(--error, #ef4444) 30%, transparent); }
-  .danger-btn { color: var(--error, #f87171); justify-content: center; }
+  .editor-card-title.danger { color: var(--danger); }
+  .danger-card { border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
+  .danger-btn { color: var(--danger); justify-content: center; }
   .danger-btn .material-symbols-rounded { margin-right: 6px; }
 
   .card-hint { font-size: 12px; color: var(--text-3); margin: 0; line-height: 1.5; }

@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../../lib/back-stack.js';
   import { _ } from 'svelte-i18n';
   import { scale, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
@@ -192,7 +193,7 @@
 {#if open}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div use:portal class="cl-backdrop" on:click={cancel}
+  <div use:portal class="cl-backdrop" on:click={cancel} use:closeOnBack={cancel}
     in:fade={{ duration: 180 }} out:fade={{ duration: 140 }}>
     <div
       class="cl-box"
@@ -332,7 +333,7 @@
 <svelte:window on:keydown={onLightboxKey} />
 {#if lightboxIndex >= 0 && photos[lightboxIndex]}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div use:portal class="lb-backdrop" on:click={closeLightbox}
+  <div use:portal class="lb-backdrop" on:click={closeLightbox} use:closeOnBack={closeLightbox}
     in:fade={{ duration: 160 }} out:fade={{ duration: 120 }}>
     <button class="lb-close" on:click|stopPropagation={closeLightbox} aria-label="Close" title="Close (Esc)">
       <span class="material-symbols-rounded">close</span>
@@ -370,7 +371,7 @@
     border-radius: var(--radius-lg);
     width: 100%;
     max-width: 480px;
-    max-height: calc(100vh - 32px);
+    max-height: min(calc(100vh - 32px), calc(100dvh - 2 * var(--safe-top) - 16px));
     overflow-y: auto;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
     display: flex;
@@ -408,7 +409,7 @@
     border-radius: var(--radius-sm);
     transition: color var(--dur-fast), background var(--dur-fast);
   }
-  .icon-btn:hover { color: var(--error, #f87171); background: color-mix(in srgb, var(--error, #ef4444) 12%, transparent); }
+  .icon-btn:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
   .icon-btn .material-symbols-rounded { font-size: 22px; }
 
   .cl-body {
@@ -572,7 +573,7 @@
     display: flex; align-items: center; justify-content: center;
     z-index: 2;
   }
-  .photo-remove:hover { background: var(--error, #ef4444); }
+  .photo-remove:hover { background: var(--danger); }
   .photo-remove .material-symbols-rounded { font-size: 14px; }
 
   /* ── Lightbox ─────────────────────────────────────────────────────── */

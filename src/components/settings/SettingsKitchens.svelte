@@ -360,7 +360,7 @@
     cursor: pointer;
   }
   .btn-link:hover { text-decoration: underline; }
-  .btn-link.danger { color: var(--error, #f87171); }
+  .btn-link.danger { color: var(--danger); }
 
   /* Kitchen row */
   .kitchen-row { padding: 0 16px; }

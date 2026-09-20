@@ -15,6 +15,7 @@ import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { deriveSodiumSalt } from '../lib/nutrition-derive.js';
+import { dispatchWebhookEvent } from '../lib/webhooks.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -451,6 +452,8 @@ router.put('/:id', wrap((req, res) => {
   // A row that is itself a variant can never own a nutrition source.
   if (nextGenericParentId != null) nextNutritionSourceVariantId = null;
 
+  const nextInStock = body.in_stock != null ? (body.in_stock ? 1 : 0) : existing.in_stock;
+
   db.prepare(
     `UPDATE pantry_items SET
        name = ?, brand = ?, barcode = ?, in_stock = ?, quantity = ?, unit = ?, expires_on = ?,
@@ -464,8 +467,12 @@ router.put('/:id', wrap((req, res) => {
     name,
     body.brand !== undefined ? (body.brand?.toString().trim() || null) : existing.brand,
     body.barcode !== undefined ? (body.barcode?.toString().trim() || null) : existing.barcode,
-    body.in_stock != null ? (body.in_stock ? 1 : 0) : existing.in_stock,
-    body.quantity != null ? (body.quantity === '' ? null : Number(body.quantity)) : existing.quantity,
+    nextInStock,
+    // An explicit null or '' clears the quantity; only an absent key keeps
+    // the stored one. Sending null used to fall through to "keep", so
+    // marking an item back in stock left quantity 0, which still reads as
+    // out of stock everywhere quantity is the source of truth.
+    body.quantity !== undefined ? (body.quantity === '' || body.quantity === null ? null : Number(body.quantity)) : existing.quantity,
     body.unit !== undefined ? (body.unit || null) : existing.unit,
     body.expires_on !== undefined ? (body.expires_on || null) : existing.expires_on,
     body.nt_food_id !== undefined ? (body.nt_food_id || null) : existing.nt_food_id,
@@ -482,6 +489,13 @@ router.put('/:id', wrap((req, res) => {
     nextNutritionSourceVariantId,
     id,
   );
+
+  if (existing.in_stock === 1 && nextInStock === 0) {
+    try {
+      dispatchWebhookEvent(u, 'pantry.out_of_stock', { pantry_item_id: id, name });
+    } catch (e) { /* never let a webhook failure block the save */ }
+  }
+
   const row = db.prepare(`SELECT * FROM pantry_items WHERE id = ?`).get(id);
   res.json(_hydrate(row));
 }));
@@ -545,6 +559,13 @@ router.patch('/:id/stock', wrap((req, res) => {
   }
   const next = req.body?.in_stock ? 1 : 0;
   db.prepare(`UPDATE pantry_items SET in_stock = ?, updated_at = datetime('now') WHERE id = ?`).run(next, id);
+
+  if (existing.in_stock === 1 && next === 0) {
+    try {
+      dispatchWebhookEvent(u, 'pantry.out_of_stock', { pantry_item_id: id, name: existing.name });
+    } catch (e) { /* never let a webhook failure block the save */ }
+  }
+
   res.json({ ok: true, in_stock: !!next });
 }));
 

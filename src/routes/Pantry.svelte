@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../lib/back-stack.js';
   import { onMount } from 'svelte';
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
@@ -30,7 +31,8 @@
   } from '../lib/pantry-variants.js';
   import * as OFF from '../lib/off.js';
   import * as USDA from '../lib/usda.js';
-  import { offEnabled, usdaEnabled, usdaApiKey, offSearchLanguage, offSearchCountry, pantryDefaultSource } from '../stores/settings.js';
+  import * as NT from '../lib/nt-foods.js';
+  import { offEnabled, usdaEnabled, usdaApiKey, ntFederationEnabled, offSearchLanguage, offSearchCountry, pantryDefaultSource } from '../stores/settings.js';
   import { offCountryTagToFlag, offCountryTagToName } from '../lib/off-country-flag.js';
   import { portal } from '../lib/portal.js';
   import { slide } from 'svelte/transition';
@@ -124,15 +126,17 @@
   let searchSource = pantryDefaultSource.get() || 'local';
   let offResults = [];
   let usdaResults = [];
+  let ntResults = [];
   let externalLoading = false;
   let _searchTimer = null;
-  // 'all' is only offered when at least 2 external sources are enabled —
+  // 'all' is only offered when at least 2 external sources are enabled,
   // otherwise it's not meaningfully different from just picking that one
   // source. Mirrors NutriTrace's availableSources shape.
   $: _perSourceOptions = [
     { value: 'local', label: 'Pantry' },
     ...($offEnabled  ? [{ value: 'off',  label: 'OFF'  }] : []),
     ...($usdaEnabled && $usdaApiKey ? [{ value: 'usda', label: 'USDA' }] : []),
+    ...($ntFederationEnabled ? [{ value: 'nt', label: 'NutriTrace' }] : []),
   ];
   $: availableSources = _perSourceOptions.length >= 2
     ? [{ value: 'all', label: 'All' }, ..._perSourceOptions]
@@ -147,24 +151,29 @@
     clearTimeout(_searchTimer);
     offResults = [];
     usdaResults = [];
+    ntResults = [];
     if (src === 'local' || !q.trim()) return;
     // In all-mode (or multi), fetch every source the user has enabled.
     // In single-source mode, fetch only that source.
     const wantOff  = ($offEnabled  && (src === 'off'  || src === 'all'));
     const wantUsda = ($usdaEnabled && $usdaApiKey && (src === 'usda' || src === 'all'));
-    if (!wantOff && !wantUsda) return;
+    const wantNt   = ($ntFederationEnabled && (src === 'nt' || src === 'all'));
+    if (!wantOff && !wantUsda && !wantNt) return;
     externalLoading = true;
     _searchTimer = setTimeout(async () => {
       try {
-        const [offR, usdaR] = await Promise.all([
+        const [offR, usdaR, ntR] = await Promise.all([
           wantOff  ? OFF.searchByName(q.trim())               : Promise.resolve([]),
           wantUsda ? USDA.searchByName(q.trim(), 1, $usdaApiKey) : Promise.resolve([]),
+          wantNt   ? NT.searchByName(q.trim())                : Promise.resolve([]),
         ]);
         offResults  = offR  || [];
         usdaResults = usdaR || [];
+        ntResults   = ntR   || [];
       } catch (e) {
         offResults = [];
         usdaResults = [];
+        ntResults = [];
         showError(e.message || 'Search failed');
       } finally {
         externalLoading = false;
@@ -177,6 +186,7 @@
   // doesn't need to know about the new fan-out plumbing.
   $: externalResults = searchSource === 'off' ? offResults
                      : searchSource === 'usda' ? usdaResults
+                     : searchSource === 'nt' ? ntResults
                      : [];
 
   // ── Per-source quality-tier filters (OFF completeness + USDA data type) ──
@@ -224,6 +234,9 @@
                                      : offResults;
   $: usdaVisible = usdaTiersFiltered ? usdaResults.filter(f => usdaTiersActive.has(f.dataType || 'unknown'))
                                      : usdaResults;
+  // NT has no quality-tier concept (no completeness score, no data-type
+  // taxonomy), so its "visible" list is just its results, unfiltered.
+  $: ntVisible = ntResults;
 
   // Dropdown open handlers — position via getBoundingClientRect from the
   // caret + close the other so only one is open at a time.
@@ -315,6 +328,7 @@
     local:  pinnedSources.size > 0 ? pinnedSources.has('local')  : searchSource === 'local',
     off:    pinnedSources.size > 0 ? pinnedSources.has('off')    : searchSource === 'off',
     usda:   pinnedSources.size > 0 ? pinnedSources.has('usda')   : searchSource === 'usda',
+    nt:     pinnedSources.size > 0 ? pinnedSources.has('nt')     : searchSource === 'nt',
     all:    pinnedSources.size === 0 && searchSource === 'all',
   };
   function _onChipTap(sourceValue) {
@@ -343,6 +357,7 @@
       : []),
     ...(_isSourceActive('off')  ? offVisible.map(f  => ({ ...f, _source: 'off'  })) : []),
     ...(_isSourceActive('usda') ? usdaVisible.map(f => ({ ...f, _source: 'usda' })) : []),
+    ...(_isSourceActive('nt')   ? ntVisible.map(f   => ({ ...f, _source: 'nt'   })) : []),
   ];
   function pickExternalResult(r) {
     // Open the sheet in create mode with the external-search result as
@@ -584,7 +599,13 @@
   function _expiryLabel(dateStr) {
     const d = _daysUntil(dateStr);
     if (d == null) return '';
-    if (d < 0)  return `${Math.abs(d)}d past`;
+    // Matches _expiryShortLabel's wording for the past case (was its
+    // own separate "Nd past" text before, which read as still-upcoming
+    // on an already-expired item, e.g. "63d past" under an "Expiring
+    // Soon" heading). Kept as its own function rather than merged into
+    // _expiryShortLabel because the warn-case wording here is shorter,
+    // meant for this compact spotlight tile rather than a meta-pill.
+    if (d < 0)  return 'Expired';
     if (d === 0) return 'today';
     if (d === 1) return '1d left';
     return `${d}d left`;
@@ -972,6 +993,21 @@
                       <span class="material-symbols-rounded">expand_more</span>
                     </button>
                   </div>
+                {:else if src.value === 'nt'}
+                  <!-- No tier-filter caret (NT foods have no completeness
+                       / data-type concept like OFF / USDA), but still
+                       long-press-pinnable into an all-mode fan-out same
+                       as the other two external sources. -->
+                  <button class="source-chip"
+                          class:active={activeChips.nt}
+                          on:click={() => _onChipTap('nt')}
+                          on:contextmenu|preventDefault={() => _toggleChipInMulti('nt')}
+                          on:touchstart|passive={(e) => _startChipLongPress('nt', e)}
+                          on:touchmove|passive={_maybeCancelChipLongPress}
+                          on:touchend={_cancelChipLongPress}
+                          on:touchcancel={_cancelChipLongPress}>
+                    {src.label}
+                  </button>
                 {:else}
                   <button class="source-chip"
                           class:active={activeChips[src.value]}
@@ -1052,16 +1088,16 @@
          visible without switching to the Expiring Soon filter chip.
          Only renders when there's actually anything expiring and only
          at >=1200px (mobile already has the filter chip). Clicking a
-         tile opens the item; clicking the "See all" tail jumps to the
+         tile opens the item; clicking the "See All" tail jumps to the
          Expiring Soon filter. -->
     {#if expiringSoonItems.length > 0}
-      <div class="expiring-spotlight" role="region" aria-label="Expiring soon">
+      <div class="expiring-spotlight" role="region" aria-label="Expiring & Expired">
         <div class="spotlight-head">
           <span class="material-symbols-rounded">schedule</span>
-          <span class="spotlight-title">Expiring soon</span>
+          <span class="spotlight-title">Expiring & Expired</span>
           <span class="spotlight-count">{expiringSoonCount}</span>
           <button class="spotlight-all" on:click={() => { stockFilter = 'expiring'; }}>
-            See all
+            See All
             <span class="material-symbols-rounded" style="font-size:14px">chevron_right</span>
           </button>
         </div>
@@ -1070,7 +1106,7 @@
             {@const past = _expiryStatus(x.exp) === 'past'}
             <button class="spotlight-tile" class:past
               on:click={() => onRowClick(x.item)}
-              title={`${x.item.name} — ${_expiryLabel(x.exp)}`}>
+              title={`${x.item.name}: ${_expiryLabel(x.exp)}`}>
               <div class="spotlight-photo">
                 {#if x.item.img_url}
                   <img src={x.item.img_url} alt="" loading="lazy" />
@@ -1331,7 +1367,7 @@
                 {/if}
                 <div class="item-body">
                   <div class="item-name">
-                    <span class="src-badge src-{r._source}">{r._source === 'off' ? 'OFF' : 'USDA'}</span>
+                    <span class="src-badge src-{r._source}">{r._source === 'off' ? 'OFF' : r._source === 'usda' ? 'USDA' : 'NT'}</span>
                     {r.name}
                     {#if r._source === 'off' && r.completeness != null}
                       <span class="completeness-dot" class:high={r.completeness >= 0.85}
@@ -1359,9 +1395,9 @@
         {/if}
       </div>
     {:else if searchSource !== 'local' && query.trim()}
-      {@const _srcLabel = searchSource === 'off' ? 'OFF' : 'USDA'}
-      {@const _visibleResults = searchSource === 'off' ? offVisible : usdaVisible}
-      {@const _tiersFilteredHere = searchSource === 'off' ? offTiersFiltered : usdaTiersFiltered}
+      {@const _srcLabel = searchSource === 'off' ? 'OFF' : searchSource === 'usda' ? 'USDA' : 'NutriTrace'}
+      {@const _visibleResults = searchSource === 'off' ? offVisible : searchSource === 'usda' ? usdaVisible : ntVisible}
+      {@const _tiersFilteredHere = searchSource === 'off' ? offTiersFiltered : searchSource === 'usda' ? usdaTiersFiltered : false}
       <div class="ext-results">
         {#if externalLoading}
           <div class="loading-row">
@@ -1454,7 +1490,7 @@
                on:scroll={_closeTierDropdowns} on:resize={_closeTierDropdowns} />
 
 {#if offDropdownOpen}
-  <div class="tier-dropdown-backdrop" use:portal></div>
+  <div class="tier-dropdown-backdrop" use:portal use:closeOnBack={_closeTierDropdowns}></div>
   <div class="tier-dropdown-panel" use:portal
        bind:this={offDropdownPanelEl}
        style="top:{offDropdownPos.top}px; right:{offDropdownPos.right}px"
@@ -1478,7 +1514,7 @@
 {/if}
 
 {#if usdaDropdownOpen}
-  <div class="tier-dropdown-backdrop" use:portal></div>
+  <div class="tier-dropdown-backdrop" use:portal use:closeOnBack={_closeTierDropdowns}></div>
   <div class="tier-dropdown-panel" use:portal
        bind:this={usdaDropdownPanelEl}
        style="top:{usdaDropdownPos.top}px; right:{usdaDropdownPos.right}px"
@@ -1795,6 +1831,7 @@
   }
   .src-badge.src-off  { background: #2e7d32; color: #fff; }
   .src-badge.src-usda { background: #1565c0; color: #fff; }
+  .src-badge.src-nt   { background: #6a1b9a; color: #fff; }
 
   /* External-search results — no heading since the active source-chip
      already labels which API is being queried. */
@@ -1858,7 +1895,7 @@
   .state { text-align: center; padding: 60px 16px; color: var(--text-3); display: flex; flex-direction: column; align-items: center; gap: 10px; }
   .state.empty .empty-icon { font-size: 64px; color: var(--accent); opacity: 0.6; }
   .state h2 { color: var(--text-1); margin: 12px 0 0; font-size: 20px; }
-  .state.error { color: var(--error, #f87171); }
+  .state.error { color: var(--danger); }
   .spin { font-size: 32px; animation: spin 1.2s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -1986,10 +2023,26 @@
 
   /* Expanded generic anchors its whole row in the grid so its
      variant siblings flow directly below it instead of landing next
-     to unrelated items. Grid mode only. */
+     to unrelated items. Grid mode only.
+
+     Spanning the full row width means the card's own width jumps
+     from one grid column (~220px+) to the whole row (1000px+ on a
+     wide monitor). The default vertical layout's photo is `width:
+     100%; aspect-ratio: 4/3`, so left alone it scales its HEIGHT
+     right along with that width, ballooning into a huge block.
+     Switch to a horizontal layout with a fixed-size photo instead,
+     same fix list mode already uses for its own full-width rows. */
   @media (min-width: 1200px) {
     .card-grid:not(.list) .pcard.generic.expanded {
       grid-column: 1 / -1;
+      flex-direction: row;
+      align-items: center;
+    }
+    .card-grid:not(.list) .pcard.generic.expanded .pcard-photo {
+      width: 100px;
+      height: 100px;
+      aspect-ratio: 1 / 1;
+      flex-shrink: 0;
     }
   }
   .card-grid.list .pcard {
@@ -2294,10 +2347,10 @@
   }
   .pcard-pill.expiry-pill .material-symbols-rounded { color: var(--warning, #f59e0b); }
   .pcard-pill.expiry-pill.past {
-    background: color-mix(in srgb, var(--error, #f87171) 14%, transparent);
-    color: var(--error, #f87171);
+    background: color-mix(in srgb, var(--danger) 14%, transparent);
+    color: var(--danger);
   }
-  .pcard-pill.expiry-pill.past .material-symbols-rounded { color: var(--error, #f87171); }
+  .pcard-pill.expiry-pill.past .material-symbols-rounded { color: var(--danger); }
 
   /* ── Phone layout: flip the card to a compact horizontal row ───────
      On a phone the 4:3 photo + stacked body makes each card 180px+
@@ -2453,7 +2506,7 @@
     transition: color var(--dur-fast), background var(--dur-fast);
   }
   .btn-icon:hover { color: var(--text-1); background: var(--surface-2); }
-  .btn-icon.danger:hover { color: var(--error, #f87171); }
+  .btn-icon.danger:hover { color: var(--danger); }
   .btn-icon.small .material-symbols-rounded { font-size: 18px; }
 
   /* Modal editor */

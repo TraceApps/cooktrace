@@ -33,6 +33,10 @@ import cookbooksRoutes    from './routes/cookbooks.js';
 import shareRoutes        from './routes/share.js';
 import kitchensRoutes     from './routes/kitchens.js';
 import updatesRoutes      from './routes/updates.js';
+import apiTokensRoutes    from './routes/api-tokens.js';
+import webhooksRoutes     from './routes/webhooks.js';
+import mcpRoutes          from './routes/mcp.js';
+import v1ApiRoutes        from './routes/api/v1/index.js';
 import { logger }   from './logger.js';
 import { authenticate, userMgmtActive } from './middleware/auth.js';
 import { csrfProtect } from './middleware/csrf.js';
@@ -42,6 +46,7 @@ import { seedOidcFromEnv } from './lib/oidc-env.js';
 
 // Initialise DB (runs schema)
 import db from './db.js';
+import { isPrivateUploadPath, UPLOAD_RESPONSE_HEADERS } from './lib/upload-paths.js';
 
 // Seed config from env vars if provided (env vars take priority over UI)
 seedSmtpFromEnv();
@@ -49,7 +54,7 @@ seedAiFromEnv();
 seedOidcFromEnv();
 
 const app  = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3003;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ── Reverse-proxy / subpath support ───────────────────────────────────────
@@ -107,8 +112,24 @@ router.use((req, res, next) => {
 // Serve uploaded images BEFORE auth — images are public (needed for Android WebView
 // which can't send Authorization headers on <img src> requests)
 const uploadsPath = process.env.UPLOADS_PATH || './uploads';
+// Backup archives are NOT public. BACKUPS_PATH defaults to a directory
+// inside UPLOADS_PATH, so without this the whole database dump was
+// downloadable by anyone who could reach the server, even though every
+// /api/full-backup route is admin-only.
+//
+// The guard tests the RESOLVED path rather than the URL text. A prefix
+// route on '/uploads/backups' looks equivalent and is not: express.static
+// percent-decodes before opening the file while the router matches the raw
+// path, so /uploads/%62ackups/x.zip and /uploads//backups/x.zip read
+// straight through it. A flat 404 rather than a 401, so the response says
+// nothing about whether a given filename exists.
+router.use('/uploads', (req, res, next) => {
+  if (isPrivateUploadPath(req.path)) return res.status(404).json({ error: 'Not found' });
+  next();
+});
+
 router.use('/uploads', express.static(uploadsPath, {
-  setHeaders(res) { res.set('Cache-Control', 'public, max-age=3600'); }
+  setHeaders(res) { res.set('Cache-Control', 'public, max-age=3600'); res.set(UPLOAD_RESPONSE_HEADERS); }
 }));
 
 // Proxy also before auth — used by Android WebView to load external images
@@ -181,6 +202,10 @@ router.use('/api/notify',       notifyRoutes);
 router.use('/api/units',        unitsRoutes);
 router.use('/api/cookbooks',    cookbooksRoutes);
 router.use('/api/kitchens',     kitchensRoutes);
+router.use('/api/admin/api-tokens', apiTokensRoutes);
+router.use('/api/admin/webhooks', webhooksRoutes);
+router.use('/api/mcp',          mcpRoutes);
+router.use('/api/v1',           v1ApiRoutes);
 router.use('/api/r',            shareRoutes);   // public share-link reads
 router.get('/api/health', (req, res) => res.json({ ok: true }));
 

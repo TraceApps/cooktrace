@@ -3,6 +3,8 @@
   import { fade, fly, slide } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { portal } from './lib/portal.js';
+  import { isPullSyncExempt } from './lib/pull-sync.js';
+  import { handleBack } from './lib/back-stack.js';
   import Router, { location } from 'svelte-spa-router';
 
   import BottomNav from './components/layout/BottomNav.svelte';
@@ -32,14 +34,16 @@
   // structured issue is outstanding. Drives both the red cloud badge and
   // the banner suppression logic — matches NT's exact predicate.
   $: _serverReachable = $syncState.online && !$syncState.connectionIssue;
+  // The server answers but the sync is failing, as opposed to no network at all.
+  $: _syncFailing = $syncState.online && !!$syncState.connectionIssue;
   // Reactive copy build. Fed by the sync engine's classifier; falls back
   // to the generic "Sync error" title + raw message when a non-connection
   // error is surfaced with showFailureBanner=true.
   $: _connectionCopy = describeConnectionIssue($syncState.connectionIssue, $_, true);
   $: _syncBannerCopy = $syncState.showErrorBanner && _connectionCopy
-    ? { ..._connectionCopy, icon: 'cloud_off' }
+    ? { ..._connectionCopy, icon: _connectionCopy.tone === 'wait' ? 'cloud_off' : 'cloud_alert' }
     : ($syncState.showErrorBanner && $syncState.error
-      ? { title: $_('sync.error_title'), detail: $syncState.error, icon: 'error' }
+      ? { title: $_('sync.error_title'), detail: $syncState.error, icon: 'error', tone: 'bad' }
       : null);
 
   // Pull-to-refresh gesture (native server mode). Mirrors NT App.svelte.
@@ -100,7 +104,9 @@
 
   function _startPullSync(event) {
     if (!_syncModeActive || _pullRefreshing || sidebarOpen || showNativeSetup) return;
-    if (event.target?.closest?.('[role="dialog"], .sheet-backdrop, .sidebar-panel, .sidebar-backdrop, .bottom-nav')) return;
+    // Dialogs, sheets, sidebars, the bottom bar and anything draggable keep
+    // their own touch handling. See src/lib/pull-sync.js.
+    if (isPullSyncExempt(event.target)) return;
     // Walk up from the touch target to the nearest scrolling ancestor.
     // Handles both editor pages (their own `.page-shell.editor-page`
     // becomes the scroller because it's position: fixed + overflow-y: auto)
@@ -366,6 +372,10 @@
       import('@capacitor/app').then(({ App }) => {
         let lastBack = 0;
         App.addListener('backButton', ({ canGoBack }) => {
+          // An open sheet, dialog or overlay closes first, then the slide-out
+          // sidebar, and only then does back leave the page.
+          if (handleBack()) return;
+          if (sidebarOpen && !sidebarPinned) { sidebarOpen = false; return; }
           if (canGoBack) {
             window.history.back();
           } else {
@@ -546,8 +556,10 @@
     >
       <span class="material-symbols-rounded">menu</span>
       {#if _syncModeActive && !_serverReachable}
-        <span class="conn-badge conn-offline">
-          <span class="material-symbols-rounded" style="font-size:10px">cloud_off</span>
+        <!-- Amber while simply offline (nothing lost, it just hasn't gone yet),
+             red when the server is reachable but the sync is failing. -->
+        <span class="conn-badge" class:conn-failing={_syncFailing} class:conn-offline={!_syncFailing}>
+          <span class="material-symbols-rounded" style="font-size:10px">{_syncFailing ? 'cloud_alert' : 'cloud_off'}</span>
         </span>
       {/if}
     </button>
@@ -556,7 +568,7 @@
 {/if}
 
 {#if _syncModeActive && !needsLogin && _syncBannerCopy}
-  <div class="sync-connection-banner"
+  <div class="sync-connection-banner {_syncBannerCopy.tone || 'bad'}"
     use:portal
     transition:slide={{ duration: $disableAnimations ? 0 : 200 }}>
     <span class="material-symbols-rounded sync-banner-icon">{_syncBannerCopy.icon}</span>
@@ -700,7 +712,11 @@
     transition: background 0.3s;
   }
   .conn-offline {
-    background: var(--error, #ef4444);
+    background: var(--warning);
+    color: #1b1300;
+  }
+  .conn-failing {
+    background: var(--danger);
     color: #fff;
   }
 
@@ -723,9 +739,9 @@
     transition: background 0.3s, color 0.3s;
   }
   .sync-bar-error {
-    color: var(--error, #f87171);
-    background: color-mix(in srgb, var(--error, #f87171) 8%, transparent);
-    border-color: color-mix(in srgb, var(--error, #f87171) 15%, transparent);
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 8%, transparent);
+    border-color: color-mix(in srgb, var(--danger) 15%, transparent);
   }
   .sync-bar-icon { font-size: 16px; }
   /* Allow the error string to wrap so a long failure (HTTP body, stack
@@ -735,6 +751,15 @@
   /* Smart connection banner. Ported from NT so it sits BELOW the
      device status bar and the app's compact header instead of covering
      the clock / hamburger on Android. */
+  /* Same rule as the sidebar and the rest of the app: amber when there is no
+     network, red when the server can't be reached or is answering with errors. */
+  .sync-connection-banner.wait {
+    color: var(--warning);
+    background: color-mix(in srgb, var(--warning) 8%, var(--surface-2));
+    border-color: color-mix(in srgb, var(--warning) 25%, var(--border));
+  }
+  .sync-connection-banner.wait .sync-banner-btn { color: var(--warning); }
+
   .sync-connection-banner {
     position: fixed;
     top: calc(var(--safe-top) + 60px);
@@ -743,9 +768,9 @@
     z-index: 250;
     display: flex; align-items: center; gap: 10px;
     padding: 10px 12px;
-    color: var(--error, #ef4444);
-    background: color-mix(in srgb, var(--error, #ef4444) 8%, var(--surface-2));
-    border: 1px solid color-mix(in srgb, var(--error, #ef4444) 25%, var(--border));
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 8%, var(--surface-2));
+    border: 1px solid color-mix(in srgb, var(--danger) 25%, var(--border));
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
     font-size: 12px;
@@ -766,7 +791,7 @@
   .sync-banner-btn {
     flex: 0 0 auto;
     border: 0;
-    color: var(--error, #ef4444);
+    color: var(--danger);
     background: transparent;
     font: inherit; font-weight: 600;
     cursor: pointer;

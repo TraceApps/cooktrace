@@ -8,6 +8,11 @@
     "settings": "Settings"
   },
   "sync": {
+    "synced": "Synced",
+    "syncing": "Syncing…",
+    "sync_offline": "Offline",
+    "sync_failing": "Can't reach the server",
+    "not_synced": "Not synced yet",
     "retry":            "Retry",
     "retrying":         "Retrying…",
     "dismiss_message":  "Dismiss sync message",
@@ -177,7 +182,6 @@
     },
     "cooking":            { "section": "Cooking" },
     "nutrition":          { "section": "Nutrition" },
-    "federation":         { "section": "NutriTrace Federation" },
     "server_connection":  { "section": "Server Connection" },
     "email":              { "section": "Email (SMTP)" },
     "backup":             { "section": "Backup & Restore" },
@@ -205,6 +209,8 @@
       "subtitle_empty":  "Tap to add your name and photo"
     },
     "authentication":     { "section": "Authentication" },
+    "apitokens":          { "section": "API Tokens" },
+    "webhooks":           { "section": "Webhooks" },
     "users":              {
       "section":              "Users",
       "users_heading":        "Users",
@@ -807,6 +813,9 @@
       "api_key":                "API Key",
       "api_key_ph":             "Paste your USDA API key here"
     },
+    "nutritrace": {
+      "section":                "NutriTrace"
+    },
     "scanner": {
       "section":                "Barcode Scanner",
       "beep_on_scan":           "Beep on Scan"
@@ -821,6 +830,7 @@
       "crash_available":        "Crash report available"
     },
     "about": {
+      "support_note": "CookTrace is free to self-host, always. The current goal is a Mac and an iPhone so the Trace apps can run properly on iOS.",
       "app_name":               "CookTrace",
       "federation_prefix":      "Optional federation with ",
       "federation_suffix":      " for nutrition tracking",
@@ -916,7 +926,40 @@
     "assistant_name":            "Assistant Name",
     "assistant_name_ph":         "Trace",
     "chef_hat":                  "Chef Hat",
-    "smart_log":                 "Smart Log"
+    "env_lock_banner":           "Configured via environment variables, changes are disabled.",
+    "enable_desc":               "Floating chat button on every page. Uses your own AI provider key, never shared.",
+    "enable_desc_locked":        "Floating chat button on every page. The server provides the AI.",
+    "server_default":            "Server default",
+    "smart_log":                 "Smart Log",
+    "voice_lang":                "Voice Input Language",
+    "voice_lang_desc":           "Language the microphone listens for. Defaults to your device language, override if you speak a different language than your device is set to.",
+    "voice_langs": {
+      "auto": "Auto (use device language)",
+      "en_US": "English (US)",
+      "en_GB": "English (UK)",
+      "it_IT": "Italian",
+      "es_ES": "Spanish (Spain)",
+      "es_MX": "Spanish (Mexico)",
+      "fr_FR": "French",
+      "de_DE": "German",
+      "pt_BR": "Portuguese (Brazil)",
+      "pt_PT": "Portuguese (Portugal)",
+      "nl_NL": "Dutch",
+      "pl_PL": "Polish",
+      "ru_RU": "Russian",
+      "sv_SE": "Swedish",
+      "da_DK": "Danish",
+      "nb_NO": "Norwegian",
+      "fi_FI": "Finnish",
+      "cs_CZ": "Czech",
+      "tr_TR": "Turkish",
+      "ja_JP": "Japanese",
+      "ko_KR": "Korean",
+      "zh_CN": "Chinese (Simplified)",
+      "zh_TW": "Chinese (Traditional)",
+      "hi_IN": "Hindi",
+      "ar_SA": "Arabic"
+    }
   },
   "settings_users_ct": {
     "toast": {
@@ -993,6 +1036,116 @@
     "cancel":                        "Cancel",
     "allow_password_login":          "Allow Password Login",
     "env_locked_html":               "<br /><em>Locked by <code>OIDC_ENABLE_EMAIL_PASSWORD_LOGIN</code> environment variable.</em>"
+  },
+  "settings_api_tokens_ct": {
+    "intro_before":    "Personal access tokens for external agents (Claude Desktop, Cursor, Codex",
+    "intro_dev":       "and other Model Context Protocol clients",
+    "intro_middle":    ") that connect to",
+    "intro_see":       "See",
+    "just_created": {
+      "title":   "Token created:",
+      "warn":    "Copy this now. It won't be shown again.",
+      "copy":    "Copy",
+      "saved":   "I've saved it"
+    },
+    "empty": {
+      "title": "No tokens yet",
+      "desc":  "Create one to let NutriTrace pull your recipes (read:recipes), or to let an MCP client (Claude Desktop, Cursor, Codex) read or update your recipes, pantry, shopping list, and cook diary."
+    },
+    "row": {
+      "scopes_label":  "Scopes:",
+      "scopes_none":   "none",
+      "never":         "never",
+      "just_now":      "just now",
+      "min_ago":       "{n}m ago",
+      "hr_ago":        "{n}h ago",
+      "day_ago":       "{n}d ago",
+      "last_used":     "last used {when}",
+      "expires":       "expires {when}",
+      "revoke_title":  "Revoke token"
+    },
+    "form": {
+      "new_token":     "New Token",
+      "name":          "Name",
+      "name_ph":       "e.g. claude-desktop",
+      "scopes":        "Scopes",
+      "expires_label": "Expires After (Days)",
+      "expires_ph":    "never",
+      "cancel":        "Cancel",
+      "create":        "Create",
+      "creating":      "Creating…"
+    },
+    "confirm": {
+      "revoke_title":   "Revoke \"{name}\"?",
+      "revoke_msg":     "Any client using this token will immediately lose access.",
+      "revoke_confirm": "Revoke"
+    },
+    "toast": {
+      "load_failed":     "Could not load tokens",
+      "scope_required":  "Pick at least one scope",
+      "name_required":   "Name is required",
+      "create_failed":   "Could not create token",
+      "revoke_failed":   "Could not revoke token",
+      "revoked":         "Token revoked",
+      "copied":          "Copied to clipboard",
+      "copy_failed":     "Could not copy"
+    }
+  },
+  "settings_webhooks": {
+    "intro": "Outgoing webhooks notify another service the instant something happens in CookTrace: a recipe is cooked, the shopping list is fully checked off, or a pantry item runs out. Each webhook fires a signed HTTP POST to a URL you provide.",
+    "disabled_notice": "Webhooks are not enabled on this server. A webhook can still be created, but it won't fire until WEBHOOKS_ENABLED=1 is set.",
+    "just_created": {
+      "title": "Webhook created:",
+      "warn": "Copy this secret now. It will not be shown again, and you'll need it to verify the signature on deliveries.",
+      "copy": "Copy",
+      "saved": "I've saved it"
+    },
+    "empty": {
+      "title": "No webhooks yet",
+      "desc": "Create one to notify another service when something happens."
+    },
+    "row": {
+      "last_delivery": "last delivery {when}",
+      "never": "never",
+      "just_now": "just now",
+      "min_ago": "{n}m ago",
+      "hr_ago": "{n}h ago",
+      "day_ago": "{n}d ago",
+      "status_success": "delivered",
+      "status_failed": "failed",
+      "test_title": "Send a test event",
+      "enabled_title": "Enabled",
+      "delete_title": "Delete webhook"
+    },
+    "form": {
+      "new_webhook": "New Webhook",
+      "url": "Target URL *",
+      "url_ph": "https://example.com/webhook",
+      "events": "Events *",
+      "secret_label": "Secret (Optional)",
+      "secret_ph": "Leave empty to generate one",
+      "cancel": "Cancel",
+      "create": "Create Webhook",
+      "creating": "Creating…"
+    },
+    "confirm": {
+      "delete_title": "Delete this webhook?",
+      "delete_msg": "This cannot be undone. The target will stop receiving events immediately.",
+      "delete_confirm": "Delete"
+    },
+    "toast": {
+      "load_failed": "Could not load webhooks",
+      "url_required": "Enter a target URL",
+      "event_required": "Select at least one event",
+      "create_failed": "Could not create webhook",
+      "update_failed": "Could not update webhook",
+      "delete_failed": "Could not delete webhook",
+      "deleted": "Webhook deleted",
+      "test_failed": "Test delivery failed",
+      "test_delivered": "Test event delivered",
+      "copied": "Copied to clipboard",
+      "copy_failed": "Could not copy, select the text manually"
+    }
   },
   "settings_server_conn": {
     "toast": {
@@ -1414,8 +1567,19 @@
       "saved_image":             "Saved image",
       "copied":                  "Copied to clipboard",
       "nothing_planned":         "Nothing planned in that range",
-      "already_in_pantry":       "Everything's already in your pantry"
+      "already_in_pantry":       "Everything's already in your pantry",
+      "cleared_restocked":       "List cleared. {n} marked in stock",
+      "restock_failed":          "Some pantry items couldn't be restocked ({n})",
+      "restock_undone":          "Pantry changes undone"
     },
+    "undo":                      "Undo",
+    "clear":                     "Clear",
+    "clearing":                  "Clearing…",
+    "clear_title":               "Clear Checked Items ({n})",
+    "clear_desc":                "Checked items will be removed from your list.",
+    "restock_label":             "Mark as In Stock",
+    "restock_hint":              "Untick anything you didn't actually buy.",
+    "restock_variant":           "Variant for {name}",
     "retry":                     "Retry",
     "edit_item":                 "Edit Item",
     "name":                      "Name",

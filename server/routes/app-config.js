@@ -3,7 +3,7 @@ import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, requireAdmin, userMgmtActive } from '../middleware/auth.js';
 import { testSmtp, isSmtpEnvLocked } from '../email.js';
-import { isAiEnvLocked } from '../ai.js';
+import { isAiEnvLocked, getAiConfig } from '../ai.js';
 
 const router = Router();
 
@@ -24,9 +24,14 @@ router.get('/env-locks', requireAuth, wrap(async (req, res) => {
   // ON visually. Mirrors NutriTrace #36.
   const aiLocked = isAiEnvLocked();
   let ai_enabled = false;
+  // Provider and model (never the key) so Settings can show what the server
+  // actually uses instead of this user's own, unused choices.
+  let aiServer = {};
   if (aiLocked) {
     const row = db.prepare(`SELECT value FROM app_config WHERE key = 'ai_enabled'`).get();
     ai_enabled = row?.value === 'true';
+    const cfg = getAiConfig();
+    aiServer = { ai_provider: cfg.ai_provider || 'claude', ai_model: cfg.ai_model || '' };
   }
   // backup_locked: BACKUP_SCHEDULE / BACKUP_TIME / BACKUP_RETENTION env
   // var → Auto Backup UI inputs disable, PUT /api/full-backup/schedule
@@ -37,6 +42,7 @@ router.get('/env-locks', requireAuth, wrap(async (req, res) => {
     smtp: isSmtpEnvLocked(),
     ai: aiLocked,
     ai_enabled,
+    ...aiServer,
     oidc_provider_ids: getEnvLockedProviderIds(),
     // True when OIDC_ENABLE_EMAIL_PASSWORD_LOGIN is set at boot. Admin UI
     // uses this to disable the "Enable password login" toggle with a note

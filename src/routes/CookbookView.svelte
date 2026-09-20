@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../lib/back-stack.js';
   /**
    * CookbookView — single cookbook detail page.
    *
@@ -167,13 +168,16 @@
   // handle span did with its {#if cbReorderable} guard.
   function maybeDragHandle(node, enabled) {
     let handle = null;
-    function attach() { if (!handle) handle = dragHandle(node); }
+    // While reordering is possible the card is a drag handle, so a downward
+    // drag on it must not also start pull-to-refresh (src/lib/pull-sync.js).
+    function attach() { if (!handle) { handle = dragHandle(node); node.setAttribute('data-no-pull-sync', ''); } }
     function detach() {
       if (!handle) return;
       handle.destroy();
       handle = null;
       node.removeAttribute('role');
       node.removeAttribute('tabindex');
+      node.removeAttribute('data-no-pull-sync');
       node.style.cursor = '';
     }
     if (enabled) attach();
@@ -514,7 +518,7 @@
 </div>
 
 {#if coverSheetOpen}
-  <div use:portal class="modal-backdrop" on:click={closeCoverSheet}>
+  <div use:portal class="modal-backdrop" on:click={closeCoverSheet} use:closeOnBack={closeCoverSheet}>
     <div class="modal" on:click|stopPropagation style="max-width:420px">
       <header class="modal-head">
         <h3>Cookbook Cover</h3>
@@ -533,7 +537,7 @@
 {/if}
 
 {#if moveOpen && moveDialogRecipe}
-  <div use:portal class="modal-backdrop" on:click={closeMoveDialog}>
+  <div use:portal class="modal-backdrop" on:click={closeMoveDialog} use:closeOnBack={closeMoveDialog}>
     <div class="modal" on:click|stopPropagation style="max-width:420px">
       <header class="modal-head">
         <h3>{$_('cookbook_view_ct.move_or_copy')}</h3>
@@ -580,7 +584,7 @@
 {/if}
 
 {#if addOpen}
-  <div use:portal class="modal-backdrop" on:click={closeAddDialog}>
+  <div use:portal class="modal-backdrop" on:click={closeAddDialog} use:closeOnBack={closeAddDialog}>
     <div class="modal" on:click|stopPropagation>
       <header class="modal-head">
         <h3>{$_('cookbook_view_ct.add_recipes')}</h3>
@@ -650,7 +654,7 @@
     border-radius: var(--radius-sm);
   }
   .btn-icon:hover { background: var(--surface-2); color: var(--text-1); }
-  .btn-icon.danger:hover { color: var(--error, #f87171); }
+  .btn-icon.danger:hover { color: var(--danger); }
   .btn-icon .material-symbols-rounded { font-size: 22px; }
 
   .editor-content {
@@ -1062,7 +1066,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     width: 100%; max-width: 540px;
-    max-height: 80vh;
+    max-height: min(80vh, calc(100dvh - 2 * var(--safe-top) - 16px));
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
     display: flex; flex-direction: column;
   }

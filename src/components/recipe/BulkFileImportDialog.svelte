@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../../lib/back-stack.js';
   /**
    * BulkFileImportDialog — Issue #2 Phase 2.
    *
@@ -312,7 +313,7 @@ ${textPayload.text}
 </script>
 
 {#if open}
-  <div class="backdrop" use:portal on:click={close}
+  <div class="backdrop" use:portal on:click={close} use:closeOnBack={close}
     in:fade={{ duration: 140 }} out:fade={{ duration: 100 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="head">
@@ -468,7 +469,7 @@ ${textPayload.text}
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     width: 100%; max-width: 640px;
-    max-height: 88vh;
+    max-height: min(88vh, calc(100dvh - 2 * var(--safe-top) - 16px));
     overflow: hidden;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
     display: flex; flex-direction: column;
@@ -538,7 +539,7 @@ ${textPayload.text}
   }
   .summary-stat.clean   { background: color-mix(in srgb, var(--success, #4ade80) 18%, transparent); color: var(--success, #4ade80); }
   .summary-stat.partial { background: color-mix(in srgb, var(--warning, #f59e0b) 18%, transparent); color: var(--warning, #f59e0b); }
-  .summary-stat.error   { background: color-mix(in srgb, var(--error,   #f87171) 14%, transparent); color: var(--error,   #f87171); }
+  .summary-stat.error   { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
   .summary-meta { color: var(--text-3); font-size: 12px; margin-left: auto; }
   .summary-actions {
     display: flex; flex-wrap: wrap; gap: 12px;
@@ -604,7 +605,7 @@ ${textPayload.text}
   }
   .confidence-pill.high { background: color-mix(in srgb, var(--success, #4ade80) 18%, transparent); color: var(--success, #4ade80); }
   .confidence-pill.mid  { background: color-mix(in srgb, var(--warning, #f59e0b) 18%, transparent); color: var(--warning, #f59e0b); }
-  .confidence-pill.low  { background: color-mix(in srgb, var(--error,   #f87171) 14%, transparent); color: var(--error,   #f87171); }
+  .confidence-pill.low  { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
 
   .state {
     margin: 24px 16px;
@@ -616,8 +617,8 @@ ${textPayload.text}
   }
   .state .material-symbols-rounded { font-size: 36px; color: var(--accent); }
   .state.busy .spin { font-size: 32px; animation: spin 1.2s linear infinite; }
-  .state.error .material-symbols-rounded { color: var(--error, #f87171); }
-  .state.error p { color: var(--error, #f87171); }
+  .state.error .material-symbols-rounded { color: var(--danger); }
+  .state.error p { color: var(--danger); }
   .state.done h4 { margin: 4px 0 0; color: var(--text-1); font-size: 16px; }
   .state.done p  { margin: 0; }
   .state.done .done-icon { color: var(--success, #4ade80); }

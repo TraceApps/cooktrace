@@ -1,4 +1,5 @@
 <script>
+  import { closeOnBack } from '../lib/back-stack.js';
   import { onMount } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { fade, slide } from 'svelte/transition';
@@ -681,7 +682,7 @@
 <!-- Plan-a-cook dialog -->
 {#if planOpen}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="modal-backdrop" on:click|self={() => planOpen = false} transition:fade={{ duration: 160 }}>
+  <div class="modal-backdrop" on:click|self={() => planOpen = false} use:closeOnBack={() => planOpen = false} transition:fade={{ duration: 160 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="modal-header">
         <h2>{$_('cookdiary_page.plan_a_cook')}</h2>
@@ -739,7 +740,7 @@
 <!-- Filter picker — pick a single recipe to scope all 3 views. -->
 {#if filterPickerOpen}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="modal-backdrop" on:click|self={() => filterPickerOpen = false} transition:fade={{ duration: 160 }}>
+  <div class="modal-backdrop" on:click|self={() => filterPickerOpen = false} use:closeOnBack={() => filterPickerOpen = false} transition:fade={{ duration: 160 }}>
     <div class="modal" on:click|stopPropagation>
       <header class="modal-header">
         <h2>{$_('cookdiary_page.filter_by_recipe')}</h2>
@@ -781,7 +782,7 @@
      chevrons. Mirrors NutriTrace's diary photo viewer. -->
 {#if lightboxEntry && lightboxPhoto}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="lightbox-backdrop" on:click|self={closeLightbox} transition:fade={{ duration: 160 }}>
+  <div class="lightbox-backdrop" on:click|self={closeLightbox} use:closeOnBack={closeLightbox} transition:fade={{ duration: 160 }}>
     <div class="lightbox" on:click|stopPropagation>
       <button class="lightbox-close btn-icon" on:click={closeLightbox} aria-label="Close">
         <span class="material-symbols-rounded">close</span>
@@ -1021,14 +1022,14 @@
     border-radius: var(--radius-sm);
   }
   .btn-icon:hover { color: var(--text-1); background: var(--surface-2); }
-  .btn-icon.danger:hover { color: var(--error, #f87171); }
+  .btn-icon.danger:hover { color: var(--danger); }
   .btn-icon.small { width: 30px; height: 30px; }
   .btn-icon.small .material-symbols-rounded { font-size: 18px; }
 
   .state { text-align: center; padding: 60px 16px; color: var(--text-3); display: flex; flex-direction: column; align-items: center; gap: 10px; }
   .state.empty .empty-icon { font-size: 64px; color: var(--accent); opacity: 0.6; }
   .state h2 { color: var(--text-1); margin: 12px 0 0; font-size: 20px; }
-  .state.error { color: var(--error, #f87171); }
+  .state.error { color: var(--danger); }
   .spin { font-size: 32px; animation: spin 1.2s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -1267,7 +1268,7 @@
   .modal {
     background: var(--surface-1); border: 1px solid var(--border);
     border-radius: var(--radius-lg); width: 100%; max-width: 460px;
-    max-height: calc(100vh - 32px); display: flex; flex-direction: column;
+    max-height: min(calc(100vh - 32px), calc(100dvh - 2 * var(--safe-top) - 16px)); display: flex; flex-direction: column;
     box-shadow: 0 16px 48px rgba(0,0,0,0.4);
   }
   .modal-header {
@@ -1534,7 +1535,7 @@
     border-radius: var(--radius-lg);
     width: 100%;
     max-width: 640px;
-    max-height: calc(100vh - 32px);
+    max-height: min(calc(100vh - 32px), calc(100dvh - 2 * var(--safe-top) - 16px));
     display: flex;
     flex-direction: column;
     overflow: hidden;

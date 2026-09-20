@@ -16,14 +16,21 @@
   import { tick, onMount } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
+  import { closeOnBack } from '../../lib/back-stack.js';
   import { _ } from 'svelte-i18n';
   import TraceFace from './TraceFace.svelte';
   import TraceFaceChef from './TraceFaceChef.svelte';
   import {
     aiEnabled, aiEffectivelyEnabled, envLocks, aiAssistantName, aiProvider, aiApiKey, aiModel, aiBaseUrl,
     aiKeyVerified, energyUnit, measurementSystem, dateFormat, smartLogEnabled,
-    traceChefHat,
+    traceChefHat, smartLogVoiceLang,
   } from '../../stores/settings.js';
+  // Voice input language from Settings; 'auto' means the device locale.
+  function _resolveVoiceLang() {
+    const v = smartLogVoiceLang.get();
+    if (v && v !== 'auto') return v;
+    return navigator.language || 'en-US';
+  }
   // Pick the right mascot variant based on the per-user toggle. Reactive
   // so flipping it in Settings updates every avatar immediately.
   $: Mascot = $traceChefHat ? TraceFaceChef : TraceFace;
@@ -843,7 +850,7 @@ When you write to the user's data, summarise what you did briefly and concretely
       const rec = new SR();
       rec.continuous = false;
       rec.interimResults = true;   // live update while speaking for snappy feedback
-      rec.lang = navigator.language || 'en-US';
+      rec.lang = _resolveVoiceLang();
       rec.onresult = (e) => {
         let text = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -995,6 +1002,7 @@ When you write to the user's data, summarise what you did briefly and concretely
     class:cancel-preview={_fabCancelPreview}
     style={fabStyle}
     on:pointerdown={startDrag}
+    data-no-pull-sync
     on:click={onFabClick}
     on:keydown={e => e.key === 'Enter' && onFabClick()}
     role="button"
@@ -1035,6 +1043,7 @@ When you write to the user's data, summarise what you did briefly and concretely
     <div
       class="panel-backdrop"
       use:portal
+      use:closeOnBack={() => panelOpen = false}
       transition:fade={{ duration: 200 }}
       on:click={() => panelOpen = false}
       on:keydown={() => {}}
@@ -1614,9 +1623,9 @@ When you write to the user's data, summarise what you did briefly and concretely
   .attach-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .attach-btn .material-symbols-rounded { font-size: 20px; }
   .mic-btn.recording {
-    background: color-mix(in srgb, var(--error, #ef4444) 18%, transparent);
-    border-color: var(--error, #ef4444);
-    color: var(--error, #ef4444);
+    background: color-mix(in srgb, var(--danger) 18%, transparent);
+    border-color: var(--danger);
+    color: var(--danger);
     animation: micPulse 1.2s ease-in-out infinite;
   }
   /* Smart Log session — same red ring but accented so it's distinct
@@ -1628,8 +1637,8 @@ When you write to the user's data, summarise what you did briefly and concretely
     animation: smartLogPulse 1.2s ease-in-out infinite;
   }
   @keyframes micPulse {
-    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--error, #ef4444) 50%, transparent); }
-    50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--error, #ef4444) 0%, transparent); }
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 50%, transparent); }
+    50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--danger) 0%, transparent); }
   }
   @keyframes smartLogPulse {
     0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); }
