@@ -284,6 +284,31 @@ export async function logout() {
     logoutUrl = oidcData?.logoutUrl || null;
     try { localStorage.removeItem('ct:oidc_logout_hint'); } catch {}
   } catch {}
+  // Anything changed offline goes up before the session ends, and the copy
+  // this browser keeps is cleared afterwards so the next account can't read
+  // it. If it can't go up (signing out in a shop with no signal), ask first:
+  // clearing it would destroy work the user never saw fail.
+  if (!isNative) {
+    try {
+      const { flushOutbox, clearOffline, pendingCount } = await import('../lib/offline-api.js');
+      const sent = await flushOutbox().catch(() => false);
+      if (!sent && (await pendingCount()) > 0) {
+        const waiting = await pendingCount();
+        const { confirmDialog } = await import('./confirmDialog.js');
+        const { get: getStore } = await import('svelte/store');
+        const { _: t } = await import('svelte-i18n');
+        const say = getStore(t);
+        const ok = await confirmDialog({
+          title: say('sync.sign_out_waiting_title'),
+          message: say('sync.sign_out_waiting', { values: { count: waiting } }),
+          confirmText: say('sync.sign_out_anyway'),
+          dangerous: true,
+        });
+        if (!ok) return;
+      }
+      await clearOffline();
+    } catch { /* nothing queued, or no database */ }
+  }
   try { await fetch(_apiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include', headers: _authHeaders() }); } catch {}
   // Clear auth state — but keep cached data (foods, images, server URL)
   if (isNative) {

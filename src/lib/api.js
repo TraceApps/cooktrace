@@ -50,7 +50,11 @@ const _CtApiHttp = {
     });
     if (!res.ok) {
       const e = await res.json().catch(() => ({}));
-      throw new Error(e.error || `API error ${res.status}`);
+      const err = new Error(e.error || `API error ${res.status}`);
+      // The status matters to anything deciding whether to try again: a 503
+      // is worth repeating, a 400 never will be (lib/offline-edits.js).
+      err.status = res.status;
+      throw err;
     }
     return res.json();
   },
@@ -421,6 +425,13 @@ const _CtApiHttp = {
 
 import { CtApiNative } from './api-native.js';
 import { CtApiCached } from './api-cached.js';
+import { createOfflineApi } from './offline-api.js';
+
+// The web app is the HTTP API with a copy of what it has read and a queue of
+// what it has changed behind it, so a kitchen or a shop with no signal does
+// not end the session (lib/offline-api.js). Built once, on first use.
+let _offlineHttp = null;
+const _webApi = () => (_offlineHttp ||= createOfflineApi(_CtApiHttp));
 
 // Endpoints without a local mirror in CtApiNative — these are
 // inherently server-scoped (Kitchens, per-user sharing peers, user
@@ -477,7 +488,7 @@ export const NtApi = new Proxy({}, {
       return _uploadImageConnected;
     }
     let impl;
-    if (!isNative)                                             impl = _CtApiHttp;
+    if (!isNative)                                             impl = _webApi();
     else if (!getServerUrl())                                  impl = CtApiNative;
     else if (SERVER_ONLY_METHODS.has(prop))                    impl = _CtApiHttp;
     else                                                       impl = CtApiCached;
