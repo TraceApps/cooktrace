@@ -296,6 +296,10 @@
   }
 
   onMount(async () => {
+    // Update checks: a device that was already using the app keeps checking,
+    // a fresh one stays quiet until setup asks. Runs first so nothing above
+    // can skip it (see lib/updates.js).
+    import('./lib/updates.js').then(({ migrateAutoCheck }) => migrateAutoCheck()).catch(() => {});
     // Local-mode scheduled backup tick — JS-side scheduler that fires
     // exportLocalZip() when due. No-ops in PWA / server modes. See
     // src/lib/local-backup-scheduler.js for design notes.

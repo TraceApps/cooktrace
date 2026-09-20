@@ -42,6 +42,7 @@ import { authenticate, userMgmtActive } from './middleware/auth.js';
 import { csrfProtect } from './middleware/csrf.js';
 import { seedSmtpFromEnv } from './email.js';
 import { seedAiFromEnv } from './ai.js';
+import { initUpdateCheckSetting } from './lib/update-check.js';
 import { seedOidcFromEnv } from './lib/oidc-env.js';
 
 // Initialise DB (runs schema)
@@ -52,6 +53,9 @@ import { isPrivateUploadPath, UPLOAD_RESPONSE_HEADERS } from './lib/upload-paths
 seedSmtpFromEnv();
 seedAiFromEnv();
 seedOidcFromEnv();
+
+// Update checks: existing instances keep checking, fresh ones wait for setup to ask.
+initUpdateCheckSetting();
 
 const app  = express();
 const PORT = process.env.PORT || 3003;
