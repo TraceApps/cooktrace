@@ -375,7 +375,7 @@
 
   function _saveCookMode(rid, on) {
     if (!Number.isFinite(rid)) return;
-    if (on) startCook(rid, { name: recipe?.name || '', serverId: _watchRecipeId() });
+    if (on) startCook(rid, { name: recipe?.name || '', img: recipe?.imgUrl || '', serverId: _watchRecipeId() });
     else endCook(rid);
   }
   // Resolve a step's ref_ids → the actual ingredient objects from the
@@ -538,7 +538,7 @@
     // A cook already in progress when this page opens: the watch has no way
     // of knowing unless it is told. Pressing Cook is not the only moment that
     // matters, since cook mode survives closing the app.
-    if (recipe) { describeCook(id, { name: recipe.name, serverId: _watchRecipeId() }); _tellWatch(); }
+    if (recipe) { describeCook(id, { name: recipe.name, img: recipe.imgUrl || '', serverId: _watchRecipeId() }); _tellWatch(); }
     // And the watch may have ticked something off while the phone was shut.
     _hearWatch();
     // Kick off the pantry load so the FDA box can render "~Xg per

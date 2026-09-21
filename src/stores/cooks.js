@@ -47,13 +47,13 @@ function _save(value) {
   try { localStorage.setItem(KEY, JSON.stringify(value)); } catch {}
 }
 
-/** { [localRecipeId]: { name, serverId, at } } */
+/** { [localRecipeId]: { name, img, serverId, at } } */
 export const activeCooks = writable(_load());
 
 activeCooks.subscribe(_save);
 
 /** Start cooking this recipe, alongside anything else already underway. */
-export function startCook(localId, { name = '', serverId = 0 } = {}) {
+export function startCook(localId, { name = '', img = '', serverId = 0 } = {}) {
   if (!Number.isFinite(localId)) return;
   activeCooks.update(all => {
     // Strictly after everything already underway. Two cooks started in the
@@ -62,20 +62,21 @@ export function startCook(localId, { name = '', serverId = 0 } = {}) {
     // you actually started them in.
     const latest = Object.values(all).reduce((max, c) => Math.max(max, c.at || 0), 0);
     const at = Math.max(Date.now(), latest + 1);
-    return { ...all, [localId]: { name, serverId: Number(serverId) || 0, at } };
+    return { ...all, [localId]: { name, img, serverId: Number(serverId) || 0, at } };
   });
 }
 
 /** Keep what a cook knows about itself up to date, without restarting it. */
-export function describeCook(localId, { name, serverId } = {}) {
+export function describeCook(localId, { name, img, serverId } = {}) {
   if (!Number.isFinite(localId)) return;
   activeCooks.update(all => {
     const mine = all[localId];
     if (!mine) return all;
     const next = { ...mine };
     if (name != null && name !== '') next.name = name;
+    if (img != null && img !== '') next.img = img;
     if (serverId) next.serverId = Number(serverId);
-    if (next.name === mine.name && next.serverId === mine.serverId) return all;
+    if (next.name === mine.name && next.img === mine.img && next.serverId === mine.serverId) return all;
     return { ...all, [localId]: next };
   });
 }

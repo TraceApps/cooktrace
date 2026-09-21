@@ -116,3 +116,19 @@ test('the visibility listener is removed when the page goes', () => {
   assert.match(source, /onDestroy\(\(\) => document\.removeEventListener\('visibilitychange', _onVisible\)\)/);
   assert.doesNotMatch(source, /addEventListener\('visibilitychange', async \(\) =>/);
 });
+
+test('the strip navigates to the route the app actually has', () => {
+  // The recipe route is /recipes/:id. Pushing /recipe/:id matched nothing,
+  // so tapping a cook flashed and stayed where it was.
+  const strip = readFileSync(new URL('../src/components/recipe/CookingNow.svelte', import.meta.url), 'utf8');
+  assert.match(strip, /push\(`\/recipes\/\$\{cook\.localId\}`\)/);
+  assert.doesNotMatch(strip, /push\(`\/recipe\/\$\{/);
+  // And it hides the one you are already looking at, by that same route.
+  assert.match(strip, /\$location !== `\/recipes\/\$\{c\.localId\}`/);
+});
+
+test('the strip stops ticking when the page is hidden', () => {
+  const strip = readFileSync(new URL('../src/components/recipe/CookingNow.svelte', import.meta.url), 'utf8');
+  assert.match(strip, /document\.hidden\) stop\(\)/);
+  assert.match(strip, /onDestroy\(\(\) => \{[\s\S]{0,160}removeEventListener\('visibilitychange', onVisibility\)/);
+});

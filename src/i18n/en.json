@@ -158,9 +158,12 @@
     "add_group":          "Add Group"
   },
   "cooking_now": {
-    "label":      "Cooking",
-    "label_many": "Cooking {n}",
-    "untitled":   "A recipe"
+    "label":        "Cooking",
+    "untitled":     "A recipe",
+    "just_started": "just started",
+    "minutes":      "{n, plural, one {# min} other {# min}}",
+    "hours":        "{n}h {m}m",
+    "more":         "{n, plural, one {# more cooking} other {# more cooking}}"
   },
   "recipe": {
     "prep_time":          "Prep Time",
