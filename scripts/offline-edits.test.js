@@ -7,6 +7,7 @@ import test from 'node:test';
 import {
   isOfflineError, isMirroredGet, writeOp, collapseOps, sentSeqs, answerWithOps,
   describeOp, shouldRetryStatus, newTempId, isTempId, createdId, remapIds, remapPath, pathOf, mirrorKey,
+  staleAnswerKeys,
 } from '../src/lib/offline-edits.js';
 
 const op = (seq, method, path, body, extra = {}) => {
@@ -194,4 +195,15 @@ test('your own profile, picture included, is queued like everything else', () =>
   assert.equal(collapseOps(ops).length, 1);
   assert.equal(collapseOps(ops)[0].body.nickname, 'Alex');
   assert.match(describeOp({ kind: 'profile' }), /your profile/);
+});
+
+test('the copy this browser keeps has a ceiling, and lets go of the oldest first', () => {
+  const rows = [
+    { key: '/a', at: 300 }, { key: '/b', at: 100 }, { key: '/c', at: 200 }, { key: '/d', at: 400 },
+  ];
+  assert.deepEqual(staleAnswerKeys(rows, 2).sort(), ['/b', '/c']);
+  assert.deepEqual(staleAnswerKeys(rows, 4), [], 'nothing goes while there is room');
+  assert.deepEqual(staleAnswerKeys([], 10), []);
+  // A row with no timestamp is treated as the oldest rather than kept forever.
+  assert.deepEqual(staleAnswerKeys([{ key: '/x' }, { key: '/y', at: 5 }], 1), ['/x']);
 });
