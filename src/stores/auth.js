@@ -131,6 +131,10 @@ async function _fetchAuthFromServer() {
     currentUser.set(user);
     if (user) localStorage.setItem('wl:userId', String(user.id));
     else       localStorage.removeItem('wl:userId');
+    // A paired watch talks to the server itself, so it needs this account's
+    // address and token. Sent on every sign-in, which is also what refreshes
+    // a token the watch has had refused.
+    if (user && isNative) import('../lib/wear-pairing.js').then(({ pairWatch }) => pairWatch()).catch(() => {});
     if (meData.csrf) localStorage.setItem('ct:csrf', meData.csrf);
     else             localStorage.removeItem('ct:csrf');
     // Cache for offline fallback
@@ -325,6 +329,8 @@ export async function logout() {
   localStorage.removeItem('ct:cachedUser');
   localStorage.removeItem('ct:csrf');
   currentUser.set(null);
+  // The watch should not keep a working token for an account that signed out.
+  if (isNative) import('../lib/wear-pairing.js').then(({ unpairWatch }) => unpairWatch()).catch(() => {});
   // Note: userMgmtActive is a server-wide flag, not per-session. Don't flip
   // it on logout — that hides the Login gate in App.svelte (needsLogin =
   // userMgmtActive && !currentUser) and leaves the user stuck in a half-

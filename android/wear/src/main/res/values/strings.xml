@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CookTrace</string>
+    <string name="tile_description">Your shopping list and the cook you are in</string>
+    <string name="complication_label">CookTrace to buy</string>
+</resources>

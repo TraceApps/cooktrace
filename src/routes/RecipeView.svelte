@@ -276,6 +276,44 @@
     if (!Number.isFinite(rid) || typeof localStorage === 'undefined') return;
     try { localStorage.setItem(`ct:checks:${rid}:${kind}`, JSON.stringify([...set])); } catch {}
   }
+  // ── The watch's half of the cook ──────────────────────────────────────
+  // A paired watch shows the recipe you pressed Cook on and lets you tick
+  // steps off with floury hands. Either device can tick, so every change is
+  // stamped and the later one wins.
+  const _cookStampKey = (rid) => `ct:cookat:${rid}`;
+  function _cookStamp(rid) {
+    try { return Number(localStorage.getItem(_cookStampKey(rid))) || 0; } catch { return 0; }
+  }
+  function _tellWatch(on) {
+    if (!isNative || !Number.isFinite(id)) return;
+    const at = Date.now();
+    try { localStorage.setItem(_cookStampKey(id), String(at)); } catch {}
+    import('../lib/wear-pairing.js').then(({ publishCook }) => publishCook(
+      on ? { recipeId: id, name: recipe?.name || '', steps: [...stepChecks], ingredients: [...ingChecks] } : null,
+      at,
+    )).catch(() => {});
+  }
+  /** The watch ticked something while the phone sat here. Take its word. */
+  async function _hearWatch() {
+    if (!isNative || !Number.isFinite(id)) return;
+    try {
+      const { readCook } = await import('../lib/wear-pairing.js');
+      const theirs = await readCook(_cookStamp(id));
+      if (theirs === undefined) return;
+      if (theirs === null) {
+        if (cookMode) { cookMode = false; _saveCookMode(id, false); resetChecks(); }
+        return;
+      }
+      if (theirs.recipeId !== id) return;
+      stepChecks = new Set(theirs.steps);
+      ingChecks = new Set(theirs.ingredients);
+      _saveChecks(id, 'step', stepChecks);
+      _saveChecks(id, 'ing', ingChecks);
+      try { localStorage.setItem(_cookStampKey(id), String(theirs.at)); } catch {}
+      if (!cookMode) { cookMode = true; _saveCookMode(id, true); }
+    } catch { /* no watch */ }
+  }
+
   function _saveCookMode(rid, on) {
     if (!Number.isFinite(rid) || typeof localStorage === 'undefined') return;
     try {
@@ -313,6 +351,7 @@
     else ingChecks.add(key);
     ingChecks = ingChecks;
     _saveChecks(id, 'ing', ingChecks);
+    _tellWatch(true);
   }
   function toggleStep(idx) {
     if (!cookMode) return; // see toggleIng
@@ -321,6 +360,7 @@
     else stepChecks.delete(idx);
     stepChecks = stepChecks;
     _saveChecks(id, 'step', stepChecks);
+    _tellWatch(true);
     // Marking a step done also marks off its linked ingredients as
     // used. Users who worked straight through the step without
     // checking each ingredient individually get the same end state as
@@ -397,6 +437,9 @@
   async function startCookMode() {
     cookMode = true;
     _saveCookMode(id, true);
+    // The wrist gets the recipe: this is the moment your hands stop being
+    // free and the phone stops being the thing you want to touch.
+    _tellWatch(true);
     await _acquireWakeLock();
   }
   async function endCookMode() {
@@ -404,6 +447,7 @@
     _saveCookMode(id, false);
     // Session over — clear so the next cook starts fresh.
     resetChecks();
+    _tellWatch(false);
     await _releaseWakeLock();
   }
   // If the user navigates away or backgrounds the tab, release the lock.
@@ -412,6 +456,7 @@
   // idempotent (safe to call multiple times).
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState === 'visible') await _hearWatch();
       if (cookMode && document.visibilityState === 'visible') {
         await _acquireWakeLock();
       }
