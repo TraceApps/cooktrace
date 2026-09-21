@@ -321,6 +321,19 @@
     } catch { /* no watch */ }
   }
 
+  /** Leave cook mode on every recipe but this one. */
+  function _endOtherCooks() {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const stale = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k?.startsWith('ct:cookmode:') && k !== `ct:cookmode:${id}`) stale.push(k);
+      }
+      stale.forEach(k => localStorage.removeItem(k));
+    } catch { /* nothing to tidy */ }
+  }
+
   function _saveCookMode(rid, on) {
     if (!Number.isFinite(rid) || typeof localStorage === 'undefined') return;
     try {
@@ -442,6 +455,11 @@
   }
 
   async function startCookMode() {
+    // One cook at a time. Cook mode survives closing the app, so without this
+    // an older recipe you never formally finished stays "being cooked" for
+    // ever, and the watch goes on showing it while you stand in front of
+    // something else entirely.
+    _endOtherCooks();
     cookMode = true;
     _saveCookMode(id, true);
     // The wrist gets the recipe: this is the moment your hands stop being

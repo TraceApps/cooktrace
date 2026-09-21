@@ -468,7 +468,13 @@ private fun StepScreen(store: CookStore, nav: NavHostController, index: Int) {
             Kitchen.timesIn(step.text).forEach { seconds ->
                 item(key = "t-$seconds") {
                     Button(
-                        onClick = { store.startTimer("Step ${index + 1}", seconds) },
+                        onClick = {
+                            store.startTimer("Step ${index + 1}", seconds)
+                            // Starting a timer should show you the timer.
+                            // Confirming it with a word and leaving you where
+                            // you were makes you go and find it.
+                            nav.navigate("timers")
+                        },
                         label = { Text("Start " + Kitchen.duration(seconds)) },
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     )

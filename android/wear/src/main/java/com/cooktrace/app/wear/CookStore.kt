@@ -217,7 +217,8 @@ class CookStore(private val ctx: Context) {
         val timer = Pairing.Timer(id, label, seconds, now + seconds * 1000L)
         Pairing.putTimers(ctx, kept + timer)
         KitchenAlarm.schedule(ctx, id, timer.endsAt)
-        _state.update { it.copy(timers = Pairing.timers(ctx), flash = "Timer set") }
+        // No word about it: the screen that opens next is the timer itself.
+        _state.update { it.copy(timers = Pairing.timers(ctx)) }
     }
 
     fun stopTimer(id: Int) {
