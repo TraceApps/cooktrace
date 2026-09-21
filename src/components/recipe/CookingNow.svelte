@@ -8,34 +8,35 @@
    * dish you never formally finished sits there for days and the only way
    * back to it is remembering which recipe it was.
    *
-   * Sits low and to the left so it clears the assistant button, and shows at
-   * most two dishes before it counts the rest, because this is a reminder,
-   * not a list to manage.
+   * One line, never a stack. This is a status, like the now-playing bar in a
+   * music app, and it has to sit on top of whatever you are reading without
+   * burying it. With one dish it goes straight there; with several it names
+   * the oldest and opens a picker, so every tap does something.
    */
   import { onDestroy } from 'svelte';
   import { push, location } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
   import { activeCooks, cookList } from '../../stores/cooks.js';
-  import { resolveAssetUrl } from '../../lib/platform.js';
-
-  const SHOWN = 2;
+  import ActionSheet from '../ui/ActionSheet.svelte';
 
   $: cooks = cookList($activeCooks);
   // Not the one you are already looking at.
   $: showing = cooks.filter(c => $location !== `/recipes/${c.localId}`);
-  $: visible = showing.slice(0, SHOWN);
-  $: extra = showing.length - visible.length;
+  $: first = showing[0];
+
+  let pickerOpen = false;
+  $: pickerActions = showing.map(c => ({
+    label: c.name || $_('cooking_now.untitled'),
+    icon: 'skillet',
+    value: c.localId,
+  }));
 
   // How long each has been going. A minute's resolution is plenty, and the
   // tick stops when the page is hidden so it costs nothing in a pocket.
   let now = Date.now();
   let ticker = null;
-  function start() {
-    if (ticker == null) ticker = setInterval(() => { now = Date.now(); }, 30000);
-  }
-  function stop() {
-    if (ticker != null) { clearInterval(ticker); ticker = null; }
-  }
+  const start = () => { if (ticker == null) ticker = setInterval(() => { now = Date.now(); }, 30000); };
+  const stop  = () => { if (ticker != null) { clearInterval(ticker); ticker = null; } };
   function onVisibility() {
     if (typeof document === 'undefined') return;
     if (document.hidden) stop(); else { now = Date.now(); start(); }
@@ -53,131 +54,103 @@
     const mins = Math.max(0, Math.floor((now - (at || now)) / 60000));
     if (mins < 1) return $_('cooking_now.just_started');
     if (mins < 60) return $_('cooking_now.minutes', { values: { n: mins } });
-    const hours = Math.floor(mins / 60);
-    return $_('cooking_now.hours', { values: { n: hours, m: mins % 60 } });
+    return $_('cooking_now.hours', { values: { n: Math.floor(mins / 60), m: mins % 60 } });
+  }
+
+  function open() {
+    if (showing.length === 1) push(`/recipes/${first.localId}`);
+    else pickerOpen = true;
   }
 </script>
 
-{#if visible.length}
-  <div class="cooking-now" aria-label={$_('cooking_now.label')}>
-    {#each visible as cook (cook.localId)}
-      <button class="cook-row" on:click={() => push(`/recipes/${cook.localId}`)}>
-        <span class="cook-thumb">
-          {#if cook.img}
-            <img src={resolveAssetUrl(cook.img)} alt="" loading="lazy" />
-          {:else}
-            <span class="material-symbols-rounded">skillet</span>
-          {/if}
-          <span class="cook-dot" aria-hidden="true"></span>
-        </span>
-        <span class="cook-text">
-          <span class="cook-name">{cook.name || $_('cooking_now.untitled')}</span>
-          <span class="cook-meta">{$_('cooking_now.label')} · {since(cook.at)}</span>
-        </span>
-        <span class="material-symbols-rounded cook-go">chevron_right</span>
-      </button>
-    {/each}
-    {#if extra > 0}
-      <button class="cook-more" on:click={() => push('/recipes')}>
-        {$_('cooking_now.more', { values: { n: extra } })}
-      </button>
-    {/if}
-  </div>
+{#if first}
+  <button class="cooking-now" on:click={open}
+    aria-label={$_('cooking_now.label')}>
+    <span class="cn-icon material-symbols-rounded">skillet</span>
+    <span class="cn-text">
+      {#if showing.length > 1}
+        <b>{$_('cooking_now.label_many', { values: { n: showing.length } })}</b>
+        <span class="cn-sub">{first.name || $_('cooking_now.untitled')}</span>
+      {:else}
+        <b>{first.name || $_('cooking_now.untitled')}</b>
+        <span class="cn-sub">{$_('cooking_now.label')} · {since(first.at)}</span>
+      {/if}
+    </span>
+    <span class="cn-go material-symbols-rounded">
+      {showing.length > 1 ? 'expand_less' : 'chevron_right'}
+    </span>
+  </button>
+
+  <ActionSheet
+    bind:open={pickerOpen}
+    title={$_('cooking_now.label_many', { values: { n: showing.length } })}
+    actions={pickerActions}
+    on:select={e => push(`/recipes/${e.detail.value}`)}
+  />
 {/if}
 
 <style>
+  /* One slim bar, low and to the left so it clears the assistant button and
+     leaves the page readable behind it. */
   .cooking-now {
     position: fixed;
     z-index: 60;
     left: 12px;
-    /* Clear of the assistant button, which owns the bottom right. */
     right: 84px;
-    bottom: calc(var(--nav-h, 0px) + var(--safe-bottom, 0px) + 14px);
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    max-width: 520px;
-    pointer-events: none;
-  }
-  .cook-row,
-  .cook-more {
-    pointer-events: auto;
+    bottom: calc(var(--nav-h, 0px) + var(--safe-bottom, 0px) + 12px);
+    max-width: 380px;
     display: flex;
     align-items: center;
-    gap: 10px;
-    width: 100%;
-    padding: 8px 10px;
+    gap: 9px;
+    padding: 7px 10px;
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg, 14px);
+    border-radius: var(--radius-full);
     background: var(--surface-1);
-    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.26);
     color: var(--text-1);
     text-align: left;
     cursor: pointer;
     transition: transform var(--dur-fast, 0.12s), border-color var(--dur-fast, 0.12s);
   }
-  .cook-row:hover { border-color: var(--accent); }
-  .cook-row:active { transform: scale(0.985); }
+  .cooking-now:hover { border-color: var(--accent); }
+  .cooking-now:active { transform: scale(0.985); }
 
-  .cook-thumb {
-    position: relative;
+  /* The only moving thing on the bar: a cook is live. */
+  .cn-icon {
     flex: 0 0 auto;
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
-    overflow: hidden;
     display: grid;
     place-items: center;
-    background: var(--surface-2);
-    color: var(--text-2);
-  }
-  .cook-thumb img { width: 100%; height: 100%; object-fit: cover; }
-  .cook-thumb .material-symbols-rounded { font-size: 20px; }
-
-  /* A cook is live, and this is the only moving thing on the bar. */
-  .cook-dot {
-    position: absolute;
-    right: -1px;
-    bottom: -1px;
-    width: 10px;
-    height: 10px;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
-    background: var(--accent);
-    border: 2px solid var(--surface-1);
-    animation: cook-pulse 2s ease-in-out infinite;
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--accent);
+    font-size: 17px;
+    animation: cn-pulse 2.4s ease-in-out infinite;
   }
-  @keyframes cook-pulse {
+  @keyframes cn-pulse {
     0%, 100% { opacity: 1; }
-    50%      { opacity: 0.4; }
+    50%      { opacity: 0.55; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .cook-dot { animation: none; }
+    .cn-icon { animation: none; }
   }
 
-  .cook-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-  .cook-name {
-    font-size: 14px;
+  .cn-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+  .cn-text b {
+    font-size: 13px;
     font-weight: 700;
-    line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .cook-meta {
-    font-size: 11.5px;
+  .cn-sub {
+    font-size: 11px;
     font-weight: 600;
     color: var(--text-2);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .cook-go { flex: 0 0 auto; color: var(--text-2); font-size: 20px; }
-
-  .cook-more {
-    justify-content: center;
-    padding: 6px 10px;
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--text-2);
-  }
+  .cn-go { flex: 0 0 auto; color: var(--text-2); font-size: 18px; }
 </style>

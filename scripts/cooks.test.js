@@ -121,10 +121,29 @@ test('the strip navigates to the route the app actually has', () => {
   // The recipe route is /recipes/:id. Pushing /recipe/:id matched nothing,
   // so tapping a cook flashed and stayed where it was.
   const strip = readFileSync(new URL('../src/components/recipe/CookingNow.svelte', import.meta.url), 'utf8');
-  assert.match(strip, /push\(`\/recipes\/\$\{cook\.localId\}`\)/);
+  assert.match(strip, /push\(`\/recipes\/\$\{first\.localId\}`\)/);
+  // The bug: /recipe/:id matched no route, so a tap flashed and stayed put.
   assert.doesNotMatch(strip, /push\(`\/recipe\/\$\{/);
   // And it hides the one you are already looking at, by that same route.
   assert.match(strip, /\$location !== `\/recipes\/\$\{c\.localId\}`/);
+});
+
+test('every tap on the strip goes somewhere', () => {
+  const strip = readFileSync(new URL('../src/components/recipe/CookingNow.svelte', import.meta.url), 'utf8');
+  // One dish: straight to it. Several: a picker, never a dead "more" row
+  // that lands you on the page you are already on.
+  assert.match(strip, /if \(showing\.length === 1\) push\(`\/recipes\/\$\{first\.localId\}`\);/);
+  assert.match(strip, /else pickerOpen = true;/);
+  assert.match(strip, /on:select=\{e => push\(`\/recipes\/\$\{e\.detail\.value\}`\)\}/);
+  assert.doesNotMatch(strip, /push\('\/recipes'\)/);
+});
+
+test('it is one bar, not a stack that buries the page', () => {
+  const strip = readFileSync(new URL('../src/components/recipe/CookingNow.svelte', import.meta.url), 'utf8');
+  // No each-block over the cooks in the bar itself; the list lives in the
+  // picker, which only opens when you ask for it.
+  const markup = strip.slice(strip.indexOf('{#if first}'), strip.indexOf('<style>'));
+  assert.doesNotMatch(markup, /\{#each/);
 });
 
 test('the strip stops ticking when the page is hidden', () => {

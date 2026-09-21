@@ -160,6 +160,7 @@
   "cooking_now": {
     "label":        "Cooking",
     "untitled":     "A recipe",
+    "label_many":   "Cooking {n}",
     "just_started": "just started",
     "minutes":      "{n, plural, one {# min} other {# min}}",
     "hours":        "{n}h {m}m",
