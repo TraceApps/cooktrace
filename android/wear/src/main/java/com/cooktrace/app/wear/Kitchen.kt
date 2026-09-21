@@ -209,6 +209,32 @@ object Kitchen {
         else "$m:${s.toString().padStart(2, '0')}"
     }
 
+    /**
+     * How near a timer is to ringing, for the colour of the ring around it.
+     *
+     * The two halves are measured differently on purpose. Whether something
+     * needs you NOW is a question about the clock: under a minute is under a
+     * minute, whether it is an egg or a joint of beef. Whether it is getting
+     * on is partly about proportion, so a long braise turns amber when it is
+     * down to its last third rather than staying green for hours and then
+     * flipping at the death.
+     *
+     * Measuring both by proportion was the first thing I tried, and it called
+     * a three-hour braise urgent with five minutes to go, which is wrong by a
+     * factor of five.
+     */
+    enum class Urgency { CALM, SOON, NOW }
+
+    fun urgency(secondsLeft: Int, total: Int): Urgency {
+        val left = maxOf(0, secondsLeft)
+        val fraction = left.toDouble() / maxOf(1, total)
+        return when {
+            left <= 60 -> Urgency.NOW
+            left <= 300 || fraction <= 0.30 -> Urgency.SOON
+            else -> Urgency.CALM
+        }
+    }
+
     /** "20 min", for a button offering a timer the step asked for. */
     fun duration(seconds: Int): String = when {
         seconds % 3600 == 0 && seconds >= 3600 -> "${seconds / 3600} hr"

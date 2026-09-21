@@ -93,6 +93,24 @@ class KitchenTest {
     }
 
     @Test
+    fun `how near a timer is to ringing is not just a percentage`() {
+        // A long braise: a tenth left is still eighteen minutes, and nobody
+        // needs to run for that.
+        assertEquals(Kitchen.Urgency.CALM, Kitchen.urgency(3600, 10800))
+        assertEquals(Kitchen.Urgency.SOON, Kitchen.urgency(280, 10800))
+        assertEquals(Kitchen.Urgency.NOW, Kitchen.urgency(45, 10800))
+
+        // A short boil: a third left is forty seconds, which is a scramble.
+        assertEquals(Kitchen.Urgency.NOW, Kitchen.urgency(40, 120))
+        assertEquals(Kitchen.Urgency.SOON, Kitchen.urgency(90, 600))
+        assertEquals(Kitchen.Urgency.CALM, Kitchen.urgency(500, 600))
+
+        // The ends behave.
+        assertEquals(Kitchen.Urgency.NOW, Kitchen.urgency(0, 600))
+        assertEquals(Kitchen.Urgency.CALM, Kitchen.urgency(10800, 10800))
+    }
+
+    @Test
     fun `times are written the way a button should read`() {
         assertEquals("20 min", Kitchen.duration(1200))
         assertEquals("2 hr", Kitchen.duration(7200))

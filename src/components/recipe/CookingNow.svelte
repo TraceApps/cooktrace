@@ -18,7 +18,9 @@
 
 {#if showing.length}
   <div class="cooking-now" role="navigation" aria-label={$_('cooking_now.label')}>
-    <span class="cooking-now-label">{$_('cooking_now.label')}</span>
+    <span class="cooking-now-label">
+      {showing.length > 1 ? $_('cooking_now.label_many', { values: { n: showing.length } }) : $_('cooking_now.label')}
+    </span>
     <div class="cooking-now-chips">
       {#each showing as cook (cook.localId)}
         <button class="cooking-now-chip" on:click={() => push(`/recipe/${cook.localId}`)}>
@@ -31,13 +33,26 @@
 {/if}
 
 <style>
+  /* Fixed, above the nav bar, because this has to be visible from wherever
+     you happen to be: the whole point is telling you something is cooking
+     when you are not on its page. In the normal flow it sat at the bottom of
+     the document where nobody would ever scroll to find it. Below the Trace
+     button (80) and the timer pill so it cannot cover either. */
   .cooking-now {
+    position: fixed;
+    z-index: 60;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(var(--nav-h, 0px) + var(--safe-bottom, 0px) + 12px);
+    max-width: min(92vw, 560px);
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 12px;
+    padding: 6px 10px;
+    border-radius: var(--radius-full);
     background: var(--surface-2);
-    border-bottom: 1px solid var(--border);
+    border: 1px solid var(--border);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
     overflow-x: auto;
     scrollbar-width: none;
   }
