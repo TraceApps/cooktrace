@@ -5,6 +5,7 @@
  * so they're always available and don't depend on third-party proxies.
  */
 import fs from 'fs';
+import { detectImageTypeFromBuffer } from './image-magic.js';
 import path from 'path';
 import crypto from 'crypto';
 import dns from 'dns/promises';
@@ -151,6 +152,13 @@ export function localizeDataUrl(img_url) {
     const bytes = Buffer.from(b64, 'base64');
     if (!bytes.length || bytes.length > MAX_EMBEDDED_BYTES) {
       logger.warn(`[image-localizer] Refusing embedded image of ${bytes.length} bytes`);
+      return null;
+    }
+    // The same magic-byte check the upload route runs, before anything is
+    // written: a client-sent type is not evidence of anything, and this
+    // tree is served to anyone holding the URL.
+    if (!detectImageTypeFromBuffer(bytes)) {
+      logger.warn('[image-localizer] Refusing an embedded file that is not an image');
       return null;
     }
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
