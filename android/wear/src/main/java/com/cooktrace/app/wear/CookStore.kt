@@ -245,6 +245,7 @@ class CookStore(private val ctx: Context) {
         val timer = Pairing.Timer(id, label, seconds, now + seconds * 1000L)
         Pairing.putTimers(ctx, kept + timer)
         KitchenAlarm.schedule(ctx, id, timer.endsAt)
+        KitchenOngoing.refresh(ctx)
         // No word about it: the screen that opens next is the timer itself.
         _state.update { it.copy(timers = Pairing.timers(ctx)) }
     }
@@ -266,12 +267,14 @@ class CookStore(private val ctx: Context) {
         if (updated == kept) return
         Pairing.putTimers(ctx, updated)
         updated.firstOrNull { it.id == id }?.let { KitchenAlarm.schedule(ctx, it.id, it.endsAt) }
+        KitchenOngoing.refresh(ctx)
         _state.update { it.copy(timers = Pairing.timers(ctx)) }
     }
 
     fun stopTimer(id: Int) {
         KitchenAlarm.cancel(ctx, id)
         Pairing.putTimers(ctx, Pairing.timers(ctx).filterNot { it.id == id })
+        KitchenOngoing.refresh(ctx)
         _state.update { it.copy(timers = Pairing.timers(ctx)) }
     }
 
@@ -281,6 +284,10 @@ class CookStore(private val ctx: Context) {
         val live = Pairing.timers(ctx).filterNot { it.done(now) }
         if (live.size != _state.value.timers.size) {
             Pairing.putTimers(ctx, live)
+            // Inside the branch: this runs on every tick, and posting a
+            // notification twice a second is the one way to make this cost
+            // something.
+            KitchenOngoing.refresh(ctx)
             _state.update { it.copy(timers = live) }
         }
     }

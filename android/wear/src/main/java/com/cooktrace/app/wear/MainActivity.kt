@@ -1,8 +1,13 @@
 package com.cooktrace.app.wear
 
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,12 +28,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -72,11 +79,27 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private lateinit var store: CookStore
+    /** Where to go on opening, when something outside the app said where. */
+    private var route by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         store = CookStore(applicationContext)
-        setContent { WearApp(store) }
+        route = intent?.getStringExtra(EXTRA_ROUTE)
+        setContent { WearApp(store, route) { route = null } }
+    }
+
+    // Tapping the timer on the watch face with the app already open: the same
+    // journey, and it should still go to the timer rather than wherever the
+    // app happened to be left.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        route = intent.getStringExtra(EXTRA_ROUTE)
+    }
+
+    companion object {
+        const val EXTRA_ROUTE = "com.cooktrace.app.wear.ROUTE"
     }
 
     override fun onResume() {
@@ -104,9 +127,33 @@ private fun WhileWatching(vararg keys: Any?, block: suspend CoroutineScope.() ->
 }
 
 @Composable
-fun WearApp(store: CookStore) {
+fun WearApp(store: CookStore, route: String? = null, onRouted: () -> Unit = {}) {
     val nav = rememberSwipeDismissableNavController()
     val state by store.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    // Opened from the timer on the watch face: go where it points, once.
+    LaunchedEffect(route) {
+        if (route != null) {
+            nav.navigate(route)
+            onRouted()
+        }
+    }
+
+    // Asked for the first time there is something to show, not on first
+    // launch: a permission prompt makes sense next to the thing it is for.
+    // Refused, everything still works except the entry on the face.
+    val notify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        KitchenOngoing.refresh(context)
+    }
+    val counting = state.timers.isNotEmpty()
+    LaunchedEffect(counting) {
+        if (!counting || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@LaunchedEffect
+        val granted = ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) notify.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+    }
 
     // While the app is open, keep up with the phone and the clock.
     WhileWatching(state.paired) {

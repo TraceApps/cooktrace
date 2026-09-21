@@ -98,6 +98,9 @@ class KitchenAlarmReceiver : BroadcastReceiver() {
         val live = Pairing.timers(context).filterNot { it.done(now) }
         if (live.size != Pairing.timers(context).size) Pairing.putTimers(context, live)
         KitchenTileService.refresh(context)
+        // The one that rang comes off the face too, and what is left carries
+        // on counting there.
+        KitchenOngoing.refresh(context)
         KitchenAlarm.buzz(context)
     }
 }
