@@ -105,7 +105,12 @@ async function _absorb(oldName, db) {
     req.onerror = req.onblocked = () => resolve(null);
   });
   if (!old) return;
-  for (const store of _STORES) {
+  // The work waiting to go up and what each temporary id became always come
+  // across. Copies of answers only come if nothing has been changed yet in
+  // this session: this runs late, after a change may already have tidied
+  // them up, and bringing a stale one back resurrects what was deleted.
+  const stores = _changedSomething ? ['outbox', 'meta'] : _STORES;
+  for (const store of stores) {
     if (!old.objectStoreNames.contains(store) || !db.objectStoreNames.contains(store)) continue;
     const rows = await new Promise((resolve) => {
       try {
@@ -155,6 +160,9 @@ const _all = (store) => _tx(store, 'readonly', s => s.getAll()).then(r => r || [
 // changed offline at all.
 const KEEP_ANSWERS = 400;
 let _sinceTrim = 0;
+// Has anything been changed since this page opened? Decides whether copies
+// kept before the account was known are still safe to carry over.
+let _changedSomething = false;
 // Keeps two refusals in the same millisecond from landing on one another.
 let _refusedSeq = 0;
 
@@ -502,10 +510,16 @@ export async function offlineFetch(http, method, path, body) {
     return _straight(http, m, target, body);
   }
 
+  _changedSomething = true;
   const queued = await _loadOps();
   if (_online() && !queued.length) {
     try {
       const answer = await http._fetch(m, target, body);
+      // Whatever this change makes stale goes, the same as after a replay.
+      // Without this, something deleted while online was still in the copy
+      // held here, and came back the moment the connection did not: the
+      // screens read from that copy, and nothing had told them.
+      await _forgetTouched([{ ...op, path: target }]);
       _publish({ online: true, error: null });
       return answer;
     } catch (err) {
