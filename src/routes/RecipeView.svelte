@@ -303,19 +303,32 @@
   function _cookStamp(rid) {
     try { return Number(localStorage.getItem(_cookStampKey(rid))) || 0; } catch { return 0; }
   }
+  /**
+   * Which id the watch should be given. The watch asks YOUR SERVER for the
+   * recipe, and in the native app the id in the address is this phone's own,
+   * from its local mirror, not the server's. Sending the local one makes the
+   * watch fetch whatever recipe happens to hold that number on the server,
+   * which is how a cake turned into a tray of cookies. Zero means there is
+   * nothing the watch could fetch: either the page has not settled yet, or
+   * this recipe has never reached the server.
+   */
+  function _watchRecipeId() {
+    if (!recipe || Number(recipe.id) !== id) return 0;
+    if (!isNative) return id;
+    return Number(recipe.server_id) || 0;
+  }
+
   function _tellWatch(on) {
     if (!isNative || !Number.isFinite(id)) return;
+    const rid = on ? _watchRecipeId() : 0;
+    if (on && !rid) {
+      console.warn('[wear] not sending the cook: this recipe has no server id yet');
+      return;
+    }
     const at = Date.now();
     try { localStorage.setItem(_cookStampKey(id), String(at)); } catch {}
-    // The name is cosmetic: the watch fetches the recipe by id and titles it
-    // from that. So only send a name when it is certainly this recipe's, and
-    // never let a name that has not caught up stop the cook reaching the
-    // wrist. `id` changes the instant you navigate and `recipe` catches up
-    // when the load finishes, which is how one recipe's id went out under
-    // another's name.
-    const named = recipe && Number(recipe.id) === id ? (recipe.name || '') : '';
     _publishCook(
-      on ? { recipeId: id, name: named, steps: [...stepChecks], ingredients: [...ingChecks] } : null,
+      on ? { recipeId: rid, name: recipe.name || '', steps: [...stepChecks], ingredients: [...ingChecks] } : null,
       at,
     ).catch(() => {});
   }
@@ -329,7 +342,8 @@
         if (cookMode) { cookMode = false; _saveCookMode(id, false); resetChecks(); }
         return;
       }
-      if (theirs.recipeId !== id) return;
+      // The watch speaks in server ids, this page in local ones.
+      if (theirs.recipeId !== _watchRecipeId()) return;
       stepChecks = new Set(theirs.steps);
       ingChecks = new Set(theirs.ingredients);
       _saveChecks(id, 'step', stepChecks);

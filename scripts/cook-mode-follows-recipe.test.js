@@ -36,8 +36,23 @@ test('starting a cook ends any other', () => {
   assert.match(start, /_endOtherCooks\(\)/);
 });
 
-test('the watch is never told a recipe id and a name from different recipes', () => {
+test('the watch is given the server id, never this phone local one', () => {
+  // The native app keeps its own autoincrement ids and a separate server_id.
+  // The watch fetches the recipe from the server, so sending the local id
+  // makes it fetch whatever recipe holds that number there instead.
+  const pick = source.slice(source.indexOf('function _watchRecipeId'), source.indexOf('function _tellWatch'));
+  assert.match(pick, /if \(!isNative\) return id;/);
+  assert.match(pick, /Number\(recipe\.server_id\) \|\| 0/);
+  assert.match(pick, /Number\(recipe\.id\) !== id/);
+
   const tell = source.slice(source.indexOf('function _tellWatch'), source.indexOf('async function _hearWatch'));
-  assert.match(tell, /Number\(recipe\.id\) === id/);
-  assert.match(tell, /recipeId: id/);
+  assert.match(tell, /recipeId: rid/);
+  // And it refuses rather than sending something the watch cannot resolve.
+  assert.match(tell, /if \(on && !rid\)/);
+  assert.doesNotMatch(tell, /recipeId: id\b/);
+});
+
+test('what comes back from the watch is compared in the same units', () => {
+  const hear = source.slice(source.indexOf('async function _hearWatch'));
+  assert.match(hear.slice(0, 800), /theirs\.recipeId !== _watchRecipeId\(\)/);
 });
