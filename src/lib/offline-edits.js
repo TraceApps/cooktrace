@@ -241,6 +241,45 @@ export function answerWithOps(url, mirrored, ops) {
 }
 
 /**
+ * The answer a queued write hands back, shaped like the route's own.
+ *
+ * The screens read these, so the shape matters as much as the status. A
+ * cook logged from a recipe answers with the RECIPE, for instance, because
+ * that screen puts the answer straight back into what it is showing.
+ */
+export function queuedReply(op, body, tempId, { recipe } = {}) {
+  const now = new Date().toISOString();
+  const queued = { queued: true, offline: true };
+  switch (op?.kind) {
+    case 'diary-create':
+      // From a recipe ("I cooked this") the route answers with the recipe;
+      // from the diary it answers with the entry.
+      if (/\/api\/recipes\/-?\d+\/cooked$/.test(String(op.path || ''))) {
+        return recipe
+          ? { ...recipe, last_cooked_at: body?.date || now, cook_count: (recipe.cook_count || 0) + 1, ...queued }
+          : { ...(body || {}), id: tempId, ...queued };
+      }
+      return { ...(body || {}), id: tempId, created_at: now, ...queued };
+    case 'profile':
+      return { user: { ...(body || {}) }, ...queued };
+    case 'shopping-create':
+    case 'pantry-create':
+    case 'recipe-create':
+    case 'comment-create':
+      return { ...(body || {}), id: tempId, created_at: now, updated_at: now, ...queued };
+    case 'shopping-update':
+    case 'shopping-check':
+    case 'pantry-update':
+    case 'pantry-stock':
+    case 'diary-update':
+    case 'recipe-update':
+      return { ...(body || {}), id: op.id, updated_at: now, ...queued };
+    default:
+      return { ok: true, ...(body || {}), ...queued };
+  }
+}
+
+/**
  * Which kept answers to let go of, oldest first, once there are more than
  * `keep`. The copy this browser holds has to have a ceiling: a database with
  * no room left would refuse the outbox too, and then nothing could be

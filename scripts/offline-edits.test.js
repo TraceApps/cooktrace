@@ -7,7 +7,7 @@ import test from 'node:test';
 import {
   isOfflineError, isMirroredGet, writeOp, collapseOps, sentSeqs, answerWithOps,
   describeOp, shouldRetryStatus, newTempId, isTempId, createdId, remapIds, remapPath, pathOf, mirrorKey,
-  staleAnswerKeys,
+  staleAnswerKeys, queuedReply,
 } from '../src/lib/offline-edits.js';
 
 const op = (seq, method, path, body, extra = {}) => {
@@ -206,4 +206,24 @@ test('the copy this browser keeps has a ceiling, and lets go of the oldest first
   assert.deepEqual(staleAnswerKeys([], 10), []);
   // A row with no timestamp is treated as the oldest rather than kept forever.
   assert.deepEqual(staleAnswerKeys([{ key: '/x' }, { key: '/y', at: 5 }], 1), ['/x']);
+});
+
+test('a queued answer is shaped like the route it stands in for', () => {
+  // The screens read these. A photo helper in LiftTrace refused to carry on
+  // because the shape was wrong, and said "Could not save photo" for a photo
+  // that was safely queued.
+  const cooked = queuedReply({ kind: 'diary-create', path: '/api/recipes/4/cooked' }, { date: '2026-09-20' }, -9,
+    { recipe: { id: 4, name: 'Carbonara', cook_count: 2 } });
+  assert.equal(cooked.name, 'Carbonara', 'logging a cook answers with the recipe, as the route does');
+  assert.equal(cooked.cook_count, 3);
+  const entry = queuedReply({ kind: 'diary-create', path: '/api/cook-diary' }, { date: '2026-09-20' }, -9);
+  assert.equal(entry.id, -9, 'from the diary it answers with the entry');
+  const item = queuedReply({ kind: 'shopping-create' }, { name: 'Milk' }, -7);
+  assert.equal(item.id, -7);
+  assert.equal(item.name, 'Milk');
+  const ticked = queuedReply({ kind: 'shopping-check', id: 3 }, { checked: true }, null);
+  assert.equal(ticked.id, 3);
+  assert.equal(ticked.checked, true);
+  assert.deepEqual(queuedReply({ kind: 'profile' }, { nickname: 'Alex' }, null).user, { nickname: 'Alex' });
+  assert.equal(queuedReply({ kind: 'setting' }, { key: 'a', value: 1 }, null).ok, true);
 });

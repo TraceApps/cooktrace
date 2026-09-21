@@ -23,7 +23,7 @@ import { writable } from 'svelte/store';
 import {
   isOfflineError, isMirroredGet, mirrorKey, pathOf, writeOp, collapseOps, sentSeqs,
   answerWithOps, newTempId, createdId, remapIds, remapPath, describeOp, shouldRetryStatus,
-  MAKES_A_ROW, staleAnswerKeys,
+  MAKES_A_ROW, staleAnswerKeys, queuedReply,
 } from './offline-edits.js';
 
 const RETRY_MIN_MS = 3_000;
@@ -520,7 +520,9 @@ export async function offlineFetch(http, method, path, body) {
   });
   if (!stored) throw _offlineError();
 
-  // Answer in the shape the route would have, so the screen carries on.
-  if (tempId != null) return { ...(body || {}), id: tempId, queued: true, offline: true };
-  return { ok: true, ...(body || {}), queued: true, offline: true };
+  // Answer in the shape the route would have, so the screen carries on:
+  // several of them put this straight back into what they are showing.
+  const recipeId = String(target).match(/^\/api\/recipes\/(-?\d+)\/cooked$/)?.[1];
+  const recipe = recipeId ? await _recall(`/api/recipes/${recipeId}`) : null;
+  return queuedReply({ ...op, id: op.id ?? tempId, path: target }, body, tempId, { recipe });
 }
