@@ -499,10 +499,36 @@
         mod.syncState.subscribe(v => syncState.set(v));
         mod.startNetworkMonitor();
         mod.fullSync();
-        setInterval(() => mod.fullSync(true), 30000);
-        import('@capacitor/app').then(({ App }) => {
-          App.addListener('resume', () => mod.fullSync());
+        // Pull every 30s while the app is actually in front of you. A WebView
+        // keeps its timers running when the app is backgrounded and the screen
+        // is off, and an app still on top with the screen off is not frozen,
+        // so an ungated interval keeps waking the radio with nobody looking.
+        // Stopping loses nothing: coming back fires a sync of its own.
+        let poll = null;
+        const startPolling = () => {
+          if (poll == null) poll = setInterval(() => mod.fullSync(true), 30000);
+        };
+        const stopPolling = () => {
+          if (poll != null) { clearInterval(poll); poll = null; }
+        };
+        startPolling();
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) stopPolling(); else startPolling();
         });
+        import('@capacitor/app').then(({ App }) => {
+          App.addListener('resume', () => {
+            startPolling();
+            mod.fullSync();
+            // A watch paired since this app was last opened, or a token that
+            // has been refreshed: either way the watch needs telling. Signing
+            // in is not the only moment that matters, and on an app that is
+            // already signed in it never happens at all.
+            import('./lib/wear-pairing.js').then(({ pairWatch }) => pairWatch()).catch(() => {});
+          });
+          App.addListener('pause', () => stopPolling());
+        });
+        // And on launch, once auth has settled.
+        setTimeout(() => import('./lib/wear-pairing.js').then(({ pairWatch }) => pairWatch()).catch(() => {}), 2500);
       });
     }
 

@@ -40,13 +40,23 @@ export async function pairWatch() {
   const serverUrl = getServerUrl();
   const token = getAuthToken();
   // Local-only mode keeps everything on the phone, so there is no address for
-  // the watch to call and nothing to pair.
-  if (!serverUrl || !token) return false;
-  if (!(await hasWatch())) return false;
+  // the watch to call and nothing to pair. Say which of these it is: a watch
+  // stuck on "pair from your phone" is otherwise a mystery from both ends,
+  // and this line is the only thing that can tell you why.
+  if (!serverUrl || !token) {
+    console.warn('[wear] not pairing:', serverUrl ? 'signed in on this device but no token' : 'no server connected');
+    return false;
+  }
+  if (!(await hasWatch())) {
+    console.warn('[wear] not pairing: no watch is connected to this phone');
+    return false;
+  }
   try {
     await WearPairing.pair({ serverUrl, token });
+    console.info('[wear] paired with the watch');
     return true;
-  } catch {
+  } catch (e) {
+    console.warn('[wear] pairing failed:', e?.message || e);
     return false;
   }
 }
