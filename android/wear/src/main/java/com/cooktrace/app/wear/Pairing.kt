@@ -165,7 +165,7 @@ object Pairing {
         if (id <= 0) return null
         return Cook(
             recipeId = id,
-            name = o.optString("name"),
+            name = Kitchen.text(o, "name"),
             steps = o.optJSONArray("steps").toIntSet(),
             ingredients = o.optJSONArray("ingredients").toStringSet(),
             at = o.optLong("at", 0L),
@@ -242,7 +242,7 @@ object Pairing {
         val arr = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
         return (0 until arr.length()).mapNotNull { i ->
             val o = arr.optJSONObject(i) ?: return@mapNotNull null
-            Timer(o.optInt("id"), o.optString("label"), o.optInt("total"), o.optLong("endsAt"))
+            Timer(o.optInt("id"), Kitchen.text(o, "label"), o.optInt("total"), o.optLong("endsAt"))
         }
     }
 
@@ -283,11 +283,11 @@ object Pairing {
             const val COOKED = "cooked"
 
             fun from(o: JSONObject) = Op(
-                kind = o.optString("kind", CHECK),
+                kind = Kitchen.text(o, "kind").ifBlank { CHECK },
                 itemId = o.optLong("itemId"),
                 checked = o.optBoolean("checked", false),
                 recipeId = o.optLong("recipeId"),
-                date = o.optString("date"),
+                date = Kitchen.text(o, "date"),
                 seq = o.optLong("seq", 0L),
             )
         }

@@ -131,6 +131,29 @@ class KitchenTest {
     }
 
     @Test
+    fun `a field that is null reads as nothing, never as the word null`() {
+        // Android's JSON reader answers an explicitly null field with the four
+        // letters "null", where the one these tests run against answers with
+        // an empty string. Both are handled, or a shopping row with no aisle
+        // puts the word "null" on the watch, which is what it did.
+        val nulls = """[{"id":1,"name":"Bread","quantity":null,"unit":null,"aisle":null,"checked":0,"recipe_name":null}]"""
+        val item = Kitchen.items(nulls).single()
+        assertEquals("", item.unit)
+        assertEquals("", item.aisle)
+        assertEquals("", item.from)
+        assertEquals("", item.amount)
+        // And the aisle it falls into is the named one, not "null".
+        assertEquals("Anything else", Kitchen.aisles(listOf(item)).single().first)
+
+        // The same anywhere else a string comes out of JSON.
+        val o = org.json.JSONObject("""{"a":null,"b":"null","c":" x "}""")
+        assertEquals("", Kitchen.text(o, "a"))
+        assertEquals("", Kitchen.text(o, "b"))
+        assertEquals("x", Kitchen.text(o, "c"))
+        assertEquals("", Kitchen.text(o, "missing"))
+    }
+
+    @Test
     fun `nothing sensible in, nothing silly out`() {
         assertTrue(Kitchen.items("not json").isEmpty())
         assertNull(Kitchen.recipe("{}"))

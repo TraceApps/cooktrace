@@ -17,6 +17,21 @@ import org.json.JSONObject
  */
 object Kitchen {
 
+    /**
+     * A string from JSON, with nothing in it when there is nothing there.
+     *
+     * Android's own JSON reader answers a field that is explicitly null with
+     * the four letters "null" rather than an empty string, and the reference
+     * implementation that unit tests run against does not, so this is a bug
+     * that passes every test and then shows the word "null" on a watch. A
+     * shopping row with no aisle is exactly that case.
+     */
+    fun text(o: JSONObject, key: String): String {
+        if (o.isNull(key)) return ""
+        val value = o.optString(key)
+        return if (value == "null") "" else value.trim()
+    }
+
     // ── The shopping list ────────────────────────────────────────────────
 
     data class Item(
@@ -37,16 +52,16 @@ object Kitchen {
         val arr = runCatching { JSONArray(body) }.getOrNull() ?: return emptyList()
         return (0 until arr.length()).mapNotNull { i ->
             val o = arr.optJSONObject(i) ?: return@mapNotNull null
-            val name = o.optString("name").trim()
+            val name = text(o, "name")
             if (name.isBlank()) return@mapNotNull null
             Item(
                 id = o.optLong("id"),
                 name = name,
                 qty = number(o.opt("quantity")),
-                unit = o.optString("unit").orEmpty().trim(),
-                aisle = o.optString("aisle").orEmpty().trim(),
+                unit = text(o, "unit"),
+                aisle = text(o, "aisle"),
                 checked = o.optInt("checked", 0) == 1 || o.optBoolean("checked", false),
-                from = o.optString("recipe_name").orEmpty().trim(),
+                from = text(o, "recipe_name"),
             )
         }
     }
@@ -111,7 +126,7 @@ object Kitchen {
         if (id <= 0) return null
         return Recipe(
             id = id,
-            name = o.optString("name").ifBlank { "Recipe" },
+            name = text(o, "name").ifBlank { "Recipe" },
             servings = o.optInt("servings", 0),
             ingredients = ingredients(o.optJSONArray("ingredients")),
             steps = steps(o.optJSONArray("steps")),
@@ -130,7 +145,7 @@ object Kitchen {
             val items = group.optJSONArray("items") ?: continue
             for (i in 0 until items.length()) {
                 val it = items.optJSONObject(i) ?: continue
-                val name = it.optString("name").trim()
+                val name = text(it, "name")
                 if (name.isBlank()) continue
                 out.add(
                     Ingredient(
@@ -141,7 +156,7 @@ object Kitchen {
                         // a tick on one would mean nothing on the other.
                         key = "$g-$i",
                         qty = number(it.opt("qty")),
-                        unit = it.optString("unit").orEmpty().trim(),
+                        unit = text(it, "unit"),
                         name = name,
                     )
                 )
@@ -154,9 +169,9 @@ object Kitchen {
         val out = mutableListOf<Step>()
         for (i in 0 until (arr?.length() ?: 0)) {
             val s = arr!!.optJSONObject(i) ?: continue
-            val text = s.optString("text").trim()
-            if (text.isBlank()) continue
-            out.add(Step(index = out.size, title = s.optString("title").orEmpty().trim(), text = text))
+            val body = text(s, "text")
+            if (body.isBlank()) continue
+            out.add(Step(index = out.size, title = text(s, "title"), text = body))
         }
         return out
     }

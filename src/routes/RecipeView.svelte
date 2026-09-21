@@ -476,6 +476,12 @@
     } finally {
       loading = false;
     }
+    // A cook already in progress when this page opens: the watch has no way
+    // of knowing unless it is told. Pressing Cook is not the only moment that
+    // matters, since cook mode survives closing the app.
+    if (cookMode && recipe) _tellWatch(true);
+    // And the watch may have ticked something off while the phone was shut.
+    _hearWatch();
     // Kick off the pantry load so the FDA box can render "~Xg per
     // serving" instead of "1 of N" once we have densities + per-piece
     // masses to work with. Non-blocking — the box re-renders when the
