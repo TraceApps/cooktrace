@@ -95,3 +95,16 @@ test('sharing, kitchens and imports are never decided offline', () => {
   }
   assert.match(edits, /Sharing decides who can\s+\* see your food/);
 });
+
+test('an embedded photo becomes a file on every route that takes one', () => {
+  const localizer = read('../server/lib/image-localizer.js');
+  assert.match(localizer, /export function localizeDataUrl/);
+  // Every screen that can hold a photo: recipes, cook photos, cookbook
+  // covers, diary entries and pantry items, on create AND on edit.
+  for (const [file, uses] of [['../server/routes/recipes.js', 3], ['../server/routes/cookbooks.js', 1],
+                              ['../server/routes/cook-diary.js', 2], ['../server/routes/pantry.js', 2]]) {
+    const src = read(file);
+    const found = (src.match(/localizeDataUrls?\(/g) || []).length;
+    assert.ok(found >= uses, `${file} localises its photos (${found} of ${uses})`);
+  }
+});

@@ -13,6 +13,7 @@
  * + recipe.cook_count honest after deletes / converts.
  */
 import { Router } from 'express';
+import { localizeDataUrl } from '../lib/image-localizer.js';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
@@ -170,7 +171,9 @@ router.post('/', wrap((req, res) => {
 
   const kind = body.kind === 'cooked' ? 'cooked' : 'planned';
   const notes = body.notes ? String(body.notes).trim() || null : null;
-  const photoUrl = body.photo_url ?? null;
+  // A photo taken with no connection arrives embedded in the row; it
+  // becomes a file here, so everything downstream sees an ordinary path.
+  const photoUrl = localizeDataUrl(body.photo_url ?? null);
   const servings = body.servings != null ? Number(body.servings) || null : null;
   const mealType = _coerceMealType(body.meal_type);
   const rating   = _coerceRating(body.rating);
@@ -209,7 +212,7 @@ router.put('/:id', wrap((req, res) => {
   const date = (typeof body.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) ? body.date : existing.date;
   const kind = body.kind === 'cooked' || body.kind === 'planned' ? body.kind : existing.kind;
   const notes = body.notes !== undefined ? (body.notes ? String(body.notes).trim() || null : null) : existing.notes;
-  const photoUrl = body.photo_url !== undefined ? (body.photo_url ?? null) : existing.photo_url;
+  const photoUrl = body.photo_url !== undefined ? localizeDataUrl(body.photo_url ?? null) : existing.photo_url;
   const servings = body.servings !== undefined ? (body.servings === '' || body.servings == null ? null : Number(body.servings)) : existing.servings;
   const mealType = body.meal_type !== undefined ? _coerceMealType(body.meal_type) : existing.meal_type;
   const rating   = body.rating    !== undefined ? _coerceRating(body.rating)      : existing.rating;

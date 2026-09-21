@@ -11,6 +11,7 @@
  * match so "Flour" and "flour" share one row).
  */
 import { Router } from 'express';
+import { localizeDataUrl } from '../lib/image-localizer.js';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
@@ -365,7 +366,8 @@ router.post('/', wrap((req, res) => {
     body.unit || null,
     body.expires_on || null,
     body.nt_food_id || null,
-    body.img_url || body.imgUrl || null,
+    // A photo taken with no connection arrives embedded; it becomes a file here.
+    localizeDataUrl(body.img_url || body.imgUrl || null),
     body.notes || null,
     categorySlug,
     categoryId,
@@ -476,7 +478,7 @@ router.put('/:id', wrap((req, res) => {
     body.unit !== undefined ? (body.unit || null) : existing.unit,
     body.expires_on !== undefined ? (body.expires_on || null) : existing.expires_on,
     body.nt_food_id !== undefined ? (body.nt_food_id || null) : existing.nt_food_id,
-    body.img_url !== undefined ? (body.img_url || body.imgUrl || null) : existing.img_url,
+    body.img_url !== undefined ? localizeDataUrl(body.img_url || body.imgUrl || null) : existing.img_url,
     body.notes !== undefined ? (body.notes || null) : existing.notes,
     nextCategorySlug,
     nextCategoryId,
