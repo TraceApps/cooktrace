@@ -1193,7 +1193,10 @@ When you write to the user's data, summarise what you did briefly and concretely
     backdrop-filter: blur(12px) saturate(180%);
     -webkit-backdrop-filter: blur(12px) saturate(180%);
     cursor: pointer;
-    z-index: 400;
+    /* Below the cooking timer pill (80) and the lowest sheet (100), above the
+       bottom bar (50), so the button never draws over an open sheet or dialog.
+       Same as NutriTrace #233. */
+    z-index: 75;
     display: flex;
     align-items: center;
     justify-content: center;
