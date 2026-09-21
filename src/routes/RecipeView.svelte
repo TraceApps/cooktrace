@@ -63,7 +63,8 @@
   $: canEdit = !!recipe && (
     recipe.user_id == null ||
     recipe.user_id === $currentUser?.id ||
-    $currentUser?.role === 'admin'
+    $currentUser?.role === 'admin' ||
+    recipe.can_edit === true
   );
   $: isSharedView = !!recipe && recipe.user_id != null
     && $currentUser?.id != null

@@ -44,7 +44,7 @@ router.get('/', wrap((req, res) => {
   const u = uid(req);
   if (u == null) return res.json([]);
   const rows = db.prepare(`
-    SELECT k.id, k.name, k.slug, k.owner_user_id, k.created_at,
+    SELECT k.id, k.name, k.slug, k.owner_user_id, k.created_at, k.members_can_edit,
            m.role, m.auto_share,
            (SELECT COUNT(*) FROM kitchen_members WHERE kitchen_id = k.id) AS member_count,
            (SELECT COUNT(DISTINCT recipe_id) FROM recipe_shares
@@ -54,7 +54,21 @@ router.get('/', wrap((req, res) => {
      WHERE m.user_id = ?
      ORDER BY k.name COLLATE NOCASE ASC
   `).all(u, u);
-  res.json(rows.map(r => ({ ...r, auto_share: !!r.auto_share })));
+  res.json(rows.map(r => ({ ...r, auto_share: !!r.auto_share, members_can_edit: !!r.members_can_edit })));
+}));
+
+// ── PUT /:id/members-can-edit — owner lets members edit shared recipes ─
+// Covers recipes shared through this kitchen only (recipe_shares rows
+// tagged via_kitchen_id). Members can edit them; deleting, re-sharing
+// and changing visibility or category stay with the recipe owner.
+router.put('/:id/members-can-edit', wrap((req, res) => {
+  const u = uid(req);
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+  if (!_isOwner(id, u)) return res.status(403).json({ error: 'Only the owner can change this' });
+  const enabled = !!req.body?.enabled;
+  db.prepare(`UPDATE kitchens SET members_can_edit = ? WHERE id = ?`).run(enabled ? 1 : 0, id);
+  res.json({ enabled });
 }));
 
 // ── Shared internal helper: fan every recipe I own into a kitchen ─────

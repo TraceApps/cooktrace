@@ -1484,6 +1484,7 @@ export const CtApiNative = {
   async removeKitchenMember()      { return { ok: true }; },
   async shareRecipeWithKitchen()   { return { added: 0 }; },
   async setKitchenAutoShare()      { return { enabled: false, recipes: 0, added: 0 }; },
+  async setKitchenMembersCanEdit() { return { enabled: false }; },
   async shareCookbookWithKitchen() { return { added: 0 }; },
   async getCookbooksSharedWithMe() { return []; },
   async getCookbookShares()        { return []; },

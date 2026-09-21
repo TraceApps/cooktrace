@@ -991,7 +991,12 @@
     "remove":                    "Remove",
     "leave":                     "Leave",
     "invite_username_ph":        "Username to invite",
-    "delete_kitchen":            "Delete Kitchen"
+    "delete_kitchen":            "Delete Kitchen",
+    "members_can_edit_title":    "Members Can Edit Shared Recipes",
+    "members_can_edit_on":       "Everyone in this Kitchen can edit the recipes shared here. Deleting, sharing and categories stay with each recipe's owner.",
+    "members_can_edit_off":      "Turn on so everyone in this Kitchen can edit the recipes shared here, not just their owners.",
+    "members_can_edit_toggle":   "Toggle members can edit",
+    "members_can_edit_failed":   "Could not update the setting"
   },
   "settings_import_ct": {
     "import_section":            "Import from Another App",

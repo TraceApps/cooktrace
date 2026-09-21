@@ -317,6 +317,8 @@ const _CtApiHttp = {
   // carries { enabled, recipes, added } so the UI can toast a
   // meaningful summary of the fanout.
   setKitchenAutoShare(kitchenId, enabled)     { return this.put(`/api/kitchens/${kitchenId}/auto-share`, { enabled }); },
+  // Owner-only: let members edit the recipes shared through this kitchen.
+  setKitchenMembersCanEdit(kitchenId, enabled) { return this.put(`/api/kitchens/${kitchenId}/members-can-edit`, { enabled }); },
 
   getCookbooks()                              { return this.get('/api/cookbooks'); },
   async getCookbook(id) {

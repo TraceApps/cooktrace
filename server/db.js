@@ -745,6 +745,12 @@ db.exec(`
 if (!columnExists('kitchen_members', 'auto_share')) {
   db.exec(`ALTER TABLE kitchen_members ADD COLUMN auto_share INTEGER NOT NULL DEFAULT 0`);
 }
+// Per-kitchen, owner-controlled. When 1, members may edit (not delete,
+// re-share or re-scope) the recipes shared with them through this kitchen.
+// Off by default so existing kitchens keep their read-only sharing.
+if (!columnExists('kitchens', 'members_can_edit')) {
+  db.exec(`ALTER TABLE kitchens ADD COLUMN members_can_edit INTEGER NOT NULL DEFAULT 0`);
+}
 if (!columnExists('recipe_shares', 'via_kitchen_id')) {
   db.exec(`ALTER TABLE recipe_shares ADD COLUMN via_kitchen_id INTEGER REFERENCES kitchens(id) ON DELETE SET NULL`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_recipe_shares_via_kitchen ON recipe_shares(via_kitchen_id)`);

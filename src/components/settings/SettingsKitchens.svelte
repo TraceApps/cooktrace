@@ -176,6 +176,18 @@
     finally { autoShareBusyId = null; }
   }
 
+  // Owner-only. Lets members edit the recipes shared through this kitchen.
+  let editBusyId = null;
+  async function toggleMembersCanEdit(k) {
+    if (editBusyId === k.id) return;
+    editBusyId = k.id;
+    try {
+      const res = await NtApi.setKitchenMembersCanEdit(k.id, !k.members_can_edit);
+      kitchens = kitchens.map(x => x.id === k.id ? { ...x, members_can_edit: !!res.enabled } : x);
+    } catch (e) { showError(e.message || $_('settings_kitchens_ct.members_can_edit_failed')); }
+    finally { editBusyId = null; }
+  }
+
   async function deleteKitchen(k) {
     const ok = await confirmDialog({
       title: `Delete Kitchen "${k.name}"?`,
@@ -265,6 +277,24 @@
                   <span class="switch-knob"></span>
                 </button>
               </div>
+
+              {#if isOwner(k)}
+                <div class="auto-share-row" class:on={k.members_can_edit}>
+                  <div class="auto-share-copy">
+                    <span class="auto-share-title">{$_('settings_kitchens_ct.members_can_edit_title')}</span>
+                    <span class="auto-share-hint">
+                      {k.members_can_edit ? $_('settings_kitchens_ct.members_can_edit_on') : $_('settings_kitchens_ct.members_can_edit_off')}
+                    </span>
+                  </div>
+                  <button class="switch" class:on={k.members_can_edit}
+                    disabled={editBusyId === k.id}
+                    on:click={() => toggleMembersCanEdit(k)}
+                    aria-pressed={k.members_can_edit}
+                    aria-label={$_('settings_kitchens_ct.members_can_edit_toggle')}>
+                    <span class="switch-knob"></span>
+                  </button>
+                </div>
+              {/if}
 
               <div class="member-list">
                 {#each (members[k.id] || []) as m (m.user_id)}

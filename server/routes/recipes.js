@@ -475,6 +475,19 @@ router.get('/shared-with-me', wrap((req, res) => {
   })));
 }));
 
+// True when the recipe reached this user through a kitchen whose owner
+// lets members edit shared recipes, and the user is still a member.
+function _canEditViaKitchen(recipeId, userId) {
+  if (userId == null) return false;
+  return !!db.prepare(
+    `SELECT 1 FROM recipe_shares s
+       JOIN kitchens k ON k.id = s.via_kitchen_id
+       JOIN kitchen_members m ON m.kitchen_id = k.id AND m.user_id = s.grantee_id
+      WHERE s.recipe_id = ? AND s.grantee_id = ? AND k.members_can_edit = 1
+      LIMIT 1`
+  ).get(recipeId, userId);
+}
+
 // ── GET /:id — single recipe ────────────────────────────────────────────
 router.get('/:id', wrap((req, res) => {
   const u = uid(req);
@@ -494,7 +507,9 @@ router.get('/:id', wrap((req, res) => {
   if (!isOwner && !isShared && row.visibility !== 'group') {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  res.json(_withCreatorAvatar(_hydrate(row), row));
+  // Lets the recipe view show Edit to kitchen members the owner allowed.
+  const can_edit = isOwner || req.user?.role === 'admin' || (isShared && _canEditViaKitchen(id, u));
+  res.json({ ..._withCreatorAvatar(_hydrate(row), row), can_edit });
 }));
 
 // ── POST / — create ─────────────────────────────────────────────────────
@@ -543,7 +558,8 @@ router.put('/:id', wrap((req, res) => {
   if (!existing) return res.status(404).json({ error: 'Not found' });
   const isOwner = (u == null && existing.user_id == null) || existing.user_id === u;
   const isAdmin = req.user?.role === 'admin';
-  if (!isOwner && !isAdmin) return res.status(403).json({ error: 'Only the recipe owner or an admin can edit this recipe' });
+  const isKitchenEditor = !isOwner && !isAdmin && _canEditViaKitchen(id, u);
+  if (!isOwner && !isAdmin && !isKitchenEditor) return res.status(403).json({ error: 'Only the recipe owner or an admin can edit this recipe' });
 
   const body = { ...(req.body || {}) };
   if (_userSetting(u, 'autoCreatePantryFromRecipes') === 'true') {
@@ -551,6 +567,12 @@ router.put('/:id', wrap((req, res) => {
   }
   const data = _toStorage(body);
   if (!data.name) return res.status(400).json({ error: 'Name is required' });
+  // A kitchen member edits the recipe, not its place in the owner's
+  // library: categories are per-user and visibility is the owner's call.
+  if (isKitchenEditor) {
+    data.visibility = existing.visibility;
+    data.category_id = existing.category_id;
+  }
 
   // Option E guard (2026-08-11): if any of the nested JSON fields
   // (ingredients / steps / tags / tools / nutrition) is empty on the
