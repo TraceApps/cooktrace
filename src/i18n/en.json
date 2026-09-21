@@ -158,8 +158,9 @@
     "add_group":          "Add Group"
   },
   "cooking_now": {
-    "label":    "Cooking",
-    "untitled": "A recipe"
+    "label":      "Cooking",
+    "label_many": "Cooking {n}",
+    "untitled":   "A recipe"
   },
   "recipe": {
     "prep_time":          "Prep Time",
