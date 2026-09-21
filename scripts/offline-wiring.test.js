@@ -108,3 +108,18 @@ test('an embedded photo becomes a file on every route that takes one', () => {
     assert.ok(found >= uses, `${file} localises its photos (${found} of ${uses})`);
   }
 });
+
+test('your profile and its picture work the same way here as in the sibling apps', () => {
+  // One shape in all three: the picture goes through the API layer, which
+  // embeds it when there is no connection; the save goes through the API
+  // layer, so the queue sees it; the server turns the embedded picture into
+  // a file at the route, through the shared localiser.
+  assert.match(offline, /impl\.uploadImage = async \(file\)/);
+  assert.match(offline, /embeddableDataUrl\(file\)/);
+  assert.match(edits, /kind: 'profile', key: 'profile'/);
+  const profile = read('../src/routes/Profile.svelte');
+  assert.match(profile, /await NtApi\.put\('\/api\/auth\/profile'/);
+  assert.ok(!/fetch\(apiUrl\('\/api\/auth\/profile'\)/.test(profile), 'no raw fetch around the API layer');
+  const auth = read('../server/routes/auth.js');
+  assert.match(auth, /localizeDataUrl\(req\.body\?\.avatar_url\)/);
+});

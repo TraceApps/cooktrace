@@ -184,3 +184,14 @@ test('a photo taken offline travels inside the row', () => {
   // Uploading itself is never queued: there is nothing to upload to.
   assert.equal(writeOp('POST', '/api/upload', {}), null);
 });
+
+test('your own profile, picture included, is queued like everything else', () => {
+  assert.equal(writeOp('PUT', '/api/auth/profile', { nickname: 'Alex' }).key, 'profile');
+  const ops = [
+    op(1, 'PUT', '/api/auth/profile', { nickname: 'Al' }),
+    op(2, 'PUT', '/api/auth/profile', { nickname: 'Alex', avatar_url: 'data:image/jpeg;base64,x' }),
+  ];
+  assert.equal(collapseOps(ops).length, 1);
+  assert.equal(collapseOps(ops)[0].body.nickname, 'Alex');
+  assert.match(describeOp({ kind: 'profile' }), /your profile/);
+});

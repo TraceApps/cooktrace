@@ -116,6 +116,10 @@ export function writeOp(method, url, body) {
   match = path.match(/^\/api\/recipes\/(-?\d+)\/comments$/);
   if (match && m === 'POST') return { kind: 'comment-create', key: null };
 
+  // Your own profile: a name, a nickname, a picture. Nothing here decides
+  // what anyone else can see, so it queues like the rest.
+  if (path === '/api/auth/profile' && m === 'PUT') return { kind: 'profile', key: 'profile' };
+
   if (path === '/api/settings' && m === 'PUT') return { kind: 'setting', key: `setting:${body?.key}` };
   return null;
 }
@@ -261,6 +265,7 @@ export function describeOp(op) {
     case 'recipe-update':    return 'a recipe you changed';
     case 'recipe-delete':    return 'a recipe you deleted';
     case 'comment-create':   return 'the note you left on a recipe';
+    case 'profile':          return 'your profile';
     case 'setting':          return `the "${op.body?.key || 'setting'}" setting`;
     default:                 return 'a change you made';
   }
