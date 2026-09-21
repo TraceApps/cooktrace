@@ -62,52 +62,47 @@ export async function pairWatch() {
 }
 
 /**
- * The cook you are in, for the watch to show: which recipe (by the id YOUR
- * SERVER uses, never this phone's own) and what has been ticked off it. Pass
- * null when the cook is over.
+ * Every cook underway, for the watch to show: each one by the id YOUR SERVER
+ * uses (never this phone's own) and what has been ticked off it. A list, not
+ * a single cook, because a meal is usually two dishes and two devices sharing
+ * one slot would only overwrite each other.
  */
-export async function publishCook(cook, at = 0) {
+export async function publishCooks(cooks, at = 0) {
   if (!isNative) return false;
   try {
-    if (!cook) {
-      await WearPairing.clearCook({ at: at || Date.now() });
-      return true;
-    }
-    await WearPairing.cook({
-      // Named for what it must be. The phone has two ids for a recipe, its
-      // own and the server's, and the watch can only use the server's.
-      serverRecipeId: Number(cook.serverRecipeId) || 0,
-      name: String(cook.name || ''),
-      steps: Array.from(cook.steps || []).map(Number).filter(Number.isFinite),
-      ingredients: Array.from(cook.ingredients || []).map(String),
+    await WearPairing.cooks({
+      cooks: (cooks || []).map(c => ({
+        serverRecipeId: Number(c.serverRecipeId) || 0,
+        name: String(c.name || ''),
+        steps: Array.from(c.steps || []).map(Number).filter(Number.isFinite),
+        ingredients: Array.from(c.ingredients || []).map(String),
+      })).filter(c => c.serverRecipeId > 0),
       at: at || Date.now(),
     });
     return true;
-  } catch {
+  } catch (e) {
+    console.warn('[wear] could not send the cooks:', e?.message || e);
     return false;
   }
 }
 
 /**
- * What the watch says about the cook, when it has the later word. Returns
- * the cook to adopt, null to end one, or undefined when the phone's own
- * state is newer and nothing should change here.
+ * What the watch says about the cooks, when it has the later word. Returns
+ * the list to adopt, or undefined when this phone's own state is newer and
+ * nothing here should change.
  */
-export async function readCook(mine = 0) {
+export async function readCooks(mine = 0) {
   if (!isNative) return undefined;
   try {
-    const remote = await WearPairing.readCook();
+    const remote = await WearPairing.readCooks();
     if (!remote?.found) return undefined;
-    const at = Number(remote.at || 0);
-    if (at <= mine) return undefined;
-    if (remote.cleared || !Number(remote.serverRecipeId)) return null;
-    return {
-      serverRecipeId: Number(remote.serverRecipeId),
-      name: String(remote.name || ''),
-      steps: (remote.steps || []).map(Number).filter(Number.isFinite),
-      ingredients: (remote.ingredients || []).map(String),
-      at,
-    };
+    if (Number(remote.at || 0) <= mine) return undefined;
+    return (remote.cooks || []).map(c => ({
+      serverRecipeId: Number(c.serverRecipeId) || 0,
+      name: String(c.name || ''),
+      steps: (c.steps || []).map(Number).filter(Number.isFinite),
+      ingredients: (c.ingredients || []).map(String),
+    })).filter(c => c.serverRecipeId > 0);
   } catch {
     return undefined;
   }

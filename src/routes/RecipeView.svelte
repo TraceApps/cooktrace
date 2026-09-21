@@ -29,7 +29,7 @@
   import { scaleQty, displayQty, displayQtyParts, parseQty } from '../lib/qty.js';
   import { convertWithinFamily, convertQty, unitFamily } from '../lib/recipe-nutrition.js';
   import { resolveAssetUrl, isNative, getServerUrl } from '../lib/platform.js';
-  import { publishCook as _publishCook, readCook as _readCook } from '../lib/wear-pairing.js';
+  import { publishCooks as _publishCooks, readCooks as _readCooks } from '../lib/wear-pairing.js';
   import { portal } from '../lib/portal.js';
   import RecipeComments from '../components/recipe/RecipeComments.svelte';
   import KitchenGear from '../components/recipe/KitchenGear.svelte';
@@ -39,6 +39,8 @@
   import { cookModeActive } from '../stores/cookMode.js';
   import { currentUser } from '../stores/auth.js';
   import { onDestroy, tick } from 'svelte';
+  import { get } from 'svelte/store';
+  import { activeCooks, startCook, endCook, isCooking, describeCook, cookList } from '../stores/cooks.js';
   import { computeRecipeNutrition, computeRecipeMass, lookupCommonDensity } from '../lib/recipe-nutrition.js';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import { buildRecipeCardPages, buildRecipeShareText } from '../lib/recipe-card.js';
@@ -61,7 +63,12 @@
   // read-only view — the Edit / Delete buttons drop out and the
   // header shows the creator's byline so they know who to ask about
   // changes.
+  // can_edit comes from the server, which also covers a kitchen Sous
+  // Chef editing a recipe shared into that kitchen. The local checks
+  // stay as the fallback for responses that predate the field (the
+  // native local database, an older server).
   $: canEdit = !!recipe && (
+    recipe.can_edit === true ||
     recipe.user_id == null ||
     recipe.user_id === $currentUser?.id ||
     $currentUser?.role === 'admin'
@@ -246,30 +253,27 @@
   // surprise. cookMode itself is persisted so a reload mid-cook
   // returns you to cooking with checks intact.
   const _initialId = parseInt(params.id, 10);
-  let cookMode = Number.isFinite(_initialId) && typeof localStorage !== 'undefined'
-    && localStorage.getItem(`ct:cookmode:${_initialId}`) === '1';
+  // Which recipes are being cooked lives in one place now, so a cook is
+  // visible from anywhere rather than only from its own page, and so more
+  // than one can be underway: dinner in the oven while dessert is started.
+  $: cookMode = Number.isFinite(id) && !!$activeCooks[id];
   // One-shot cleanup: if we're not inside an active session on entry,
   // wipe any leftover checks. Catches both the legacy "persisted forever"
   // state from before this gate existed and any orphaned entries from
   // crashed sessions where End/I-made-this never ran.
-  if (!cookMode && Number.isFinite(_initialId) && typeof localStorage !== 'undefined') {
+  if (!isCooking(_initialId) && Number.isFinite(_initialId) && typeof localStorage !== 'undefined') {
     try {
       localStorage.removeItem(`ct:checks:${_initialId}:ing`);
       localStorage.removeItem(`ct:checks:${_initialId}:step`);
       localStorage.removeItem(`ct:checks:${_initialId}:tool`);
     } catch {}
   }
-  // The router reuses this page when only the id in the address changes, so
-  // `cookMode` above is computed once and then belongs to whichever recipe
-  // you happened to open first. Walking from a recipe you are cooking to one
-  // you are not left the new one looking like it was being cooked, and the
-  // watch was duly told so. Cook mode follows the recipe on screen.
+  // Walking to another recipe clears whatever that one has left over, since
+  // it is not being cooked.
   let _cookModeFor = _initialId;
   $: if (Number.isFinite(id) && id !== _cookModeFor) {
     _cookModeFor = id;
-    cookMode = typeof localStorage !== 'undefined'
-      && localStorage.getItem(`ct:cookmode:${id}`) === '1';
-    if (!cookMode && typeof localStorage !== 'undefined') {
+    if (!isCooking(id) && typeof localStorage !== 'undefined') {
       try {
         localStorage.removeItem(`ct:checks:${id}:ing`);
         localStorage.removeItem(`ct:checks:${id}:step`);
@@ -296,21 +300,23 @@
     try { localStorage.setItem(`ct:checks:${rid}:${kind}`, JSON.stringify([...set])); } catch {}
   }
   // ── The watch's half of the cook ──────────────────────────────────────
-  // A paired watch shows the recipe you pressed Cook on and lets you tick
-  // steps off with floury hands. Either device can tick, so every change is
-  // stamped and the later one wins.
-  const _cookStampKey = (rid) => `ct:cookat:${rid}`;
-  function _cookStamp(rid) {
-    try { return Number(localStorage.getItem(_cookStampKey(rid))) || 0; } catch { return 0; }
+  // A paired watch shows what you are cooking and lets you tick steps off
+  // with floury hands. Several cooks can be underway, so what travels is the
+  // whole list rather than "the" cook: two devices editing one slot would
+  // spend their time overwriting each other. Either can tick, so every write
+  // is stamped and the later one wins.
+  const COOKS_AT = 'ct:cooksat';
+  function _cooksStamp() {
+    try { return Number(localStorage.getItem(COOKS_AT)) || 0; } catch { return 0; }
   }
+
   /**
    * Which id the watch should be given. The watch asks YOUR SERVER for the
    * recipe, and in the native app the id in the address is this phone's own,
    * from its local mirror, not the server's. Sending the local one makes the
-   * watch fetch whatever recipe happens to hold that number on the server,
-   * which is how a cake turned into a tray of cookies. Zero means there is
-   * nothing the watch could fetch: either the page has not settled yet, or
-   * this recipe has never reached the server.
+   * watch fetch whatever recipe happens to hold that number on the server.
+   * Zero means there is nothing the watch could fetch: either the page has
+   * not settled, or this recipe has never reached the server.
    */
   function _watchRecipeId() {
     if (!recipe || Number(recipe.id) !== id) return 0;
@@ -318,60 +324,59 @@
     return Number(recipe.server_id) || 0;
   }
 
-  function _tellWatch(on) {
-    if (!isNative || !Number.isFinite(id)) return;
-    const rid = on ? _watchRecipeId() : 0;
-    if (on && !rid) {
-      console.warn('[wear] not sending the cook: this recipe has no server id yet');
-      return;
-    }
-    const at = Date.now();
-    try { localStorage.setItem(_cookStampKey(id), String(at)); } catch {}
-    _publishCook(
-      on ? { serverRecipeId: rid, name: recipe.name || '', steps: [...stepChecks], ingredients: [...ingChecks] } : null,
-      at,
-    ).catch(() => {});
+  /** Every cook underway, as the watch needs to see it. */
+  function _cooksForWatch() {
+    return cookList(get(activeCooks))
+      .filter(c => c.serverId > 0)
+      .map(c => ({
+        serverRecipeId: c.serverId,
+        name: c.name || '',
+        steps: [..._loadChecks(c.localId, 'step')],
+        ingredients: [..._loadChecks(c.localId, 'ing')],
+      }));
   }
-  /** The watch ticked something while the phone sat here. Take its word. */
+
+  function _tellWatch() {
+    if (!isNative) return;
+    const at = Date.now();
+    try { localStorage.setItem(COOKS_AT, String(at)); } catch {}
+    _publishCooks(_cooksForWatch(), at).catch(() => {});
+  }
+
+  /** The watch ticked something, or finished a dish. Take its word. */
   async function _hearWatch() {
-    if (!isNative || !Number.isFinite(id)) return;
+    if (!isNative) return;
     try {
-      const theirs = await _readCook(_cookStamp(id));
-      if (theirs === undefined) return;
-      if (theirs === null) {
-        if (cookMode) { cookMode = false; _saveCookMode(id, false); resetChecks(); }
-        return;
+      const theirs = await _readCooks(_cooksStamp());
+      if (!theirs) return;
+      const mine = get(activeCooks);
+      const byServer = new Map(
+        Object.entries(mine).map(([localId, v]) => [Number(v.serverId), Number(localId)]),
+      );
+      const seen = new Set();
+      for (const cook of theirs) {
+        const localId = byServer.get(Number(cook.serverRecipeId));
+        if (!localId) continue;
+        seen.add(localId);
+        _saveChecks(localId, 'step', new Set(cook.steps));
+        _saveChecks(localId, 'ing', new Set(cook.ingredients));
+        if (localId === id) {
+          stepChecks = new Set(cook.steps);
+          ingChecks = new Set(cook.ingredients);
+        }
       }
-      // The watch speaks in server ids, this page in local ones.
-      if (theirs.serverRecipeId !== _watchRecipeId()) return;
-      stepChecks = new Set(theirs.steps);
-      ingChecks = new Set(theirs.ingredients);
-      _saveChecks(id, 'step', stepChecks);
-      _saveChecks(id, 'ing', ingChecks);
-      try { localStorage.setItem(_cookStampKey(id), String(theirs.at)); } catch {}
-      if (!cookMode) { cookMode = true; _saveCookMode(id, true); }
+      // A dish the watch says is finished is finished here too.
+      for (const localId of byServer.values()) {
+        if (!seen.has(localId)) endCook(localId);
+      }
+      try { localStorage.setItem(COOKS_AT, String(Date.now())); } catch {}
     } catch { /* no watch */ }
   }
 
-  /** Leave cook mode on every recipe but this one. */
-  function _endOtherCooks() {
-    if (typeof localStorage === 'undefined') return;
-    try {
-      const stale = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k?.startsWith('ct:cookmode:') && k !== `ct:cookmode:${id}`) stale.push(k);
-      }
-      stale.forEach(k => localStorage.removeItem(k));
-    } catch { /* nothing to tidy */ }
-  }
-
   function _saveCookMode(rid, on) {
-    if (!Number.isFinite(rid) || typeof localStorage === 'undefined') return;
-    try {
-      if (on) localStorage.setItem(`ct:cookmode:${rid}`, '1');
-      else    localStorage.removeItem(`ct:cookmode:${rid}`);
-    } catch {}
+    if (!Number.isFinite(rid)) return;
+    if (on) startCook(rid, { name: recipe?.name || '', serverId: _watchRecipeId() });
+    else endCook(rid);
   }
   // Resolve a step's ref_ids → the actual ingredient objects from the
   // recipe's grouped-ingredients tree. Returns in refIds order so the
@@ -403,7 +408,7 @@
     else ingChecks.add(key);
     ingChecks = ingChecks;
     _saveChecks(id, 'ing', ingChecks);
-    _tellWatch(true);
+    _tellWatch();
   }
   function toggleStep(idx) {
     if (!cookMode) return; // see toggleIng
@@ -412,7 +417,7 @@
     else stepChecks.delete(idx);
     stepChecks = stepChecks;
     _saveChecks(id, 'step', stepChecks);
-    _tellWatch(true);
+    _tellWatch();
     // Marking a step done also marks off its linked ingredients as
     // used. Users who worked straight through the step without
     // checking each ingredient individually get the same end state as
@@ -487,24 +492,17 @@
   }
 
   async function startCookMode() {
-    // One cook at a time. Cook mode survives closing the app, so without this
-    // an older recipe you never formally finished stays "being cooked" for
-    // ever, and the watch goes on showing it while you stand in front of
-    // something else entirely.
-    _endOtherCooks();
-    cookMode = true;
     _saveCookMode(id, true);
     // The wrist gets the recipe: this is the moment your hands stop being
     // free and the phone stops being the thing you want to touch.
-    _tellWatch(true);
+    _tellWatch();
     await _acquireWakeLock();
   }
   async function endCookMode() {
-    cookMode = false;
     _saveCookMode(id, false);
     // Session over — clear so the next cook starts fresh.
     resetChecks();
-    _tellWatch(false);
+    _tellWatch();
     await _releaseWakeLock();
   }
   // If the user navigates away or backgrounds the tab, release the lock.
@@ -540,7 +538,7 @@
     // A cook already in progress when this page opens: the watch has no way
     // of knowing unless it is told. Pressing Cook is not the only moment that
     // matters, since cook mode survives closing the app.
-    if (cookMode && recipe) _tellWatch(true);
+    if (recipe) { describeCook(id, { name: recipe.name, serverId: _watchRecipeId() }); _tellWatch(); }
     // And the watch may have ticked something off while the phone was shut.
     _hearWatch();
     // Kick off the pantry load so the FDA box can render "~Xg per
@@ -946,6 +944,12 @@
                 From <a href={recipe.source_url} target="_blank" rel="noopener noreferrer">
                   {domainFromUrl(recipe.source_url)}
                 </a>
+              </span>
+            {/if}
+            {#if recipe.last_edited_by_name}
+              <span class="dot">·</span>
+              <span title={recipe.updated_at || ''}>
+                {$_('recipe_view_ct.last_edited_by', { values: { name: recipe.last_edited_by_name } })}
               </span>
             {/if}
             {#if recipe.last_cooked_at}

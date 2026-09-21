@@ -12,6 +12,7 @@
   import Sidebar   from './components/layout/Sidebar.svelte';
   import UpdateBanner from './components/UpdateBanner.svelte';
   import TopTimerPill from './components/recipe/TopTimerPill.svelte';
+  import CookingNow from './components/recipe/CookingNow.svelte';
   import { cookModeActive } from './stores/cookMode.js';
   import Toast     from './components/ui/Toast.svelte';
   import ConfirmDialogMount from './components/ui/ConfirmDialogMount.svelte';
@@ -584,6 +585,12 @@
      follows the user across every page, draggable to any position,
      and renders nothing when no timers are running. -->
 <TopTimerPill />
+
+<!-- What you have on the go, from anywhere. Cook mode survives closing the
+     app and more than one recipe can be in it, so without this a dish you
+     never formally finished is invisible until you remember which one it
+     was. Renders nothing when nothing is cooking. -->
+{#if !needsLogin}<CookingNow />{/if}
 
 <!-- In-app update banner (native only). Renders only if the OS-level
      notification permission is denied — grants suppress the banner and

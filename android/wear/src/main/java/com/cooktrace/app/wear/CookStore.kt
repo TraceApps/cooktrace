@@ -32,9 +32,10 @@ class CookStore(private val ctx: Context) {
         /** A word about what just happened, shown for a moment. */
         val flash: String? = null,
         val items: List<Kitchen.Item> = emptyList(),
-        /** The cook the phone put you in, if any. */
-        val cook: Pairing.Cook? = null,
-        val recipe: Kitchen.Recipe? = null,
+        /** The cooks the phone put you in. A meal is often two dishes. */
+        val cooks: List<Pairing.Cook> = emptyList(),
+        /** The recipe behind each of them, by the id the server uses. */
+        val recipes: Map<Long, Kitchen.Recipe> = emptyMap(),
         val timers: List<Pairing.Timer> = emptyList(),
     ) {
         val toBuy: Int get() = items.count { !it.checked }
@@ -60,7 +61,7 @@ class CookStore(private val ctx: Context) {
      */
     private val watcher = Pairing.watch(ctx) { key ->
         when (key) {
-            Pairing.KEY_COOK -> _state.update { it.copy(cook = Pairing.cook(ctx)) }
+            Pairing.KEY_COOK -> _state.update { it.copy(cooks = Pairing.cooks(ctx)) }
             Pairing.KEY_TIMERS -> _state.update { it.copy(timers = Pairing.timers(ctx)) }
             Pairing.KEY_URL, Pairing.KEY_TOKEN ->
                 _state.update { it.copy(paired = Pairing.config(ctx) != null) }
@@ -78,8 +79,8 @@ class CookStore(private val ctx: Context) {
         _state.update {
             it.copy(
                 items = Pairing.list(ctx)?.let { body -> Kitchen.items(body) }.orEmpty(),
-                cook = Pairing.cook(ctx),
-                recipe = Pairing.recipe(ctx)?.let { body -> Kitchen.recipe(body) },
+                cooks = Pairing.cooks(ctx),
+                recipes = readRecipes(),
                 timers = Pairing.timers(ctx),
                 pending = Pairing.outbox(ctx).size,
             )
@@ -108,7 +109,7 @@ class CookStore(private val ctx: Context) {
                 val mine = waiting.firstOrNull { it.kind == Pairing.Op.CHECK && it.itemId == item.id }
                 if (mine == null) item else item.copy(checked = mine.checked)
             }
-            readRecipe(cfg)
+            readRecipes(cfg)
             _state.update {
                 it.copy(
                     loading = false, offline = false, error = null,
@@ -121,19 +122,34 @@ class CookStore(private val ctx: Context) {
         }
     }
 
-    /** The recipe of the cook in progress, fetched once and kept. */
-    private suspend fun readRecipe(cfg: Pairing.Config) {
-        val cook = Pairing.cook(ctx)
-        if (cook == null) {
-            _state.update { it.copy(recipe = null) }
-            return
+    /** Whatever recipes the watch has already been given, off the disk. */
+    private fun readRecipes(): Map<Long, Kitchen.Recipe> =
+        Pairing.cooks(ctx).mapNotNull { cook ->
+            Pairing.recipe(ctx, cook.serverRecipeId)
+                ?.let { Kitchen.recipe(it) }
+                ?.let { cook.serverRecipeId to it }
+        }.toMap()
+
+    /**
+     * The recipe behind each cook, fetched once and kept. Only what is missing
+     * is asked for, so a second dish costs one request and a glance at a cook
+     * you are already in costs none.
+     */
+    private suspend fun readRecipes(cfg: Pairing.Config) {
+        val cooks = Pairing.cooks(ctx)
+        val have = _state.value.recipes.toMutableMap()
+        for (cook in cooks) {
+            if (have.containsKey(cook.serverRecipeId)) continue
+            runCatching {
+                val body = CookApi.recipe(cfg, cook.serverRecipeId)
+                Pairing.putRecipe(ctx, cook.serverRecipeId, body)
+                Kitchen.recipe(body)?.let { have[cook.serverRecipeId] = it }
+            }
         }
-        if (_state.value.recipe?.id == cook.recipeId) return
-        runCatching {
-            val body = CookApi.recipe(cfg, cook.recipeId)
-            Pairing.putRecipe(ctx, body)
-            _state.update { it.copy(recipe = Kitchen.recipe(body)) }
-        }
+        val live = cooks.map { it.serverRecipeId }.toSet()
+        have.keys.retainAll(live)
+        Pairing.forgetRecipesExcept(ctx, live)
+        _state.update { it.copy(cooks = cooks, recipes = have.toMap()) }
     }
 
     // ── The shopping list ────────────────────────────────────────────────
@@ -171,36 +187,48 @@ class CookStore(private val ctx: Context) {
     // ── The cook ─────────────────────────────────────────────────────────
 
     /** Tick a step off, or put it back. The phone sees it too. */
-    fun tickStep(index: Int, done: Boolean) {
-        val cook = _state.value.cook ?: return
-        val steps = if (done) cook.steps + index else cook.steps - index
-        Pairing.publishCook(ctx, cook.copy(steps = steps))
-        _state.update { it.copy(cook = Pairing.cook(ctx)) }
+    fun tickStep(serverRecipeId: Long, index: Int, done: Boolean) {
+        change(serverRecipeId) { cook ->
+            cook.copy(steps = if (done) cook.steps + index else cook.steps - index)
+        }
     }
 
     /** Tick an ingredient off as it goes in. */
-    fun tickIngredient(key: String, done: Boolean) {
-        val cook = _state.value.cook ?: return
-        val ings = if (done) cook.ingredients + key else cook.ingredients - key
-        Pairing.publishCook(ctx, cook.copy(ingredients = ings))
-        _state.update { it.copy(cook = Pairing.cook(ctx)) }
+    fun tickIngredient(serverRecipeId: Long, key: String, done: Boolean) {
+        change(serverRecipeId) { cook ->
+            cook.copy(ingredients = if (done) cook.ingredients + key else cook.ingredients - key)
+        }
+    }
+
+    private fun change(serverRecipeId: Long, edit: (Pairing.Cook) -> Pairing.Cook) {
+        val cooks = _state.value.cooks
+        if (cooks.none { it.serverRecipeId == serverRecipeId }) return
+        // The whole list goes back, with this one changed. Sending only the
+        // dish you touched would tell the phone the others had ended.
+        val next = cooks.map { if (it.serverRecipeId == serverRecipeId) edit(it) else it }
+        Pairing.publishCooks(ctx, next)
+        _state.update { it.copy(cooks = Pairing.cooks(ctx)) }
     }
 
     /**
      * Cooked. It goes into the diary the same way anything else does, queued
-     * if there is no signal, and the cook is over on both devices.
+     * if there is no signal, and that dish is over on both devices. Anything
+     * else you have on the go carries on.
      */
-    fun cooked() {
-        val cook = _state.value.cook ?: return
-        Pairing.queue(ctx, Pairing.Op(Pairing.Op.COOKED, recipeId = cook.recipeId, date = today))
-        Pairing.publishCook(ctx, null)
+    fun cooked(serverRecipeId: Long) {
+        val cooks = _state.value.cooks
+        if (cooks.none { it.serverRecipeId == serverRecipeId }) return
+        Pairing.queue(ctx, Pairing.Op(Pairing.Op.COOKED, recipeId = serverRecipeId, date = today))
+        Pairing.publishCooks(ctx, cooks.filterNot { it.serverRecipeId == serverRecipeId })
         _state.update {
             it.copy(
-                cook = null, recipe = null,
+                cooks = Pairing.cooks(ctx),
+                recipes = it.recipes - serverRecipeId,
                 pending = Pairing.outbox(ctx).size,
                 flash = "Cooked",
             )
         }
+        Pairing.forgetRecipesExcept(ctx, _state.value.cooks.map { c -> c.serverRecipeId }.toSet())
         redrawSurfaces()
         send()
     }

@@ -93,82 +93,89 @@ public class WearPairingPlugin extends Plugin {
     }
 
     /**
-     * The cook you are in: which recipe, and what has been ticked off it.
-     * Sent whenever either side ticks something, stamped so the later word
-     * wins, since the watch can tick too.
+     * Every cook underway, each by the id the SERVER uses, with what has been
+     * ticked off it. A list rather than a single cook: a meal is usually two
+     * dishes, and two devices sharing one slot would overwrite each other.
      */
     @PluginMethod
-    public void cook(PluginCall call) {
+    public void cooks(PluginCall call) {
         PutDataMapRequest req = PutDataMapRequest.create(COOK_PATH);
-        req.getDataMap().putBoolean("cleared", false);
-        req.getDataMap().putLong("serverRecipeId", call.getDouble("serverRecipeId", 0d).longValue());
-        req.getDataMap().putString("name", call.getString("name", ""));
-        req.getDataMap().putIntegerArrayList("steps", intList(call.getArray("steps")));
-        req.getDataMap().putStringArrayList("ingredients", stringList(call.getArray("ingredients")));
+        java.util.ArrayList<com.google.android.gms.wearable.DataMap> out = new java.util.ArrayList<>();
+        com.getcapacitor.JSArray list = call.getArray("cooks");
+        if (list != null) {
+            try {
+                for (Object entry : list.toList()) {
+                    if (!(entry instanceof org.json.JSONObject)) continue;
+                    org.json.JSONObject o = (org.json.JSONObject) entry;
+                    long id = o.optLong("serverRecipeId", 0L);
+                    if (id <= 0) continue;
+                    com.google.android.gms.wearable.DataMap one = new com.google.android.gms.wearable.DataMap();
+                    one.putLong("serverRecipeId", id);
+                    one.putString("name", o.optString("name", ""));
+                    one.putIntegerArrayList("steps", intList(o.optJSONArray("steps")));
+                    one.putStringArrayList("ingredients", stringList(o.optJSONArray("ingredients")));
+                    out.add(one);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "could not read the cooks: " + e.getMessage());
+            }
+        }
+        req.getDataMap().putDataMapArrayList("cooks", out);
         req.getDataMap().putLong("at", stampOf(call));
-        long recipeId = req.getDataMap().getLong("serverRecipeId", 0L);
-        Log.i(TAG, "sending the cook to the watch: recipe " + recipeId
-            + ", " + req.getDataMap().getIntegerArrayList("steps").size() + " steps ticked");
+        Log.i(TAG, "sending " + out.size() + " cook(s) to the watch");
         Wearable.getDataClient(getContext()).putDataItem(req.asPutDataRequest().setUrgent())
             .addOnSuccessListener(item -> call.resolve())
             .addOnFailureListener(e -> {
-                Log.w(TAG, "the cook did not reach the watch: " + e.getMessage());
+                Log.w(TAG, "the cooks did not reach the watch: " + e.getMessage());
                 call.reject(e.getMessage() == null ? "Couldn't reach the watch" : e.getMessage());
             });
     }
 
-    private java.util.ArrayList<Integer> intList(com.getcapacitor.JSArray arr) {
+    private java.util.ArrayList<Integer> intList(org.json.JSONArray arr) {
         java.util.ArrayList<Integer> out = new java.util.ArrayList<>();
-        if (arr == null) return out;
-        try {
-            for (Object o : arr.toList()) {
-                if (o instanceof Number) out.add(((Number) o).intValue());
-            }
-        } catch (Exception ignored) { }
+        for (int i = 0; arr != null && i < arr.length(); i++) out.add(arr.optInt(i));
         return out;
     }
 
-    private java.util.ArrayList<String> stringList(com.getcapacitor.JSArray arr) {
+    private java.util.ArrayList<String> stringList(org.json.JSONArray arr) {
         java.util.ArrayList<String> out = new java.util.ArrayList<>();
-        if (arr == null) return out;
-        try {
-            for (Object o : arr.toList()) {
-                if (o != null) out.add(String.valueOf(o));
-            }
-        } catch (Exception ignored) { }
+        for (int i = 0; arr != null && i < arr.length(); i++) {
+            String s = arr.optString(i, "");
+            if (!s.isEmpty()) out.add(s);
+        }
         return out;
     }
 
-    /**
-     * What the watch says about the cook. The phone reads this when it comes
-     * back to the front and takes it if it is the later word, so a step
-     * ticked on the wrist shows on the page.
-     */
+    /** What the watch says about the cooks, newest record wins. */
     @PluginMethod
-    public void readCook(PluginCall call) {
+    public void readCooks(PluginCall call) {
         Wearable.getDataClient(getContext()).getDataItems()
             .addOnSuccessListener(items -> {
                 JSObject ret = new JSObject();
                 ret.put("found", false);
-                // Each device keeps its own record at this path, so this has
-                // to be the NEWEST of them rather than whichever the loop
-                // happens to reach last.
                 long newest = 0L;
                 for (com.google.android.gms.wearable.DataItem item : items) {
                     String path = item.getUri().getPath();
                     if (path == null || !path.startsWith(COOK_PATH)) continue;
-                    com.google.android.gms.wearable.DataMap map =
-                        DataMapItem.fromDataItem(item).getDataMap();
+                    com.google.android.gms.wearable.DataMap map = DataMapItem.fromDataItem(item).getDataMap();
                     long at = map.getLong("at", 0L);
                     if (at < newest) continue;
                     newest = at;
+                    com.getcapacitor.JSArray cooks = new com.getcapacitor.JSArray();
+                    java.util.ArrayList<com.google.android.gms.wearable.DataMap> raw =
+                        map.getDataMapArrayList("cooks");
+                    for (int i = 0; raw != null && i < raw.size(); i++) {
+                        com.google.android.gms.wearable.DataMap one = raw.get(i);
+                        JSObject cook = new JSObject();
+                        cook.put("serverRecipeId", one.getLong("serverRecipeId", 0L));
+                        cook.put("name", one.getString("name", ""));
+                        cook.put("steps", new com.getcapacitor.JSArray(one.getIntegerArrayList("steps")));
+                        cook.put("ingredients", new com.getcapacitor.JSArray(one.getStringArrayList("ingredients")));
+                        cooks.put(cook);
+                    }
                     ret.put("found", true);
-                    ret.put("serverRecipeId", map.getLong("serverRecipeId", 0L));
-                    ret.put("name", map.getString("name", ""));
-                    ret.put("steps", new com.getcapacitor.JSArray(map.getIntegerArrayList("steps")));
-                    ret.put("ingredients", new com.getcapacitor.JSArray(map.getStringArrayList("ingredients")));
                     ret.put("at", at);
-                    ret.put("cleared", map.getBoolean("cleared", false));
+                    ret.put("cooks", cooks);
                 }
                 items.release();
                 call.resolve(ret);
@@ -178,21 +185,6 @@ public class WearPairingPlugin extends Plugin {
                 ret.put("found", false);
                 call.resolve(ret);
             });
-    }
-
-    /**
-     * The cook ended. Published as a finished marker rather than deleted, so
-     * both sides can tell "ended a moment ago" from "nothing has been said
-     * yet" and the later word still wins.
-     */
-    @PluginMethod
-    public void clearCook(PluginCall call) {
-        PutDataMapRequest req = PutDataMapRequest.create(COOK_PATH);
-        req.getDataMap().putBoolean("cleared", true);
-        req.getDataMap().putLong("at", stampOf(call));
-        Wearable.getDataClient(getContext()).putDataItem(req.asPutDataRequest().setUrgent())
-            .addOnSuccessListener(item -> call.resolve())
-            .addOnFailureListener(e -> call.reject(e.getMessage() == null ? "Couldn't reach the watch" : e.getMessage()));
     }
 
     /** Signed out on the phone: take the credentials off the watch. */

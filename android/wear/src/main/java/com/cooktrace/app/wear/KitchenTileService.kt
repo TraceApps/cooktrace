@@ -41,7 +41,7 @@ class KitchenTileService : TileService() {
         val paired = Pairing.config(this) != null
         val items = Pairing.list(this)?.let { Kitchen.items(it) }.orEmpty()
         val toBuy = items.count { !it.checked }
-        val cook = Pairing.cook(this)
+        val cooks = Pairing.cooks(this)
         val timers = Pairing.timers(this).filterNot { it.done(System.currentTimeMillis()) }
 
         val headline: String
@@ -57,9 +57,11 @@ class KitchenTileService : TileService() {
                 detail = soonest.label.ifBlank { "Timer" } +
                     (if (timers.size > 1) " and ${timers.size - 1} more" else "")
             }
-            cook != null -> {
-                headline = cook.name.ifBlank { "Cooking" }
-                detail = "${cook.steps.size} steps done" +
+            cooks.isNotEmpty() -> {
+                val first = cooks.first()
+                headline = first.name.ifBlank { "Cooking" }
+                detail = (if (cooks.size > 1) "and ${cooks.size - 1} more · " else "") +
+                    "${first.steps.size} steps done" +
                     (if (toBuy > 0) " · $toBuy to buy" else "")
             }
             toBuy > 0 -> {

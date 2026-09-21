@@ -157,6 +157,10 @@
     "add_step":           "Add Step",
     "add_group":          "Add Group"
   },
+  "cooking_now": {
+    "label":    "Cooking",
+    "untitled": "A recipe"
+  },
   "recipe": {
     "prep_time":          "Prep Time",
     "cook_time":          "Cook Time",

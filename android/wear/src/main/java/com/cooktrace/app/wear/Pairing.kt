@@ -37,7 +37,7 @@ object Pairing {
     private const val KEY_LIST_AT = "list_at"
     const val KEY_COOK = "cook"
     private const val KEY_COOK_AT = "cook_at"
-    private const val KEY_RECIPE = "recipe"
+    private const val KEY_RECIPE = "recipe_"
     const val KEY_TIMERS = "timers"
     private const val KEY_OUTBOX = "outbox"
     private const val KEY_SEQ = "outbox_seq"
@@ -81,9 +81,9 @@ object Pairing {
             for (item in items) {
                 val path = item.uri.path.orEmpty()
                 if (path.startsWith(PairingService.COOK_PATH)) {
-                    // putCook ignores anything older than what is known, so
+                    // putCooks ignores anything older than what is known, so
                     // the newest wins whatever order these arrive in.
-                    putCook(ctx, DataMapItem.fromDataItem(item).dataMap)
+                    putCooks(ctx, DataMapItem.fromDataItem(item).dataMap)
                     continue
                 }
                 if (!path.startsWith(PairingService.PATH)) continue
@@ -126,7 +126,8 @@ object Pairing {
     fun clear(ctx: Context) {
         prefs(ctx).edit().remove(KEY_URL).remove(KEY_TOKEN).remove(KEY_REFUSED)
             .remove(KEY_LIST).remove(KEY_LIST_AT).remove(KEY_COOK).remove(KEY_COOK_AT)
-            .remove(KEY_RECIPE).remove(KEY_TIMERS).remove(KEY_OUTBOX).apply()
+            .remove(KEY_TIMERS).remove(KEY_OUTBOX).apply()
+        forgetRecipesExcept(ctx, emptySet())
     }
 
     // ── The list the watch last saw ──────────────────────────────────────
@@ -137,18 +138,13 @@ object Pairing {
         prefs(ctx).edit().putString(KEY_LIST, body).putLong(KEY_LIST_AT, System.currentTimeMillis()).apply()
     }
 
-    /** The recipe of the cook in progress, kept so a basement kitchen still has it. */
-    fun recipe(ctx: Context): String? = prefs(ctx).getString(KEY_RECIPE, null)
-
-    fun putRecipe(ctx: Context, body: String) {
-        prefs(ctx).edit().putString(KEY_RECIPE, body).apply()
-    }
-
     // ── The cook in progress ─────────────────────────────────────────────
 
     /**
-     * The recipe you are cooking and what has been ticked off it. Held by
-     * both devices, stamped so the later word wins, since either can tick.
+     * A recipe being cooked and what has been ticked off it. Several can be
+     * underway at once, which is what a meal usually is, so what travels
+     * between the devices is the whole list: two of them editing one slot
+     * would spend their time undoing each other.
      */
     data class Cook(
         /**
@@ -156,78 +152,90 @@ object Pairing {
          * own and the server's, and only this one means anything here: the
          * watch fetches the recipe from the server itself.
          */
-        val recipeId: Long,
+        val serverRecipeId: Long,
         val name: String,
         val steps: Set<Int>,
         val ingredients: Set<String>,
-        val at: Long,
     )
 
-    fun cook(ctx: Context): Cook? {
-        val raw = prefs(ctx).getString(KEY_COOK, null) ?: return null
-        val o = runCatching { JSONObject(raw) }.getOrNull() ?: return null
-        val id = o.optLong("recipeId", 0L)
-        if (id <= 0) return null
-        return Cook(
-            recipeId = id,
-            name = Kitchen.text(o, "name"),
-            steps = o.optJSONArray("steps").toIntSet(),
-            ingredients = o.optJSONArray("ingredients").toStringSet(),
-            at = o.optLong("at", 0L),
-        )
+    fun cooks(ctx: Context): List<Cook> {
+        val raw = prefs(ctx).getString(KEY_COOK, null) ?: return emptyList()
+        val arr = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i ->
+            val o = arr.optJSONObject(i) ?: return@mapNotNull null
+            val id = o.optLong("serverRecipeId", 0L)
+            if (id <= 0) return@mapNotNull null
+            Cook(
+                serverRecipeId = id,
+                name = Kitchen.text(o, "name"),
+                steps = o.optJSONArray("steps").toIntSet(),
+                ingredients = o.optJSONArray("ingredients").toStringSet(),
+            )
+        }
     }
 
-    /** Something the phone (or this watch) said about the cook. */
-    fun putCook(ctx: Context, map: DataMap) {
+    /** Something the phone (or this watch) said about the cooks. */
+    fun putCooks(ctx: Context, map: DataMap) {
         val at = map.getLong("at", 0L)
         if (at > 0 && at < prefs(ctx).getLong(KEY_COOK_AT, 0L)) return
-        if (map.getBoolean("cleared", false) || map.getLong("serverRecipeId", 0L) <= 0) {
-            clearCook(ctx, at)
-            return
+        val arr = JSONArray()
+        for (one in map.getDataMapArrayList("cooks").orEmpty()) {
+            val id = one.getLong("serverRecipeId", 0L)
+            if (id <= 0) continue
+            arr.put(
+                JSONObject()
+                    .put("serverRecipeId", id)
+                    .put("name", one.getString("name").orEmpty())
+                    .put("steps", JSONArray((one.getIntegerArrayList("steps") ?: arrayListOf()).toList()))
+                    .put("ingredients", JSONArray((one.getStringArrayList("ingredients") ?: arrayListOf()).toList()))
+            )
         }
-        val o = JSONObject()
-            .put("recipeId", map.getLong("serverRecipeId"))
-            .put("name", map.getString("name").orEmpty())
-            .put("steps", JSONArray((map.getIntegerArrayList("steps") ?: arrayListOf()).toList()))
-            .put("ingredients", JSONArray((map.getStringArrayList("ingredients") ?: arrayListOf()).toList()))
-            .put("at", at)
         prefs(ctx).edit()
-            .putString(KEY_COOK, o.toString())
+            .putString(KEY_COOK, arr.toString())
             .putLong(KEY_COOK_AT, if (at > 0) at else System.currentTimeMillis())
             .apply()
     }
 
-    /**
-     * Forget the cook. The stamp only moves when the ending was itself dated:
-     * stamping an undated one with the time of day would shut out every
-     * record older than this moment, including one about to arrive.
-     */
-    fun clearCook(ctx: Context, at: Long = 0L) {
-        val edit = prefs(ctx).edit().remove(KEY_COOK).remove(KEY_RECIPE)
-        if (at > 0) edit.putLong(KEY_COOK_AT, at)
-        edit.apply()
-    }
-
     /** The wearer ticked something. Written down here and told to the phone. */
-    fun publishCook(ctx: Context, cook: Cook?) {
+    fun publishCooks(ctx: Context, cooks: List<Cook>) {
         val at = System.currentTimeMillis()
         val request = PutDataMapRequest.create(PairingService.COOK_PATH)
-        request.dataMap.apply {
-            if (cook == null) {
-                putBoolean("cleared", true)
-            } else {
-                putBoolean("cleared", false)
-                putLong("serverRecipeId", cook.recipeId)
-                putString("name", cook.name)
-                putIntegerArrayList("steps", ArrayList(cook.steps.sorted()))
-                putStringArrayList("ingredients", ArrayList(cook.ingredients.sorted()))
-            }
-            putLong("at", at)
+        val out = ArrayList<DataMap>()
+        for (cook in cooks) {
+            out.add(
+                DataMap().apply {
+                    putLong("serverRecipeId", cook.serverRecipeId)
+                    putString("name", cook.name)
+                    putIntegerArrayList("steps", ArrayList(cook.steps.sorted()))
+                    putStringArrayList("ingredients", ArrayList(cook.ingredients.sorted()))
+                }
+            )
         }
-        putCook(ctx, request.dataMap)
+        request.dataMap.putDataMapArrayList("cooks", out)
+        request.dataMap.putLong("at", at)
+        putCooks(ctx, request.dataMap)
         runCatching {
             Wearable.getDataClient(ctx).putDataItem(request.asPutDataRequest().setUrgent())
-        }.onFailure { Log.w(TAG, "couldn't tell the phone about the cook: " + it.message) }
+        }.onFailure { Log.w(TAG, "couldn't tell the phone about the cooks: " + it.message) }
+    }
+
+    /** The recipe behind a cook, kept so a basement kitchen still has it. */
+    fun recipe(ctx: Context, serverRecipeId: Long): String? =
+        prefs(ctx).getString(KEY_RECIPE + serverRecipeId, null)
+
+    fun putRecipe(ctx: Context, serverRecipeId: Long, body: String) {
+        prefs(ctx).edit().putString(KEY_RECIPE + serverRecipeId, body).apply()
+    }
+
+    /** Recipes for cooks that are over are not worth keeping. */
+    fun forgetRecipesExcept(ctx: Context, keep: Set<Long>) {
+        val edit = prefs(ctx).edit()
+        for (key in prefs(ctx).all.keys) {
+            if (!key.startsWith(KEY_RECIPE)) continue
+            val id = key.removePrefix(KEY_RECIPE).toLongOrNull() ?: continue
+            if (id !in keep) edit.remove(key)
+        }
+        edit.apply()
     }
 
     // ── Timers, several at once ──────────────────────────────────────────

@@ -25,7 +25,7 @@ class PairingService : WearableListenerService() {
                 // anything. Acting on it would close a cook the other device
                 // is still in.
                 if (event.type != DataEvent.TYPE_DELETED) {
-                    Pairing.putCook(this, DataMapItem.fromDataItem(event.dataItem).dataMap)
+                    Pairing.putCooks(this, DataMapItem.fromDataItem(event.dataItem).dataMap)
                 }
                 continue
             }

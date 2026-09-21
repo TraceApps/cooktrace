@@ -138,10 +138,18 @@ fun WearApp(store: CookStore) {
     AppScaffold {
         SwipeDismissableNavHost(navController = nav, startDestination = "list") {
             composable("list") { ShoppingScreen(store, nav) }
-            composable("cook") { CookScreen(store, nav) }
-            composable("ingredients") { IngredientsScreen(store) }
-            composable("step/{index}") { entry ->
-                StepScreen(store, nav, entry.arguments?.getString("index")?.toIntOrNull() ?: 0)
+            composable("cook/{recipe}") { entry ->
+                CookScreen(store, nav, entry.arguments?.getString("recipe")?.toLongOrNull() ?: 0L)
+            }
+            composable("ingredients/{recipe}") { entry ->
+                IngredientsScreen(store, entry.arguments?.getString("recipe")?.toLongOrNull() ?: 0L)
+            }
+            composable("step/{recipe}/{index}") { entry ->
+                StepScreen(
+                    store, nav,
+                    entry.arguments?.getString("recipe")?.toLongOrNull() ?: 0L,
+                    entry.arguments?.getString("index")?.toIntOrNull() ?: 0,
+                )
             }
             composable("timers") { TimersScreen(store) }
         }
@@ -194,26 +202,34 @@ private fun ShoppingScreen(store: CookStore, nav: NavHostController) {
             }
             // What you are doing right now comes before the list you keep.
             // The list is home because it is what you use every week; a cook
-            // in progress is what you are holding a spoon for.
-            state.cook?.let { cook ->
-                item(key = "cooking") { ListHeader { Text("Cooking") } }
-                item(key = "cook") {
-                    TitleCard(
-                        onClick = { nav.navigate("cook") },
-                        // The recipe the watch actually fetched, not the name
-                        // that came with the handoff: the page on the phone
-                        // can have moved on since.
-                        title = {
-                            Text(
-                                state.recipe?.name ?: cook.name.ifBlank { "Cooking" },
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        val steps = state.recipe?.steps?.size ?: 0
-                        Text(if (steps > 0) "${cook.steps.size} of $steps steps done" else "Cooking now")
+            // in progress is what you are holding a spoon for. There can be
+            // more than one: dinner in the oven while dessert is started.
+            if (state.cooks.isNotEmpty()) {
+                item(key = "cooking") {
+                    ListHeader {
+                        Text(if (state.cooks.size == 1) "Cooking" else "Cooking ${state.cooks.size}")
+                    }
+                }
+                state.cooks.forEach { cook ->
+                    item(key = "cook-${cook.serverRecipeId}") {
+                        val recipe = state.recipes[cook.serverRecipeId]
+                        TitleCard(
+                            onClick = { nav.navigate("cook/${cook.serverRecipeId}") },
+                            // The recipe the watch actually fetched, not the
+                            // name that came with the handoff: the page on the
+                            // phone can have moved on since.
+                            title = {
+                                Text(
+                                    recipe?.name ?: cook.name.ifBlank { "Cooking" },
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            val steps = recipe?.steps?.size ?: 0
+                            Text(if (steps > 0) "${cook.steps.size} of $steps steps done" else "Cooking now")
+                        }
                     }
                 }
             }
@@ -311,23 +327,26 @@ private fun ItemRow(item: Kitchen.Item, onToggle: () -> Unit) {
  * were when you looked away to stir something.
  */
 @Composable
-private fun CookScreen(store: CookStore, nav: NavHostController) {
+private fun CookScreen(store: CookStore, nav: NavHostController, serverRecipeId: Long) {
     val state by store.state.collectAsStateWithLifecycle()
     val listState = rememberScalingLazyListState()
-    val cook = state.cook
-    val recipe = state.recipe
+    val cook = state.cooks.firstOrNull { it.serverRecipeId == serverRecipeId }
+    val recipe = state.recipes[serverRecipeId]
 
     ScreenScaffold(
         scrollState = listState,
         edgeButton = {
             if (cook != null) {
-                EdgeButton(onClick = { store.cooked() }) { Text("I cooked this") }
+                EdgeButton(onClick = {
+                    store.cooked(serverRecipeId)
+                    nav.popBackStack()
+                }) { Text("I cooked this") }
             }
         },
     ) {
         if (cook == null) {
             Box(modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
-                Message(title = "Not cooking", body = "Press Cook on your phone and it turns up here.")
+                Message(title = "Not cooking this", body = "Press Cook on your phone and it turns up here.")
             }
             return@ScreenScaffold
         }
@@ -356,7 +375,7 @@ private fun CookScreen(store: CookStore, nav: NavHostController) {
             if (recipe != null && recipe.ingredients.isNotEmpty()) {
                 item(key = "ings") {
                     TitleCard(
-                        onClick = { nav.navigate("ingredients") },
+                        onClick = { nav.navigate("ingredients/$serverRecipeId") },
                         title = { Text("Ingredients") },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
@@ -396,9 +415,9 @@ private fun CookScreen(store: CookStore, nav: NavHostController) {
                     val done = cook.steps.contains(step.index)
                     SplitCheckboxButton(
                         checked = done,
-                        onCheckedChange = { store.tickStep(step.index, !done) },
+                        onCheckedChange = { store.tickStep(serverRecipeId, step.index, !done) },
                         toggleContentDescription = "Step ${step.index + 1}",
-                        onContainerClick = { nav.navigate("step/${step.index}") },
+                        onContainerClick = { nav.navigate("step/$serverRecipeId/${step.index}") },
                         containerClickLabel = step.heading,
                         label = {
                             Text(
@@ -422,18 +441,18 @@ private fun CookScreen(store: CookStore, nav: NavHostController) {
  * that says "simmer for 20 minutes" should not make you dial 20 minutes.
  */
 @Composable
-private fun StepScreen(store: CookStore, nav: NavHostController, index: Int) {
+private fun StepScreen(store: CookStore, nav: NavHostController, serverRecipeId: Long, index: Int) {
     val state by store.state.collectAsStateWithLifecycle()
     val listState = rememberScalingLazyListState()
-    val step = state.recipe?.steps?.getOrNull(index)
-    val done = state.cook?.steps?.contains(index) == true
+    val step = state.recipes[serverRecipeId]?.steps?.getOrNull(index)
+    val done = state.cooks.firstOrNull { it.serverRecipeId == serverRecipeId }?.steps?.contains(index) == true
 
     ScreenScaffold(
         scrollState = listState,
         edgeButton = {
             if (step != null) {
                 EdgeButton(onClick = {
-                    store.tickStep(index, !done)
+                    store.tickStep(serverRecipeId, index, !done)
                     nav.popBackStack()
                 }) { Text(if (done) "Not done" else "Step done") }
             }
@@ -486,11 +505,11 @@ private fun StepScreen(store: CookStore, nav: NavHostController, index: Int) {
 
 /** What goes in, ticked off as it goes in. */
 @Composable
-private fun IngredientsScreen(store: CookStore) {
+private fun IngredientsScreen(store: CookStore, serverRecipeId: Long) {
     val state by store.state.collectAsStateWithLifecycle()
     val listState = rememberScalingLazyListState()
-    val cook = state.cook
-    val ingredients = state.recipe?.ingredients.orEmpty()
+    val cook = state.cooks.firstOrNull { it.serverRecipeId == serverRecipeId }
+    val ingredients = state.recipes[serverRecipeId]?.ingredients.orEmpty()
 
     ScreenScaffold(scrollState = listState) {
         CrownColumn(listState) {
@@ -503,9 +522,9 @@ private fun IngredientsScreen(store: CookStore) {
                     val done = cook?.ingredients?.contains(ing.key) == true
                     SplitCheckboxButton(
                         checked = done,
-                        onCheckedChange = { store.tickIngredient(ing.key, !done) },
+                        onCheckedChange = { store.tickIngredient(serverRecipeId, ing.key, !done) },
                         toggleContentDescription = ing.name,
-                        onContainerClick = { store.tickIngredient(ing.key, !done) },
+                        onContainerClick = { store.tickIngredient(serverRecipeId, ing.key, !done) },
                         containerClickLabel = ing.name,
                         label = {
                             Text(
