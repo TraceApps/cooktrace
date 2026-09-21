@@ -287,10 +287,16 @@
   }
   function _tellWatch(on) {
     if (!isNative || !Number.isFinite(id)) return;
+    // Say nothing until the recipe on screen is the recipe in the address.
+    // `id` changes the instant you navigate and `recipe` catches up when the
+    // load finishes, so publishing in between sends one recipe's id under
+    // another's name, and the watch then draws a cook that reads as two
+    // different dishes at once.
+    if (on && (!recipe || recipe.id !== id)) return;
     const at = Date.now();
     try { localStorage.setItem(_cookStampKey(id), String(at)); } catch {}
     _publishCook(
-      on ? { recipeId: id, name: recipe?.name || '', steps: [...stepChecks], ingredients: [...ingChecks] } : null,
+      on ? { recipeId: recipe.id, name: recipe.name || '', steps: [...stepChecks], ingredients: [...ingChecks] } : null,
       at,
     ).catch(() => {});
   }

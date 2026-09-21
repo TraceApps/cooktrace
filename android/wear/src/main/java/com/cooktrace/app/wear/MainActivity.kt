@@ -189,20 +189,31 @@ private fun ShoppingScreen(store: CookStore, nav: NavHostController) {
             return@ScreenScaffold
         }
         CrownColumn(listState) {
-            item { ListHeader { Text("Shopping") } }
             if (state.pending > 0 || state.offline || state.error != null) {
                 item { StatusLine(state) }
             }
-            // The cook you are in, if the phone put you in one.
+            // What you are doing right now comes before the list you keep.
+            // The list is home because it is what you use every week; a cook
+            // in progress is what you are holding a spoon for.
             state.cook?.let { cook ->
+                item(key = "cooking") { ListHeader { Text("Cooking") } }
                 item(key = "cook") {
                     TitleCard(
                         onClick = { nav.navigate("cook") },
-                        title = { Text(cook.name.ifBlank { "Cooking" }, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                        // The recipe the watch actually fetched, not the name
+                        // that came with the handoff: the page on the phone
+                        // can have moved on since.
+                        title = {
+                            Text(
+                                state.recipe?.name ?: cook.name.ifBlank { "Cooking" },
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         val steps = state.recipe?.steps?.size ?: 0
-                        Text(if (steps > 0) "${cook.steps.size} of $steps steps" else "Cooking now")
+                        Text(if (steps > 0) "${cook.steps.size} of $steps steps done" else "Cooking now")
                     }
                 }
             }
@@ -218,6 +229,7 @@ private fun ShoppingScreen(store: CookStore, nav: NavHostController) {
                     }
                 }
             }
+            item(key = "shopping") { ListHeader { Text("Shopping") } }
             val aisles = Kitchen.aisles(state.items)
             aisles.forEach { (aisle, items) ->
                 item(key = "aisle-$aisle") { ListHeader { Text(aisle, maxLines = 1, overflow = TextOverflow.Ellipsis) } }
@@ -320,7 +332,27 @@ private fun CookScreen(store: CookStore, nav: NavHostController) {
             return@ScreenScaffold
         }
         CrownColumn(listState) {
-            item { ListHeader { Text(cook.name.ifBlank { "Cooking" }, maxLines = 2, overflow = TextOverflow.Ellipsis) } }
+            item {
+                ListHeader {
+                    Text(
+                        recipe?.name ?: cook.name.ifBlank { "Cooking" },
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            val total = recipe?.steps?.size ?: 0
+            if (total > 0) {
+                item {
+                    Text(
+                        "${cook.steps.size} of $total steps done",
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                    )
+                }
+            }
             if (recipe != null && recipe.ingredients.isNotEmpty()) {
                 item(key = "ings") {
                     TitleCard(
@@ -345,6 +377,11 @@ private fun CookScreen(store: CookStore, nav: NavHostController) {
                 }
             }
             val steps = recipe?.steps.orEmpty()
+            if (steps.isNotEmpty()) {
+                // A heading over them, so a list of ticks is plainly the
+                // method rather than whatever else it might be.
+                item(key = "steps-head") { ListHeader { Text("Steps") } }
+            }
             if (steps.isEmpty()) {
                 item {
                     Message(
@@ -353,6 +390,7 @@ private fun CookScreen(store: CookStore, nav: NavHostController) {
                     )
                 }
             }
+            val upTo = steps.firstOrNull { !cook.steps.contains(it.index) }?.index
             steps.forEach { step ->
                 item(key = "s-${step.index}") {
                     val done = cook.steps.contains(step.index)
@@ -364,7 +402,7 @@ private fun CookScreen(store: CookStore, nav: NavHostController) {
                         containerClickLabel = step.heading,
                         label = {
                             Text(
-                                "${step.index + 1}. " + step.heading,
+                                (if (step.index == upTo) "→ " else "") + "${step.index + 1}. " + step.heading,
                                 maxLines = 3,
                                 overflow = TextOverflow.Ellipsis,
                                 textDecoration = if (done) TextDecoration.LineThrough else null,
