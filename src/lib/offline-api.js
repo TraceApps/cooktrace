@@ -25,6 +25,12 @@ import {
   answerWithOps, newTempId, createdId, remapIds, remapPath, describeOp, shouldRetryStatus,
   MAKES_A_ROW, staleAnswerKeys, queuedReply,
 } from './offline-edits.js';
+// Loaded with everything else, never fetched on demand: a picture is kept
+// exactly when there is no connection to fetch a separate file with, and a
+// browser whose service worker has not taken the newest build yet would have
+// no copy of it. This is what "Failed to fetch dynamically imported module"
+// looked like from the outside.
+import { embeddableDataUrl } from './image-embed.js';
 
 const RETRY_MIN_MS = 3_000;
 const RETRY_MAX_MS = 30_000;
@@ -440,7 +446,6 @@ export function createOfflineApi(http) {
         _publish({ online: false });
       }
     }
-    const { embeddableDataUrl } = await import('./image-embed.js');
     return embeddableDataUrl(file);
   };
 
