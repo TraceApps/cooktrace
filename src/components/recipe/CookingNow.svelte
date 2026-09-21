@@ -91,7 +91,10 @@
 
 <style>
   /* One slim bar, low and to the left so it clears the assistant button and
-     leaves the page readable behind it. */
+     leaves the page readable behind it. Frosted rather than solid: the same
+     treatment as the bottom nav, so the bar reads as chrome floating over the
+     page instead of a card dropped on top of it, and you can still see what
+     is underneath. Solid surface where the blur is unsupported. */
   .cooking-now {
     position: fixed;
     z-index: 60;
@@ -106,11 +109,21 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-full);
     background: var(--surface-1);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.26);
+    box-shadow: var(--shadow-md);
     color: var(--text-1);
     text-align: left;
     cursor: pointer;
     transition: transform var(--dur-fast, 0.12s), border-color var(--dur-fast, 0.12s);
+  }
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .cooking-now {
+      /* --glass-surface sits at 0.88 for a full-width bar; a small pill can
+         afford to be lighter, so thin it out and let the blur do the work. */
+      background: color-mix(in srgb, var(--glass-surface) 76%, transparent);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border-color: color-mix(in srgb, var(--border) 80%, transparent);
+    }
   }
   .cooking-now:hover { border-color: var(--accent); }
   .cooking-now:active { transform: scale(0.985); }
