@@ -193,6 +193,45 @@
   }
 
   function isOwner(k) { return k.role === 'owner'; }
+
+  // Kitchen roles. 'sous' may edit the recipes shared into this kitchen,
+  // 'member' is read-only and stays the default a member joins with.
+  function everyoneEdits(kitchenId) {
+    const rest = (members[kitchenId] || []).filter(m => m.role !== 'owner');
+    return rest.length > 0 && rest.every(m => m.role === 'sous');
+  }
+
+  async function setRole(kitchenId, member, role) {
+    const prev = member.role;
+    if (prev === role) return;
+    members[kitchenId] = (members[kitchenId] || []).map(m => m.user_id === member.user_id ? { ...m, role } : m);
+    try {
+      await NtApi.setKitchenMemberRole(kitchenId, member.user_id, role);
+      showSuccess(role === 'sous'
+        ? $_('settings_kitchens_ct.toast.can_edit_now', { values: { name: member.full_name || member.username } })
+        : $_('settings_kitchens_ct.toast.read_only_now', { values: { name: member.full_name || member.username } }));
+    } catch (e) {
+      members[kitchenId] = (members[kitchenId] || []).map(m => m.user_id === member.user_id ? { ...m, role: prev } : m);
+      showError(e.message || 'Could not change the role');
+    }
+  }
+
+  async function setAllRoles(kitchenId, role) {
+    const targets = (members[kitchenId] || []).filter(m => m.role !== 'owner' && m.role !== role);
+    if (targets.length === 0) return;
+    const ids = new Set(targets.map(m => m.user_id));
+    const prev = members[kitchenId];
+    members[kitchenId] = prev.map(m => ids.has(m.user_id) ? { ...m, role } : m);
+    try {
+      for (const m of targets) await NtApi.setKitchenMemberRole(kitchenId, m.user_id, role);
+      showSuccess(role === 'sous'
+        ? $_('settings_kitchens_ct.toast.all_can_edit')
+        : $_('settings_kitchens_ct.toast.all_read_only'));
+    } catch (e) {
+      members[kitchenId] = prev;
+      showError(e.message || 'Could not change the roles');
+    }
+  }
 </script>
 
 <div class="card settings-card">
@@ -266,6 +305,17 @@
                 </button>
               </div>
 
+              {#if isOwner(k) && (members[k.id] || []).some(m => m.role !== 'owner')}
+                <div class="role-help">
+                  <span class="setting-desc">{$_('settings_kitchens_ct.roles_help')}</span>
+                  <button class="btn-link" on:click={() => setAllRoles(k.id, everyoneEdits(k.id) ? 'member' : 'sous')}>
+                    {everyoneEdits(k.id)
+                      ? $_('settings_kitchens_ct.nobody_edits')
+                      : $_('settings_kitchens_ct.everyone_edits')}
+                  </button>
+                </div>
+              {/if}
+
               <div class="member-list">
                 {#each (members[k.id] || []) as m (m.user_id)}
                   <div class="member-row">
@@ -274,6 +324,18 @@
                       {#if m.role === 'owner'}<span class="badge">{$_('settings_kitchens_ct.owner_badge')}</span>{/if}
                       {#if m.user_id === $currentUser?.id}<span class="muted">(you)</span>{/if}
                     </span>
+                    {#if isOwner(k) && m.role !== 'owner'}
+                      <div class="select-wrap role-picker">
+                        <select class="select sel-sm" value={m.role}
+                          aria-label={$_('settings_kitchens_ct.role_for', { values: { name: m.full_name || m.username } })}
+                          on:change={e => setRole(k.id, m, e.target.value)}>
+                          <option value="member">{$_('settings_kitchens_ct.role_cook')}</option>
+                          <option value="sous">{$_('settings_kitchens_ct.role_sous')}</option>
+                        </select>
+                      </div>
+                    {:else if m.role === 'sous'}
+                      <span class="badge">{$_('settings_kitchens_ct.role_sous')}</span>
+                    {/if}
                     {#if isOwner(k) && m.user_id !== $currentUser?.id}
                       <button class="btn-link danger" on:click={() => removeMember(k.id, m)}>{$_('settings_kitchens_ct.remove')}</button>
                     {:else if m.user_id === $currentUser?.id && !isOwner(k)}
@@ -440,7 +502,36 @@
     padding: 6px 0;
     font-size: 13px;
   }
-  .member-name { display: inline-flex; align-items: center; gap: 6px; }
+  .member-name { display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+  .member-row .role-picker { margin-left: auto; }
+  .role-help {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; padding: 2px 0 6px;
+  }
+  .select-wrap { position: relative; display: inline-block; }
+  .select-wrap::after {
+    content: '';
+    position: absolute;
+    right: 9px; top: 50%;
+    transform: translateY(-25%) rotate(45deg);
+    width: 6px; height: 6px;
+    border-right: 2px solid var(--text-3);
+    border-bottom: 2px solid var(--text-3);
+    pointer-events: none;
+  }
+  .select {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 5px 26px 5px 9px;
+    color: var(--text-1);
+    font-size: 12px;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+  }
+  .select:focus { outline: 2px solid var(--accent-dim); border-color: var(--accent); }
+  .sel-sm { height: 30px; }
   .invite-row { display: flex; gap: 8px; margin-top: 4px; align-items: center; }
   .invite-row .input { flex: 1; }
   .invite-picker { flex: 1; min-width: 0; }

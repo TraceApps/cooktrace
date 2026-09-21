@@ -986,12 +986,22 @@
   },
   "settings_kitchens_ct": {
     "toast": {
-      "kitchen_deleted":         "Kitchen deleted"
+      "kitchen_deleted":         "Kitchen deleted",
+      "can_edit_now":            "{name} can edit shared recipes",
+      "read_only_now":           "{name} can read shared recipes",
+      "all_can_edit":            "Everyone can edit shared recipes",
+      "all_read_only":           "Shared recipes are read-only again"
     },
     "um_required":               "User Management Required",
     "create_new_kitchen":        "Create a New Kitchen",
     "new_name_ph":               "Smith Family Kitchen",
     "owner_badge":               "Owner",
+    "role_cook":                 "Line Cook",
+    "role_sous":                 "Sous Chef",
+    "role_for":                  "Role for {name}",
+    "roles_help":                "Sous Chefs can edit the recipes shared into this Kitchen. Line Cooks cook from them.",
+    "everyone_edits":            "Let Everyone Edit",
+    "nobody_edits":              "Make All Read-Only",
     "remove":                    "Remove",
     "leave":                     "Leave",
     "invite_username_ph":        "Username to invite",
@@ -1358,6 +1368,7 @@
     "done":                      "Done"
   },
   "recipe_view_ct": {
+    "last_edited_by":            "Last edited by {name}",
     "toast": {
       "recipe_deleted":          "Recipe deleted",
       "preparing_share":         "Preparing share…",

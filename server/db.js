@@ -285,6 +285,14 @@ if (!columnExists('recipes', 'nt_meal_id')) {
   db.exec(`ALTER TABLE recipes ADD COLUMN nt_meal_id INTEGER`);
 }
 
+// Who last saved this recipe, when that was not its owner. A kitchen
+// Sous Chef can edit recipes shared into the kitchen, so a shared
+// library needs to answer "who changed step 3". NULL means the owner
+// saved it last, which is the case for every row before this column.
+if (!columnExists('recipes', 'last_edited_by')) {
+  db.exec(`ALTER TABLE recipes ADD COLUMN last_edited_by INTEGER REFERENCES users(id) ON DELETE SET NULL`);
+}
+
 // ai_chat_history was originally append-only with just created_at, but
 // /api/sync/pull SELECTs updated_at on every table in TABLES (including
 // this one). Without the column, the pull SQL errors with "no such

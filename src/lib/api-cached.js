@@ -95,6 +95,43 @@ wrapped.getRecipe = async function (id) {
   return { ...rest, imgUrl: resolveAssetUrl(img_url) || '' };
 };
 
+// updateRecipe, mirror of the getRecipe fallback above. A recipe shared
+// into a Kitchen is not in local SQLite, and /api/sync/push only accepts
+// rows the pusher owns, so saving one through the normal local-then-push
+// path would look saved on the phone and never reach the server. Those
+// saves go straight to the API instead; the server decides whether the
+// user is allowed (owner, admin, or Sous Chef in the sharing Kitchen).
+// Recipes the user owns keep the offline-first path unchanged.
+wrapped.updateRecipe = async function (id, data) {
+  let local = null;
+  try { local = await CtApiNative.getRecipe(id); } catch { /* treat as remote */ }
+  if (local) {
+    const r = await CtApiNative.updateRecipe(id, data);
+    _schedulePush();
+    return r;
+  }
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    throw new Error('Editing a recipe shared with you needs a connection.');
+  }
+  const { getServerUrl, getAuthToken, apiUrl, resolveAssetUrl } = await import('./platform.js');
+  const headers = { 'Content-Type': 'application/json' };
+  if (getServerUrl()) {
+    const token = getAuthToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(apiUrl(`/api/recipes/${id}`), {
+    method: 'PUT', headers, credentials: 'include', body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
+  const row = await res.json();
+  if (!row) return null;
+  const { img_url, ...rest } = row;
+  return { ...rest, imgUrl: resolveAssetUrl(img_url) || '' };
+};
+
 // Kick off the periodic background sync the first time anything calls
 // into the cached impl. Safe to call repeatedly (startSyncLoop is
 // idempotent).

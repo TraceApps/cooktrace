@@ -1480,6 +1480,7 @@ export const CtApiNative = {
   async getKitchenMembers()        { return []; },
   async createKitchen()            { throw new Error('Kitchens require a server connection.'); },
   async deleteKitchen()            { return { ok: true }; },
+  async setKitchenMemberRole()     { throw new Error('Kitchens require a server connection.'); },
   async addKitchenMember()         { throw new Error('Kitchens require a server connection.'); },
   async removeKitchenMember()      { return { ok: true }; },
   async shareRecipeWithKitchen()   { return { added: 0 }; },

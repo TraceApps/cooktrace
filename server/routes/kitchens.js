@@ -178,6 +178,33 @@ router.get('/:id/members', wrap((req, res) => {
   res.json(rows);
 }));
 
+// ── PUT /:id/members/:userId/role ────────────────────────────────────
+// Roles inside a kitchen, stored in the column that already carries
+// 'owner' and 'member':
+//   owner  (Head Chef): the kitchen's owner, set at creation, not editable here.
+//   sous   (Sous Chef): may edit the recipes shared into this kitchen.
+//   member (Line Cook): read-only, the default a new member joins with.
+// Owner only. The owner's own role can't be changed, since ownership is
+// what the invite, remove and delete routes authorize against.
+const EDITABLE_ROLES = new Set(['sous', 'member']);
+router.put('/:id/members/:userId/role', wrap((req, res) => {
+  const u = uid(req);
+  const id = parseInt(req.params.id, 10);
+  const target = parseInt(req.params.userId, 10);
+  if (!Number.isFinite(id) || !Number.isFinite(target)) return res.status(400).json({ error: 'Invalid id' });
+  if (!_isOwner(id, u)) return res.status(403).json({ error: 'Only the owner can change roles' });
+
+  const role = (req.body?.role || '').toString().trim();
+  if (!EDITABLE_ROLES.has(role)) return res.status(400).json({ error: "role must be 'sous' or 'member'" });
+  if (_isOwner(id, target)) return res.status(400).json({ error: "The owner's role can't be changed" });
+
+  const result = db.prepare(
+    `UPDATE kitchen_members SET role = ? WHERE kitchen_id = ? AND user_id = ? AND role != 'owner'`
+  ).run(role, id, target);
+  if (result.changes === 0) return res.status(404).json({ error: 'Not a member of this kitchen' });
+  res.json({ ok: true, user_id: target, role });
+}));
+
 // ── POST /:id/members — invite a user by username ────────────────────
 // When the new member is added, we ALSO fan every existing auto-share
 // enabled member's recipes at them, so the "join the family kitchen

@@ -311,6 +311,7 @@ const _CtApiHttp = {
   getKitchenMembers(id)                       { return this.get(`/api/kitchens/${id}/members`); },
   addKitchenMember(id, username)              { return this.post(`/api/kitchens/${id}/members`, { username }); },
   removeKitchenMember(id, userId)             { return this.del(`/api/kitchens/${id}/members/${userId}`); },
+  setKitchenMemberRole(id, userId, role)      { return this.put(`/api/kitchens/${id}/members/${userId}/role`, { role }); },
   shareRecipeWithKitchen(kitchenId, recipeId) { return this.post(`/api/kitchens/${kitchenId}/share-recipe`, { recipe_id: recipeId }); },
   // Per-user auto-share toggle. Enabling backfills every existing
   // recipe you own to every current kitchen member. Server response

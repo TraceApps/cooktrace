@@ -475,6 +475,22 @@ router.get('/shared-with-me', wrap((req, res) => {
   })));
 }));
 
+// True when the recipe reached this user through a kitchen where they
+// hold the Sous Chef role, and they are still a member. Read live on
+// every call rather than stored, so demoting someone or removing them
+// from the kitchen takes the access away immediately.
+function _canEditViaKitchen(recipeId, userId) {
+  if (userId == null) return false;
+  return !!db.prepare(
+    `SELECT 1 FROM recipe_shares s
+       JOIN kitchen_members m
+         ON m.kitchen_id = s.via_kitchen_id AND m.user_id = s.grantee_id
+      WHERE s.recipe_id = ? AND s.grantee_id = ? AND s.via_kitchen_id IS NOT NULL
+        AND m.role = 'sous'
+      LIMIT 1`
+  ).get(recipeId, userId);
+}
+
 // ── GET /:id — single recipe ────────────────────────────────────────────
 router.get('/:id', wrap((req, res) => {
   const u = uid(req);
@@ -494,7 +510,17 @@ router.get('/:id', wrap((req, res) => {
   if (!isOwner && !isShared && row.visibility !== 'group') {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  res.json(_withCreatorAvatar(_hydrate(row), row));
+  // The client shows Edit on this, so it has to answer the same question
+  // the PUT route below asks, or the button lies.
+  const can_edit = isOwner || req.user?.role === 'admin' || _canEditViaKitchen(id, u);
+  const editor = row.last_edited_by != null
+    ? db.prepare(`SELECT username, full_name FROM users WHERE id = ?`).get(row.last_edited_by)
+    : null;
+  res.json({
+    ..._withCreatorAvatar(_hydrate(row), row),
+    can_edit,
+    last_edited_by_name: editor ? (editor.full_name || editor.username) : null,
+  });
 }));
 
 // ── POST / — create ─────────────────────────────────────────────────────
@@ -543,14 +569,33 @@ router.put('/:id', wrap((req, res) => {
   if (!existing) return res.status(404).json({ error: 'Not found' });
   const isOwner = (u == null && existing.user_id == null) || existing.user_id === u;
   const isAdmin = req.user?.role === 'admin';
-  if (!isOwner && !isAdmin) return res.status(403).json({ error: 'Only the recipe owner or an admin can edit this recipe' });
+  const isKitchenEditor = !isOwner && !isAdmin && _canEditViaKitchen(id, u);
+  if (!isOwner && !isAdmin && !isKitchenEditor) {
+    return res.status(403).json({ error: 'Only the recipe owner or an admin can edit this recipe' });
+  }
 
   const body = { ...(req.body || {}) };
-  if (_userSetting(u, 'autoCreatePantryFromRecipes') === 'true') {
-    body.ingredients = _linkIngredientsToPantry(u, body.ingredients);
+  // Pantry links live inside the recipe's own JSON and point at rows in
+  // ONE person's pantry. Resolve them against the owner's pantry, never
+  // the editor's, or a Sous Chef's save would silently repoint the
+  // owner's ingredients at pantry rows the owner doesn't have, breaking
+  // their match pill, their shopping list and the federated nutrition.
+  const pantryOwner = isOwner ? u : existing.user_id;
+  if (_userSetting(pantryOwner, 'autoCreatePantryFromRecipes') === 'true') {
+    body.ingredients = _linkIngredientsToPantry(pantryOwner, body.ingredients);
   }
   const data = _toStorage(body);
   if (!data.name) return res.status(400).json({ error: 'Name is required' });
+
+  // A Sous Chef edits the recipe, not its place in the owner's library.
+  // Categories are per person, visibility is the owner's call, and the
+  // star rating and favourite mark are the owner's opinion of it.
+  if (isKitchenEditor) {
+    data.visibility  = existing.visibility;
+    data.category_id = existing.category_id;
+    data.rating      = existing.rating;
+    data.favorite    = existing.favorite;
+  }
 
   // Option E guard (2026-08-11): if any of the nested JSON fields
   // (ingredients / steps / tags / tools / nutrition) is empty on the
@@ -571,6 +616,7 @@ router.put('/:id', wrap((req, res) => {
        prep_minutes = ?, cook_minutes = ?, total_minutes = ?, rest_minutes = ?, rating = ?, favorite = ?,
        ingredients = ?, steps = ?, tags = ?, tools = ?, nutrition = ?,
        source_url = ?, notes = ?, visibility = ?, category_id = ?, video_url = ?,
+       last_edited_by = ?,
        updated_at = datetime('now')
      WHERE id = ?`
   ).run(
@@ -578,6 +624,8 @@ router.put('/:id', wrap((req, res) => {
     data.prep_minutes, data.cook_minutes, data.total_minutes, data.rest_minutes, data.rating, data.favorite,
     guarded.ingredients, guarded.steps, guarded.tags, guarded.tools, guarded.nutrition,
     data.source_url, data.notes, data.visibility, data.category_id, data.video_url,
+    // Only worth recording when someone other than the owner saved.
+    isOwner ? null : u,
     id,
   );
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(id);
