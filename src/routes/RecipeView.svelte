@@ -259,6 +259,24 @@
       localStorage.removeItem(`ct:checks:${_initialId}:tool`);
     } catch {}
   }
+  // The router reuses this page when only the id in the address changes, so
+  // `cookMode` above is computed once and then belongs to whichever recipe
+  // you happened to open first. Walking from a recipe you are cooking to one
+  // you are not left the new one looking like it was being cooked, and the
+  // watch was duly told so. Cook mode follows the recipe on screen.
+  let _cookModeFor = _initialId;
+  $: if (Number.isFinite(id) && id !== _cookModeFor) {
+    _cookModeFor = id;
+    cookMode = typeof localStorage !== 'undefined'
+      && localStorage.getItem(`ct:cookmode:${id}`) === '1';
+    if (!cookMode && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(`ct:checks:${id}:ing`);
+        localStorage.removeItem(`ct:checks:${id}:step`);
+        localStorage.removeItem(`ct:checks:${id}:tool`);
+      } catch {}
+    }
+  }
   let wakeLockSentinel = null;
   $: cookModeActive.set(cookMode);
   onDestroy(() => cookModeActive.set(false));
@@ -479,13 +497,17 @@
   // It auto-re-acquires on visibility return when cookMode is still
   // true. Native re-uses the same path — KeepAwake.keepAwake() is
   // idempotent (safe to call multiple times).
+  // One listener, taken away when this page goes. It used to be added and
+  // never removed, so every visit left another behind, each holding the
+  // recipe that was open when it was made and acting on it later.
+  const _onVisible = async () => {
+    if (document.visibilityState !== 'visible') return;
+    await _hearWatch();
+    if (cookMode) await _acquireWakeLock();
+  };
   if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', async () => {
-      if (document.visibilityState === 'visible') await _hearWatch();
-      if (cookMode && document.visibilityState === 'visible') {
-        await _acquireWakeLock();
-      }
-    });
+    document.addEventListener('visibilitychange', _onVisible);
+    onDestroy(() => document.removeEventListener('visibilitychange', _onVisible));
   }
 
   $: id = parseInt(params.id, 10);
