@@ -34,7 +34,7 @@ object KitchenAlarm {
         val alarms = ctx.getSystemService(AlarmManager::class.java) ?: return
         val intent = pending(ctx, id)
         runCatching {
-            // Exact, and awake through idle: a rest is 90 seconds, and a
+            // Exact, and awake through idle: two minutes for an egg, and a
             // minute of drift makes it useless.
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarms.canScheduleExactAlarms()) {
                 alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, endsAt, intent)

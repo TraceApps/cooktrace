@@ -249,6 +249,26 @@ class CookStore(private val ctx: Context) {
         _state.update { it.copy(timers = Pairing.timers(ctx)) }
     }
 
+    /**
+     * Two more minutes, because the pan is not ready. Starting over would
+     * throw away the count and lose the head start, which is the one thing a
+     * timer is for.
+     */
+    fun extendTimer(id: Int, seconds: Int) {
+        if (seconds <= 0) return
+        val now = System.currentTimeMillis()
+        val kept = Pairing.timers(ctx).filterNot { it.done(now) }
+        // The total grows with the deadline so the ring still reads as a
+        // fraction of the whole wait rather than jumping past full.
+        val updated = kept.map {
+            if (it.id == id) it.copy(total = it.total + seconds, endsAt = it.endsAt + seconds * 1000L) else it
+        }
+        if (updated == kept) return
+        Pairing.putTimers(ctx, updated)
+        updated.firstOrNull { it.id == id }?.let { KitchenAlarm.schedule(ctx, it.id, it.endsAt) }
+        _state.update { it.copy(timers = Pairing.timers(ctx)) }
+    }
+
     fun stopTimer(id: Int) {
         KitchenAlarm.cancel(ctx, id)
         Pairing.putTimers(ctx, Pairing.timers(ctx).filterNot { it.id == id })

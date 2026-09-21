@@ -44,6 +44,7 @@ import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.EdgeButton
+import androidx.wear.compose.material3.FilledTonalIconButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.ListHeader
@@ -153,7 +154,10 @@ fun WearApp(store: CookStore) {
                     entry.arguments?.getString("index")?.toIntOrNull() ?: 0,
                 )
             }
-            composable("timers") { TimersScreen(store) }
+            composable("timers") { TimersScreen(store, nav) }
+            composable("timer/{id}") { entry ->
+                OneTimerScreen(store, nav, entry.arguments?.getString("id")?.toIntOrNull() ?: 0)
+            }
         }
     }
 }
@@ -236,28 +240,7 @@ private fun ShoppingScreen(store: CookStore, nav: NavHostController) {
                 }
             }
             if (state.timers.isNotEmpty()) {
-                item(key = "timers") {
-                    val now = System.currentTimeMillis()
-                    val soonest = state.timers.minByOrNull { it.endsAt }!!
-                    val left = soonest.secondsLeft(now)
-                    TitleCard(
-                        onClick = { nav.navigate("timers") },
-                        title = {
-                            Text(
-                                Kitchen.clock(left),
-                                color = ringColour(Kitchen.urgency(left, soonest.total)),
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            soonest.label.ifBlank { "Timer" } +
-                                (if (state.timers.size > 1) " and ${state.timers.size - 1} more" else ""),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
+                item(key = "timers") { TimerGlance(store, state.timers) { nav.navigate("timers") } }
             }
             item(key = "shopping") { ListHeader { Text("Shopping") } }
             val aisles = Kitchen.aisles(state.items)
@@ -398,22 +381,7 @@ private fun CookScreen(store: CookStore, nav: NavHostController, serverRecipeId:
                 }
             }
             if (state.timers.isNotEmpty()) {
-                item(key = "timers") {
-                    val now = System.currentTimeMillis()
-                    val soonest = state.timers.minByOrNull { it.endsAt }!!
-                    val left = soonest.secondsLeft(now)
-                    Button(
-                        onClick = { nav.navigate("timers") },
-                        label = {
-                            Text(
-                                Kitchen.clock(left) +
-                                    (if (state.timers.size > 1) " · ${state.timers.size} timers" else " · timer"),
-                                color = ringColour(Kitchen.urgency(left, soonest.total)),
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                item(key = "timers") { TimerGlance(store, state.timers) { nav.navigate("timers") } }
             }
             val steps = recipe?.steps.orEmpty()
             if (steps.isNotEmpty()) {
@@ -564,6 +532,52 @@ private fun IngredientsScreen(store: CookStore, serverRecipeId: Long) {
     }
 }
 
+/**
+ * The soonest timer, wherever you are: the time left in the colour it has
+ * earned, and a way into the timers. The same row on the shopping list and
+ * inside a cook, so the count is never somewhere you have to go looking.
+ *
+ * It keeps its own second hand, because a frozen number is worse than none;
+ * the tick is tied to the screen being in front of you, so it stops the
+ * moment your wrist drops.
+ */
+@Composable
+private fun TimerGlance(store: CookStore, timers: List<Pairing.Timer>, onOpen: () -> Unit) {
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    WhileWatching(timers.size) {
+        while (true) {
+            now = System.currentTimeMillis()
+            // Nothing ticks behind a timer that has rung: tidy it away and the
+            // row goes with it, rather than sitting at 0:00 with a live clock.
+            if (timers.all { it.done(now) }) {
+                store.tidyTimers()
+                break
+            }
+            delay(1000)
+        }
+    }
+    val soonest = timers.minByOrNull { it.endsAt } ?: return
+    val left = soonest.secondsLeft(now)
+    TitleCard(
+        onClick = onOpen,
+        title = {
+            Text(
+                Kitchen.clock(left),
+                maxLines = 1,
+                color = ringColour(Kitchen.urgency(left, soonest.total)),
+            )
+        },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(
+            soonest.label.ifBlank { "Timer" } +
+                (if (timers.size > 1) " and ${timers.size - 1} more" else ""),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 /** Green while there is time, amber when it is getting on, red at the death. */
 @Composable
 private fun ringColour(urgency: Kitchen.Urgency): Color = when (urgency) {
@@ -575,12 +589,13 @@ private fun ringColour(urgency: Kitchen.Urgency): Color = when (urgency) {
 /**
  * Everything counting down at once, because a kitchen runs a pan and an oven.
  *
- * The one finishing soonest gets the ring around the screen, since that is
- * the one about to want you; the rest are listed under it with their own
- * colour. The ring empties as the time goes and turns amber, then red.
+ * With one on the go this is the timer itself, full screen: the ring, the
+ * number, and the two things you do to it. With several it is the list, the
+ * soonest first, and tapping one opens that same face. A tap never stops a
+ * timer: a mis-tap on a wrist should not throw away a braise.
  */
 @Composable
-private fun TimersScreen(store: CookStore) {
+private fun TimersScreen(store: CookStore, nav: NavHostController) {
     val state by store.state.collectAsStateWithLifecycle()
     val listState = rememberScalingLazyListState()
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -594,11 +609,16 @@ private fun TimersScreen(store: CookStore) {
     }
 
     val running = state.timers.sortedBy { it.endsAt }
+    if (running.size == 1) {
+        TimerFaceFor(store, running.first().id, onGone = null)
+        return
+    }
     val soonest = running.firstOrNull()
 
     Box(modifier = Modifier.fillMaxSize()) {
         // The ring belongs to the screen, not to a row, so it is drawn behind
-        // the list rather than inside it.
+        // the list rather than inside it. It follows the one finishing soonest,
+        // since that is the one about to want you.
         if (soonest != null) {
             val left = soonest.secondsLeft(now)
             CircularProgressIndicator(
@@ -624,7 +644,7 @@ private fun TimersScreen(store: CookStore) {
                     item(key = timer.id) {
                         val left = timer.secondsLeft(now)
                         TitleCard(
-                            onClick = { store.stopTimer(timer.id) },
+                            onClick = { nav.navigate("timer/${timer.id}") },
                             title = {
                                 Text(
                                     Kitchen.clock(left),
@@ -635,13 +655,126 @@ private fun TimersScreen(store: CookStore) {
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
-                                timer.label.ifBlank { "Timer" } + " · tap to stop",
+                                timer.label.ifBlank { "Timer" },
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/** One timer, opened from the list. */
+@Composable
+private fun OneTimerScreen(store: CookStore, nav: NavHostController, id: Int) {
+    TimerFaceFor(store, id, onGone = { nav.popBackStack() })
+}
+
+/**
+ * The face of a single timer, wherever it is shown from.
+ *
+ * It keeps the last thing it knew about the timer, so the screen still says
+ * what rang instead of emptying the instant the timer is tidied away.
+ */
+@Composable
+private fun TimerFaceFor(store: CookStore, id: Int, onGone: (() -> Unit)?) {
+    val state by store.state.collectAsStateWithLifecycle()
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    var last by remember { mutableStateOf<Pairing.Timer?>(null) }
+
+    val live = state.timers.firstOrNull { it.id == id }
+    LaunchedEffect(live) { if (live != null) last = live }
+    val timer = live ?: last
+
+    // Only a running timer needs a clock; once it has rung the screen is
+    // still, so nothing ticks behind it.
+    WhileWatching(id, live != null) {
+        if (live == null) return@WhileWatching
+        while (true) {
+            now = System.currentTimeMillis()
+            store.tidyTimers()
+            delay(500)
+        }
+    }
+
+    if (timer == null) {
+        LaunchedEffect(Unit) { onGone?.invoke() }
+        Message(title = "Nothing counting", body = "A step that mentions a time offers one.")
+        return
+    }
+    val left = if (live != null) timer.secondsLeft(now) else 0
+    TimerFace(
+        label = timer.label,
+        left = left,
+        total = timer.total,
+        onExtend = { store.extendTimer(id, it) },
+        onStop = {
+            store.stopTimer(id)
+            onGone?.invoke()
+        },
+    )
+}
+
+/**
+ * The ring, the number, and the two things you do to it: give it longer, or
+ * be done with it. The same face LiftTrace shows for a rest between sets, so
+ * a timer looks and behaves the same on the wrist whichever app set it.
+ */
+@Composable
+private fun TimerFace(
+    label: String,
+    left: Int,
+    total: Int,
+    onExtend: (Int) -> Unit,
+    onStop: () -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(
+            progress = { (left.toFloat() / maxOf(1, total).toFloat()).coerceIn(0f, 1f) },
+            colors = ProgressIndicatorDefaults.colors(
+                indicatorColor = ringColour(Kitchen.urgency(left, total)),
+            ),
+            modifier = Modifier.fillMaxSize().padding(3.dp),
+        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(horizontal = 36.dp),
+        ) {
+            Text(
+                if (left > 0) Kitchen.clock(left) else "Ready",
+                style = MaterialTheme.typography.displayMedium,
+            )
+            Text(
+                label.ifBlank { "Timer" },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                // Minutes, not seconds: a pan wants another minute and an oven
+                // another five, and nothing in a kitchen is decided in tens.
+                if (left > 0) {
+                    FilledTonalIconButton(
+                        onClick = { onExtend(60) },
+                        modifier = Modifier.size(40.dp),
+                    ) { Text("+1") }
+                    FilledTonalIconButton(
+                        onClick = { onExtend(300) },
+                        modifier = Modifier.size(40.dp),
+                    ) { Text("+5") }
+                }
+                FilledTonalIconButton(
+                    onClick = onStop,
+                    modifier = Modifier.size(40.dp),
+                ) { Text(if (left > 0) "Stop" else "Done") }
             }
         }
     }
