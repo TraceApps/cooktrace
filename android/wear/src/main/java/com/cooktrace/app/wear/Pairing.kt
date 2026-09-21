@@ -151,6 +151,11 @@ object Pairing {
      * both devices, stamped so the later word wins, since either can tick.
      */
     data class Cook(
+        /**
+         * The id YOUR SERVER uses. The phone has two for every recipe, its
+         * own and the server's, and only this one means anything here: the
+         * watch fetches the recipe from the server itself.
+         */
         val recipeId: Long,
         val name: String,
         val steps: Set<Int>,
@@ -176,12 +181,12 @@ object Pairing {
     fun putCook(ctx: Context, map: DataMap) {
         val at = map.getLong("at", 0L)
         if (at > 0 && at < prefs(ctx).getLong(KEY_COOK_AT, 0L)) return
-        if (map.getBoolean("cleared", false) || map.getLong("recipeId", 0L) <= 0) {
+        if (map.getBoolean("cleared", false) || map.getLong("serverRecipeId", 0L) <= 0) {
             clearCook(ctx, at)
             return
         }
         val o = JSONObject()
-            .put("recipeId", map.getLong("recipeId"))
+            .put("recipeId", map.getLong("serverRecipeId"))
             .put("name", map.getString("name").orEmpty())
             .put("steps", JSONArray((map.getIntegerArrayList("steps") ?: arrayListOf()).toList()))
             .put("ingredients", JSONArray((map.getStringArrayList("ingredients") ?: arrayListOf()).toList()))
@@ -212,7 +217,7 @@ object Pairing {
                 putBoolean("cleared", true)
             } else {
                 putBoolean("cleared", false)
-                putLong("recipeId", cook.recipeId)
+                putLong("serverRecipeId", cook.recipeId)
                 putString("name", cook.name)
                 putIntegerArrayList("steps", ArrayList(cook.steps.sorted()))
                 putStringArrayList("ingredients", ArrayList(cook.ingredients.sorted()))

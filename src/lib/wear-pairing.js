@@ -62,8 +62,9 @@ export async function pairWatch() {
 }
 
 /**
- * The cook you are in, for the watch to show: which recipe, and what has
- * been ticked off it. Pass null when the cook is over.
+ * The cook you are in, for the watch to show: which recipe (by the id YOUR
+ * SERVER uses, never this phone's own) and what has been ticked off it. Pass
+ * null when the cook is over.
  */
 export async function publishCook(cook, at = 0) {
   if (!isNative) return false;
@@ -73,7 +74,9 @@ export async function publishCook(cook, at = 0) {
       return true;
     }
     await WearPairing.cook({
-      recipeId: Number(cook.recipeId) || 0,
+      // Named for what it must be. The phone has two ids for a recipe, its
+      // own and the server's, and the watch can only use the server's.
+      serverRecipeId: Number(cook.serverRecipeId) || 0,
       name: String(cook.name || ''),
       steps: Array.from(cook.steps || []).map(Number).filter(Number.isFinite),
       ingredients: Array.from(cook.ingredients || []).map(String),
@@ -97,9 +100,9 @@ export async function readCook(mine = 0) {
     if (!remote?.found) return undefined;
     const at = Number(remote.at || 0);
     if (at <= mine) return undefined;
-    if (remote.cleared || !Number(remote.recipeId)) return null;
+    if (remote.cleared || !Number(remote.serverRecipeId)) return null;
     return {
-      recipeId: Number(remote.recipeId),
+      serverRecipeId: Number(remote.serverRecipeId),
       name: String(remote.name || ''),
       steps: (remote.steps || []).map(Number).filter(Number.isFinite),
       ingredients: (remote.ingredients || []).map(String),

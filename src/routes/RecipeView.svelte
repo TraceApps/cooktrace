@@ -328,7 +328,7 @@
     const at = Date.now();
     try { localStorage.setItem(_cookStampKey(id), String(at)); } catch {}
     _publishCook(
-      on ? { recipeId: rid, name: recipe.name || '', steps: [...stepChecks], ingredients: [...ingChecks] } : null,
+      on ? { serverRecipeId: rid, name: recipe.name || '', steps: [...stepChecks], ingredients: [...ingChecks] } : null,
       at,
     ).catch(() => {});
   }
@@ -343,7 +343,7 @@
         return;
       }
       // The watch speaks in server ids, this page in local ones.
-      if (theirs.recipeId !== _watchRecipeId()) return;
+      if (theirs.serverRecipeId !== _watchRecipeId()) return;
       stepChecks = new Set(theirs.steps);
       ingChecks = new Set(theirs.ingredients);
       _saveChecks(id, 'step', stepChecks);

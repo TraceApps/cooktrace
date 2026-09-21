@@ -101,12 +101,12 @@ public class WearPairingPlugin extends Plugin {
     public void cook(PluginCall call) {
         PutDataMapRequest req = PutDataMapRequest.create(COOK_PATH);
         req.getDataMap().putBoolean("cleared", false);
-        req.getDataMap().putLong("recipeId", call.getDouble("recipeId", 0d).longValue());
+        req.getDataMap().putLong("serverRecipeId", call.getDouble("serverRecipeId", 0d).longValue());
         req.getDataMap().putString("name", call.getString("name", ""));
         req.getDataMap().putIntegerArrayList("steps", intList(call.getArray("steps")));
         req.getDataMap().putStringArrayList("ingredients", stringList(call.getArray("ingredients")));
         req.getDataMap().putLong("at", stampOf(call));
-        long recipeId = req.getDataMap().getLong("recipeId", 0L);
+        long recipeId = req.getDataMap().getLong("serverRecipeId", 0L);
         Log.i(TAG, "sending the cook to the watch: recipe " + recipeId
             + ", " + req.getDataMap().getIntegerArrayList("steps").size() + " steps ticked");
         Wearable.getDataClient(getContext()).putDataItem(req.asPutDataRequest().setUrgent())
@@ -163,7 +163,7 @@ public class WearPairingPlugin extends Plugin {
                     if (at < newest) continue;
                     newest = at;
                     ret.put("found", true);
-                    ret.put("recipeId", map.getLong("recipeId", 0L));
+                    ret.put("serverRecipeId", map.getLong("serverRecipeId", 0L));
                     ret.put("name", map.getString("name", ""));
                     ret.put("steps", new com.getcapacitor.JSArray(map.getIntegerArrayList("steps")));
                     ret.put("ingredients", new com.getcapacitor.JSArray(map.getStringArrayList("ingredients")));
