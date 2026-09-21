@@ -61,7 +61,7 @@ function _dbName() {
   } catch { /* private mode */ }
   return `cooktrace-offline-${user || 'single'}`;
 }
-const _STORES = ['answers', 'outbox', 'refused'];
+const _STORES = ['answers', 'outbox', 'refused', 'meta'];
 
 function _db() {
   if (typeof indexedDB === 'undefined') return Promise.resolve(null);
@@ -72,12 +72,13 @@ function _db() {
   // what was kept with it rather than leaving it where nothing reads it.
   const leaving = _dbPromise?.name && _dbPromise.name !== name ? _dbPromise.name : null;
   const p = new Promise((resolve) => {
-    const req = indexedDB.open(name, 1);
+    const req = indexedDB.open(name, 2);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains('answers')) db.createObjectStore('answers', { keyPath: 'key' });
       if (!db.objectStoreNames.contains('outbox')) db.createObjectStore('outbox', { keyPath: 'seq', autoIncrement: true });
       if (!db.objectStoreNames.contains('refused')) db.createObjectStore('refused', { keyPath: 'at' });
+      if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta');
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => resolve(null);
@@ -192,6 +193,19 @@ _channel?.addEventListener('message', async (e) => {
  * goes up would otherwise be sent against an id the server never had.
  */
 let _swapped = {};
+// Kept on disk as well as in memory. A flush that stops halfway (the page is
+// closed, the signal goes again) leaves queued work that refers to a row the
+// server has just created; without the map that work would be sent against
+// an id the server never had. NoteTrace has always done this.
+async function _loadSwapped() {
+  const kept = await _tx('meta', 'readonly', s => s.get('idMap'));
+  if (kept) _swapped = { ...kept, ..._swapped };
+  return _swapped;
+}
+async function _rememberSwapped(map) {
+  _swapped = { ..._swapped, ...map };
+  await _tx('meta', 'readwrite', s => s.put(_swapped, 'idMap'));
+}
 
 function _offlineError(message) {
   const err = new Error(message || 'This needs a connection.');
@@ -247,9 +261,11 @@ async function _flushOnce() {
   if (!_online() || !_http) { _scheduleFlush(_backoff()); return false; }
   _publish({ syncing: true });
 
+  await _loadSwapped();
   const done = new Set();
   const refused = [];
-  const map = {};
+  // Ids learned in an earlier run apply to what is still queued from it.
+  const map = { ..._swapped };
   let stopped = null;
 
   for (const op of collapseOps(ops)) {
@@ -281,7 +297,7 @@ async function _flushOnce() {
 
   if (refused.length) await _tx('refused', 'readwrite', s => { for (const r of refused) s.put(r); });
   if (Object.keys(map).length) {
-    _swapped = { ..._swapped, ...map };
+    await _rememberSwapped(map);
     _channel?.postMessage({ type: 'outbox', ids: map });
   }
 
@@ -335,6 +351,7 @@ function _wire() {
   });
   // A queue left from last time goes up even if the first screen opened
   // never calls the API.
+  _loadSwapped().catch(() => {});
   _loadOps().then(() => { _publish(); if (_ops.length) _scheduleFlush(0); });
 }
 
