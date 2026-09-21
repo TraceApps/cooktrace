@@ -29,6 +29,7 @@
   import { scaleQty, displayQty, displayQtyParts, parseQty } from '../lib/qty.js';
   import { convertWithinFamily, convertQty, unitFamily } from '../lib/recipe-nutrition.js';
   import { resolveAssetUrl, isNative, getServerUrl } from '../lib/platform.js';
+  import { publishCook as _publishCook, readCook as _readCook } from '../lib/wear-pairing.js';
   import { portal } from '../lib/portal.js';
   import RecipeComments from '../components/recipe/RecipeComments.svelte';
   import KitchenGear from '../components/recipe/KitchenGear.svelte';
@@ -288,17 +289,16 @@
     if (!isNative || !Number.isFinite(id)) return;
     const at = Date.now();
     try { localStorage.setItem(_cookStampKey(id), String(at)); } catch {}
-    import('../lib/wear-pairing.js').then(({ publishCook }) => publishCook(
+    _publishCook(
       on ? { recipeId: id, name: recipe?.name || '', steps: [...stepChecks], ingredients: [...ingChecks] } : null,
       at,
-    )).catch(() => {});
+    ).catch(() => {});
   }
   /** The watch ticked something while the phone sat here. Take its word. */
   async function _hearWatch() {
     if (!isNative || !Number.isFinite(id)) return;
     try {
-      const { readCook } = await import('../lib/wear-pairing.js');
-      const theirs = await readCook(_cookStamp(id));
+      const theirs = await _readCook(_cookStamp(id));
       if (theirs === undefined) return;
       if (theirs === null) {
         if (cookMode) { cookMode = false; _saveCookMode(id, false); resetChecks(); }

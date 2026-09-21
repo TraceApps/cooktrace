@@ -106,9 +106,15 @@ public class WearPairingPlugin extends Plugin {
         req.getDataMap().putIntegerArrayList("steps", intList(call.getArray("steps")));
         req.getDataMap().putStringArrayList("ingredients", stringList(call.getArray("ingredients")));
         req.getDataMap().putLong("at", stampOf(call));
+        long recipeId = req.getDataMap().getLong("recipeId", 0L);
+        Log.i(TAG, "sending the cook to the watch: recipe " + recipeId
+            + ", " + req.getDataMap().getIntegerArrayList("steps").size() + " steps ticked");
         Wearable.getDataClient(getContext()).putDataItem(req.asPutDataRequest().setUrgent())
             .addOnSuccessListener(item -> call.resolve())
-            .addOnFailureListener(e -> call.reject(e.getMessage() == null ? "Couldn't reach the watch" : e.getMessage()));
+            .addOnFailureListener(e -> {
+                Log.w(TAG, "the cook did not reach the watch: " + e.getMessage());
+                call.reject(e.getMessage() == null ? "Couldn't reach the watch" : e.getMessage());
+            });
     }
 
     private java.util.ArrayList<Integer> intList(com.getcapacitor.JSArray arr) {
