@@ -24,6 +24,7 @@
     buildVariantsByParent,
     topLevelItems,
     aggregateStock,
+    isItemInStock,
     matchesSearch,
     queryHitVariant,
     matchingVariants,
@@ -857,12 +858,15 @@
   }
 
   async function quickToggle(it) {
-    // Quantity is the source of truth (v1.0). Marking out of stock
-    // sets qty to 0; marking back in sets it to null (untracked, in
-    // stock) so we don't have to invent a quantity. in_stock travels
-    // alongside as a server-schema mirror so existing reads keep working.
-    const nextInStock = Number(it.quantity) === 0; // currently out → going in
-    const nextQty = nextInStock ? null : 0;
+    // The current state comes from isItemInStock, the same read the card
+    // uses to draw the check. Deriving it from quantity here broke on a
+    // blank quantity: Number(null) === 0, so an untracked in-stock item
+    // looked out of stock and every tap marked it in again.
+    // Marking out sets qty to 0. Marking in keeps a positive quantity if
+    // there is one and otherwise sets 1, so On Hand shows the tap took
+    // effect instead of a blank that the sheet then misread.
+    const nextInStock = !isItemInStock(it);
+    const nextQty = nextInStock ? (Number(it.quantity) > 0 ? Number(it.quantity) : 1) : 0;
     const prevQty = it.quantity;
     const prevInStock = it.in_stock;
     items = items.map(i => i.id === it.id
@@ -1191,7 +1195,7 @@
             {@const stockAgg = aggregateStock(it, variantsByParent)}
             {@const isGen = stockAgg.isGeneric}
             {@const effExp = _effectiveExpiry(it, isGen)}
-            {@const inStockDisplay = isGen ? stockAgg.stocked > 0 : !!it.in_stock}
+            {@const inStockDisplay = isGen ? stockAgg.stocked > 0 : isItemInStock(it)}
             {@const expanded = expandedGenerics.has(it.id)}
             {@const variants = isGen ? (variantsByParent.get(it.id) || []) : []}
             <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
