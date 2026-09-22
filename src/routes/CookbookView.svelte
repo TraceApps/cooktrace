@@ -255,10 +255,16 @@
   // there was just no client UI to set it. Reuses the shared
   // ImagePicker + the same header-X modal shell the Step Photo
   // picker in RecipeEditor uses.
+  // A cookbook shared into a Kitchen is editable by a Sous Chef, which
+  // only the server can decide, so the controls follow its can_edit
+  // rather than "is this mine". Smart cookbooks stay generated.
+  $: cbEditable = !!cookbook && !cookbook.is_smart
+    && (!cookbook.shared_with_me || cookbook.can_edit === true);
+
   let coverSheetOpen = false;
   let coverDraft = '';
   function openCoverSheet() {
-    if (!cookbook || cookbook.is_smart || cookbook.shared_with_me) return;
+    if (!cbEditable) return;
     coverDraft = cookbook.cover_image_url || '';
     coverSheetOpen = true;
   }
@@ -318,7 +324,7 @@
       </div>
     {:else if cookbook}
       <header class="cb-hero">
-        {#if !cookbook.is_smart && !cookbook.shared_with_me}
+        {#if cbEditable}
           <button class="cb-cover cb-cover-editable" on:click={openCoverSheet}
             aria-label="Set cookbook cover" title="Set cookbook cover">
             {#if cookbook.cover_image_url}
@@ -437,7 +443,7 @@
             <div class="card recipe-card"
               class:has-cat={!!r.category?.color}
               style={r.category?.color ? `--cat-color:${r.category.color}` : ''}>
-              <div class="card-drag-wrap" use:maybeDragHandle={cbReorderable && !cookbook.is_smart && !cookbook.shared_with_me}>
+              <div class="card-drag-wrap" use:maybeDragHandle={cbReorderable && cbEditable}>
               <button class="card-clickable" on:click={() => push(`/recipes/${r.id}`)}>
                 <div class="card-image">
                   {#if r.imgUrl}
@@ -496,7 +502,7 @@
                 </div>
               </button>
               </div>
-              {#if !cookbook.is_smart && !cookbook.shared_with_me}
+              {#if cbEditable}
                 <button class="remove-btn" on:click={() => removeRecipe(r)}
                   aria-label={`Remove ${r.name}`} title="Remove from cookbook">
                   <span class="material-symbols-rounded">close</span>

@@ -205,6 +205,31 @@ router.put('/:id/members/:userId/role', wrap((req, res) => {
   res.json({ ok: true, user_id: target, role });
 }));
 
+// ── PUT /:id/owner ───────────────────────────────────────────────────
+// Hand the kitchen to another member. Ownership lives on the kitchen row
+// and is mirrored by the 'owner' role on the member row, so both move
+// together or neither does. The outgoing owner stays in the kitchen as a
+// Sous Chef, keeping the editing they had a moment ago; they can be
+// demoted like anyone else afterwards. This also un-dead-ends the
+// "owner cannot leave" message on the remove route.
+router.put('/:id/owner', wrap((req, res) => {
+  const u = uid(req);
+  const id = parseInt(req.params.id, 10);
+  const target = parseInt(req.body?.user_id, 10);
+  if (!Number.isFinite(id) || !Number.isFinite(target)) return res.status(400).json({ error: 'Invalid id' });
+  if (!_isOwner(id, u)) return res.status(403).json({ error: 'Only the owner can hand over a kitchen' });
+  if (target === u) return res.status(400).json({ error: 'You already own this kitchen' });
+  if (!_isMember(id, target)) return res.status(404).json({ error: 'Not a member of this kitchen' });
+
+  const tx = db.transaction(() => {
+    db.prepare(`UPDATE kitchens SET owner_user_id = ? WHERE id = ?`).run(target, id);
+    db.prepare(`UPDATE kitchen_members SET role = 'owner' WHERE kitchen_id = ? AND user_id = ?`).run(id, target);
+    db.prepare(`UPDATE kitchen_members SET role = 'sous' WHERE kitchen_id = ? AND user_id = ?`).run(id, u);
+  });
+  tx();
+  res.json({ ok: true, owner_user_id: target });
+}));
+
 // ── POST /:id/members — invite a user by username ────────────────────
 // When the new member is added, we ALSO fan every existing auto-share
 // enabled member's recipes at them, so the "join the family kitchen
@@ -218,11 +243,16 @@ router.post('/:id/members', wrap((req, res) => {
   if (!username) return res.status(400).json({ error: 'username required' });
   const target = db.prepare(`SELECT id, username, full_name FROM users WHERE username = ? COLLATE NOCASE`).get(username);
   if (!target) return res.status(404).json({ error: `No user named '${username}'` });
+  // The owner can hand out Sous Chef at invite time, so a household
+  // where everyone edits is one step rather than invite-then-promote.
+  // Anything else, including a missing role, joins as a Line Cook.
+  const role = EDITABLE_ROLES.has((req.body?.role || '').toString().trim())
+    ? req.body.role.toString().trim() : 'member';
 
   const tx = db.transaction(() => {
     const inserted = db.prepare(
-      `INSERT OR IGNORE INTO kitchen_members (kitchen_id, user_id, role) VALUES (?, ?, 'member')`
-    ).run(id, target.id);
+      `INSERT OR IGNORE INTO kitchen_members (kitchen_id, user_id, role) VALUES (?, ?, ?)`
+    ).run(id, target.id, role);
     if (inserted.changes > 0) {
       // Backfill: every current member with auto_share=1 fans their
       // library into the new joiner. The new joiner starts with
@@ -237,7 +267,7 @@ router.post('/:id/members', wrap((req, res) => {
     }
   });
   tx();
-  res.status(201).json({ user_id: target.id, username: target.username, full_name: target.full_name, role: 'member' });
+  res.status(201).json({ user_id: target.id, username: target.username, full_name: target.full_name, role });
 }));
 
 // ── DELETE /:id/members/:userId — remove a member (or self-leave) ────

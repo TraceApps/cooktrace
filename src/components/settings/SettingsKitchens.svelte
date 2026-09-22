@@ -26,6 +26,7 @@
   // Per-kitchen expanded panel state
   let openId = null;
   let members = {};      // { kitchenId: [member, ...] }
+  let inviteRole = 'member';  // Role the new member joins with
   let inviteName = '';        // Combobox picked value (display name string)
   let inviteTyped = '';       // Raw typed text (for freeform invite fallback)
   let inviteBusy = false;
@@ -105,7 +106,7 @@
     if (!username) return;
     inviteBusy = true;
     try {
-      await NtApi.addKitchenMember(kitchenId, username);
+      await NtApi.addKitchenMember(kitchenId, username, inviteRole);
       showSuccess(`Added ${username}`);
       inviteName = '';
       inviteTyped = '';
@@ -114,6 +115,23 @@
       kitchens = kitchens.map(k => k.id === kitchenId ? { ...k, member_count: (members[kitchenId] || []).length } : k);
     } catch (e) { showError(e.message || 'Could not add member'); }
     finally { inviteBusy = false; }
+  }
+
+  async function handOver(kitchenId, member) {
+    const name = member.full_name || member.username;
+    const ok = await confirmDialog({
+      title: `Make ${name} the Head Chef?`,
+      message: `${name} will own this Kitchen: inviting, removing and setting roles, and deleting it. You stay in the Kitchen as a Sous Chef, so you can still edit the recipes shared into it. Only ${name} can hand it back.`,
+      confirmText: 'Hand Over',
+      dangerous: true,
+    });
+    if (!ok) return;
+    try {
+      await NtApi.transferKitchen(kitchenId, member.user_id);
+      await load();
+      await loadMembers(kitchenId);
+      showSuccess(`${name} owns this Kitchen now`);
+    } catch (e) { showError(e.message || 'Could not hand over the Kitchen'); }
   }
 
   async function removeMember(kitchenId, member) {
@@ -337,6 +355,7 @@
                       <span class="badge">{$_('settings_kitchens_ct.role_sous')}</span>
                     {/if}
                     {#if isOwner(k) && m.user_id !== $currentUser?.id}
+                      <button class="btn-link" on:click={() => handOver(k.id, m)}>{$_('settings_kitchens_ct.hand_over')}</button>
                       <button class="btn-link danger" on:click={() => removeMember(k.id, m)}>{$_('settings_kitchens_ct.remove')}</button>
                     {:else if m.user_id === $currentUser?.id && !isOwner(k)}
                       <button class="btn-link danger" on:click={() => removeMember(k.id, m)}>{$_('settings_kitchens_ct.leave')}</button>
@@ -361,6 +380,13 @@
                       maxResults={20}
                       on:create={() => invite(k.id)}
                     />
+                  </div>
+                  <div class="select-wrap">
+                    <select class="select sel-sm" bind:value={inviteRole}
+                      aria-label={$_('settings_kitchens_ct.invite_role')}>
+                      <option value="member">{$_('settings_kitchens_ct.role_cook')}</option>
+                      <option value="sous">{$_('settings_kitchens_ct.role_sous')}</option>
+                    </select>
                   </div>
                   <button class="btn btn-secondary" on:click={() => invite(k.id)}
                     disabled={inviteBusy || (!inviteName.trim() && !inviteTyped.trim())}>

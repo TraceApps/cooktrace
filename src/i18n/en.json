@@ -1004,6 +1004,8 @@
     "role_cook":                 "Line Cook",
     "role_sous":                 "Sous Chef",
     "role_for":                  "Role for {name}",
+    "invite_role":               "Role for the new member",
+    "hand_over":                 "Make Head Chef",
     "roles_help":                "Sous Chefs can edit the recipes shared into this Kitchen. Line Cooks cook from them.",
     "everyone_edits":            "Let Everyone Edit",
     "nobody_edits":              "Make All Read-Only",

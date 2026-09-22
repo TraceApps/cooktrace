@@ -4,7 +4,7 @@
  * Text checks over the source, in the style of the other *-wiring tests,
  * so this runs without a compiled better-sqlite3 binding. The behaviour
  * itself (who may save what) is exercised end to end against the real
- * routes by scripts/kitchen-roles-harness.mjs, which needs node:sqlite.
+ * routes by scripts/kitchen-roles-harness/, which needs node:sqlite.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -19,6 +19,8 @@ const settings   = read('../src/components/settings/SettingsKitchens.svelte');
 const apiJs      = read('../src/lib/api.js');
 const nativeJs   = read('../src/lib/api-native.js');
 const cachedJs   = read('../src/lib/api-cached.js');
+const cookbooksJs = read('../server/routes/cookbooks.js');
+const cbView      = read('../src/routes/CookbookView.svelte');
 
 test('roles reuse the existing kitchen_members.role column, no new flag', () => {
   assert.match(dbJs, /CREATE TABLE IF NOT EXISTS kitchen_members[\s\S]{0,300}role\s+TEXT NOT NULL DEFAULT 'member'/);
@@ -92,4 +94,39 @@ test('the app sends a shared-recipe save straight to the server, not through syn
   assert.match(body, /CtApiNative\.updateRecipe/, 'owned recipes keep the offline-first path');
   assert.match(body, /method: 'PUT'/, 'a recipe with no local row goes to the API');
   assert.match(body, /navigator\.onLine === false/, 'and refuses clearly when offline');
+});
+
+test('an owner can pick the role when inviting, and anything odd joins read-only', () => {
+  const post = kitchensJs.slice(kitchensJs.indexOf("router.post('/:id/members'"));
+  const body = post.slice(0, post.indexOf('\n}));'));
+  assert.match(body, /EDITABLE_ROLES\.has\(\(req\.body\?\.role \|\| ''\)/);
+  assert.match(body, /: 'member';/, 'an unknown role falls back to Line Cook');
+  assert.match(body, /VALUES \(\?, \?, \?\)/, 'the chosen role is what gets inserted');
+});
+
+test('handing a kitchen over moves the row and both member roles together', () => {
+  const route = kitchensJs.slice(kitchensJs.indexOf("router.put('/:id/owner'"));
+  const body = route.slice(0, route.indexOf('\n}));'));
+  assert.match(body, /if \(!_isOwner\(id, u\)\) return res\.status\(403\)/);
+  assert.match(body, /if \(!_isMember\(id, target\)\) return res\.status\(404\)/);
+  assert.match(body, /UPDATE kitchens SET owner_user_id = \? WHERE id = \?/);
+  assert.match(body, /SET role = 'owner' WHERE kitchen_id = \? AND user_id = \?/);
+  assert.match(body, /SET role = 'sous' WHERE kitchen_id = \? AND user_id = \?/);
+  assert.match(body, /db\.transaction/, 'ownership and the member rows move together or not at all');
+});
+
+test('a Sous Chef can edit a cookbook shared into the kitchen, but not delete or reshare it', () => {
+  assert.match(cookbooksJs, /function _canEditViaKitchen/);
+  const fn = cookbooksJs.slice(cookbooksJs.indexOf('function _canEditViaKitchen'));
+  assert.match(fn.slice(0, fn.indexOf('\n}')), /FROM cookbook_shares s[\s\S]*m\.role = 'sous'/);
+  for (const route of ["router.put('/:id',", "router.post('/:id/recipes',", "router.put('/:id/recipes/order',", "router.delete('/:id/recipes/:recipeId',"]) {
+    const block = cookbooksJs.slice(cookbooksJs.indexOf(route));
+    assert.match(block.slice(0, 700), /!isOwner && !_canEditViaKitchen\(id, u\)/, `${route} admits a Sous Chef`);
+  }
+  for (const route of ["router.delete('/:id',", "router.post('/:id/shares',"]) {
+    const block = cookbooksJs.slice(cookbooksJs.indexOf(route));
+    assert.doesNotMatch(block.slice(0, 700), /_canEditViaKitchen/, `${route} stays owner only`);
+  }
+  assert.match(cookbooksJs, /can_edit: isOwner \|\| _canEditViaKitchen\(id, u\)/);
+  assert.match(cbView, /cookbook\.can_edit === true/);
 });
