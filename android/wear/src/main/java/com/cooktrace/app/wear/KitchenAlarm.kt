@@ -97,6 +97,9 @@ class KitchenAlarmReceiver : BroadcastReceiver() {
         val now = System.currentTimeMillis()
         val live = Pairing.timers(context).filterNot { it.done(now) }
         if (live.size != Pairing.timers(context).size) Pairing.putTimers(context, live)
+        // What rang, said in words, before the list it came from is tidied.
+        val rang = Pairing.timers(context).firstOrNull { it.done(now) }
+        KitchenOngoing.rang(context, rang?.label.orEmpty())
         KitchenTileService.refresh(context)
         // The one that rang comes off the face too, and what is left carries
         // on counting there.

@@ -35,6 +35,7 @@ object KitchenOngoing {
 
     private const val CHANNEL = "timers"
     private const val NOTE_ID = 4200
+    private const val RANG_ID = 4201
 
     /**
      * Post, update or take down the entry, from whatever the saved timers now
@@ -94,6 +95,30 @@ object KitchenOngoing {
 
     fun hide(ctx: Context) {
         runCatching { NotificationManagerCompat.from(ctx).cancel(NOTE_ID) }
+    }
+
+    /**
+     * It rang. The buzz on its own says something happened but not what, and
+     * a watch buzzes for plenty of reasons, so this is what is left on screen
+     * to answer that: which app, which dish, and a way back in.
+     *
+     * Silent, because the alarm has already done the buzzing as a proper
+     * alarm; this is only the words.
+     */
+    fun rang(ctx: Context, label: String) {
+        if (!NotificationManagerCompat.from(ctx).areNotificationsEnabled()) return
+        channel(ctx)
+        val what = label.ifBlank { "Timer" }
+        val note = NotificationCompat.Builder(ctx, CHANNEL)
+            .setSmallIcon(R.drawable.ic_timer)
+            .setContentTitle("$what is done")
+            .setContentText("Your CookTrace timer has finished.")
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setSilent(true)
+            .setAutoCancel(true)
+            .setContentIntent(open(ctx))
+            .build()
+        runCatching { NotificationManagerCompat.from(ctx).notify(RANG_ID, note) }
     }
 
     /** Tapping it goes to the timers, not to the shopping list. */
