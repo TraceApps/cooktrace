@@ -151,3 +151,14 @@ test('the strip stops ticking when the page is hidden', () => {
   assert.match(strip, /document\.hidden\) stop\(\)/);
   assert.match(strip, /onDestroy\(\(\) => \{[\s\S]{0,160}removeEventListener\('visibilitychange', onVisibility\)/);
 });
+
+test('ticking things off does not wake the watch once per tap', () => {
+  const view = readFileSync(new URL('../src/routes/RecipeView.svelte', import.meta.url), 'utf8');
+  // Every write to the Data Layer starts the watch's listener service, so a
+  // burst of checks has to settle into one write.
+  assert.match(view, /_tellTimer\s*=\s*setTimeout\(send,\s*\d+\)/);
+  // The handover is the exception: a recipe should reach the wrist at once.
+  assert.match(view, /_tellWatch\(\{\s*now:\s*true\s*\}\)/);
+  // And nothing may be lost by leaving the page mid-burst.
+  assert.match(view, /onDestroy\(\(\)\s*=>\s*\{\s*if\s*\(_tellTimer/);
+});

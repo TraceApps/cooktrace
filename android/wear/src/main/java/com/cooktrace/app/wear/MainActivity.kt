@@ -650,7 +650,10 @@ private fun TimersScreen(store: CookStore, nav: NavHostController) {
     WhileWatching(state.timers.size) {
         while (true) {
             now = System.currentTimeMillis()
-            store.tidyTimers()
+            // Only when something has actually run out. Tidying re-reads and
+            // re-parses the saved timers, and doing that twice a second for
+            // the whole of a bake is most of what this screen would cost.
+            if (state.timers.any { it.done(now) }) store.tidyTimers()
             delay(500)
         }
     }
@@ -742,7 +745,10 @@ private fun TimerFaceFor(store: CookStore, id: Int, onGone: (() -> Unit)?) {
         if (live == null) return@WhileWatching
         while (true) {
             now = System.currentTimeMillis()
-            store.tidyTimers()
+            if (live.done(now)) {
+                store.tidyTimers()
+                break
+            }
             delay(500)
         }
     }

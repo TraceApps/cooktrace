@@ -336,12 +336,27 @@
       }));
   }
 
-  function _tellWatch() {
+  // Every write to the Data Layer wakes the watch app to read it, so ticking
+  // six ingredients in a row should be one wake and not six. The stamp is
+  // taken when the burst settles, which is also what makes it the later word.
+  let _tellTimer = null;
+  function _tellWatch({ now = false } = {}) {
     if (!isNative) return;
-    const at = Date.now();
-    try { localStorage.setItem(COOKS_AT, String(at)); } catch {}
-    _publishCooks(_cooksForWatch(), at).catch(() => {});
+    const send = () => {
+      _tellTimer = null;
+      const at = Date.now();
+      try { localStorage.setItem(COOKS_AT, String(at)); } catch {}
+      _publishCooks(_cooksForWatch(), at).catch(() => {});
+    };
+    if (_tellTimer != null) clearTimeout(_tellTimer);
+    // Starting or ending a cook goes at once: that is the handover itself,
+    // and waiting two seconds to send a recipe to a wrist is noticeable.
+    if (now) send();
+    else _tellTimer = setTimeout(send, 1500);
   }
+  // Leaving the page mid-burst must not lose the last tick: the watch would
+  // then be showing a step you had already done.
+  onDestroy(() => { if (_tellTimer != null) { clearTimeout(_tellTimer); _tellTimer = null; _tellWatch({ now: true }); } });
 
   /** The watch ticked something, or finished a dish. Take its word. */
   async function _hearWatch() {
@@ -495,14 +510,14 @@
     _saveCookMode(id, true);
     // The wrist gets the recipe: this is the moment your hands stop being
     // free and the phone stops being the thing you want to touch.
-    _tellWatch();
+    _tellWatch({ now: true });
     await _acquireWakeLock();
   }
   async function endCookMode() {
     _saveCookMode(id, false);
     // Session over — clear so the next cook starts fresh.
     resetChecks();
-    _tellWatch();
+    _tellWatch({ now: true });
     await _releaseWakeLock();
   }
   // If the user navigates away or backgrounds the tab, release the lock.
@@ -538,7 +553,7 @@
     // A cook already in progress when this page opens: the watch has no way
     // of knowing unless it is told. Pressing Cook is not the only moment that
     // matters, since cook mode survives closing the app.
-    if (recipe) { describeCook(id, { name: recipe.name, img: recipe.imgUrl || '', serverId: _watchRecipeId() }); _tellWatch(); }
+    if (recipe) { describeCook(id, { name: recipe.name, img: recipe.imgUrl || '', serverId: _watchRecipeId() }); _tellWatch({ now: true }); }
     // And the watch may have ticked something off while the phone was shut.
     _hearWatch();
     // Kick off the pantry load so the FDA box can render "~Xg per
