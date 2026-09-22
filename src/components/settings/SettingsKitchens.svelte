@@ -16,6 +16,7 @@
   import { currentUser, userMgmtActive } from '../../stores/auth.js';
   import Spinner from '../ui/Spinner.svelte';
   import Combobox from '../ui/Combobox.svelte';
+  import ActionSheet from '../ui/ActionSheet.svelte';
 
   let kitchens = [];
   let loading = false;
@@ -132,6 +133,24 @@
       await loadMembers(kitchenId);
       showSuccess(`${name} owns this Kitchen now`);
     } catch (e) { showError(e.message || 'Could not hand over the Kitchen'); }
+  }
+
+  // Which member's menu is open, and what it offers. Held as one object so
+  // the sheet cannot be showing one member's name over another's actions.
+  let memberMenu = null;
+  $: memberActions = memberMenu ? [
+    { label: $_('settings_kitchens_ct.hand_over'), icon: 'stars', value: 'hand_over' },
+    { label: $_('settings_kitchens_ct.remove'), icon: 'person_remove', value: 'remove', danger: true },
+  ] : [];
+  function openMemberMenu(kitchenId, member) {
+    memberMenu = { kitchenId, member };
+  }
+  function pickMemberAction(value) {
+    const open = memberMenu;
+    memberMenu = null;
+    if (!open) return;
+    if (value === 'hand_over') handOver(open.kitchenId, open.member);
+    else if (value === 'remove') removeMember(open.kitchenId, open.member);
   }
 
   async function removeMember(kitchenId, member) {
@@ -326,7 +345,7 @@
               {#if isOwner(k) && (members[k.id] || []).some(m => m.role !== 'owner')}
                 <div class="role-help">
                   <span class="setting-desc">{$_('settings_kitchens_ct.roles_help')}</span>
-                  <button class="btn-link" on:click={() => setAllRoles(k.id, everyoneEdits(k.id) ? 'member' : 'sous')}>
+                  <button class="btn btn-secondary btn-sm" on:click={() => setAllRoles(k.id, everyoneEdits(k.id) ? 'member' : 'sous')}>
                     {everyoneEdits(k.id)
                       ? $_('settings_kitchens_ct.nobody_edits')
                       : $_('settings_kitchens_ct.everyone_edits')}
@@ -355,10 +374,16 @@
                       <span class="badge">{$_('settings_kitchens_ct.role_sous')}</span>
                     {/if}
                     {#if isOwner(k) && m.user_id !== $currentUser?.id}
-                      <button class="btn-link" on:click={() => handOver(k.id, m)}>{$_('settings_kitchens_ct.hand_over')}</button>
-                      <button class="btn-link danger" on:click={() => removeMember(k.id, m)}>{$_('settings_kitchens_ct.remove')}</button>
+                      <!-- Two actions on one line ran into each other and
+                           neither looked pressable. Behind one control they
+                           have room for their own words. -->
+                      <button class="btn-icon-sm" aria-haspopup="menu"
+                        aria-label={$_('settings_kitchens_ct.member_actions', { values: { name: m.full_name || m.username } })}
+                        on:click={() => openMemberMenu(k.id, m)}>
+                        <span class="material-symbols-rounded">more_vert</span>
+                      </button>
                     {:else if m.user_id === $currentUser?.id && !isOwner(k)}
-                      <button class="btn-link danger" on:click={() => removeMember(k.id, m)}>{$_('settings_kitchens_ct.leave')}</button>
+                      <button class="btn btn-danger btn-sm" on:click={() => removeMember(k.id, m)}>{$_('settings_kitchens_ct.leave')}</button>
                     {/if}
                   </div>
                 {/each}
@@ -394,7 +419,7 @@
                   </button>
                 </div>
                 <div class="kitchen-actions">
-                  <button class="btn-link danger" on:click={() => deleteKitchen(k)}>{$_('settings_kitchens_ct.delete_kitchen')}</button>
+                  <button class="btn btn-danger btn-sm" on:click={() => deleteKitchen(k)}>{$_('settings_kitchens_ct.delete_kitchen')}</button>
                 </div>
               {/if}
             </div>
@@ -404,6 +429,14 @@
     {/if}
   {/if}
 </div>
+
+<ActionSheet
+  open={memberMenu != null}
+  title={memberMenu ? (memberMenu.member.full_name || memberMenu.member.username) : ''}
+  actions={memberActions}
+  on:select={e => pickMemberAction(e.detail.value)}
+  on:cancel={() => memberMenu = null}
+/>
 
 <style>
   .card.settings-card {
@@ -525,6 +558,7 @@
   .member-list { display: flex; flex-direction: column; gap: 4px; }
   .member-row {
     display: flex; align-items: center; justify-content: space-between;
+    gap: 10px;
     padding: 6px 0;
     font-size: 13px;
   }
@@ -534,17 +568,12 @@
     display: flex; align-items: baseline; justify-content: space-between;
     gap: 12px; flex-wrap: wrap; padding: 2px 0 6px;
   }
+  /* The shared arrow already draws itself on .select-wrap::after. Drawing a
+     second one here left both on the same pseudo-element, which is what was
+     making a black diamond of it; this only moves the app's own arrow in to
+     suit a smaller select. */
   .select-wrap { position: relative; display: inline-block; }
-  .select-wrap::after {
-    content: '';
-    position: absolute;
-    right: 9px; top: 50%;
-    transform: translateY(-25%) rotate(45deg);
-    width: 6px; height: 6px;
-    border-right: 2px solid var(--text-3);
-    border-bottom: 2px solid var(--text-3);
-    pointer-events: none;
-  }
+  .select-wrap::after { right: 10px; }
   .select {
     background: var(--surface-2);
     border: 1px solid var(--border);
@@ -561,5 +590,27 @@
   .invite-row { display: flex; gap: 8px; margin-top: 4px; align-items: center; }
   .invite-row .input { flex: 1; }
   .invite-picker { flex: 1; min-width: 0; }
-  .kitchen-actions { display: flex; justify-content: flex-end; padding-top: 6px; }
+  .kitchen-actions { display: flex; justify-content: flex-end; padding-top: 10px; }
+
+  /* Small versions of the page's buttons, for a row that is a line of text
+     high. Same shapes, less of them. */
+  .btn-sm { padding: 6px 11px; font-size: 12px; }
+  .btn-danger {
+    background: rgba(255,92,92,0.14);
+    color: var(--danger);
+    border-color: rgba(255,92,92,0.3);
+  }
+  .btn-danger:hover { background: rgba(255,92,92,0.22); }
+  /* The one control that holds what you can do to a member. */
+  .btn-icon-sm {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; flex: 0 0 auto;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-2);
+    cursor: pointer;
+  }
+  .btn-icon-sm:hover { background: var(--surface-3); color: var(--text-1); }
+  .btn-icon-sm .material-symbols-rounded { font-size: 18px; }
 </style>

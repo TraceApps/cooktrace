@@ -1004,6 +1004,7 @@
     "role_cook":                 "Line Cook",
     "role_sous":                 "Sous Chef",
     "role_for":                  "Role for {name}",
+    "member_actions":            "What to do about {name}",
     "invite_role":               "Role for the new member",
     "hand_over":                 "Make Head Chef",
     "roles_help":                "Sous Chefs can edit the recipes shared into this Kitchen. Line Cooks cook from them.",
