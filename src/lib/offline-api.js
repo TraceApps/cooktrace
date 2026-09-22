@@ -179,15 +179,26 @@ async function _trimAnswers() {
   if (stale.length) await _tx('answers', 'readwrite', s => { for (const key of stale) s.delete(key); });
 }
 
+// Reading an answer keeps it young. Without this the trim below drops by
+// when a copy was written, so the shopping list read once at sign-in is the
+// first thing thrown away while you browse recipes, which is exactly the
+// screen you need in a shop with no signal.
+function _touch(row) {
+  if (!row?.key) return;
+  _tx('answers', 'readwrite', s => s.put({ ...row, at: Date.now() })).catch?.(() => {});
+}
+
 /** What was last seen for this call: the exact call first, then its path. */
 async function _recall(url) {
   const exact = await _tx('answers', 'readonly', s => s.get(mirrorKey(url)));
-  if (exact) return exact.body;
+  if (exact) { _touch(exact); return exact.body; }
   const path = pathOf(url);
   const byPath = await _tx('answers', 'readonly', s => s.get(path));
-  if (byPath) return byPath.body;
+  if (byPath) { _touch(byPath); return byPath.body; }
   const rows = await _all('answers');
-  return rows.find(r => pathOf(r.key) === path)?.body;
+  const hit = rows.find(r => pathOf(r.key) === path);
+  if (hit) _touch(hit);
+  return hit?.body;
 }
 
 // ── Outbox ───────────────────────────────────────────────────────────
@@ -253,9 +264,19 @@ async function _queue(op) {
   if (seq == null) {
     // Out of room, most likely. What you have changed matters more than a
     // copy of something you can read again later, so make space and retry
-    // before telling anyone this cannot be saved.
-    await _tx('answers', 'readwrite', s => s.clear());
-    seq = await _tx('outbox', 'readwrite', s => s.add(op));
+    // before telling anyone this cannot be saved. Half first: clearing the
+    // whole copy took the shopping list with it, so someone in a shop with
+    // no signal was left looking at "this needs a connection".
+    const rows = await _all('answers');
+    const oldestHalf = staleAnswerKeys(rows, Math.floor(rows.length / 2));
+    if (oldestHalf.length) {
+      await _tx('answers', 'readwrite', s => { for (const key of oldestHalf) s.delete(key); });
+      seq = await _tx('outbox', 'readwrite', s => s.add(op));
+    }
+    if (seq == null) {
+      await _tx('answers', 'readwrite', s => s.clear());
+      seq = await _tx('outbox', 'readwrite', s => s.add(op));
+    }
   }
   // No database to queue into (private mode, no space at all): say so rather
   // than pretending it was saved.
@@ -395,6 +416,23 @@ async function _forgetTouched(sent) {
   const rows = await _all('answers');
   const stale = rows.filter(r => [...prefixes].some(p => pathOf(r.key) === p || pathOf(r.key).startsWith(p + '/')));
   if (stale.length) await _tx('answers', 'readwrite', s => { for (const r of stale) s.delete(r.key); });
+  // Dropping them leaves a hole: nothing reads a screen you do not open, so
+  // the next time you are offline it has nothing to show and says it needs a
+  // connection. This runs right after a successful replay, which means there
+  // is a connection now, so read the lists back while there is one.
+  await _refreshLists(prefixes);
+}
+
+/** Read the affected lists back, so the copy has no hole in it. */
+async function _refreshLists(prefixes) {
+  if (!_http) return;
+  for (const path of prefixes) {
+    if (!isMirroredGet(path)) continue;
+    try {
+      const answer = await _http._fetch('GET', path);
+      await _remember(mirrorKey(path), answer);
+    } catch { /* the connection went again: the next read will fill it */ }
+  }
 }
 
 /** How much is waiting to go up. */
