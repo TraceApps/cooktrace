@@ -268,6 +268,60 @@ export function addOneMinute(id) {
   _save(next);
 }
 
+/**
+ * What the watch says is counting, taken as the later word.
+ *
+ * Only the running ones are reconciled. A timer that has rung and is sitting
+ * there waiting to be dismissed is this device's business, not the watch's:
+ * the watch drops a timer the moment it rings, and treating that as "the
+ * watch stopped it" would silence an alarm nobody had answered yet.
+ */
+export function adoptTimers(list) {
+  if (!Array.isArray(list)) return;
+  const now = Date.now();
+  const theirs = new Map(
+    list.filter(t => t && t.key && Number(t.endsAt) > now).map(t => [String(t.key), t]),
+  );
+  const mine = get(cookTimers);
+  const next = [];
+  for (const t of mine) {
+    // Rung, or already counting down here and still counting there.
+    if (t.done || t.dismissed) { next.push(t); continue; }
+    const match = theirs.get(t.id);
+    if (!match) {
+      // Gone from the watch: stopped there, so it stops here.
+      _stopAlarmLoop(t.id);
+      _lastSecondsLeft.delete(t.id);
+      continue;
+    }
+    theirs.delete(t.id);
+    const endsAt = Number(match.endsAt);
+    next.push(endsAt === t.endsAt ? t : { ...t, endsAt });
+  }
+  // Started on the wrist, new to this device.
+  for (const [key, t] of theirs) {
+    const total = Number(t.total) || Math.max(1, Math.round((Number(t.endsAt) - now) / 1000));
+    next.push({
+      id: key,
+      label: t.label || 'Timer',
+      recipeName: null,
+      recipeId: null,
+      stepIndex: null,
+      durationSec: total,
+      startedAt: Number(t.endsAt) - total * 1000,
+      endsAt: Number(t.endsAt),
+      done: false,
+      dismissed: false,
+    });
+  }
+  const changed = next.length !== mine.length ||
+    next.some((t, i) => t !== mine[i]);
+  if (!changed) return;
+  if (next.some(t => !t.done && !t.dismissed)) _ensureTicker();
+  cookTimers.set(next);
+  _save(next);
+}
+
 /** Format a remaining duration as "MM:SS" (or "H:MM:SS" past 1 hour). */
 export function formatRemaining(ms) {
   const sec = Math.max(0, Math.round(ms / 1000));

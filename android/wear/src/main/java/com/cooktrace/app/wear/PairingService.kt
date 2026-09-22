@@ -29,6 +29,15 @@ class PairingService : WearableListenerService() {
                 }
                 continue
             }
+            if (path.startsWith(TIMER_PATH)) {
+                // A deletion is the Data Layer tidying up after a device, not
+                // anyone stopping a timer: stopping one arrives as a list that
+                // no longer has it.
+                if (event.type != DataEvent.TYPE_DELETED) {
+                    Pairing.adoptTimers(this, DataMapItem.fromDataItem(event.dataItem).dataMap)
+                }
+                continue
+            }
             if (!path.startsWith(PATH)) continue
             if (event.type == DataEvent.TYPE_DELETED) {
                 Pairing.clear(this)
@@ -51,5 +60,7 @@ class PairingService : WearableListenerService() {
         const val PATH = "/cooktrace/pairing"
         /** The recipe the phone put you in, and what has been ticked off it. */
         const val COOK_PATH = "/cooktrace/cook"
+        /** What is counting down, shared only while a cook is handed over. */
+        const val TIMER_PATH = "/cooktrace/timers"
     }
 }

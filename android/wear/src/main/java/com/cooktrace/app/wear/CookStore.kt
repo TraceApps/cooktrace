@@ -242,10 +242,14 @@ class CookStore(private val ctx: Context) {
         // A small id, reused once a timer is gone, so the alarm that belongs
         // to it can be cancelled by name.
         val id = (1..8).firstOrNull { candidate -> kept.none { it.id == candidate } } ?: return
-        val timer = Pairing.Timer(id, label, seconds, now + seconds * 1000L)
+        // A key of its own, minted once: the id is reused and the deadline
+        // moves when it is extended, so neither can say "the same timer" to
+        // the phone.
+        val timer = Pairing.Timer(id, label, seconds, now + seconds * 1000L, "w$id-$now")
         Pairing.putTimers(ctx, kept + timer)
         KitchenAlarm.schedule(ctx, id, timer.endsAt)
         KitchenOngoing.refresh(ctx)
+        Pairing.publishTimers(ctx, Pairing.timers(ctx))
         // No word about it: the screen that opens next is the timer itself.
         _state.update { it.copy(timers = Pairing.timers(ctx)) }
     }
@@ -268,6 +272,7 @@ class CookStore(private val ctx: Context) {
         Pairing.putTimers(ctx, updated)
         updated.firstOrNull { it.id == id }?.let { KitchenAlarm.schedule(ctx, it.id, it.endsAt) }
         KitchenOngoing.refresh(ctx)
+        Pairing.publishTimers(ctx, updated)
         _state.update { it.copy(timers = Pairing.timers(ctx)) }
     }
 
@@ -275,6 +280,7 @@ class CookStore(private val ctx: Context) {
         KitchenAlarm.cancel(ctx, id)
         Pairing.putTimers(ctx, Pairing.timers(ctx).filterNot { it.id == id })
         KitchenOngoing.refresh(ctx)
+        Pairing.publishTimers(ctx, Pairing.timers(ctx))
         _state.update { it.copy(timers = Pairing.timers(ctx)) }
     }
 
@@ -288,6 +294,7 @@ class CookStore(private val ctx: Context) {
             // notification twice a second is the one way to make this cost
             // something.
             KitchenOngoing.refresh(ctx)
+            Pairing.publishTimers(ctx, live)
             _state.update { it.copy(timers = live) }
         }
     }

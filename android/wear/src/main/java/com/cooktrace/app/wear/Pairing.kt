@@ -39,6 +39,7 @@ object Pairing {
     private const val KEY_COOK_AT = "cook_at"
     private const val KEY_RECIPE = "recipe_"
     const val KEY_TIMERS = "timers"
+    private const val KEY_TIMERS_AT = "timers_at"
     private const val KEY_OUTBOX = "outbox"
     private const val KEY_SEQ = "outbox_seq"
 
@@ -78,12 +79,20 @@ object Pairing {
         return try {
             val items = Wearable.getDataClient(ctx).getDataItems().await()
             var found: Config? = null
+            val timerItems = ArrayList<DataMap>()
             for (item in items) {
                 val path = item.uri.path.orEmpty()
                 if (path.startsWith(PairingService.COOK_PATH)) {
                     // putCooks ignores anything older than what is known, so
                     // the newest wins whatever order these arrive in.
                     putCooks(ctx, DataMapItem.fromDataItem(item).dataMap)
+                    continue
+                }
+                if (path.startsWith(PairingService.TIMER_PATH)) {
+                    // After the cooks, on purpose: whether timers are shared
+                    // at all depends on there being a cook, and both are being
+                    // read here in whatever order they arrive.
+                    timerItems.add(DataMapItem.fromDataItem(item).dataMap)
                     continue
                 }
                 if (!path.startsWith(PairingService.PATH)) continue
@@ -96,6 +105,7 @@ object Pairing {
                 found = Config(url.trimEnd('/'), token)
             }
             items.release()
+            timerItems.forEach { adoptTimers(ctx, it) }
             found ?: existing
         } catch (e: Exception) {
             Log.w(TAG, "couldn't read the pairing: " + e.message)
@@ -126,7 +136,7 @@ object Pairing {
     fun clear(ctx: Context) {
         prefs(ctx).edit().remove(KEY_URL).remove(KEY_TOKEN).remove(KEY_REFUSED)
             .remove(KEY_LIST).remove(KEY_LIST_AT).remove(KEY_COOK).remove(KEY_COOK_AT)
-            .remove(KEY_TIMERS).remove(KEY_OUTBOX).apply()
+            .remove(KEY_TIMERS).remove(KEY_TIMERS_AT).remove(KEY_OUTBOX).apply()
         forgetRecipesExcept(ctx, emptySet())
     }
 
@@ -245,9 +255,23 @@ object Pairing {
      * timer is not a rest timer. Each carries a deadline rather than a count,
      * so a watch that slept still knows where it is.
      */
-    data class Timer(val id: Int, val label: String, val total: Int, val endsAt: Long) {
+    data class Timer(
+        val id: Int,
+        val label: String,
+        val total: Int,
+        val endsAt: Long,
+        /**
+         * The same timer on both devices. The id is this watch's own, because
+         * an alarm is cancelled by request code and those have to be small;
+         * the key is what the phone knows it by, and it is what the two
+         * devices match on.
+         */
+        val key: String = "",
+    ) {
         fun secondsLeft(now: Long): Int = maxOf(0, ((endsAt - now + 999) / 1000).toInt())
         fun done(now: Long): Boolean = endsAt <= now
+        /** Something to match on for a timer that started before keys did. */
+        val matchKey: String get() = if (key.isNotBlank()) key else "w$id-$endsAt"
     }
 
     fun timers(ctx: Context): List<Timer> {
@@ -255,7 +279,10 @@ object Pairing {
         val arr = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
         return (0 until arr.length()).mapNotNull { i ->
             val o = arr.optJSONObject(i) ?: return@mapNotNull null
-            Timer(o.optInt("id"), Kitchen.text(o, "label"), o.optInt("total"), o.optLong("endsAt"))
+            Timer(
+                o.optInt("id"), Kitchen.text(o, "label"), o.optInt("total"),
+                o.optLong("endsAt"), Kitchen.text(o, "key"),
+            )
         }
     }
 
@@ -265,9 +292,76 @@ object Pairing {
             arr.put(
                 JSONObject().put("id", it.id).put("label", it.label)
                     .put("total", it.total).put("endsAt", it.endsAt)
+                    .put("key", it.matchKey)
             )
         }
         prefs(ctx).edit().putString(KEY_TIMERS, arr.toString()).apply()
+    }
+
+    /**
+     * Timers cross between the phone and the watch only while a cook has been
+     * handed over. Off a cook, a timer set on the phone has no business
+     * scheduling an alarm on a watch in a drawer, and the watch has no
+     * business being woken to hear about one.
+     */
+    fun sharingTimers(ctx: Context): Boolean = cooks(ctx).isNotEmpty()
+
+    /** The wearer started, extended or stopped one. Tell the phone. */
+    fun publishTimers(ctx: Context, timers: List<Timer>) {
+        if (!sharingTimers(ctx)) return
+        val at = System.currentTimeMillis()
+        prefs(ctx).edit().putLong(KEY_TIMERS_AT, at).apply()
+        val request = PutDataMapRequest.create(PairingService.TIMER_PATH)
+        val out = ArrayList<DataMap>()
+        for (timer in timers) {
+            out.add(
+                DataMap().apply {
+                    putString("key", timer.matchKey)
+                    putString("label", timer.label)
+                    putInt("total", timer.total)
+                    putLong("endsAt", timer.endsAt)
+                }
+            )
+        }
+        request.dataMap.putDataMapArrayList("timers", out)
+        request.dataMap.putLong("at", at)
+        runCatching {
+            Wearable.getDataClient(ctx).putDataItem(request.asPutDataRequest().setUrgent())
+        }.onFailure { Log.w(TAG, "couldn't tell the phone about the timers: " + it.message) }
+    }
+
+    /**
+     * What the phone says is counting. The later word wins, as everywhere
+     * else, and the alarms are made to match: one is scheduled for a timer
+     * that is new here and cancelled for one that has gone.
+     */
+    fun adoptTimers(ctx: Context, map: DataMap) {
+        if (!sharingTimers(ctx)) return
+        val at = map.getLong("at", 0L)
+        if (at > 0 && at < prefs(ctx).getLong(KEY_TIMERS_AT, 0L)) return
+        val now = System.currentTimeMillis()
+        val mine = timers(ctx)
+        val taken = HashSet(mine.map { it.id })
+        val kept = ArrayList<Timer>()
+        for (one in map.getDataMapArrayList("timers").orEmpty()) {
+            val endsAt = one.getLong("endsAt", 0L)
+            if (endsAt <= now) continue
+            val key = one.getString("key").orEmpty()
+            if (key.isBlank()) continue
+            val was = mine.firstOrNull { it.matchKey == key }
+            // Its own id here, so the alarm it already has is the alarm it
+            // keeps; a new one takes the lowest free number.
+            val id = was?.id ?: (1..8).firstOrNull { it !in taken } ?: continue
+            taken.add(id)
+            val timer = Timer(id, one.getString("label").orEmpty(), one.getInt("total", 0), endsAt, key)
+            kept.add(timer)
+            if (was == null || was.endsAt != endsAt) KitchenAlarm.schedule(ctx, id, endsAt)
+        }
+        // Whatever the phone no longer has is over, and its alarm with it.
+        val living = kept.map { it.id }.toSet()
+        mine.filterNot { it.id in living }.forEach { KitchenAlarm.cancel(ctx, it.id) }
+        putTimers(ctx, kept)
+        prefs(ctx).edit().putLong(KEY_TIMERS_AT, if (at > 0) at else now).apply()
     }
 
     // ── Ticked with no connection ────────────────────────────────────────

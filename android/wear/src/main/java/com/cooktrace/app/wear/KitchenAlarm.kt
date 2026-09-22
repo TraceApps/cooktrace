@@ -101,6 +101,8 @@ class KitchenAlarmReceiver : BroadcastReceiver() {
         // The one that rang comes off the face too, and what is left carries
         // on counting there.
         KitchenOngoing.refresh(context)
+        // The phone holds the same timer, and it has rung here.
+        Pairing.publishTimers(context, live)
         KitchenAlarm.buzz(context)
     }
 }

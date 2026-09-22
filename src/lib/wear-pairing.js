@@ -108,6 +108,55 @@ export async function readCooks(mine = 0) {
   }
 }
 
+/**
+ * What is counting down in the kitchen, for the watch to hold too.
+ *
+ * Only ever called while a cook has been handed over: off a cook the watch
+ * has no business being woken to hear about a timer, let alone ringing in a
+ * drawer about one. Each timer carries a key both devices know it by and an
+ * absolute deadline, so a slow delivery is late rather than wrong.
+ */
+export async function publishTimers(timers, at = 0) {
+  if (!isNative) return false;
+  try {
+    await WearPairing.timers({
+      timers: (timers || []).map(t => ({
+        key: String(t.key || ''),
+        label: String(t.label || ''),
+        total: Number(t.total) || 0,
+        endsAt: Number(t.endsAt) || 0,
+      })).filter(t => t.key && t.endsAt > 0),
+      at: at || Date.now(),
+    });
+    return true;
+  } catch (e) {
+    console.warn('[wear] could not send the timers:', e?.message || e);
+    return false;
+  }
+}
+
+/**
+ * What the watch says is counting, when it has the later word. Returns the
+ * list to adopt, or undefined when this phone's own state is newer and
+ * nothing here should change.
+ */
+export async function readTimers(mine = 0) {
+  if (!isNative) return undefined;
+  try {
+    const remote = await WearPairing.readTimers();
+    if (!remote?.found) return undefined;
+    if (Number(remote.at || 0) <= mine) return undefined;
+    return (remote.timers || []).map(t => ({
+      key: String(t.key || ''),
+      label: String(t.label || ''),
+      total: Number(t.total) || 0,
+      endsAt: Number(t.endsAt) || 0,
+    })).filter(t => t.key && t.endsAt > 0);
+  } catch {
+    return undefined;
+  }
+}
+
 /** Signed out: the watch shouldn't keep a working token. */
 export async function unpairWatch() {
   if (!isNative) return false;

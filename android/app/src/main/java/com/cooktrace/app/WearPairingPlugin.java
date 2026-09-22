@@ -32,6 +32,8 @@ public class WearPairingPlugin extends Plugin {
 
     private static final String PATH = "/cooktrace/pairing";
     private static final String COOK_PATH = "/cooktrace/cook";
+    /** What is counting down, shared only while a cook is handed over. */
+    private static final String TIMER_PATH = "/cooktrace/timers";
     private static final String TAG = "WearPairing";
 
     /** True when a watch is paired with this phone, so the UI can say so. */
@@ -144,6 +146,90 @@ public class WearPairingPlugin extends Plugin {
             if (!s.isEmpty()) out.add(s);
         }
         return out;
+    }
+
+    /**
+     * What is counting down in the kitchen, so the phone and the wrist agree
+     * about the clock. Each timer carries a key both devices know it by and
+     * an absolute deadline, never a remaining count: a few seconds in the
+     * post then delays when it appears rather than making it wrong.
+     */
+    @PluginMethod
+    public void timers(PluginCall call) {
+        PutDataMapRequest req = PutDataMapRequest.create(TIMER_PATH);
+        java.util.ArrayList<com.google.android.gms.wearable.DataMap> out = new java.util.ArrayList<>();
+        com.getcapacitor.JSArray list = call.getArray("timers");
+        if (list != null) {
+            try {
+                for (Object entry : list.toList()) {
+                    if (!(entry instanceof org.json.JSONObject)) continue;
+                    org.json.JSONObject o = (org.json.JSONObject) entry;
+                    String key = o.optString("key", "");
+                    long endsAt = o.optLong("endsAt", 0L);
+                    if (key.isEmpty() || endsAt <= 0) continue;
+                    com.google.android.gms.wearable.DataMap one = new com.google.android.gms.wearable.DataMap();
+                    one.putString("key", key);
+                    one.putString("label", o.optString("label", ""));
+                    one.putInt("total", o.optInt("total", 0));
+                    one.putLong("endsAt", endsAt);
+                    out.add(one);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "could not read the timers: " + e.getMessage());
+            }
+        }
+        req.getDataMap().putDataMapArrayList("timers", out);
+        req.getDataMap().putLong("at", stampOf(call));
+        Log.i(TAG, "sending " + out.size() + " timer(s) to the watch");
+        Wearable.getDataClient(getContext()).putDataItem(req.asPutDataRequest().setUrgent())
+            .addOnSuccessListener(item -> call.resolve())
+            .addOnFailureListener(e -> {
+                Log.w(TAG, "the timers did not reach the watch: " + e.getMessage());
+                call.reject(e.getMessage() == null ? "Couldn't reach the watch" : e.getMessage());
+            });
+    }
+
+    /** What the watch says is counting, newest record wins. */
+    @PluginMethod
+    public void readTimers(PluginCall call) {
+        Wearable.getDataClient(getContext()).getDataItems()
+            .addOnSuccessListener(items -> {
+                JSObject ret = new JSObject();
+                ret.put("found", false);
+                long newest = 0L;
+                for (com.google.android.gms.wearable.DataItem item : items) {
+                    String path = item.getUri().getPath();
+                    if (path == null || !path.startsWith(TIMER_PATH)) continue;
+                    com.google.android.gms.wearable.DataMap map = DataMapItem.fromDataItem(item).getDataMap();
+                    long at = map.getLong("at", 0L);
+                    // One record per device on the same path: take the one
+                    // with the later stamp, not whichever comes back first.
+                    if (at < newest) continue;
+                    newest = at;
+                    com.getcapacitor.JSArray timers = new com.getcapacitor.JSArray();
+                    java.util.ArrayList<com.google.android.gms.wearable.DataMap> raw =
+                        map.getDataMapArrayList("timers");
+                    for (int i = 0; raw != null && i < raw.size(); i++) {
+                        com.google.android.gms.wearable.DataMap one = raw.get(i);
+                        JSObject timer = new JSObject();
+                        timer.put("key", one.getString("key", ""));
+                        timer.put("label", one.getString("label", ""));
+                        timer.put("total", one.getInt("total", 0));
+                        timer.put("endsAt", one.getLong("endsAt", 0L));
+                        timers.put(timer);
+                    }
+                    ret.put("found", true);
+                    ret.put("at", at);
+                    ret.put("timers", timers);
+                }
+                items.release();
+                call.resolve(ret);
+            })
+            .addOnFailureListener(e -> {
+                JSObject ret = new JSObject();
+                ret.put("found", false);
+                call.resolve(ret);
+            });
     }
 
     /** What the watch says about the cooks, newest record wins. */

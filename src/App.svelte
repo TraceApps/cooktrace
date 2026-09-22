@@ -333,6 +333,11 @@
         });
       }).catch(() => { /* ignore */ });
 
+      // The clock the phone and the wrist share, while a cook is handed
+      // over. It sends nothing until there is one.
+      import('./lib/wear-timers.js').then(({ watchTimers }) => watchTimers())
+        .catch(() => { /* ignore */ });
+
       // Clean stale APKs from Directory.Data/updates/ on boot.
       import('./lib/updates.js').then(({ cleanUpdateCache }) => {
         cleanUpdateCache();
