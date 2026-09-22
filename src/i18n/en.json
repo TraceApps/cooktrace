@@ -1010,7 +1010,7 @@
     "roles_help":                "Who can do what in this Kitchen:",
     "role_help_owner":                "invites and removes people, sets roles, and can delete the Kitchen",
     "role_help_sous":                "edits the recipes and cookbooks shared into it",
-    "role_help_cook":                "cooks from them",
+    "role_help_cook":                "cooks from them, read only, and is what everyone starts as",
     "everyone_edits":            "Let Everyone Edit",
     "nobody_edits":              "Make All Read-Only",
     "remove":                    "Remove",
