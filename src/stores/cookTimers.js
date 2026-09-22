@@ -276,7 +276,7 @@ export function addOneMinute(id) {
  * the watch drops a timer the moment it rings, and treating that as "the
  * watch stopped it" would silence an alarm nobody had answered yet.
  */
-export function adoptTimers(list) {
+export function adoptTimers(list, since = 0) {
   if (!Array.isArray(list)) return;
   const now = Date.now();
   const theirs = new Map(
@@ -289,6 +289,11 @@ export function adoptTimers(list) {
     if (t.done || t.dismissed) { next.push(t); continue; }
     const match = theirs.get(t.id);
     if (!match) {
+      // A timer started here after the watch took its snapshot cannot be in
+      // that snapshot, and its absence is not the watch saying it is over.
+      // Without this, starting one on each device within a moment of the
+      // other silently stops whichever was started first.
+      if (since > 0 && Number(t.startedAt) > since) { next.push(t); continue; }
       // Gone from the watch: stopped there, so it stops here.
       _stopAlarmLoop(t.id);
       _lastSecondsLeft.delete(t.id);

@@ -72,7 +72,7 @@ test('nothing crosses unless a cook has been handed to the watch', () => {
   // are published under.
   assert.match(src, /export function sharingTimers\(\)[\s\S]*?c\.serverId > 0/);
   // Both directions are behind it.
-  assert.match(src, /const send = \(\) => \{[\s\S]*?if \(!sharingTimers\(\)\) return;/);
+  assert.match(src, /const send = \(\) => \{[\s\S]*?if \(!sharingTimers\(\)\) \{/);
   assert.match(src, /export async function hearWatch\(\)[\s\S]*?if \(!isNative \|\| !sharingTimers\(\)\) return;/);
 });
 
@@ -88,4 +88,25 @@ test('a burst of timer changes is one write, and an unchanged list is none', () 
 test('the watch is never sent more timers than it can run', () => {
   const src = readFileSync(new URL('../src/lib/wear-timers.js', import.meta.url), 'utf8');
   assert.match(src, /\.slice\(0, 8\)/);
+});
+
+test('a timer still running when the next cook starts is sent to it', () => {
+  const src = readFileSync(new URL('../src/lib/wear-timers.js', import.meta.url), 'utf8');
+  // The "nothing changed" guard is what stops a tick being a write, but it
+  // must not outlive the gate closing, or the watch starts a cook blind.
+  assert.match(src, /if \(!sharingTimers\(\)\) \{[\s\S]*?last = '';[\s\S]*?return;/);
+});
+
+test('a timer started here after the watch spoke is not stopped by its silence', () => {
+  reset();
+  // The watch's list is a snapshot of what it knew. A timer started on the
+  // phone a moment later cannot be in it, and its absence means nothing.
+  const spoke = Date.now() - 5_000;
+  const mine = startTimer({ label: 'Rice', durationSec: 900 });
+  assert.ok(mine.startedAt > spoke);
+  adoptTimers([], spoke);
+  assert.equal(get(cookTimers).length, 1);
+  // Without a stamp the watch's word is taken as complete, as before.
+  adoptTimers([]);
+  assert.equal(get(cookTimers).length, 0);
 });

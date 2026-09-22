@@ -58,7 +58,13 @@ export function tellWatch({ now = false } = {}) {
   if (!isNative) return;
   const send = () => {
     pending = null;
-    if (!sharingTimers()) return;
+    if (!sharingTimers()) {
+      // Off a cook, forget what was last sent. Otherwise a timer still
+      // running when the next cook starts would match the last shape and be
+      // held back as "nothing new", leaving the watch without it.
+      last = '';
+      return;
+    }
     const timers = forWatch();
     // Nothing to say: the ticking itself changes nothing on the wire, since
     // every timer is a deadline rather than a count.
@@ -77,9 +83,12 @@ export function tellWatch({ now = false } = {}) {
 /** The watch started, extended or stopped one. Take its word if it is newer. */
 export async function hearWatch() {
   if (!isNative || !sharingTimers()) return;
-  const theirs = await readTimers(stamp());
+  const at = stamp();
+  const theirs = await readTimers(at);
   if (theirs === undefined) return;
-  adoptTimers(theirs);
+  // The stamp this device last sent: anything started here since then is
+  // newer than what the watch could have seen.
+  adoptTimers(theirs, at);
   // What was adopted is now this device's state too, so the stamp moves with
   // it and the same record is not adopted again on the next look.
   setStamp(Date.now());

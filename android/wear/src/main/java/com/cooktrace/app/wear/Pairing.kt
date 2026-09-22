@@ -357,10 +357,20 @@ object Pairing {
             kept.add(timer)
             if (was == null || was.endsAt != endsAt) KitchenAlarm.schedule(ctx, id, endsAt)
         }
-        // Whatever the phone no longer has is over, and its alarm with it.
-        val living = kept.map { it.id }.toSet()
+        // A timer started here after the phone took its snapshot cannot be in
+        // that snapshot, and its absence is not the phone saying it is over.
+        // Without this, starting one on each device within a moment of the
+        // other silently cancels whichever was started first.
+        val keys = kept.map { it.matchKey }.toSet()
+        val newer = mine.filter {
+            it.matchKey !in keys && !it.done(now) && it.endsAt - it.total * 1000L > at
+        }
+        val all = kept + newer
+        // Whatever the phone no longer has, and this watch did not start
+        // since, is over, and its alarm with it.
+        val living = all.map { it.id }.toSet()
         mine.filterNot { it.id in living }.forEach { KitchenAlarm.cancel(ctx, it.id) }
-        putTimers(ctx, kept)
+        putTimers(ctx, all)
         prefs(ctx).edit().putLong(KEY_TIMERS_AT, if (at > 0) at else now).apply()
     }
 

@@ -135,22 +135,41 @@
     } catch (e) { showError(e.message || 'Could not hand over the Kitchen'); }
   }
 
-  // Which member's menu is open, and what it offers. Held as one object so
-  // the sheet cannot be showing one member's name over another's actions.
-  let memberMenu = null;
-  $: memberActions = memberMenu ? [
-    { label: $_('settings_kitchens_ct.hand_over'), icon: 'stars', value: 'hand_over' },
-    { label: $_('settings_kitchens_ct.remove'), icon: 'person_remove', value: 'remove', danger: true },
-  ] : [];
-  function openMemberMenu(kitchenId, member) {
-    memberMenu = { kitchenId, member };
-  }
-  function pickMemberAction(value) {
-    const open = memberMenu;
-    memberMenu = null;
-    if (!open) return;
-    if (value === 'hand_over') handOver(open.kitchenId, open.member);
-    else if (value === 'remove') removeMember(open.kitchenId, open.member);
+  // The roles, named once. A native select opens the operating system's own
+  // list, which looks like nothing else in the app; this opens the same sheet
+  // everything else here opens.
+  $: roleName = {
+    member: $_('settings_kitchens_ct.role_cook'),
+    sous:   $_('settings_kitchens_ct.role_sous'),
+    owner:  $_('settings_kitchens_ct.role_owner'),
+  };
+  $: memberRoleActions = [
+    { label: roleName.member, icon: 'skillet',      value: 'member' },
+    { label: roleName.sous,   icon: 'edit_note',    value: 'sous'   },
+    // Handing the Kitchen over is not the same kind of act as the other two,
+    // and the sheet can say so where a line in a dropdown cannot.
+    { label: roleName.owner,  icon: 'stars',        value: 'owner', danger: true },
+  ];
+  $: inviteRoleActions = [
+    { label: roleName.member, icon: 'skillet',   value: 'member' },
+    { label: roleName.sous,   icon: 'edit_note', value: 'sous'   },
+  ];
+
+  /** Whose role is being picked, if anyone's. */
+  let rolePicker = null;
+  let invitePickerOpen = false;
+
+  /**
+   * A role chosen from the sheet. Head Chef is not a role you set on someone,
+   * it is the Kitchen changing hands, so it asks first and nothing is written
+   * until the answer is yes.
+   */
+  async function pickRole(value) {
+    const open = rolePicker;
+    rolePicker = null;
+    if (!open || value === open.member.role) return;
+    if (value === 'owner') { await handOver(open.kitchenId, open.member); return; }
+    setRole(open.kitchenId, open.member, value);
   }
 
   async function removeMember(kitchenId, member) {
@@ -343,8 +362,18 @@
               </div>
 
               {#if isOwner(k) && (members[k.id] || []).some(m => m.role !== 'owner')}
+                <!-- Three roles in one sentence read as a wall. A line each,
+                     strongest first, is the shape of the thing being
+                     described and can be scanned rather than parsed. -->
                 <div class="role-help">
-                  <span class="setting-desc">{$_('settings_kitchens_ct.roles_help')}</span>
+                  <div class="roles">
+                    <p class="setting-desc roles-lead">{$_('settings_kitchens_ct.roles_help')}</p>
+                    <ul class="role-list">
+                      <li><b>{$_('settings_kitchens_ct.role_owner')}</b> {$_('settings_kitchens_ct.role_help_owner')}</li>
+                      <li><b>{$_('settings_kitchens_ct.role_sous')}</b> {$_('settings_kitchens_ct.role_help_sous')}</li>
+                      <li><b>{$_('settings_kitchens_ct.role_cook')}</b> {$_('settings_kitchens_ct.role_help_cook')}</li>
+                    </ul>
+                  </div>
                   <button class="btn btn-secondary btn-sm" on:click={() => setAllRoles(k.id, everyoneEdits(k.id) ? 'member' : 'sous')}>
                     {everyoneEdits(k.id)
                       ? $_('settings_kitchens_ct.nobody_edits')
@@ -362,25 +391,27 @@
                       {#if m.user_id === $currentUser?.id}<span class="muted">(you)</span>{/if}
                     </span>
                     {#if isOwner(k) && m.role !== 'owner'}
-                      <div class="select-wrap role-picker">
-                        <select class="select sel-sm" value={m.role}
-                          aria-label={$_('settings_kitchens_ct.role_for', { values: { name: m.full_name || m.username } })}
-                          on:change={e => setRole(k.id, m, e.target.value)}>
-                          <option value="member">{$_('settings_kitchens_ct.role_cook')}</option>
-                          <option value="sous">{$_('settings_kitchens_ct.role_sous')}</option>
-                        </select>
-                      </div>
+                      <!-- Head Chef sits with the other roles because that is
+                           what it is. It is the one that cannot be taken back
+                           by the person choosing it, so it asks first and the
+                           picker goes back to where it was if the answer is
+                           no. -->
+                      <button class="role-pill"
+                        aria-haspopup="dialog"
+                        aria-label={$_('settings_kitchens_ct.role_for', { values: { name: m.full_name || m.username } })}
+                        on:click={() => rolePicker = { kitchenId: k.id, member: m }}>
+                        <span class="role-pill-text">{roleName[m.role] || roleName.member}</span>
+                        <span class="material-symbols-rounded" aria-hidden="true">expand_more</span>
+                      </button>
                     {:else if m.role === 'sous'}
                       <span class="badge">{$_('settings_kitchens_ct.role_sous')}</span>
                     {/if}
                     {#if isOwner(k) && m.user_id !== $currentUser?.id}
-                      <!-- Two actions on one line ran into each other and
-                           neither looked pressable. Behind one control they
-                           have room for their own words. -->
-                      <button class="btn-icon-sm" aria-haspopup="menu"
-                        aria-label={$_('settings_kitchens_ct.member_actions', { values: { name: m.full_name || m.username } })}
-                        on:click={() => openMemberMenu(k.id, m)}>
-                        <span class="material-symbols-rounded">more_vert</span>
+                      <button class="btn-icon-sm danger"
+                        title={$_('settings_kitchens_ct.remove')}
+                        aria-label={$_('settings_kitchens_ct.remove_member', { values: { name: m.full_name || m.username } })}
+                        on:click={() => removeMember(k.id, m)}>
+                        <span class="material-symbols-rounded">person_remove</span>
                       </button>
                     {:else if m.user_id === $currentUser?.id && !isOwner(k)}
                       <button class="btn btn-danger btn-sm" on:click={() => removeMember(k.id, m)}>{$_('settings_kitchens_ct.leave')}</button>
@@ -406,13 +437,13 @@
                       on:create={() => invite(k.id)}
                     />
                   </div>
-                  <div class="select-wrap">
-                    <select class="select sel-sm" bind:value={inviteRole}
-                      aria-label={$_('settings_kitchens_ct.invite_role')}>
-                      <option value="member">{$_('settings_kitchens_ct.role_cook')}</option>
-                      <option value="sous">{$_('settings_kitchens_ct.role_sous')}</option>
-                    </select>
-                  </div>
+                  <button class="role-pill"
+                    aria-haspopup="dialog"
+                    aria-label={$_('settings_kitchens_ct.invite_role')}
+                    on:click={() => invitePickerOpen = true}>
+                    <span class="role-pill-text">{roleName[inviteRole] || roleName.member}</span>
+                    <span class="material-symbols-rounded" aria-hidden="true">expand_more</span>
+                  </button>
                   <button class="btn btn-secondary" on:click={() => invite(k.id)}
                     disabled={inviteBusy || (!inviteName.trim() && !inviteTyped.trim())}>
                     {inviteBusy ? 'Adding…' : 'Add'}
@@ -431,11 +462,18 @@
 </div>
 
 <ActionSheet
-  open={memberMenu != null}
-  title={memberMenu ? (memberMenu.member.full_name || memberMenu.member.username) : ''}
-  actions={memberActions}
-  on:select={e => pickMemberAction(e.detail.value)}
-  on:cancel={() => memberMenu = null}
+  open={rolePicker != null}
+  title={rolePicker ? (rolePicker.member.full_name || rolePicker.member.username) : ''}
+  actions={memberRoleActions}
+  on:select={e => pickRole(e.detail.value)}
+  on:cancel={() => rolePicker = null}
+/>
+
+<ActionSheet
+  bind:open={invitePickerOpen}
+  title={$_('settings_kitchens_ct.invite_role')}
+  actions={inviteRoleActions}
+  on:select={e => inviteRole = e.detail.value}
 />
 
 <style>
@@ -565,28 +603,18 @@
   .member-name { display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
   .member-row .role-picker { margin-left: auto; }
   .role-help {
-    display: flex; align-items: baseline; justify-content: space-between;
-    gap: 12px; flex-wrap: wrap; padding: 2px 0 6px;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; padding: 2px 0 8px;
   }
-  /* The shared arrow already draws itself on .select-wrap::after. Drawing a
-     second one here left both on the same pseudo-element, which is what was
-     making a black diamond of it; this only moves the app's own arrow in to
-     suit a smaller select. */
-  .select-wrap { position: relative; display: inline-block; }
-  .select-wrap::after { right: 10px; }
-  .select {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 5px 26px 5px 9px;
-    color: var(--text-1);
-    font-size: 12px;
-    appearance: none;
-    -webkit-appearance: none;
-    cursor: pointer;
+  .roles { flex: 1 1 260px; min-width: 0; }
+  .roles-lead { margin: 0 0 4px; }
+  .role-list {
+    list-style: none;
+    margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: 2px;
+    font-size: 13px; color: var(--text-2);
   }
-  .select:focus { outline: 2px solid var(--accent-dim); border-color: var(--accent); }
-  .sel-sm { height: 30px; }
+  .role-list b { color: var(--text-1); font-weight: 600; }
   .invite-row { display: flex; gap: 8px; margin-top: 4px; align-items: center; }
   .invite-row .input { flex: 1; }
   .invite-picker { flex: 1; min-width: 0; }
@@ -612,5 +640,29 @@
     cursor: pointer;
   }
   .btn-icon-sm:hover { background: var(--surface-3); color: var(--text-1); }
+  /* The role control. A native select opens the operating system's list,
+     which is the one thing on this page that looks like another app; this is
+     an ordinary button that opens the sheet everything else here opens. */
+  .role-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    flex: 0 0 auto;
+    height: 32px;
+    padding: 0 6px 0 11px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full, 999px);
+    color: var(--text-1);
+    font-size: 12px; font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color var(--dur-fast, 0.12s), background var(--dur-fast, 0.12s);
+  }
+  .role-pill:hover { border-color: var(--accent); background: var(--surface-3); }
+  .role-pill:active { transform: scale(0.97); }
+  .role-pill .material-symbols-rounded { font-size: 18px; color: var(--text-2); }
+  .role-pill-text { overflow: hidden; text-overflow: ellipsis; }
+
+  .btn-icon-sm.danger { color: var(--danger); border-color: rgba(255,92,92,0.3); }
+  .btn-icon-sm.danger:hover { background: rgba(255,92,92,0.14); color: var(--danger); }
   .btn-icon-sm .material-symbols-rounded { font-size: 18px; }
 </style>
