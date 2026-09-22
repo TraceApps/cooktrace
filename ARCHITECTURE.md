@@ -25,8 +25,34 @@ The important reads:
 - `server/db.js`, schema, migrations, sole SQLite entry point
 - `server/routes/`, Express handlers, one file per domain
 - `src/routes/`, top-level Svelte page components
+- `android/wear/src/main/java/com/cooktrace/app/wear/`, the Wear OS app: `Kitchen.kt` (parsing and the decisions the watch makes on its own), `CookStore.kt` (state plus the outbox), `Pairing.kt` (prefs, cache and the Wearable Data Layer), `CookApi.kt`
 
 Everything else is discoverable with `grep` and `ls`.
+
+## The watch is a client, not a satellite
+
+`android/wear` is a standalone Wear OS app that talks to the server itself
+over the same REST routes the phone and browser use. The phone hands over the
+address and a token through the Wearable Data Layer and nothing is typed on
+the watch. Both APKs must carry the same package name and signing certificate
+or the Data Layer silently carries nothing.
+
+Three paths cross the Data Layer, each one record per device, each stamped by
+the clock of whoever wrote it, newest wins, and a deletion is the Data Layer
+tidying up after a device rather than a signal to act on:
+
+- `/cooktrace/pairing`, the server address and token
+- `/cooktrace/cook`, the cooks underway and what has been ticked off each,
+  by the id the **server** uses and never this phone's own local id
+- `/cooktrace/timers`, what is counting down, matched by a key that outlives
+  both the watch's small alarm ids and a deadline that moves when extended,
+  and shared only while a cook has been handed over
+
+Anything that has to happen with the app off the screen is an AlarmManager
+exact alarm carrying a deadline, never something counting; anything repeating
+on screen is inside `repeatOnLifecycle(RESUMED)`. Every write to the Data
+Layer starts the watch app's listener service, so bursts are coalesced rather
+than sent per tap.
 
 ## Key Design Decisions
 
