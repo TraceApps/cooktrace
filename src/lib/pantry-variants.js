@@ -89,6 +89,20 @@ export function topLevelItems(items) {
  * Callers can render the same pill component for both ("In Stock" /
  * "Out of Stock" for flat; "3 of 5 variants stocked" for generics).
  */
+export function isItemInStock(item) {
+  // One answer to "is this row in stock?" for every screen that shows or
+  // flips it. in_stock is what the pantry list, recipe match, shopping
+  // restock and the server's stock set already read, and every save path
+  // writes it alongside quantity (0 -> out, anything else -> in), so it
+  // wins when present. quantity is only the fallback for a row that has
+  // no in_stock yet. Watch out for Number(null) === 0: an untracked
+  // (null / blank) quantity is NOT zero.
+  if (!item) return false;
+  if (item.in_stock != null && item.in_stock !== '') return !!Number(item.in_stock);
+  if (item.quantity == null || item.quantity === '') return true;
+  return Number(item.quantity) > 0;
+}
+
 export function aggregateStock(item, variantsByParent) {
   if (!item) return { stocked: 0, total: 0, isGeneric: false };
   const children = variantsByParent?.get?.(item.id) || [];

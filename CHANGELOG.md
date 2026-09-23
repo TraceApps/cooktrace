@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The check on a pantry item can be unticked again, and ticking it puts 1 in On Hand.** Tapping + on an item's photo marked it in stock but left On Hand blank, and from then on the check could not be unticked: every tap marked it in stock again, and the only way out was opening the item and typing 0. The item's own sheet also showed it as Out of Stock while the card showed it checked. Ticking now sets On Hand to 1 (or keeps the number that was there), unticking sets it to 0, and the card, the button and the sheet agree. [#55](https://github.com/TraceApps/cooktrace/issues/55)
+
 ---
 
 ## [1.4.0-dev01] - 2026-09-22 (pre-release)

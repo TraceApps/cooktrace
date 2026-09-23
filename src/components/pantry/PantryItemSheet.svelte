@@ -45,7 +45,7 @@
   import { categoryLabel, categoryIcon } from '../../lib/pantry-categories.js';
   import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS, isDerived, deriveSodiumSalt } from '../../lib/nutriments.js';
   import { lookupBarcode, contributeToOFF } from '../../lib/off.js';
-  import { displayVariantName as _sharedDisplayVariantName } from '../../lib/pantry-variants.js';
+  import { displayVariantName as _sharedDisplayVariantName, isItemInStock } from '../../lib/pantry-variants.js';
   import { visibleNutriments, offEnabled, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks } from '../../stores/settings.js';
   import { scanNutritionLabel } from '../../lib/scan-nutrition.js';
 
@@ -815,7 +815,9 @@
   // sheet's edit mode. The qty-row CSS rules were stripped alongside.
 
   // ── Derived display ────────────────────────────────────────────────
-  $: isInStock = item ? !(Number(item.quantity) === 0) : true;
+  // Same read as the pantry card (isItemInStock). !(Number(qty) === 0)
+  // showed a blank quantity as Out of Stock, since Number(null) === 0.
+  $: isInStock = item ? isItemInStock(item) : true;
   $: servingDescription = (item && item.serving_size && item.serving_unit)
     ? `${item.serving_size} ${item.serving_unit}`
     : '';
