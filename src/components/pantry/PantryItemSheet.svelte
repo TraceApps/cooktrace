@@ -17,10 +17,12 @@
    *               blank item with optional `prefill` (used by the
    *               barcode-scan flow for an unrecognized code).
    *
-   * In Stock is DERIVED display: `quantity === 0` reads as Out of Stock;
-   * `null` or `> 0` reads as In Stock. The explicit in_stock column
-   * lives on in the schema so server reads still work, but every save
-   * path computes it from quantity so the two never drift.
+   * In Stock comes from `isItemInStock` (src/lib/pantry-variants.js), the
+   * same read the pantry card and its check button use, so the three
+   * always agree. It trusts the `in_stock` column when present and falls
+   * back to `quantity` only for a row that has none. A blank quantity is
+   * NOT zero: reading it as zero is what left the card's check stuck on
+   * (issue #55).
    *
    * Caller usage:
    *   <PantryItemSheet bind:open itemId={...}

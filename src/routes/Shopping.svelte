@@ -415,9 +415,12 @@
       if (!p) continue;
       const patch = { in_stock: 1 };
       const prev = { in_stock: p.in_stock ? 1 : 0 };
-      // Pantry treats quantity 0 as out of stock, so clear it too.
+      // An item sitting at 0 would still read as out of stock, so give it
+      // the same 1 the pantry card's check button writes. Both ways of
+      // marking something in stock then leave the same On Hand. A count
+      // the user already recorded is left alone.
       if (p.quantity != null && Number(p.quantity) === 0) {
-        patch.quantity = null;
+        patch.quantity = 1;
         prev.quantity = p.quantity;
       }
       try {
