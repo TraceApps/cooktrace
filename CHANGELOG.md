@@ -8,6 +8,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Fixed
+- **The in-app updater can no longer hand a phone the watch build.** A release carries both APKs, and they share a package id so the watch app installs straight over the phone one. The updater took whichever `.apk` the release listed first, which is upload order and no promise at all. It now picks the phone's build by name, and offers nothing at all rather than a watch build.
 
 - **The check on a pantry item can be unticked again, and ticking it puts 1 in On Hand.** Tapping + on an item's photo marked it in stock but left On Hand blank, and from then on the check could not be unticked: every tap marked it in stock again, and the only way out was opening the item and typing 0. The item's own sheet also showed it as Out of Stock while the card showed it checked. Ticking now sets On Hand to 1 (or keeps the number that was there), unticking sets it to 0, and the card, the button and the sheet agree. [#55](https://github.com/TraceApps/cooktrace/issues/55)
 
