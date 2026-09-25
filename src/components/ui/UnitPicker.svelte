@@ -1,5 +1,8 @@
 <script>
   import { onMount, onDestroy, tick, createEventDispatcher } from 'svelte';
+  import { get } from 'svelte/store';
+  import { fold } from '../../lib/fold.js';
+  import { placeAnchoredMenu } from '../../lib/fold-core.js';
   import { fade } from 'svelte/transition';
   import { unitGroupsMerged } from '../../lib/units.js';
   import { measurementSystem } from '../../stores/settings.js';
@@ -109,19 +112,14 @@
   function _repositionPopover() {
     if (!inputEl) return;
     const r = inputEl.getBoundingClientRect();
-    const vh = window.innerHeight;
-    const POP_MAX_H = 320;
-    const GAP = 4;
-    // Prefer below; flip above when there's no room (and the input is
-    // far enough down the viewport that the flipped popover fits).
-    const spaceBelow = vh - r.bottom - 8;
-    const spaceAbove = r.top - 8;
-    const placeAbove = spaceBelow < 200 && spaceAbove > spaceBelow;
-    const top = placeAbove
-      ? Math.max(8, r.top - GAP - Math.min(POP_MAX_H, spaceAbove))
-      : r.bottom + GAP;
-    const maxH = placeAbove ? Math.min(POP_MAX_H, spaceAbove) : Math.min(POP_MAX_H, spaceBelow);
-    popStyle = `top:${top}px;left:${r.left}px;width:${r.width}px;max-height:${maxH}px;`;
+    // Prefer below, flip above when the room is short. On a foldable lying
+    // open the crease counts as the end of the room, so the list is never cut
+    // in half by the hinge.
+    const place = placeAnchoredMenu({
+      anchorTop: r.top, anchorBottom: r.bottom,
+      viewportHeight: window.innerHeight, maxHeight: 320, fold: get(fold),
+    });
+    popStyle = `top:${place.top}px;left:${r.left}px;width:${r.width}px;max-height:${place.maxHeight}px;`;
   }
   function _onScrollOrResize() { if (open) _repositionPopover(); }
   onMount(() => {

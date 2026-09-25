@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { foldFromFeatures, foldFromSegments, sizeClassFor, columnsAcrossFold, keepOffCrease } from '../src/lib/fold-core.js';
+import { foldFromFeatures, foldFromSegments, sizeClassFor, columnsAcrossFold, keepOffCrease, placeAnchoredMenu } from '../src/lib/fold-core.js';
 
 test('size classes', () => {
   assert.equal(sizeClassFor(344), 'compact');
@@ -72,4 +72,53 @@ test('a panel too big for either side stays where it was put', () => {
   // 900 wide with a crease at 480: neither side can hold it, and pushing it
   // off screen would be worse than leaving it across the fold.
   assert.equal(keepOffCrease({ pos: 50, size: 900, start: 480, end: 520, min: 12, max: 1000 }), 50);
+});
+
+test('a menu opens below its field when there is room', () => {
+  const place = placeAnchoredMenu({ anchorTop: 100, anchorBottom: 140, viewportHeight: 900, fold: null });
+  assert.equal(place.above, false);
+  assert.equal(place.top, 144);
+  assert.equal(place.maxHeight, 320);
+});
+
+test('a menu flips above its field when the space below is short', () => {
+  const place = placeAnchoredMenu({ anchorTop: 700, anchorBottom: 740, viewportHeight: 800, fold: null });
+  assert.equal(place.above, true);
+  assert.ok(place.top < 700, 'it sits above the field');
+});
+
+test('a menu never ends up split by the crease, wherever the field is', () => {
+  // The property that matters, checked the length of the screen rather than
+  // at one flattering spot: the menu's box never overlaps the hinge.
+  const fold = { posture: 'tabletop', start: 500, end: 540 };
+  for (let top = 0; top <= 940; top += 20) {
+    const place = placeAnchoredMenu({ anchorTop: top, anchorBottom: top + 40, viewportHeight: 1000, fold });
+    const bottom = place.top + place.maxHeight;
+    const clear = bottom <= fold.start || place.top >= fold.end || place.maxHeight === 0;
+    assert.ok(clear, `field at ${top}: menu ${place.top}-${bottom} runs through the crease`);
+  }
+});
+
+test('the roomier side wins when a crease shortens one of them', () => {
+  // 156px below the field before the crease, 292 above it: above is better,
+  // and bigger, which is the same rule as a menu near the bottom of a screen.
+  const fold = { posture: 'tabletop', start: 500, end: 540 };
+  const place = placeAnchoredMenu({ anchorTop: 300, anchorBottom: 340, viewportHeight: 1000, fold });
+  assert.equal(place.above, true);
+  assert.equal(place.maxHeight, 288);
+});
+
+test('a field just above the crease sends its menu the other way', () => {
+  // Only 20px between the field and the crease: above is roomier.
+  const fold = { posture: 'tabletop', start: 500, end: 540 };
+  const place = placeAnchoredMenu({ anchorTop: 440, anchorBottom: 480, viewportHeight: 1000, fold });
+  assert.equal(place.above, true);
+  assert.ok(place.top + place.maxHeight <= 440, 'it ends above the field');
+});
+
+test('a field below the crease opens downwards as usual', () => {
+  const fold = { posture: 'tabletop', start: 500, end: 540 };
+  const place = placeAnchoredMenu({ anchorTop: 600, anchorBottom: 640, viewportHeight: 1000, fold });
+  assert.equal(place.above, false);
+  assert.equal(place.maxHeight, 320);
 });

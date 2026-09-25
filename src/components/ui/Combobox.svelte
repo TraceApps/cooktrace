@@ -38,6 +38,9 @@
    *   on:change  → fires on every effective value change
    */
   import { createEventDispatcher } from 'svelte';
+  import { get } from 'svelte/store';
+  import { fold } from '../../lib/fold.js';
+  import { placeAnchoredMenu } from '../../lib/fold-core.js';
   import { portal } from '../../lib/portal.js';
 
   export let mode = 'single';
@@ -54,7 +57,9 @@
   let inputEl;
   let wrapperEl;
   let popoverEl;
-  let popoverPos = { left: 0, top: 0, width: 0 };
+  // The same cap the stylesheet gives it, so the list is no taller than before.
+  const POPOVER_MAX_H = 280;
+  let popoverPos = { left: 0, top: 0, width: 0, maxHeight: POPOVER_MAX_H };
   // In-progress text the user is typing — bindable so callers can pull
   // it for an external "Add" button without forcing the user to press
   // Enter or pick a suggestion first.
@@ -99,7 +104,14 @@
   function _positionPopover() {
     if (!wrapperEl) return;
     const r = wrapperEl.getBoundingClientRect();
-    popoverPos = { left: r.left, top: r.bottom + 4, width: r.width };
+    // It used to open downwards whatever was underneath. Now it takes the
+    // roomier side, and on a foldable lying open the crease ends the room, so
+    // the list is never cut in half by the hinge.
+    const place = placeAnchoredMenu({
+      anchorTop: r.top, anchorBottom: r.bottom,
+      viewportHeight: window.innerHeight, maxHeight: POPOVER_MAX_H, fold: get(fold),
+    });
+    popoverPos = { left: r.left, top: place.top, width: r.width, maxHeight: place.maxHeight };
   }
 
   function openPopover() {
@@ -269,7 +281,7 @@
   <div use:portal
     class="cb-popover"
     bind:this={popoverEl}
-    style="left:{popoverPos.left}px; top:{popoverPos.top}px; width:{popoverPos.width}px;"
+    style="left:{popoverPos.left}px; top:{popoverPos.top}px; width:{popoverPos.width}px; max-height:{popoverPos.maxHeight}px;"
     role="listbox">
     {#each filtered as opt, i (opt.name)}
       <button type="button" class="cb-row" class:active={i === highlightIndex}

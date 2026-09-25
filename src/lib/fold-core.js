@@ -79,3 +79,48 @@ export function keepOffCrease({ pos, size, start, end, min, max }) {
   }
   return pos;
 }
+
+/**
+ * Where a menu anchored to a field should open: below it, or flipped above.
+ *
+ * A list that opens below a field and runs under a horizontal crease is split
+ * in half by the hinge, and unlike the page behind it there is no scrolling it
+ * clear. The crease is treated as the edge of the available space, so the menu
+ * either stops short of it or opens on the other side of the field.
+ *
+ * Sideways is deliberately left alone: these menus match the width of the
+ * field they belong to, and a list that slid away from its own field would
+ * look broken rather than considerate.
+ *
+ * Returns the top to place it at, the height it may use, and which way it
+ * went. With no fold it behaves as an ordinary flip-when-short menu.
+ */
+export function placeAnchoredMenu({
+  anchorTop, anchorBottom, viewportHeight,
+  maxHeight = 320, gap = 4, margin = 8, fold,
+}) {
+  const t = fold?.posture === 'tabletop' ? fold : null;
+
+  // The run of screen below the field: it ends at the crease, or begins after
+  // it when the field itself reaches into the crease.
+  let belowStart = anchorBottom + gap;
+  let belowEnd = viewportHeight - margin;
+  if (t) {
+    if (belowStart < t.start) belowEnd = Math.min(belowEnd, t.start);
+    else belowStart = Math.max(belowStart, t.end);
+  }
+  // And the run above it, the same way round.
+  let aboveStart = margin;
+  let aboveEnd = anchorTop - gap;
+  if (t) {
+    if (aboveEnd > t.end) aboveStart = Math.max(aboveStart, t.end);
+    else aboveEnd = Math.min(aboveEnd, t.start);
+  }
+
+  const below = Math.max(0, belowEnd - belowStart);
+  const above = Math.max(0, aboveEnd - aboveStart);
+  const openAbove = below < Math.min(maxHeight, 200) && above > below;
+  const height = Math.min(maxHeight, openAbove ? above : below);
+  const top = openAbove ? aboveEnd - height : belowStart;
+  return { top: Math.round(top), maxHeight: Math.round(height), above: openAbove };
+}
