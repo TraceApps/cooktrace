@@ -15,7 +15,16 @@
  * so callers can show a "use Photo Import per page" hint. Auto-rendering
  * those as images is a Phase 1.5+ enhancement.
  */
-import { PDFParse } from 'pdf-parse';
+// pdf-parse is never loaded in this process. It pulls in @napi-rs/canvas,
+// whose prebuilt Skia binary uses CPU instructions some virtual machines
+// do not have (QEMU's default model, for one). Loading it there raises
+// SIGILL, which kills the process and cannot be caught, so importing it
+// here took the whole server down at boot. PDFs are read in a child
+// process instead (pdf-extract-worker.js): a crash kills only the child
+// and comes back as an error. Reported in issue #59.
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { logger } from '../logger.js';
 
 /**
  * Decide which extractor to run.
@@ -55,26 +64,55 @@ export async function extractText(buffer, mimeType, filename) {
 }
 
 /** PDF text extraction via pdf-parse 2.x. */
+// How long a single PDF may take before the child is killed. Generous:
+// a scanned cookbook page can be slow, and the upload cap already bounds
+// the size.
+const PDF_TIMEOUT_MS = Number(process.env.CT_PDF_TIMEOUT_MS) || 60_000;
+
+/** PDF text extraction, run in a child process. See the note at the top. */
 async function _extractPdf(buffer) {
-  let parser;
-  let result;
-  try {
-    parser = new PDFParse({ data: buffer });
-    result = await parser.getText();
-  } catch (e) {
-    // pdf-parse throws on encrypted / corrupted PDFs.
-    throw new Error('PDF read failed: ' + (e.message || 'unknown error'));
-  } finally {
-    if (parser && typeof parser.destroy === 'function') {
-      try { await parser.destroy(); } catch {}
-    }
+  const worker = process.env.CT_PDF_WORKER
+    || fileURLToPath(new URL('./pdf-extract-worker.js', import.meta.url));
+
+  const { out, code, signal } = await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [worker], { stdio: ['pipe', 'pipe', 'pipe'] });
+    let out = '';
+    let err = '';
+    const timer = setTimeout(() => { child.kill('SIGKILL'); }, PDF_TIMEOUT_MS);
+    child.stdout.on('data', (c) => { out += c; });
+    child.stderr.on('data', (c) => { err += c; });
+    child.on('error', (e) => { clearTimeout(timer); reject(e); });
+    child.on('close', (code, signal) => {
+      clearTimeout(timer);
+      if (err.trim()) logger.warn('[pdf] worker stderr:', err.trim().slice(0, 500));
+      resolve({ out, code, signal });
+    });
+    child.stdin.on('error', () => { /* the child died before reading; close handles it */ });
+    child.stdin.end(buffer);
+  });
+
+  if (signal) {
+    // SIGILL / SIGSEGV: the PDF reader cannot run on this machine. SIGKILL
+    // is our own timeout above.
+    if (signal === 'SIGKILL') throw new Error('PDF read timed out');
+    throw new Error(
+      `PDF import is not available on this server: the PDF reader stopped with ${signal}. `
+      + 'This usually means the CPU lacks instructions the reader was built for. '
+      + 'Every other import method still works.'
+    );
   }
-  // result.text is the concatenated text across all pages; result.pages is an
-  // array of per-page strings. Older pdf-parse returns numpages; v2 uses total.
-  const text = String(result?.text || '').trim();
-  const pages = Array.isArray(result?.pages)
-    ? result.pages.length
-    : (result?.total || result?.numpages || null);
+
+  let parsed;
+  try {
+    parsed = JSON.parse(out);
+  } catch {
+    throw new Error(`PDF read failed: the PDF reader returned nothing usable (exit ${code})`);
+  }
+  // pdf-parse throws on encrypted / corrupted PDFs.
+  if (parsed.error) throw new Error('PDF read failed: ' + parsed.error);
+
+  const text = String(parsed.text || '').trim();
+  const pages = parsed.pages ?? null;
   return {
     type: 'pdf',
     text,
