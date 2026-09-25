@@ -1,6 +1,8 @@
 <script>
   import { closeOnBack } from '../lib/back-stack.js';
   import { onMount, tick } from 'svelte';
+  import { fold } from '../lib/fold.js';
+  import { columnsAcrossFold, gridTemplateAcrossFold, columnForIndex } from '../lib/fold-core.js';
   import { push } from 'svelte-spa-router';
   import { fade } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
@@ -800,6 +802,29 @@
     if (r?.total_minutes != null) return r.total_minutes;
     return (r?.prep_minutes || 0) + (r?.cook_minutes || 0) + (r?.rest_minutes || 0);
   }
+
+  // Half open like a book, the cards are dealt onto the two pages rather than
+  // across the crease, with an empty track where the hinge is. Measured from
+  // the grid itself, since the crease is reported in screen coordinates and
+  // this page sits beside whatever sidebar is pinned.
+  const CARD_MIN = 260;
+  const GRID_GAP = 14;
+  const GRID_PLAIN = `repeat(auto-fill, minmax(${CARD_MIN}px, 1fr))`;
+  let gridEl, gridLeft = 0, gridW = 0;
+  function measureGrid() {
+    const box = gridEl?.getBoundingClientRect();
+    gridLeft = box?.left ?? 0;
+    gridW = box?.width ?? 0;
+  }
+  onMount(() => {
+    measureGrid();
+    const ro = new ResizeObserver(measureGrid);
+    if (gridEl) ro.observe(gridEl);
+    return () => ro.disconnect();
+  });
+  $: if ($fold !== undefined && gridEl) measureGrid();
+  $: gridSplit = columnsAcrossFold({ width: gridW, left: gridLeft, gap: GRID_GAP, minCard: CARD_MIN, fold: $fold });
+  $: gridTemplate = gridTemplateAcrossFold(gridSplit, GRID_PLAIN);
 </script>
 
 <div class="page-shell" style="--header-h: {headerH}px">
@@ -1482,13 +1507,13 @@
         <p>{$_('routes.recipes.no_match', { values: { q: query } })}</p>
       </div>
     {:else}
-      <div class="grid">
-        {#each filtered as r (r.id)}
+      <div class="grid" bind:this={gridEl} style="grid-template-columns:{gridTemplate}">
+        {#each filtered as r, _i (r.id)}
           <button class="card recipe-card"
             class:selecting={selectMode}
             class:selected={selectMode && selectedIds.has(r.id)}
             class:has-cat={!!r.category?.color}
-            style={r.category?.color ? `--cat-color:${r.category.color}` : ''}
+            style="grid-column:{columnForIndex(_i, gridSplit)}; {r.category?.color ? `--cat-color:${r.category.color}` : ''}"
             use:longpress
             on:longpress={() => selectMode ? toggleSelected(r.id) : openCardMenu(r)}
             on:click={() => selectMode ? toggleSelected(r.id) : push(`/recipes/${r.id}`)}>
