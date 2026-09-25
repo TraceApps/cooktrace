@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
         // Custom plugins must be registered BEFORE super.onCreate so the
         // bridge picks them up when it builds its plugin handle map.
         registerPlugin(WearPairingPlugin.class);
+        registerPlugin(FoldPlugin.class);
         super.onCreate(savedInstanceState);
     }
 

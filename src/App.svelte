@@ -3,6 +3,7 @@
   import { fade, fly, slide } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { portal } from './lib/portal.js';
+  import { initFold } from './lib/fold.js';
   import { isPullSyncExempt } from './lib/pull-sync.js';
   import { offlineState } from './lib/offline-api.js';
   import { handleBack } from './lib/back-stack.js';
@@ -310,6 +311,7 @@
   }
 
   onMount(async () => {
+    initFold();
     // Update checks: a device that was already using the app keeps checking,
     // a fresh one stays quiet until setup asks. Runs first so nothing above
     // can skip it (see lib/updates.js).
