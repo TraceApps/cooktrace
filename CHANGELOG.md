@@ -7,7 +7,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.4.0-dev02] - 2026-09-25 (pre-release)
+
+Second dev pre-release of the 1.4.0 minor. Three fixes, each from a real
+install: the image not starting on some virtual machines, the in-app
+updater offering the watch build to phones, and the pantry stock check
+that could not be unticked.
+
 ### Fixed
+- **The Docker image would not start on some virtual machines**, stopping with "Illegal instruction" before the server came up ([#59](https://github.com/TraceApps/cooktrace/issues/59), thanks @bajtekv). The PDF reader used for recipe imports loads a graphics library whose prebuilt binary needs CPU instructions that some virtual CPUs, including QEMU's default, do not provide. Loading it killed the whole process at startup, and that kind of crash cannot be caught. PDFs are now read in a separate short-lived process, so the server starts and runs normally everywhere, and on a machine whose CPU cannot run the reader only PDF import is affected, with a message saying so rather than a dead container. A PDF that takes more than a minute is given up on instead of holding the request open.
 - **The in-app updater can no longer hand a phone the watch build.** A release carries both APKs, and they share a package id so the watch app installs straight over the phone one. The updater took whichever `.apk` the release listed first, which is upload order and no promise at all. It now picks the phone's build by name, and offers nothing at all rather than a watch build.
 
 - **The check on a pantry item can be unticked again, and ticking it puts 1 in On Hand.** Tapping + on an item's photo marked it in stock but left On Hand blank, and from then on the check could not be unticked: every tap marked it in stock again, and the only way out was opening the item and typing 0. The item's own sheet also showed it as Out of Stock while the card showed it checked. Ticking now sets On Hand to 1 (or keeps the number that was there), unticking sets it to 0, and the card, the button and the sheet agree. [#55](https://github.com/TraceApps/cooktrace/issues/55)
@@ -32,7 +42,6 @@ First dev pre-release of the 1.4.0 minor. Two headlines: CookTrace on a watch, w
 
 ### Fixed
 
-- **The Docker image would not start on some virtual machines**, stopping with "Illegal instruction" before the server came up ([#59](https://github.com/TraceApps/cooktrace/issues/59), thanks @bajtekv). The PDF reader used for recipe imports loads a graphics library whose prebuilt binary needs CPU instructions that some virtual CPUs, including QEMU's default, do not provide. Loading it killed the whole process at startup, and that kind of crash cannot be caught. PDFs are now read in a separate short-lived process, so the server starts and runs normally everywhere, and on a machine whose CPU cannot run the reader only PDF import is affected, with a message saying so rather than a dead container. A PDF that takes more than a minute is given up on instead of holding the request open.
 - **A list you have already opened is still there offline after your changes go up.** When queued work reached your server, the app dropped its copy of the lists that change touched so they would be read again, but nothing reads a screen you do not open. Come back offline without opening it and your shopping list said it needed a connection, empty. Those lists are read back the moment the change goes up now.
 - **A browser low on room keeps your shopping list.** Making space for something you changed cleared the whole copy at once, taking the list you were standing in the shop with. It now gives up the oldest half first, and only clears everything if that is still not enough. What the browser keeps also counts a read as recent use, so the list you look at is the last thing dropped rather than the first.
 - **"A New Version Is Available" on the web now says what it means, and Reload works.** The browser banner used the Android wording and its Reload button could do nothing at all, and a tab left open never noticed a new version. Same fix in all four Trace apps.
