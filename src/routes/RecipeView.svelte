@@ -39,6 +39,7 @@
   import { cookModeActive } from '../stores/cookMode.js';
   import { currentUser } from '../stores/auth.js';
   import { onDestroy, tick } from 'svelte';
+  import { fold } from '../lib/fold.js';
   import { get } from 'svelte/store';
   import { activeCooks, startCook, endCook, isCooking, describeCook, cookList } from '../stores/cooks.js';
   import { computeRecipeNutrition, computeRecipeMass, lookupCommonDensity } from '../lib/recipe-nutrition.js';
@@ -845,6 +846,33 @@
     }
   }
 
+  // Half open like a book: the ingredients on one page and the method on the
+  // other, with the crease between them, the way a cookbook lies open.
+  //
+  // This does not wait for the desktop breakpoint at 960px. A foldable's inner
+  // display is around 840px across, so that rule never fires on one, and two
+  // usable columns either side of the crease read better than a single wide
+  // one. It only snaps when both pages are left wide enough for a recipe.
+  let layoutEl, layoutLeft = 0, layoutW = 0;
+  function measureLayout() {
+    const box = layoutEl?.getBoundingClientRect();
+    layoutLeft = box?.left ?? 0;
+    layoutW = box?.width ?? 0;
+  }
+  onMount(() => {
+    measureLayout();
+    const ro = new ResizeObserver(measureLayout);
+    if (layoutEl) ro.observe(layoutEl);
+    return () => ro.disconnect();
+  });
+  // Folding moves the crease without resizing the page.
+  $: if ($fold !== undefined && layoutEl) measureLayout();
+  $: foldLeftW = $fold?.posture === 'book' && layoutW > 0 ? $fold.start - layoutLeft : null;
+  $: layoutHinge = $fold?.posture === 'book' ? Math.max(0, $fold.end - $fold.start) : 0;
+  $: layoutSnap = foldLeftW != null
+    && foldLeftW >= 280
+    && layoutW - foldLeftW - layoutHinge >= 280;
+
 </script>
 
 <div class="page-shell editor-page" class:cook-mode={cookMode} style="--editor-header-h: {editorHeaderH}px">
@@ -1069,7 +1097,8 @@
              • desktop (1280+): Ingredients(+KitchenGear) | Steps(+Notes) | Nutrition
              Cook History + Comments + Last Updated render full-width below
              outside this grid. -->
-        <div class="layout">
+        <div class="layout" bind:this={layoutEl} class:fold-snap={layoutSnap}
+          style={layoutSnap ? `--left-w:${foldLeftW}px; --hinge:${layoutHinge}px` : ''}>
         <div class="col col-left">
         <section class="section ingredients-section">
           <h2 class="section-title">
@@ -1710,6 +1739,18 @@
       align-self: start;
     }
   }
+  /* Half open like a book: the crease is the gutter between the ingredients
+     and the method, and nutrition flows below across both pages. Placed after
+     the width breakpoints so it wins wherever both would apply. */
+  :global(html.fold-book) .layout.fold-snap {
+    display: grid;
+    grid-template-columns: var(--left-w) minmax(0, 1fr);
+    gap: var(--hinge);
+    align-items: flex-start;
+  }
+  :global(html.fold-book) .layout.fold-snap .col-right { grid-column: 1 / -1; }
+  :global(html.fold-book) .layout.fold-snap .col-left { position: sticky; top: 16px; }
+
   /* Each column is itself a flex stack — Ingredients above Kitchen
      Gear, Steps above Notes, etc. */
   .col {

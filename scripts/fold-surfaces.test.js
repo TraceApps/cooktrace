@@ -36,3 +36,22 @@ test('the stylesheet is loaded, and last so it wins', () => {
   assert.ok(styles.includes('fold'), 'fold.css is imported');
   assert.equal(styles[styles.length - 1], 'fold', 'and it comes last');
 });
+
+test('a recipe opens like a cookbook, without waiting for a desktop width', () => {
+  const view = readFileSync(new URL('../src/routes/RecipeView.svelte', import.meta.url), 'utf8');
+  // The two-column layout starts at 960px, which a foldable's inner display
+  // never reaches, so the snap is driven by the crease rather than a
+  // breakpoint, and only when both pages are wide enough for a recipe.
+  assert.match(view, /foldLeftW >= 280/);
+  assert.match(view, /layoutW - foldLeftW - layoutHinge >= 280/);
+  assert.match(view, /html\.fold-book\) \.layout\.fold-snap/);
+  // Measured, never worked out from the sidebar's width.
+  assert.match(view, /getBoundingClientRect\(\)[\s\S]*?layoutLeft/);
+});
+
+test('Settings splits at the crease too, on the same terms', () => {
+  const settings = readFileSync(new URL('../src/routes/Settings.svelte', import.meta.url), 'utf8');
+  assert.match(settings, /foldRailW >= 200/);
+  assert.match(settings, /paneW - foldRailW >= 320/);
+  assert.match(settings, /\.settings-two-pane\.fold-snap/);
+});
