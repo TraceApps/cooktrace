@@ -172,8 +172,12 @@
     box-sizing: border-box;
     width: 100%;
   }
-  @media (min-width: 880px) {
-    .manage-body {
+  /* Gated on the room available, not an 880px viewport, which a foldable
+     open flat (852px) missed by 28. Both the grid and the rail's vertical
+     list move together: the grid alone left the mobile chip strip clipped
+     inside a 280px column. */
+  @media all {
+    :global(html.wide-content) .manage-body {
       display: grid;
       grid-template-columns: 280px minmax(0, 1fr);
       gap: 24px;
@@ -185,7 +189,9 @@
      don't wrap as aggressively. Right pane keeps minmax(0,1fr) so
      it soaks up the rest of the viewport. */
   @media (min-width: 1440px) {
-    .manage-body {
+    /* Prefixed to match the rules above, which now carry html.wide-content and
+       would otherwise outrank this. */
+    :global(html.wide-content) .manage-body {
       grid-template-columns: 320px minmax(0, 1fr);
       gap: 28px;
     }
@@ -253,8 +259,8 @@
     color: var(--accent);
   }
 
-  @media (min-width: 880px) {
-    .rail {
+  @media all {
+    :global(html.wide-content) .rail {
       flex-direction: column;
       gap: 4px;
       padding: 0;
@@ -276,21 +282,21 @@
       scrollbar-width: thin;
       scrollbar-color: var(--border) transparent;
     }
-    .rail-item {
+    :global(html.wide-content) .rail-item {
       width: 100%;
       box-sizing: border-box;
       align-items: flex-start;
       padding: 12px 14px;
       text-align: left;
     }
-    .rail-item .rail-text {
+    :global(html.wide-content) .rail-item .rail-text {
       display: flex;
       flex-direction: column;
       gap: 2px;
       min-width: 0;
     }
     .rail-item .rail-label { font-size: 14px; }
-    .rail-item .rail-desc {
+    :global(html.wide-content) .rail-item .rail-desc {
       display: block;
       font-size: 11px;
       font-weight: 500;
@@ -305,7 +311,7 @@
        use, so the selection reads instantly on the desktop rail.
        Mobile rail keeps the plain pill since "left border" doesn't
        apply to a horizontal chip row. */
-    .rail-pill {
+    :global(html.wide-content) .rail-pill {
       border-left-width: 3px;
       border-top-left-radius: 0;
       border-bottom-left-radius: 0;
