@@ -2851,11 +2851,20 @@
      The img already covers, so it crops rather than distorts, and the
      min-height keeps a recipe with almost no meta from collapsing it. */
   @media (max-width: 1279px) {
+    /* Balanced columns here rather than 1.4fr/1fr. The meta column is what
+       drives the height at this width, and giving it more room costs fewer
+       wrapped lines than it costs the hero. */
+    :global(html.wide-content) .recipe-header {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    /* Fills the column so there is no large void beside the meta, but capped:
+       stretching it unbounded put a 645px image on an 883px screen. Measured
+       at 852 this lands at 396x520 with a 73px void. */
     :global(html.wide-content) .recipe-header .hero {
       align-self: stretch;
       aspect-ratio: auto;
       min-height: 260px;
-      max-height: none;
+      max-height: min(60vh, 520px);
     }
   }
 </style>
