@@ -3,7 +3,7 @@
 Ideas and planned enhancements. Grouped by area. No commitment to order or timeline.
 Items marked ~~strikethrough~~ have been implemented.
 
-Last refreshed at v1.0.1 (2026-08-09).
+Last refreshed at v1.4.0-dev02 (2026-09-25).
 
 ---
 
@@ -26,6 +26,33 @@ Apply the same sweep to LT and NT in their respective v1.1.0 releases once the C
 ---
 
 ## Recipes
+
+### Recipe revision history, linked to the diary
+Requested in [#54](https://github.com/TraceApps/cooktrace/issues/54) (DefectiveConsole), aimed at 1.5.0.
+Save a version whenever a recipe changes and record which version each cook
+used, so an old diary entry opens the recipe as it was made. Then a History
+view with a comparison, restore as a new version, and the reverse: open a
+version and see every cook of it with its rating. Traps: every write path has
+to snapshot (web, REST, MCP, phone sync), restoring must add a version rather
+than rewind, a save that changes nothing should not make one, and revisions
+record who saved them now that a Sous Chef can edit a shared recipe.
+
+### Use a recipe as an ingredient (sub-recipes)
+Requested in [#58](https://github.com/TraceApps/cooktrace/issues/58)
+(herver1971), with a full design. An ingredient row gains an optional
+reference to another recipe, instead of a pantry item, so a sauce or a dough
+is written once and used everywhere. Pays off in the shopping list (expand
+the sub-recipe into its own ingredients), nutrition (contribute per serving
+or per gram), and navigation from the recipe view and Cook Mode. Needs a
+depth limit and a cycle guard.
+
+**Decide first:** the reference cannot be the recipe's row id. Sync only
+translates ids in declared columns, never ids inside the ingredients JSON, so
+a phone-created reference would point at the wrong recipe on the server.
+`share_token` is not a substitute: it only exists while a recipe is publicly
+shared. This wants a stable per-recipe identifier written at creation on both
+the server and the phone, which would also serve the revision history above,
+export and import, and federation.
 
 ### ~~Recipe CRUD~~ *(done, Phase 1)*
 Server + UI + image upload via 3-button picker.
