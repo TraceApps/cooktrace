@@ -1648,8 +1648,11 @@
     gap: 12px;
     min-width: 0;
   }
-  @media (min-width: 960px) {
-    .recipe-header {
+  /* A tablet-tier layout, gated on the room available rather than a
+     960px viewport. A foldable open flat is about 852px, so it never
+     reached this and got the phone layout on its biggest screen. */
+  @media all {
+    :global(html.wide-content) .recipe-header{
       display: grid;
       grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
       gap: 28px;
@@ -1661,7 +1664,7 @@
        stretch to match the meta column's height (was producing
        blown-up heroes on recipes with shorter meta + tall source
        images). */
-    .recipe-header .hero {
+    :global(html.wide-content) .recipe-header .hero{
       aspect-ratio: 16 / 9;
       max-height: 480px;
       border-radius: var(--radius-lg);
@@ -1700,20 +1703,23 @@
     flex-direction: column;
     gap: 24px;
   }
-  @media (min-width: 960px) {
+  /* A tablet-tier layout, gated on the room available rather than a
+     960px viewport. A foldable open flat is about 852px, so it never
+     reached this and got the phone layout on its biggest screen. */
+  @media all {
     /* Wider screens get the genre-standard 16:9 hero — same fixed
        cover crop, just less vertical real-estate so the page below
        lands closer to the fold. */
-    .hero { aspect-ratio: 16 / 9; }
+    :global(html.wide-content) .hero { aspect-ratio: 16 / 9; }
 
-    .layout {
+    :global(html.wide-content) .layout{
       display: grid;
       grid-template-columns: minmax(280px, 0.85fr) 1.15fr;
       gap: 28px;
       align-items: flex-start;
     }
     /* On 2-col, Nutrition spans both columns and flows below. */
-    .col-right { grid-column: 1 / -1; }
+    :global(html.wide-content) .col-right { grid-column: 1 / -1; }
     /* Sticky left column — Ingredients + Kitchen Gear stay in view as
        you scroll the steps. We deliberately don't set overflow-y here
        any more: setting it to auto forces overflow-x to be clipped
@@ -1722,7 +1728,7 @@
        Comments was. Trade: extremely long ingredient lists scroll
        the whole page rather than scrolling inside the column — fine
        for ~20-row recipes which is the realistic ceiling. */
-    .col-left {
+    :global(html.wide-content) .col-left{
       position: sticky;
       top: 16px;
     }
