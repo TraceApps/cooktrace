@@ -116,9 +116,15 @@
   // streak math stays correct regardless of which date window the
   // list view has loaded. Null while initially fetching.
   let stats = null;
-  async function loadStats() {
+  async function loadStats(retry = true) {
     try { stats = await NtApi.getCookDiaryStats(); }
-    catch { stats = null; }
+    catch (e) {
+      // A transient failure here used to hide the dashboard for the whole
+      // session. Keep whatever we already had and try once more.
+      console.warn('[diary] stats failed:', e?.message || e);
+      if (retry) { setTimeout(() => loadStats(false), 2000); return; }
+      if (!stats) stats = null;
+    }
   }
 
   // Heatmap — daily cook counts for the last 52 weeks. Independent of
@@ -407,9 +413,15 @@
          first, then 4-tile strip). Goes side-by-side on wide screens
          so the two summaries share one row instead of forming a tall
          column above the actual diary. -->
-    {#if stats && stats.total_cooks > 0}
+    {#if (stats && stats.total_cooks > 0) || heatmap.length > 0}
     <div class="diary-dashboard" transition:fade={{ duration: 160 }}>
-      <CookHeatmap data={heatmap} on:select={onHeatmapCellClick} />
+      <!-- Shown on its own data. It used to sit inside the stats condition, so a
+           single failed /api/cook-diary/stats call at launch took the whole
+           dashboard with it, silently and with no retry. -->
+      {#if heatmap.length > 0}
+        <CookHeatmap data={heatmap} on:select={onHeatmapCellClick} />
+      {/if}
+      {#if stats && stats.total_cooks > 0}
       <div class="stats-card">
         <div class="stat-tile">
           <span class="stat-value">{stats.cooks_this_week}</span>
@@ -440,6 +452,7 @@
           </div>
         {/if}
       </div>
+      {/if}
     </div>
     {/if}
 
