@@ -38,7 +38,7 @@
   import { startTimer, formatRemaining } from '../stores/cookTimers.js';
   import { cookModeActive } from '../stores/cookMode.js';
   import { currentUser } from '../stores/auth.js';
-  import { onDestroy, tick } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import { fold } from '../lib/fold.js';
   import { get } from 'svelte/store';
   import { activeCooks, startCook, endCook, isCooking, describeCook, cookList } from '../stores/cooks.js';
