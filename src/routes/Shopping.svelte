@@ -1361,7 +1361,10 @@
      so short cards stack into the gap under a tall neighbour instead of
      every row being as tall as its tallest card. Row gap is 0 because
      the vertical gap is folded into each span. */
-  @media (min-width: 1200px) {
+  /* auto-fill already picks the column count, so the only thing the 1200px
+     gate did was keep a foldable (about 852px, two columns of 400) on the
+     phone layout. */
+  @media all {
     .groups-grid:not(.flat-mode) {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
@@ -1373,7 +1376,7 @@
   }
 
   .group { margin-bottom: 16px; }
-  @media (min-width: 1200px) {
+  @media all {
     .groups-grid:not(.flat-mode) .group {
       margin: 0;
       background: var(--surface-1);
@@ -1393,7 +1396,7 @@
      auto-collapse (see script) this makes the wall condense as you
      sweep through the store. */
   .groups-grid:not(.flat-mode) .group.done .group-title-text { color: var(--text-3); }
-  @media (min-width: 1200px) {
+  @media all {
     .groups-grid:not(.flat-mode) .group.done {
       background: color-mix(in srgb, var(--accent) 6%, var(--surface-1));
       border-color: color-mix(in srgb, var(--accent) 25%, var(--border));

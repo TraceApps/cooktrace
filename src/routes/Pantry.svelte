@@ -1927,8 +1927,11 @@
      they're visible without switching filters. Tiles are small photo
      + name + "3d left" pill. Past-expiry tiles pick up a red tint. */
   .expiring-spotlight { display: none; }
-  @media (min-width: 1200px) {
-    .expiring-spotlight {
+  /* The expiring spotlight is a summary, not a layout: a foldable open flat
+     has ample room for it, and it was the only thing the 1200px gate held
+     back on this screen. */
+  @media all {
+    :global(html.wide-content) .expiring-spotlight {
       display: block;
       margin: 8px 0 14px;
       padding: 10px 12px;
@@ -1936,20 +1939,20 @@
       border: 1px solid color-mix(in srgb, var(--warning, #f59e0b) 30%, var(--border));
       border-radius: var(--radius-lg);
     }
-    .spotlight-head {
+    :global(html.wide-content) .spotlight-head {
       display: flex; align-items: center; gap: 8px;
       margin-bottom: 8px;
     }
     .spotlight-head .material-symbols-rounded { font-size: 18px; color: var(--warning, #f59e0b); }
     .spotlight-title { font-size: 13px; font-weight: 700; color: var(--text-1); }
-    .spotlight-count {
+    :global(html.wide-content) .spotlight-count {
       font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
       text-transform: uppercase;
       background: color-mix(in srgb, var(--warning, #f59e0b) 20%, transparent);
       color: var(--warning, #f59e0b);
       padding: 2px 8px; border-radius: 999px;
     }
-    .spotlight-all {
+    :global(html.wide-content) .spotlight-all {
       margin-left: auto;
       display: inline-flex; align-items: center; gap: 2px;
       background: transparent; border: none; cursor: pointer;
@@ -1957,14 +1960,14 @@
       padding: 4px 8px; border-radius: var(--radius-sm);
     }
     .spotlight-all:hover { color: var(--text-1); background: var(--surface-2); }
-    .spotlight-strip {
+    :global(html.wide-content) .spotlight-strip {
       display: flex; gap: 10px;
       overflow-x: auto;
       scrollbar-width: none;
       padding-bottom: 2px;
     }
     .spotlight-strip::-webkit-scrollbar { display: none; }
-    .spotlight-tile {
+    :global(html.wide-content) .spotlight-tile {
       flex: 0 0 auto;
       display: flex; align-items: center; gap: 8px;
       width: 220px;
@@ -1978,7 +1981,7 @@
     }
     .spotlight-tile:hover { transform: translateY(-1px); border-color: var(--accent-dim); }
     .spotlight-tile.past { border-color: color-mix(in srgb, var(--danger, #ef4444) 45%, var(--border)); }
-    .spotlight-photo {
+    :global(html.wide-content) .spotlight-photo {
       width: 40px; height: 40px; flex-shrink: 0;
       background: var(--surface-2); border-radius: var(--radius-sm);
       display: flex; align-items: center; justify-content: center;
@@ -1986,15 +1989,15 @@
     }
     .spotlight-photo img { width: 100%; height: 100%; object-fit: cover; }
     .spotlight-photo .material-symbols-rounded { font-size: 20px; color: var(--accent); opacity: 0.7; }
-    .spotlight-body {
+    :global(html.wide-content) .spotlight-body {
       display: flex; flex-direction: column; gap: 2px; min-width: 0;
     }
-    .spotlight-name {
+    :global(html.wide-content) .spotlight-name {
       font-size: 13px; font-weight: 600; color: var(--text-1);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       max-width: 150px;
     }
-    .spotlight-days {
+    :global(html.wide-content) .spotlight-days {
       font-size: 11px; font-weight: 600;
       color: var(--warning, #f59e0b);
     }
