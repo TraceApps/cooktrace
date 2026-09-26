@@ -869,8 +869,18 @@
     gap: 0;
     margin: 0 0 14px;
   }
+  /* Below the desktop tier the heatmap spans the full width and the stats sit
+     under it, rather than sharing a row: a year of weeks wants the width, and
+     the stats read fine as a 4-across strip. Desktop keeps them side by side. */
+  @media (max-width: 1279px) {
+    :global(html.wide-content) .diary-dashboard {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 14px;
+    }
+  }
   @media (min-width: 1280px) {
-    .diary-dashboard {
+    :global(html.wide-content) .diary-dashboard {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 320px;
       gap: 14px;
@@ -901,8 +911,8 @@
     border-radius: var(--radius-md);
     min-width: 0;
   }
-  @media (min-width: 1280px) {
-    .stats-card {
+  @media all {
+    :global(html.wide-content) .stats-card {
       grid-template-columns: 1fr 1fr;
       grid-template-rows: 1fr 1fr;
       gap: 8px;
@@ -1038,14 +1048,14 @@
      screen. Each day-card becomes a self-contained bordered surface
      at wide widths so the visual break between days stays clear. */
   .day-grid { display: block; }
-  @media (min-width: 1200px) {
-    .day-grid {
+  @media all {
+    :global(html.wide-content) .day-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
       gap: 20px;
       align-items: start;
     }
-    .day-grid .day-group {
+    :global(html.wide-content) .day-grid .day-group {
       margin: 0;
       background: var(--surface-1);
       border: 1px solid var(--border);
@@ -1190,7 +1200,7 @@
   }
   /* Roomier month cells on wide screens so 3-5 cook pills fit per
      day without the name truncating. clamp() keeps growth sane. */
-  @media (min-width: 1280px) {
+  @media all {
     .cell { min-height: clamp(88px, 14vh, 180px); padding: 6px 7px; gap: 3px; }
   }
   .cell.dim { background: var(--bg); opacity: 0.6; }
@@ -1409,8 +1419,8 @@
   }
   /* Bigger tiles on wide viewports — 140px tiles read as thumbnail
      bricks on a 1920px monitor; 180px feels like an actual photo. */
-  @media (min-width: 1200px) {
-    .photo-grid {
+  @media all {
+    :global(html.wide-content) .photo-grid {
       grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
       gap: 12px;
     }

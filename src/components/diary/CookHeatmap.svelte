@@ -321,4 +321,17 @@
   .legend-cell[data-level="2"] { background: color-mix(in srgb, var(--accent) 50%, var(--surface-2)); }
   .legend-cell[data-level="3"] { background: color-mix(in srgb, var(--accent) 75%, var(--surface-2)); }
   .legend-cell[data-level="4"] { background: var(--accent); }
+
+  /* Between 768 and 1024 the fixed 16px cell needs 1007px for 53 weeks, so a
+     year of squares simply ran off the page: on a foldable open flat it
+     overflowed by 214px. Below the desktop tier the columns become fractions
+     of whatever width there is, and aspect-ratio keeps the cells square. */
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .hm-months { grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); }
+    .hm-grid {
+      grid-template-rows: repeat(7, auto);
+      grid-auto-columns: minmax(0, 1fr);
+    }
+    .cell { width: auto; height: auto; aspect-ratio: 1; }
+  }
 </style>

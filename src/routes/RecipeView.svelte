@@ -2844,4 +2844,18 @@
       top: 16px;
     }
   }
+
+  /* Between the tablet tier and desktop, the meta column is narrow enough that
+     its text wraps taller than a 16:9 hero, leaving a large void under the
+     image (329px on a foldable at 852). Let the hero fill the row instead.
+     The img already covers, so it crops rather than distorts, and the
+     min-height keeps a recipe with almost no meta from collapsing it. */
+  @media (max-width: 1279px) {
+    :global(html.wide-content) .recipe-header .hero {
+      align-self: stretch;
+      aspect-ratio: auto;
+      min-height: 260px;
+      max-height: none;
+    }
+  }
 </style>
