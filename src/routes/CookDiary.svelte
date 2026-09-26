@@ -980,7 +980,12 @@
   .diary-toolbar {
     position: sticky;
     top: calc(var(--page-top, var(--safe-top)) + 56px + var(--hamburger-row, 0px));
-    z-index: 15;
+    /* Below .page-header (z-index 10), not above it. The toolbar sticks 5px
+       higher than the header's 61px bottom edge, so at 15 its opaque bar
+       painted over the frosted header and cut a hard line into it. Underneath,
+       the header's blur covers that overlap and the toolbar still hides the
+       entries scrolling below it. */
+    z-index: 9;
     background: var(--bg);
     padding-top: 6px;
     margin: -6px 0 4px;
