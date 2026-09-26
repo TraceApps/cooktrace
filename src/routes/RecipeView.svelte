@@ -1728,17 +1728,23 @@
        Comments was. Trade: extremely long ingredient lists scroll
        the whole page rather than scrolling inside the column — fine
        for ~20-row recipes which is the realistic ceiling. */
+    /* Not sticky at this size. With no height cap the column runs past its
+       grid row and draws over the nutrition block below it, which put the
+       Recompute card on top of the ingredients. Desktop restores it below,
+       where the steps column is the taller of the two. */
     :global(html.wide-content) .col-left{
-      position: sticky;
-      top: 16px;
+      position: static;
     }
   }
+  /* Prefixed to match the tablet tier's specificity. Without this the
+     two-column rules above, which now carry html.wide-content, outranked
+     these and desktop silently lost its third column. */
   @media (min-width: 1280px) {
-    .layout {
+    :global(html.wide-content) .layout {
       grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr) minmax(280px, 0.85fr);
       gap: 32px;
     }
-    .col-right {
+    :global(html.wide-content) .col-right {
       grid-column: auto;
       position: sticky;
       top: 16px;
@@ -2827,5 +2833,15 @@
     }
     .nutrition-section { display: none !important; }  /* nutrition box renders poorly on B&W */
     @page { margin: 0.6in; }
+  }
+
+  /* The sticky ingredients column is a desktop behaviour: there the steps
+     column is reliably the taller one, so the sticky column has somewhere to
+     travel without escaping its row. */
+  @media (min-width: 1280px) {
+    :global(html.wide-content) .col-left {
+      position: sticky;
+      top: 16px;
+    }
   }
 </style>
