@@ -354,13 +354,18 @@
   // no name / brand / barcode / thumbnail.
   $: _allModeItems = searchSource !== 'all' ? [] : [
     ...(_isSourceActive('local')
-      ? (items || []).filter(f => query.trim() ? matchesSearch(f, buildVariantsByParent(items), query) : false).map(f => ({ ...f, _source: 'local' }))
+      ? (query.trim() ? topLevelItems(items).filter(f => matchesSearch(f, variantsByParent, query)) : [])
+          .map(f => ({ ...f, _source: 'local' }))
       : []),
     ...(_isSourceActive('off')  ? offVisible.map(f  => ({ ...f, _source: 'off'  })) : []),
     ...(_isSourceActive('usda') ? usdaVisible.map(f => ({ ...f, _source: 'usda' })) : []),
     ...(_isSourceActive('nt')   ? ntVisible.map(f   => ({ ...f, _source: 'nt'   })) : []),
   ];
   function pickExternalResult(r) {
+    // A local row in All mode is an item the pantry already holds, so it
+    // opens like any other pantry row. Prefilling the create sheet from it
+    // would save a duplicate of something already there.
+    if (r?._source === 'local') { openItem(r); return; }
     // Open the sheet in create mode with the external-search result as
     // the prefill payload. No route navigation; user stays on Pantry.
     sheetPrefill = r;
@@ -1366,12 +1371,14 @@
                 on:keydown={(e) => { if (e.key === 'Enter') pickExternalResult(r); }}>
                 {#if r.img_url}
                   <img class="item-thumb" src={r.img_url} alt="" loading="lazy" />
+                {:else if r._source === 'local'}
+                  <span class="material-symbols-rounded ext-stub-icon">{_catIconBySlug(_itemSlug(r))}</span>
                 {:else}
                   <span class="material-symbols-rounded ext-stub-icon">qr_code_scanner</span>
                 {/if}
                 <div class="item-body">
                   <div class="item-name">
-                    <span class="src-badge src-{r._source}">{r._source === 'off' ? 'OFF' : r._source === 'usda' ? 'USDA' : 'NT'}</span>
+                    <span class="src-badge src-{r._source}">{r._source === 'off' ? 'OFF' : r._source === 'usda' ? 'USDA' : r._source === 'nt' ? 'NT' : 'Pantry'}</span>
                     {r.name}
                     {#if r._source === 'off' && r.completeness != null}
                       <span class="completeness-dot" class:high={r.completeness >= 0.85}
@@ -1392,7 +1399,7 @@
                   {#if r.brand}<div class="item-notes">{r.brand}</div>{/if}
                   {#if r.barcode}<div class="item-qty" style="font-size:11px">{r.barcode}</div>{/if}
                 </div>
-                <span class="material-symbols-rounded ext-add">add_circle</span>
+                <span class="material-symbols-rounded ext-add">{r._source === 'local' ? 'chevron_right' : 'add_circle'}</span>
               </li>
             {/each}
           </ul>
@@ -1836,6 +1843,7 @@
   .src-badge.src-off  { background: #2e7d32; color: #fff; }
   .src-badge.src-usda { background: #1565c0; color: #fff; }
   .src-badge.src-nt   { background: #6a1b9a; color: #fff; }
+  .src-badge.src-local { background: var(--accent); color: #fff; }
 
   /* External-search results — no heading since the active source-chip
      already labels which API is being queried. */

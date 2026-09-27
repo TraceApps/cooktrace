@@ -13,8 +13,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
-- **Pantry search ignores accents.** Typing "oregano" now finds "Orégano", "cafe" finds "Café", "limon" finds "Limón", on names and brands alike. Pantries kept in Spanish, Portuguese, French, German and other languages with diacritics are full of accented names, and on a phone almost nobody types the accent, so the item looked missing. English names have no accents and match exactly as before.
-- **The All search shows your pantry again.** With the All chip (or several sources pinned), the pantry part of the results was always empty: the search received its two inputs in the wrong order and looked for the text "[object Map]".
+- **Pantry search ignores accents.** Typing "oregano" finds "Orégano", "cafe" finds "Café", "limon" finds "Limón", on names and brands alike. A pantry kept in Spanish, Portuguese, French or another language with accents no longer looks like the item is missing because nobody types the accent on a phone. Names without accents match exactly as before. Thanks to @herver1971 for the report and the fix in [#62](https://github.com/TraceApps/cooktrace/pull/62).
+- **The All search shows your own pantry again.** With the All chip, or several sources pinned, the pantry part of the results was always empty. Your items appear alongside the OFF, USDA and NutriTrace results now, badged as yours, and tapping one opens that item instead of starting a duplicate of it.
 
 ---
 

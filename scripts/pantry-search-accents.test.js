@@ -58,5 +58,38 @@ test('All mode passes the variants map before the query', () => {
   // Real calls only (a comment above them mentions matchesSearch() too).
   const calls = src.match(/matchesSearch\(\w[^\n]*/g) || [];
   assert.ok(calls.length > 0, 'expected a matchesSearch call in Pantry.svelte');
-  for (const c of calls) assert.match(c, /matchesSearch\(\s*\w+\s*,\s*buildVariantsByParent\([^)]*\)\s*,\s*query\s*\)/);
+  for (const c of calls) {
+    // The map may be a hoisted reactive value or built inline; what matters
+    // is that the query is the third argument and never the second.
+    assert.match(c, /matchesSearch\(\s*\w+\s*,\s*(?!query\b)[\w.]+(?:\([^)]*\))?\s*,\s*query\s*\)/);
+  }
+});
+
+test('All mode reuses the hoisted variants map instead of rebuilding it per item', () => {
+  const src = read('../src/routes/Pantry.svelte');
+  const allMode = src.match(/\$: _allModeItems =[\s\S]*?\n  \];/);
+  assert.ok(allMode, 'expected the _allModeItems reactive block');
+  assert.doesNotMatch(allMode[0], /buildVariantsByParent\(/);
+  // Variants are surfaced by the main list's own classification, so the
+  // merged list holds top-level rows only.
+  assert.match(allMode[0], /topLevelItems\(items\)/);
+});
+
+test('a local row in All mode opens the item it already is, never a prefilled copy', () => {
+  const src = read('../src/routes/Pantry.svelte');
+  const fn = src.match(/function pickExternalResult\(r\) \{[\s\S]*?\n  \}/);
+  assert.ok(fn, 'expected pickExternalResult');
+  assert.match(fn[0], /_source === 'local'[\s\S]*openItem\(r\);\s*return;/);
+  // The create path must stay below the local short-circuit.
+  assert.ok(fn[0].indexOf('openItem(r)') < fn[0].indexOf('sheetPrefill = r'));
+});
+
+test('an All-mode row labels its own source, local included', () => {
+  const src = read('../src/routes/Pantry.svelte');
+  const badge = src.match(/<span class="src-badge src-\{r\._source\}">\{[^}]*\}<\/span>/);
+  assert.ok(badge, 'expected the source badge');
+  // Before: anything that was not OFF or USDA was labelled NT, so a pantry
+  // item of your own claimed to come from NutriTrace.
+  assert.match(badge[0], /_source === 'nt'/);
+  assert.match(src, /\.src-badge\.src-local\s*\{/);
 });
