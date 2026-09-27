@@ -1283,7 +1283,9 @@
      action is unmissable at every viewport width. */
   .quick-add {
     display: grid;
-    grid-template-columns: 1fr 64px auto;
+    /* minmax(0, ...) rather than a bare 1fr, which cannot shrink below the
+       item picker's own width and pushed Add off the right edge of a phone. */
+    grid-template-columns: minmax(0, 1fr) 64px auto;
     gap: 8px;
     margin-bottom: 12px;
     align-items: center;
@@ -1314,7 +1316,7 @@
   .input:focus { outline: 2px solid var(--accent-dim); border-color: var(--accent); }
   /* Very narrow phones: tighten so the Add label doesn't wrap. */
   @media (max-width: 380px) {
-    .quick-add { grid-template-columns: 1fr 54px auto; gap: 6px; }
+    .quick-add { grid-template-columns: minmax(0, 1fr) 54px auto; gap: 6px; }
     .qa-add { padding: 0 10px; }
   }
 

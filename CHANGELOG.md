@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The shopping list's Add button fits on a phone.** On a phone-width screen the button beside the item picker ran off the right edge, leaving only "+ A" showing.
+
 ---
 
 ## [1.4.0-dev03] - 2026-09-27 (pre-release)
