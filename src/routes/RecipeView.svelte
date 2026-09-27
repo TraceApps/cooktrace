@@ -867,8 +867,12 @@
   });
   // Folding moves the crease without resizing the page.
   $: if ($fold !== undefined && layoutEl) measureLayout();
-  $: foldLeftW = $fold?.posture === 'book' && layoutW > 0 ? $fold.start - layoutLeft : null;
-  $: layoutHinge = $fold?.posture === 'book' ? Math.max(0, $fold.end - $fold.start) : 0;
+  // Open flat counts too. The hinge is physically there either way, and a
+  // column boundary that lands on it reads far better than one that leaves the
+  // method column starting just left of the crease.
+  $: foldSnappable = $fold?.posture === 'book' || $fold?.posture === 'flat';
+  $: foldLeftW = foldSnappable && layoutW > 0 ? $fold.start - layoutLeft : null;
+  $: layoutHinge = foldSnappable ? Math.max(0, $fold.end - $fold.start) : 0;
   $: layoutSnap = foldLeftW != null
     && foldLeftW >= 280
     && layoutW - foldLeftW - layoutHinge >= 280;
@@ -1754,13 +1758,15 @@
   /* Half open like a book: the crease is the gutter between the ingredients
      and the method, and nutrition flows below across both pages. Placed after
      the width breakpoints so it wins wherever both would apply. */
-  :global(html.fold-book) .layout.fold-snap {
+  :global(html.fold-book) .layout.fold-snap,
+  :global(html.fold-flat) .layout.fold-snap {
     display: grid;
     grid-template-columns: var(--left-w) minmax(0, 1fr);
     gap: var(--hinge);
     align-items: flex-start;
   }
-  :global(html.fold-book) .layout.fold-snap .col-right { grid-column: 1 / -1; }
+  :global(html.fold-book) .layout.fold-snap .col-right,
+  :global(html.fold-flat) .layout.fold-snap .col-right { grid-column: 1 / -1; }
   :global(html.fold-book) .layout.fold-snap .col-left { position: sticky; top: 16px; }
 
   /* Each column is itself a flex stack — Ingredients above Kitchen
