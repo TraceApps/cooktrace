@@ -354,7 +354,7 @@
   // no name / brand / barcode / thumbnail.
   $: _allModeItems = searchSource !== 'all' ? [] : [
     ...(_isSourceActive('local')
-      ? (items || []).filter(f => query.trim() ? matchesSearch(f, query, buildVariantsByParent(items)) : false).map(f => ({ ...f, _source: 'local' }))
+      ? (items || []).filter(f => query.trim() ? matchesSearch(f, buildVariantsByParent(items), query) : false).map(f => ({ ...f, _source: 'local' }))
       : []),
     ...(_isSourceActive('off')  ? offVisible.map(f  => ({ ...f, _source: 'off'  })) : []),
     ...(_isSourceActive('usda') ? usdaVisible.map(f => ({ ...f, _source: 'usda' })) : []),

@@ -113,11 +113,18 @@ export function aggregateStock(item, variantsByParent) {
   return { stocked, total: children.length, isGeneric: true };
 }
 
+// Lowercase and strip diacritics, so "oregano" finds "Orégano" and
+// "cafe" finds "Café". Spanish, Portuguese, French and German pantry
+// names carry accents that people rarely type on a phone; English names
+// have none, so for them this changes nothing.
+function _fold(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
 function _tokens(q) {
-  return String(q || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return _fold(q).trim().split(/\s+/).filter(Boolean);
 }
 function _hay(row) {
-  return ((row?.name || '') + ' ' + (row?.brand || '')).toLowerCase();
+  return _fold((row?.name || '') + ' ' + (row?.brand || ''));
 }
 function _covers(hay, tokens) {
   for (const t of tokens) if (!hay.includes(t)) return false;
