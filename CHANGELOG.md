@@ -7,14 +7,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.4.0-dev03] - 2026-09-27 (pre-release)
+
+A dev pre-release of the 1.4.0 minor. A first pass at foldables, and search that no longer cares about accents.
+
 ### Added
 
-- **Foldables use the crease.** Half open like a book, a recipe opens like a cookbook: the ingredients on the page left of the fold, the method on the right, without waiting for a desktop-sized screen. Settings puts its section list on one side and the section on the other. Dialogs, sheets, running timers and Trace keep off the crease, and a menu opened near it takes the roomier side rather than being cut in half by the hinge. In laptop posture Trace sits on the half lying flat, leaving the recipe readable on the half standing up. Recipes, lists and photos still cross the fold freely: an opened foldable is a bigger screen to read on, which is the point of having one.
+- **Preliminary foldable support.** Half open like a book, the crease becomes a divider rather than something content sits across:
+  - A recipe opens like a cookbook: the ingredients on the page left of the fold, the method on the right.
+  - Settings puts its section list on one side and the section itself on the other.
+  - Shopping deals its aisles into columns, and the pantry spotlight shows when there is room for it.
+  - The cook diary keeps its toolbar under the header, and a year of cooking fits the width.
+  - Manage splits its rail and its grid on the room available.
+  - Dialogs, sheets, running timers and Trace keep off the crease, and a menu opened near it takes the roomier side rather than being cut in half by the hinge.
+  - In laptop posture Trace sits on the half lying flat, leaving the recipe readable on the half standing up.
+  - Recipes, lists and photos still cross the fold freely, since an opened foldable is a bigger screen to read on.
+  - Diagnostics reports what the hinge is doing, so you can tell whether your phone reports one at all.
 
 ### Fixed
 
 - **Search ignores accents.** Typing "oregano" finds "Orégano", "cafe" finds "Café", "limon" finds "Limón". This holds for the pantry, recipes, cookbooks, the cook diary, tags, units, the Manage lists, Settings, Trace, the public API and the MCP tools, on names and brands alike. A kitchen kept in Spanish, Portuguese, French or another language with accents no longer looks like the item is missing because nobody types the accent on a phone. Text without accents matches exactly as before. Thanks to @herver1971 for the report and the pantry fix in [#62](https://github.com/TraceApps/cooktrace/pull/62).
 - **The All search shows your own pantry again.** With the All chip, or several sources pinned, the pantry part of the results was always empty. Your items appear alongside the OFF, USDA and NutriTrace results now, badged as yours, and tapping one opens that item instead of starting a duplicate of it.
+- **The cook dashboard no longer disappears after one failed stats call.** A single failed request at launch hid the heatmap and the summary tiles for the whole session, with no retry. The heatmap shows on its own data now, and the stats call retries once.
+- **A connection problem says what kind it was.** When the app cannot reach your server, the diagnostic log records the kind of failure and how long it waited. A timeout, an address that would not resolve, a refused connection and a rejected certificate all used to read "Failed to fetch".
+
+### Security
+
+- No dependency changes. `npm audit --omit=dev` reports 0 vulnerabilities for the app and the server.
 
 ---
 
