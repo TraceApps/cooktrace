@@ -25,6 +25,9 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Install server
+        run: npm ci --prefix server
+
       - name: i18n check
         run: npm run i18n:check
 
