@@ -41,6 +41,8 @@
   import { isNative } from '../../lib/platform.js';
   import { callAI, callAIProxy, TOOLS, setToolHandler, AI_DEFAULT_MODELS } from '../../lib/aiChat.js';
 
+  import { foldText } from '../../lib/search-text.js';
+
   let panelOpen = false;
   let messages = [];      // { role, content, time? }
 
@@ -304,17 +306,17 @@
         case 'get_recipes': {
           try {
             const all = await NtApi.getRecipes();
-            const q   = (args?.query    || '').toString().trim().toLowerCase();
-            const cat = (args?.category || '').toString().trim().toLowerCase();
+            const q   = foldText(args?.query).trim();
+            const cat = foldText(args?.category).trim();
             const favOnly = !!args?.favorite;
             let filtered = all;
             if (q) filtered = filtered.filter(r =>
-              (r.name || '').toLowerCase().includes(q) ||
-              (r.description || '').toLowerCase().includes(q) ||
-              (r.tags || []).some(t => t.toLowerCase().includes(q)));
+              foldText(r.name).includes(q) ||
+              foldText(r.description).includes(q) ||
+              (r.tags || []).some(t => foldText(t).includes(q)));
             if (cat) filtered = filtered.filter(r =>
-              (r.category?.name || '').toLowerCase() === cat ||
-              (r.category?.slug || '').toLowerCase() === cat);
+              foldText(r.category?.name) === cat ||
+              foldText(r.category?.slug) === cat);
             if (favOnly) filtered = filtered.filter(r => !!r.favorite);
             return filtered.slice(0, 100).map(_summariseRecipe);
           } catch (e) { return { error: e.message || 'Failed' }; }
@@ -348,11 +350,11 @@
             if (args?.in_stock_only) opts.in_stock = 1;
             if (args?.query) opts.q = args.query;
             const rows = await NtApi.getPantry(opts);
-            const cat = (args?.category || '').toString().trim().toLowerCase();
+            const cat = foldText(args?.category).trim();
             const filtered = cat
               ? rows.filter(p =>
-                  (p.category?.name || '').toLowerCase() === cat ||
-                  (p.category?.slug || '').toLowerCase() === cat)
+                  foldText(p.category?.name) === cat ||
+                  foldText(p.category?.slug) === cat)
               : rows;
             // Variant-aware shape (Issue #4). Standalone variants drop
             // from the top of the response; they ride along under their

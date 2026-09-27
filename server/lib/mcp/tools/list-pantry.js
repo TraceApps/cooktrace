@@ -9,6 +9,7 @@
 import { z } from 'zod';
 import db from '../../../db.js';
 import { toolResult } from '../_util.js';
+import { foldText } from '../../search-text.js';
 
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 50;
@@ -35,8 +36,8 @@ export function registerListPantry(server, { userId }) {
       const args = [userId];
       if (q) {
         const escaped = q.replace(/[\\%_]/g, c => '\\' + c);
-        const like = `%${escaped}%`;
-        clauses.push(`(name LIKE ? ESCAPE '\\' OR brand LIKE ? ESCAPE '\\')`);
+        const like = `%${foldText(escaped)}%`;
+        clauses.push(`(fold(name) LIKE ? ESCAPE '\\' OR fold(brand) LIKE ? ESCAPE '\\')`);
         args.push(like, like);
       }
       if (in_stock_only) clauses.push('in_stock = 1');

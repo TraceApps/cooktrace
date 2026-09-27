@@ -12,6 +12,8 @@
   import { confirmDialog } from '../../stores/confirmDialog.js';
   import Spinner from '../ui/Spinner.svelte';
 
+  import { foldText } from '../../lib/search-text.js';
+
   const SWATCHES = [
     '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
     '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#a855f7',
@@ -30,7 +32,7 @@
 
   let filter = '';
   $: filtered = filter.trim()
-    ? categories.filter(c => c.name.toLowerCase().includes(filter.trim().toLowerCase()))
+    ? categories.filter(c => foldText(c.name).includes(foldText(filter).trim()))
     : categories;
   $: filteredEmpty = categories.length > 0 && filtered.length === 0;
 

@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { foldText } from './lib/search-text.js';
 
 const dbPath = process.env.DB_PATH || './cooktrace.db';
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -8,6 +9,12 @@ fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+
+// Accent-insensitive text search: `fold(name) LIKE '%cafe%'` finds "Café".
+// SQLite's own LIKE folds ASCII case and nothing else, so a pantry or recipe
+// named in Spanish, Portuguese or French could not be found without typing
+// the accent. Same definition the client searches with.
+db.function('fold', { deterministic: true }, (s) => foldText(s));
 
 // ── Core tables ────────────────────────────────────────────────────────────
 db.exec(`

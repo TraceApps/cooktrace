@@ -17,6 +17,7 @@ import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { deriveSodiumSalt } from '../lib/nutrition-derive.js';
 import { dispatchWebhookEvent } from '../lib/webhooks.js';
+import { foldText } from '../lib/search-text.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -204,12 +205,12 @@ router.delete('/categories/:id', wrap((req, res) => {
 router.get('/', wrap((req, res) => {
   const u = uid(req);
   const stockOnly = req.query.in_stock === '1';
-  const q = req.query.q ? String(req.query.q).trim().toLowerCase() : '';
+  const q = req.query.q ? foldText(req.query.q).trim() : '';
 
   let sql = `SELECT * FROM pantry_items WHERE ${userClause(u)} AND deleted_at IS NULL`;
   const args = [...userArgs(u)];
   if (stockOnly) sql += ` AND in_stock = 1`;
-  if (q) { sql += ` AND LOWER(name) LIKE ?`; args.push(`%${q}%`); }
+  if (q) { sql += ` AND fold(name) LIKE ?`; args.push(`%${q}%`); }
   sql += ` ORDER BY name COLLATE NOCASE ASC`;
 
   const rows = db.prepare(sql).all(...args);

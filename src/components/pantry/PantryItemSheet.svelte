@@ -48,6 +48,7 @@
   import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS, isDerived, deriveSodiumSalt } from '../../lib/nutriments.js';
   import { lookupBarcode, contributeToOFF } from '../../lib/off.js';
   import { displayVariantName as _sharedDisplayVariantName, isItemInStock } from '../../lib/pantry-variants.js';
+  import { foldText } from '../../lib/search-text.js';
   import { visibleNutriments, offEnabled, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks } from '../../stores/settings.js';
   import { scanNutritionLabel } from '../../lib/scan-nutrition.js';
 
@@ -490,12 +491,12 @@
   }
 
   $: variantPickerResults = (() => {
-    const q = (variantPickerQuery || '').trim().toLowerCase();
+    const q = foldText(variantPickerQuery).trim();
     const pool = variantPickerMode === 'set-parent'
       ? variantContext.candidates  // anywhere flat-or-generic
       : variantContext.candidates.filter(r => r.id !== item?.id);
     if (!q) return pool.slice(0, 50);
-    return pool.filter(r => (r.name || '').toLowerCase().includes(q)).slice(0, 50);
+    return pool.filter(r => foldText(r.name).includes(q)).slice(0, 50);
   })();
 
   // Suggestion list under the inline Add Variant input (Issue #4 UX
@@ -510,15 +511,15 @@
   // accept the attachment).
   $: addVariantSuggestions = (() => {
     if (!addingVariantRow) return [];
-    const q = (newVariantBrand || '').trim().toLowerCase();
+    const q = foldText(newVariantBrand).trim();
     if (!q) return [];
     // Filter out generics from the Add Variant suggestion list so we
     // don't offer a target the server will reject.
     const pool = (variantContext.candidates || []).filter(r => !r._isGeneric);
     const scored = pool
       .map(r => {
-        const name = (r.name || '').toLowerCase();
-        const brand = (r.brand || '').toLowerCase();
+        const name = foldText(r.name);
+        const brand = foldText(r.brand);
         const hay = name + ' ' + brand;
         if (!hay.includes(q)) return null;
         // Prefer rows whose brand or name STARTS with the query, then

@@ -17,6 +17,7 @@
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import DateInput from '../components/ui/DateInput.svelte';
   import { longpress } from '../lib/long-press.js';
+  import { foldText } from '../lib/search-text.js';
   import {
     buildShoppingCardSvg, buildShoppingText,
     svgToPngBlob, shareBlob, shareText,
@@ -757,7 +758,7 @@
     }
   }
   $: filteredPickerRecipes = pickerSearch.trim()
-    ? pickerRecipes.filter(r => r.name.toLowerCase().includes(pickerSearch.trim().toLowerCase()))
+    ? pickerRecipes.filter(r => foldText(r.name).includes(foldText(pickerSearch).trim()))
     : pickerRecipes;
 
   async function addFromRecipe(r) {

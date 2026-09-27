@@ -16,6 +16,8 @@
   import { longpress } from '../lib/long-press.js';
   import { resolveAssetUrl } from '../lib/platform.js';
 
+  import { foldText } from '../lib/search-text.js';
+
   let entries = [];
   let loading = true;
   let loadError = null;
@@ -39,7 +41,7 @@
   // and the meal-type chip.
   let diarySearch = '';
   let mealFilter = ''; // '' | 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'other'
-  $: _diaryQuery = diarySearch.trim().toLowerCase();
+  $: _diaryQuery = foldText(diarySearch).trim();
 
   // All view branches read from displayEntries so the recipe filter,
   // meal-type chip, and text search apply uniformly to List / Month
@@ -50,9 +52,9 @@
     if (mealFilter)     list = list.filter(e => (e.meal_type || '') === mealFilter);
     if (_diaryQuery) {
       list = list.filter(e =>
-        ((e.recipe_name || '').toLowerCase().includes(_diaryQuery)) ||
-        ((e.notes       || '').toLowerCase().includes(_diaryQuery)) ||
-        ((e.cooked_by_full_name || e.cooked_by_username || '').toLowerCase().includes(_diaryQuery))
+        foldText(e.recipe_name).includes(_diaryQuery) ||
+        foldText(e.notes).includes(_diaryQuery) ||
+        foldText(e.cooked_by_full_name || e.cooked_by_username).includes(_diaryQuery)
       );
     }
     return list;
@@ -78,7 +80,7 @@
   function clearFilter() { filterRecipeId = null; }
 
   $: filteredFilterRecipes = filterSearch.trim()
-    ? planRecipes.filter(r => (r.name || '').toLowerCase().includes(filterSearch.trim().toLowerCase()))
+    ? planRecipes.filter(r => foldText(r.name).includes(foldText(filterSearch).trim()))
     : planRecipes;
 
   // Multi-photo entries store `photos` as a JSON array. Older single-
@@ -319,7 +321,7 @@
     }
   }
   $: filteredPlanRecipes = planSearch.trim()
-    ? planRecipes.filter(r => r.name.toLowerCase().includes(planSearch.trim().toLowerCase()))
+    ? planRecipes.filter(r => foldText(r.name).includes(foldText(planSearch).trim()))
     : planRecipes;
 
   async function savePlan() {

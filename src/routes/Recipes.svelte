@@ -21,6 +21,8 @@
   import { svgToPngBlob, shareBlobs } from '../lib/shopping-card.js';
   import { isNative, getServerUrl } from '../lib/platform.js';
 
+  import { foldText } from '../lib/search-text.js';
+
   let createSheetOpen = false;
   // Measured page-header height — exposed as --header-h on page-shell so
   // sticky sub-bars can pin below it instead of sliding underneath.
@@ -673,25 +675,25 @@
     return [...seen.values()];
   })();
   $: filteredShared = (() => {
-    const q = query.trim().toLowerCase();
+    const q = foldText(query).trim();
     let list = sharedRecipes;
     if (sharedCategorySlug) {
       list = list.filter(r => r.category && r.category.slug === sharedCategorySlug);
     }
     if (q) {
       list = list.filter(r =>
-        (r.name || '').toLowerCase().includes(q) ||
-        (r.description || '').toLowerCase().includes(q) ||
-        (r.tags || []).some(t => t.toLowerCase().includes(q)) ||
-        (r.category?.name || '').toLowerCase().includes(q) ||
-        (r.shared_by || '').toLowerCase().includes(q)
+        foldText(r.name).includes(q) ||
+        foldText(r.description).includes(q) ||
+        (r.tags || []).some(t => foldText(t).includes(q)) ||
+        foldText(r.category?.name).includes(q) ||
+        foldText(r.shared_by).includes(q)
       );
     }
     return _applySort([...list], $recipesSort);
   })();
 
   $: filtered = (() => {
-    const q = query.trim().toLowerCase();
+    const q = foldText(query).trim();
     // Optional mix-in: when the user has "Show Shared Recipes in My
     // Main List" on, append the /shared-with-me collection to the
     // owned recipes. Cards keep their existing shared_by badge + the
@@ -711,10 +713,10 @@
     }
     if (q) {
       list = list.filter(r =>
-        (r.name || '').toLowerCase().includes(q) ||
-        (r.description || '').toLowerCase().includes(q) ||
-        (r.tags || []).some(t => t.toLowerCase().includes(q)) ||
-        (r.category?.name || '').toLowerCase().includes(q)
+        foldText(r.name).includes(q) ||
+        foldText(r.description).includes(q) ||
+        (r.tags || []).some(t => foldText(t).includes(q)) ||
+        foldText(r.category?.name).includes(q)
       );
     }
     return _applySort([...list], $recipesSort);

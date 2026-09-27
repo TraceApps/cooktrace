@@ -9,6 +9,8 @@
   import { unitsOverlay, refreshUnitsOverlay } from '../../stores/unitsOverlay.js';
   import { portal } from '../../lib/portal.js';
 
+  import { foldText } from '../../lib/search-text.js';
+
   /** Stored abbreviation (e.g. "tsp"). Free text is also allowed. */
   export let value = '';
   export let placeholder = 'unit';
@@ -50,14 +52,14 @@
 
   // Filter ONLY when the user has typed since opening — clicking the field
   // (browse mode) shows every unit regardless of the saved value.
-  $: q = typedSinceOpen ? (value || '').trim().toLowerCase() : '';
+  $: q = typedSinceOpen ? foldText(value).trim() : '';
   $: filteredGroups = q
     ? orderedGroups
         .map(g => ({
           ...g,
           units: g.units.filter(u =>
-            u.abbr.toLowerCase().includes(q) ||
-            u.full.toLowerCase().includes(q)
+            foldText(u.abbr).includes(q) ||
+            foldText(u.full).includes(q)
           ),
         }))
         .filter(g => g.units.length > 0)

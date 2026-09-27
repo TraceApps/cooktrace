@@ -24,6 +24,8 @@
   import ImagePicker from '../components/ui/ImagePicker.svelte';
   import { dragHandleZone, dragHandle } from 'svelte-dnd-action';
 
+  import { foldText } from '../lib/search-text.js';
+
   export let params = {};
   $: id = parseInt(params.id, 10);
 
@@ -72,10 +74,10 @@
   $: addCandidates = allRecipes
     .filter(r => !existingIds.has(r.id))
     .filter(r => {
-      const q = addQuery.trim().toLowerCase();
+      const q = foldText(addQuery).trim();
       if (!q) return true;
-      return (r.name || '').toLowerCase().includes(q)
-        || (r.description || '').toLowerCase().includes(q);
+      return foldText(r.name).includes(q)
+        || foldText(r.description).includes(q);
     });
 
   function toggleAddSelected(rid) {
@@ -110,8 +112,8 @@
   $: displayRecipes = (() => {
     if (!cookbook) return [];
     let list = cookbook.recipes || [];
-    const q = cbQuery.trim().toLowerCase();
-    if (q) list = list.filter(r => (r.name || '').toLowerCase().includes(q));
+    const q = foldText(cbQuery).trim();
+    if (q) list = list.filter(r => foldText(r.name).includes(q));
     if (cbSort === 'alpha') {
       list = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     } else if (cbSort === 'fav') {

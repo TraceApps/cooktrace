@@ -43,6 +43,8 @@
   import { placeAnchoredMenu } from '../../lib/fold-core.js';
   import { portal } from '../../lib/portal.js';
 
+  import { foldText } from '../../lib/search-text.js';
+
   export let mode = 'single';
   export let value = mode === 'chips' ? [] : '';
   export let options = [];
@@ -86,7 +88,7 @@
       });
     if (!q) return list.slice(0, maxResults);
     return list
-      .filter(o => _norm(o.name).includes(q))
+      .filter(o => foldText(o.name).includes(foldText(q)))
       .slice(0, maxResults);
   })();
 
@@ -94,7 +96,7 @@
   // AND no exact (case-insensitive) match in the filtered list.
   $: canCreate = creatable
     && typed.trim().length > 0
-    && !filtered.some(o => _norm(o.name) === _norm(typed));
+    && !filtered.some(o => foldText(o.name) === foldText(typed));
 
   $: rowCount = filtered.length + (canCreate ? 1 : 0);
 

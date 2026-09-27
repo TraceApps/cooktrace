@@ -17,6 +17,8 @@
   import Combobox from '../ui/Combobox.svelte';
   import Spinner from '../ui/Spinner.svelte';
 
+  import { foldText } from '../../lib/search-text.js';
+
   let cookbooks = [];
   let categories = [];
   let tagOptions = [];
@@ -42,7 +44,7 @@
 
   let filter = '';
   $: filtered = filter.trim()
-    ? cookbooks.filter(cb => cb.name.toLowerCase().includes(filter.trim().toLowerCase()))
+    ? cookbooks.filter(cb => foldText(cb.name).includes(foldText(filter).trim()))
     : cookbooks;
   $: filteredEmpty = cookbooks.length > 0 && filtered.length === 0;
 
