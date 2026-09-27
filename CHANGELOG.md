@@ -9,6 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **A cookbook cover uploads from Manage, and so does a recipe video.** Both said "Upload failed" and saved nothing, although the file had already reached your server. Manage → Cookbooks is the only place a smart cookbook gets its cover, so smart cookbooks could not have one at all. Thanks to @herver1971 for the report and the diagnosis in [#63](https://github.com/TraceApps/cooktrace/issues/63).
 - **The shopping list's Add button fits on a phone.** On a phone-width screen the button beside the item picker ran off the right edge, leaving only "+ A" showing.
 
 ---

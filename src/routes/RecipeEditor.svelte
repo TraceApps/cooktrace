@@ -413,8 +413,8 @@
     }
     videoUploading = true;
     try {
-      const res = await NtApi.uploadImage(file); // same multipart handler accepts video
-      const url = res?.url || res?.path || '';
+      // Same multipart handler accepts video. It returns the URL as a string.
+      const url = await NtApi.uploadImage(file);
       if (!url) throw new Error('Upload failed');
       videoUrl = url;
       showSuccess($_('recipe_editor_ct.toast.video_uploaded'));
