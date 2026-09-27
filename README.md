@@ -36,7 +36,7 @@ No accounts, no telemetry, no cloud sync unless you opt in.</p>
 
 CookTrace runs as a single Docker container on your own hardware, with a PWA for the browser and a native Android app for your phone. No accounts on external services, no data leaving your network, no subscriptions.
 
-Third app in the Trace family alongside [NutriTrace](https://github.com/traceapps/nutritrace) and [LiftTrace](https://github.com/traceapps/lifttrace).
+Third app in the Trace family alongside [NutriTrace](https://github.com/traceapps/nutritrace), [LiftTrace](https://github.com/traceapps/lifttrace), and [NoteTrace](https://github.com/traceapps/notetrace).
 
 ## Principles
 
@@ -73,8 +73,8 @@ Third app in the Trace family alongside [NutriTrace](https://github.com/traceapp
 - **Multi-user + OIDC SSO.** Authentik, Keycloak, Pocket ID, Authelia, Auth0, Google. Auto-link verified emails, optional auto-register, admin-group claims, RP-initiated logout. → [full guide](https://traceapps.github.io/docs/auth/oidc/)
 - **Backups.** Full-DB zip with zip-slip / zip-bomb defenses, scheduled auto-backups, portable JSON export, Android local-backup zip. → [full guide](https://traceapps.github.io/docs/self-hosting/backups/)
 - **Native Android app.** Offline local mode or server-connected differential sync. → [full guide](https://traceapps.github.io/docs/mobile/install/)
-- **Wear OS.** A watch app for Wear OS 3 and up: the shopping list by aisle with a trolley in one hand, and the dish you are cooking, its ingredients and steps as checklists, with kitchen timers that ring on your wrist and show on the watch face. It talks to your server itself, so it works in a shop with no signal, and it pairs itself when you sign in on the phone. → [full guide](https://traceapps.github.io/docs/cooktrace/wear/)
-- **Wear OS.** A watch app for Wear OS 3 and up: your shopping list by aisle, ticked off with a trolley in one hand, and the cook you are in, with ingredients and steps as checklists, timers a step asks for, and "I cooked this" at the end. It talks to your server itself, and it pairs itself when you sign in on the phone.
+- **Wear OS.** A watch app for Wear OS 3 and up: your shopping list by aisle, ticked off with a trolley in one hand, and the cook you are in, with ingredients and steps as checklists, the timers a step asks for ringing on your wrist and showing on the watch face, and "I cooked this" at the end. It talks to your server itself, so it works in a shop with no signal, and it pairs itself when you sign in on the phone. → [full guide](https://traceapps.github.io/docs/cooktrace/wear/)
+- **Foldables (preliminary).** Half open like a book, a recipe opens like a cookbook, the ingredients on one side of the crease and the method on the other. Settings, Shopping, the cook diary and Manage split on the room they have, and dialogs, sheets, timers and Trace keep off the fold.
 
 ---
 
@@ -175,7 +175,7 @@ Svelte 5 (compat mode) + Vite 7 PWA · Capacitor 8 Android · Node.js + Express 
 
 ## Trace family
 
-Part of the **TraceApps** family. Sister apps: [NutriTrace](https://github.com/traceapps/nutritrace) for nutrition tracking, [LiftTrace](https://github.com/traceapps/lifttrace) for weightlifting. Full docs for all three at [traceapps.github.io/docs](https://traceapps.github.io/docs/).
+Part of the **TraceApps** family. Sister apps: [NutriTrace](https://github.com/traceapps/nutritrace) for nutrition tracking, [LiftTrace](https://github.com/traceapps/lifttrace) for weightlifting, [NoteTrace](https://github.com/traceapps/notetrace) for notes, tasks and reminders. Docs for the family at [traceapps.github.io/docs](https://traceapps.github.io/docs/).
 
 ---
 
