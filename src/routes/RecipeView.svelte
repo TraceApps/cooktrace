@@ -1723,7 +1723,18 @@
       align-items: flex-start;
     }
     /* On 2-col, Nutrition spans both columns and flows below. */
-    :global(html.wide-content) .col-right { grid-column: 1 / -1; }
+    /* Under the ingredients, not below everything. Spanning both columns put
+       nutrition and Recompute after the method column, which is much the
+       longer of the two, so they ended up stranded at the bottom with a large
+       void beside them. Desktop gives them their own third column; here the
+       ingredients column is where the room is. */
+    /* Bounded above, or the explicit rows leak into the desktop tier, which
+       only resets grid-column and would lose its third column. */
+    @media (max-width: 1279px) {
+      :global(html.wide-content) .col-left  { grid-column: 1; grid-row: 1; }
+      :global(html.wide-content) .col-mid   { grid-column: 2; grid-row: 1 / span 2; }
+      :global(html.wide-content) .col-right { grid-column: 1; grid-row: 2; }
+    }
     /* Sticky left column — Ingredients + Kitchen Gear stay in view as
        you scroll the steps. We deliberately don't set overflow-y here
        any more: setting it to auto forces overflow-x to be clipped
@@ -1765,8 +1776,12 @@
     gap: var(--hinge);
     align-items: flex-start;
   }
+  :global(html.fold-book) .layout.fold-snap .col-left,
+  :global(html.fold-flat) .layout.fold-snap .col-left { grid-column: 1; grid-row: 1; }
+  :global(html.fold-book) .layout.fold-snap .col-mid,
+  :global(html.fold-flat) .layout.fold-snap .col-mid { grid-column: 2; grid-row: 1 / span 2; }
   :global(html.fold-book) .layout.fold-snap .col-right,
-  :global(html.fold-flat) .layout.fold-snap .col-right { grid-column: 1 / -1; }
+  :global(html.fold-flat) .layout.fold-snap .col-right { grid-column: 1; grid-row: 2; }
   :global(html.fold-book) .layout.fold-snap .col-left { position: sticky; top: 16px; }
 
   /* Each column is itself a flex stack — Ingredients above Kitchen
