@@ -11,6 +11,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **Foldables use the crease.** Half open like a book, a recipe opens like a cookbook: the ingredients on the page left of the fold, the method on the right, without waiting for a desktop-sized screen. Settings puts its section list on one side and the section on the other. Dialogs, sheets, running timers and Trace keep off the crease, and a menu opened near it takes the roomier side rather than being cut in half by the hinge. In laptop posture Trace sits on the half lying flat, leaving the recipe readable on the half standing up. Recipes, lists and photos still cross the fold freely: an opened foldable is a bigger screen to read on, which is the point of having one.
 
+### Fixed
+
+- **Pantry search ignores accents.** Typing "oregano" now finds "Orégano", "cafe" finds "Café", "limon" finds "Limón", on names and brands alike. Pantries kept in Spanish, Portuguese, French, German and other languages with diacritics are full of accented names, and on a phone almost nobody types the accent, so the item looked missing. English names have no accents and match exactly as before.
+- **The All search shows your pantry again.** With the All chip (or several sources pinned), the pantry part of the results was always empty: the search received its two inputs in the wrong order and looked for the text "[object Map]".
+
 ---
 
 ## [1.4.0-dev02] - 2026-09-25 (pre-release)
