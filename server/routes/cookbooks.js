@@ -364,8 +364,10 @@ router.put('/:id', wrap((req, res) => {
   const description = req.body?.description !== undefined
     ? (req.body.description ? String(req.body.description).trim() : null)
     : existing.description;
+  // Same as create: a cover picked with no connection arrives as a data URL,
+  // and is written out as a file rather than stored whole in the row.
   const cover_image_url = req.body?.cover_image_url !== undefined
-    ? (req.body.cover_image_url ? String(req.body.cover_image_url).trim() : null)
+    ? (req.body.cover_image_url ? localizeDataUrl(String(req.body.cover_image_url).trim()) || null : null)
     : existing.cover_image_url;
   const sort_order  = req.body?.sort_order != null && Number.isFinite(parseInt(req.body.sort_order, 10))
     ? parseInt(req.body.sort_order, 10) : existing.sort_order;

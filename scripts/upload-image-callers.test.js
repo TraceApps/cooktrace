@@ -46,3 +46,12 @@ test('the cookbook cover and the recipe video take the returned string as the UR
     assert.match(readFileSync(join(root, p), 'utf8'), /const url = await NtApi\.uploadImage\(file\);/, p);
   }
 });
+
+test('a cookbook cover sent as a data URL is written out as a file on update, as on create', () => {
+  // Offline, uploadImage hands back a data URL. Saving it later used to store
+  // the whole image in the cookbook row, because only create localized it.
+  const src = readFileSync(new URL('../server/routes/cookbooks.js', import.meta.url), 'utf8');
+  const covers = [...src.matchAll(/const cover_image_url = [^;]+;/g)].map(m => m[0]);
+  assert.equal(covers.length, 2, 'expected the create and the update assignment');
+  for (const c of covers) assert.match(c, /localizeDataUrl\(/, c);
+});
