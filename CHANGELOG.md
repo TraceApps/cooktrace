@@ -13,6 +13,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **A file of the wrong type, or over the size limit, is turned away with a clear message.** Uploading one answered with a server error instead of saying what was wrong. A file that is too large now says what the limit is.
 - **A cookbook cover uploads from Manage, and so does a recipe video.** Both said "Upload failed" and saved nothing, although the file had already reached your server. Manage → Cookbooks is the only place a smart cookbook gets its cover, so smart cookbooks could not have one at all. Thanks to @herver1971 for the report and the diagnosis in [#63](https://github.com/TraceApps/cooktrace/issues/63).
 - **A cookbook cover picked with no connection is saved as a picture file** once you are back online, not stored whole inside the cookbook, where it made every list of cookbooks heavier to load. Updating a cookbook now checks its cover the way creating one always did.
 - **The shopping list's Add button fits on a phone.** On a phone-width screen the button beside the item picker ran off the right edge, leaving only "+ A" showing.

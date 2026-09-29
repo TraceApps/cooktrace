@@ -21,6 +21,19 @@ const storage = multer.diskStorage({
   },
 });
 
+// A refused or oversized file is the caller's mistake, not the server falling
+// over, so it answers 415 or 413 instead of reaching the error handler as a 500.
+function refusedType(message) {
+  return Object.assign(new Error(message), { status: 415 });
+}
+function uploadError(err, next, maxMb) {
+  if (err?.code === 'LIMIT_FILE_SIZE') {
+    return next(Object.assign(new Error(`That file is larger than this server accepts (${maxMb} MB).`), { status: 413 }));
+  }
+  if (err?.name === 'MulterError' && !err.status) err.status = 400;
+  return next(err);
+}
+
 // 100MB cap — recipe images stay tiny but video instructions can be
 // chunky (5-min smartphone clip ≈ 50MB). Authenticated users only,
 // per-user disk cost stays bounded.
@@ -30,7 +43,7 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) return cb(null, true);
     if (file.mimetype.startsWith('video/')) return cb(null, true);
-    cb(new Error('Images or videos only'));
+    cb(refusedType('Images or videos only'));
   },
 });
 
@@ -39,7 +52,7 @@ router.use(requireAuth);
 
 router.post('/', uploadLimit, (req, res, next) => {
   upload.single('file')(req, res, async (err) => {
-    if (err) return next(err);
+    if (err) return uploadError(err, next, 100);
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
     // Video uploads skip the image magic-byte check. The route is auth-
