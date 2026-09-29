@@ -7,9 +7,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.4.0-dev04] - 2026-09-29 (pre-release)
+
+A dev pre-release of the 1.4.0 minor. Spanish, a Support page in Settings, uploads that say what went wrong, and security updates.
+
 ### Added
 
+- **Spanish.** CookTrace can be used in Spanish: pick it in Settings → Regional & Units, or it follows your browser or phone. Translated almost in full by @herver1971 on Weblate. Thank you!
 - **Settings has a Support page**, next to About: Ko-fi and GitHub Sponsors, plus free ways to help (star the repo, report a bug, translate). It replaces the support row that used to sit in About.
+
+### Changed
+
+- **The in-app updater reuses an update it already downloaded.** Coming back to Updates goes straight to installing instead of downloading the whole APK again, and the button says Install. Older downloads are cleared so they stop piling up on the phone.
 
 ### Fixed
 
