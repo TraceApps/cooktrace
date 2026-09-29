@@ -358,6 +358,9 @@
     },
     "server": {
       "section": "Conexión al servidor"
+    },
+    "support": {
+      "section": "Apoyar"
     }
   },
   "login": {
@@ -912,6 +915,16 @@
       "lightness": "Luminosidad",
       "hex_code": "Código hex",
       "apply": "Aplicar color"
+    },
+    "support": {
+      "lead": "CookTrace es gratis y siempre lo va a ser. Apoyar es opcional y nunca desbloquea nada.",
+      "other_ways": "Otras formas de ayudar",
+      "star": "Estrella en GitHub",
+      "star_desc": "Las estrellas son lo que hace que la gente encuentre los proyectos que se instalan en un servidor propio.",
+      "report_bug": "Reportar un error",
+      "report_bug_desc": "Un reporte claro lo arregla para todos los que se topan con lo mismo.",
+      "translate": "Ayudar a traducir",
+      "translate_desc": "Haz que CookTrace se pueda usar en tu idioma, en Weblate."
     }
   },
   "backup_page": {
