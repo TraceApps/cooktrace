@@ -61,8 +61,11 @@
         <a href="https://ko-fi.com/traceapps" target="_blank" rel="noopener" class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px">
           <span class="material-symbols-rounded" style="font-size:14px">coffee</span> Ko-fi
         </a>
+        <a href="https://github.com/sponsors/TraceApps" target="_blank" rel="noopener" class="btn btn-secondary" style="height:30px;font-size:12px;padding:0 12px">
+          <span class="material-symbols-rounded" style="font-size:14px">favorite</span> GitHub Sponsors
+        </a>
       </div>
-      <div class="setting-desc" style="padding-left:30px;font-size:11px">{$_('settings_page.about.support_note')}</div>
+      <div class="setting-desc" style="padding-left:30px;font-size:11px">{$_('settings_page.about.support_note')} {$_('settings_page.about.support_monthly')}</div>
     </div>
     <div class="setting-divider"></div>
     <div class="about-desc" style="font-size:11px;color:var(--text-3);line-height:1.5">
