@@ -203,8 +203,8 @@
     "kitchens":           { "section": "Kitchens" },
     "diagnostics":        { "section": "Diagnostics" },
     "updates":            { "section": "Updates" },
+    "support":            { "section": "Support" },
     "about":              { "section": "About" },
-    "support_dev":        { "section": "Support Development" },
     "diary":              { "section": "Diary" },
     "water":              { "section": "Water" },
     "foods":              { "section": "Foods" },
@@ -844,14 +844,21 @@
       "crash_available":        "Crash report available"
     },
     "about": {
-      "support_note": "CookTrace is free to self-host, always. The current goal is a Mac and an iPhone so the Trace apps can run properly on iOS.",
-      "support_monthly":        "GitHub Sponsors helps with the monthly costs.",
       "app_name":               "CookTrace",
       "federation_prefix":      "Optional federation with ",
       "federation_suffix":      " for nutrition tracking",
       "family_prefix":          "Part of the ",
-      "family_suffix":          " family (with NutriTrace and LiftTrace)",
-      "support_dev":            "Support Development"
+      "family_suffix":          " family (with NutriTrace and LiftTrace)"
+    },
+    "support": {
+      "lead":                   "CookTrace is free and always will be. Support is optional and never unlocks anything.",
+      "other_ways":             "Other Ways to Help",
+      "star":                   "Star on GitHub",
+      "star_desc":              "Stars are how self-hosted projects get found.",
+      "report_bug":             "Report a Bug",
+      "report_bug_desc":        "A clear report fixes it for everyone who hits the same thing.",
+      "translate":              "Help Translate",
+      "translate_desc":         "Make CookTrace usable in your language, on Weblate."
     },
     "custom_color": {
       "saturation":             "Saturation",

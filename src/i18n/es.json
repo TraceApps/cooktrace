@@ -226,9 +226,6 @@
     "about": {
       "section": "Acerca de"
     },
-    "support_dev": {
-      "section": "Apoyar el desarrollo"
-    },
     "diary": {
       "section": "Diario"
     },
@@ -906,13 +903,11 @@
       "crash_available": "Hay un reporte de fallo disponible"
     },
     "about": {
-      "support_note": "CookTrace es y va a seguir siendo gratis para instalar en tu servidor. El objetivo actual es conseguir una Mac y un iPhone para que las apps Trace funcionen bien en iOS.",
       "app_name": "CookTrace",
       "federation_prefix": "Federación opcional con ",
       "federation_suffix": " para el seguimiento nutricional",
       "family_prefix": "Parte de la familia ",
-      "family_suffix": " (con NutriTrace y LiftTrace)",
-      "support_dev": "Apoyar el desarrollo"
+      "family_suffix": " (con NutriTrace y LiftTrace)"
     },
     "custom_color": {
       "saturation": "Saturación",

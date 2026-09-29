@@ -45,6 +45,7 @@
   import SettingsApiTokens       from '../components/settings/SettingsApiTokens.svelte';
   import SettingsWebhooks        from '../components/settings/SettingsWebhooks.svelte';
   import SettingsEmail           from '../components/settings/SettingsEmail.svelte';
+  import SettingsSupport         from '../components/settings/SettingsSupport.svelte';
   import SettingsAbout           from '../components/settings/SettingsAbout.svelte';
   import Profile                 from './Profile.svelte';
   import Sheet                   from '../components/ui/Sheet.svelte';
@@ -169,6 +170,7 @@
     serverconn:    { titleKey: 'settings.server.section',            icon: 'cloud' },
     updates:       { titleKey: 'settings.updates.section',           icon: 'system_update' },
     diagnostics:   { titleKey: 'settings.diagnostics.section',       icon: 'troubleshoot' },
+    support:       { titleKey: 'settings.support.section',           icon: 'volunteer_activism' },
     about:         { titleKey: 'settings.about.section',             icon: 'info' },
     profile:       { titleKey: 'profile.title',                      icon: 'person' },
   };
@@ -200,6 +202,7 @@
     serverconn:    SettingsServerConnection,
     updates:       SettingsUpdates,
     diagnostics:   SettingsDiagnostics,
+    support:       SettingsSupport,
     about:         SettingsAbout,
     profile:       Profile,
   };
@@ -228,7 +231,8 @@
     serverconn:    ['server','connection','sync','connect','disconnect','local mode','offline','standalone','android','native','url','login'],
     updates:       ['updates','update','upgrade','version','new version','changelog','release','releases','apk','install','download','check for updates','auto-check','channel','stable','dev','dev-latest','beta','github','server update','docker','compose','docker-compose','check frequency','check interval','how often','hourly','daily','manual','manual only','cadence','banner','notification'],
     diagnostics:   ['diagnostics','logs','verbose','console','export','bug','report','troubleshoot','crash'],
-    about:         ['about','version','cooktrace','license','source','github','donate','support','ko-fi','sponsor','github sponsors'],
+    support:       ['support','donate','donation','sponsor','github sponsors','ko-fi','kofi','tip','star','report a bug','bug','translate','weblate','help'],
+    about:         ['about','version','cooktrace','license','source','github'],
   };
 
   // Visibility predicate for section-toggle rows. Only filters when
@@ -547,6 +551,12 @@
     {/if}
   {/if}
 
+  <p class="settings-group-label">CookTrace</p>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'support')} class:active={currentSection === 'support'} aria-current={currentSection === 'support' ? 'page' : undefined} on:click={() => toggleSection('support')}>
+    <span class="material-symbols-rounded si">volunteer_activism</span>
+    <span>{$_('settings.support.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
   <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'about')} class:active={currentSection === 'about'} aria-current={currentSection === 'about' ? 'page' : undefined} on:click={() => toggleSection('about')}>
     <span class="material-symbols-rounded si">info</span>
     <span>{$_('settings.about.section')}</span>
@@ -1106,7 +1116,10 @@
       gap: 24px;
       align-items: start;
     }
-
+    /* The pane's first card starts level with the rail's top edge.
+       .section-body's 12px top padding (right for the phone's stacked
+       view) pushed every section 12px below the rail here. */
+    :global(html.wide-content) .settings-pane :global(.section-body) { padding-top: 0; }
 
     :global(html.wide-content) .settings-nav-rail {
       display: flex;
@@ -1329,5 +1342,9 @@
   }
   :global(html.fold-book:not(.force-mobile-layout)) .settings-two-pane.fold-snap .settings-mobile-index {
     display: none;
+  }
+  /* Same rail-level start as the wide two-pane above. */
+  :global(html.fold-book:not(.force-mobile-layout)) .settings-two-pane.fold-snap .settings-pane :global(.section-body) {
+    padding-top: 0;
   }
 </style>
