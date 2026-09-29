@@ -17,6 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **A cookbook cover picked with no connection is saved as a picture file** once you are back online, not stored whole inside the cookbook, where it made every list of cookbooks heavier to load. Updating a cookbook now checks its cover the way creating one always did.
 - **The shopping list's Add button fits on a phone.** On a phone-width screen the button beside the item picker ran off the right edge, leaving only "+ A" showing.
 - **Settings pages line up with the section list** on desktop and foldables. Most pages started 12px below the list beside it.
+- **The Settings section list keeps its place** on desktop and foldables. Every click in it scrolled the list back to Profile.
 
 ---
 

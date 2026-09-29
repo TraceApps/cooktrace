@@ -1,3 +1,13 @@
+<script context="module">
+  // The app wraps every route in {#key $location}, so each click in the
+  // Settings rail mounts a new Settings, rail included, and the rail would
+  // snap back to Profile. Its position lives here instead: restored when a
+  // Settings instance replaces another one (the old one is still fading
+  // out, or went a moment ago), reset when Settings is opened from
+  // elsewhere in the app.
+  const _railMemo = { top: 0, alive: 0, leftAt: 0 };
+</script>
+
 <script>
   // Thin router shell (mirrors NutriTrace / LiftTrace). Section bodies
   // live in components/settings/*.svelte and are dispatched to via
@@ -117,6 +127,16 @@
   // transition (via _pillReady flag) so it doesn't jump from 0 on
   // initial mount.
   let _railEl;
+  onMount(() => {
+    const withinSettings = _railMemo.alive > 0 || Date.now() - _railMemo.leftAt < 1000;
+    _railMemo.alive += 1;
+    if (!withinSettings) _railMemo.top = 0;
+    else if (_railEl) _railEl.scrollTop = _railMemo.top;
+  });
+  onDestroy(() => {
+    _railMemo.alive -= 1;
+    _railMemo.leftAt = Date.now();
+  });
   let _pillY = 0;
   let _pillH = 0;
   let _pillVisible = false;
@@ -612,7 +632,8 @@
       <!-- Left rail (desktop only, ≥1024px). Always shows the full
            section list so users can jump between sections without
            going back to the index. Hidden on mobile via CSS. -->
-      <aside class="settings-nav-rail" bind:this={_railEl}>
+      <aside class="settings-nav-rail" bind:this={_railEl}
+             on:scroll={() => { _railMemo.top = _railEl.scrollTop; }}>
         <!-- Sliding highlight pill (desktop rail). Mirrors LiftTrace. -->
         <div class="rail-active-pill"
              class:visible={_pillVisible}
