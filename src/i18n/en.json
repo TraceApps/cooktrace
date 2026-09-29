@@ -847,8 +847,8 @@
       "app_name":               "CookTrace",
       "federation_prefix":      "Optional federation with ",
       "federation_suffix":      " for nutrition tracking",
-      "family_prefix":          "Part of the ",
-      "family_suffix":          " family (with NutriTrace and LiftTrace)"
+      "family_line_prefix":     "Part of the ",
+      "family_line_suffix":     " family"
     },
     "support": {
       "lead":                   "CookTrace is free and always will be. Support is optional and never unlocks anything.",

@@ -905,9 +905,7 @@
     "about": {
       "app_name": "CookTrace",
       "federation_prefix": "Federación opcional con ",
-      "federation_suffix": " para el seguimiento nutricional",
-      "family_prefix": "Parte de la familia ",
-      "family_suffix": " (con NutriTrace y LiftTrace)"
+      "federation_suffix": " para el seguimiento nutricional"
     },
     "custom_color": {
       "saturation": "Saturación",
