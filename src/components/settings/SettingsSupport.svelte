@@ -22,7 +22,7 @@
       <a href="https://ko-fi.com/traceapps" target="_blank" rel="noopener" class="btn btn-secondary support-btn">
         <span class="material-symbols-rounded">coffee</span> Ko-fi
       </a>
-      <a href="https://github.com/sponsors/TraceApps" target="_blank" rel="noopener" class="btn btn-secondary support-btn">
+      <a href="https://github.com/sponsors/TraceApps?metadata_app=cooktrace&metadata_from=app" target="_blank" rel="noopener" class="btn btn-secondary support-btn">
         <span class="material-symbols-rounded">favorite</span> GitHub Sponsors
       </a>
     </div>
