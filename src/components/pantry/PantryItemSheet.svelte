@@ -17,10 +17,12 @@
    *               blank item with optional `prefill` (used by the
    *               barcode-scan flow for an unrecognized code).
    *
-   * In Stock is DERIVED display: `quantity === 0` reads as Out of Stock;
-   * `null` or `> 0` reads as In Stock. The explicit in_stock column
-   * lives on in the schema so server reads still work, but every save
-   * path computes it from quantity so the two never drift.
+   * In Stock comes from `isItemInStock` (src/lib/pantry-variants.js), the
+   * same read the pantry card and its check button use, so the three
+   * always agree. It trusts the `in_stock` column when present and falls
+   * back to `quantity` only for a row that has none. A blank quantity is
+   * NOT zero: reading it as zero is what left the card's check stuck on
+   * (issue #55).
    *
    * Caller usage:
    *   <PantryItemSheet bind:open itemId={...}
@@ -45,7 +47,8 @@
   import { categoryLabel, categoryIcon } from '../../lib/pantry-categories.js';
   import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS, isDerived, deriveSodiumSalt } from '../../lib/nutriments.js';
   import { lookupBarcode, contributeToOFF } from '../../lib/off.js';
-  import { displayVariantName as _sharedDisplayVariantName } from '../../lib/pantry-variants.js';
+  import { displayVariantName as _sharedDisplayVariantName, isItemInStock } from '../../lib/pantry-variants.js';
+  import { foldText } from '../../lib/search-text.js';
   import { visibleNutriments, offEnabled, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks } from '../../stores/settings.js';
   import { scanNutritionLabel } from '../../lib/scan-nutrition.js';
 
@@ -488,12 +491,12 @@
   }
 
   $: variantPickerResults = (() => {
-    const q = (variantPickerQuery || '').trim().toLowerCase();
+    const q = foldText(variantPickerQuery).trim();
     const pool = variantPickerMode === 'set-parent'
       ? variantContext.candidates  // anywhere flat-or-generic
       : variantContext.candidates.filter(r => r.id !== item?.id);
     if (!q) return pool.slice(0, 50);
-    return pool.filter(r => (r.name || '').toLowerCase().includes(q)).slice(0, 50);
+    return pool.filter(r => foldText(r.name).includes(q)).slice(0, 50);
   })();
 
   // Suggestion list under the inline Add Variant input (Issue #4 UX
@@ -508,15 +511,15 @@
   // accept the attachment).
   $: addVariantSuggestions = (() => {
     if (!addingVariantRow) return [];
-    const q = (newVariantBrand || '').trim().toLowerCase();
+    const q = foldText(newVariantBrand).trim();
     if (!q) return [];
     // Filter out generics from the Add Variant suggestion list so we
     // don't offer a target the server will reject.
     const pool = (variantContext.candidates || []).filter(r => !r._isGeneric);
     const scored = pool
       .map(r => {
-        const name = (r.name || '').toLowerCase();
-        const brand = (r.brand || '').toLowerCase();
+        const name = foldText(r.name);
+        const brand = foldText(r.brand);
         const hay = name + ' ' + brand;
         if (!hay.includes(q)) return null;
         // Prefer rows whose brand or name STARTS with the query, then
@@ -815,7 +818,9 @@
   // sheet's edit mode. The qty-row CSS rules were stripped alongside.
 
   // ── Derived display ────────────────────────────────────────────────
-  $: isInStock = item ? !(Number(item.quantity) === 0) : true;
+  // Same read as the pantry card (isItemInStock). !(Number(qty) === 0)
+  // showed a blank quantity as Out of Stock, since Number(null) === 0.
+  $: isInStock = item ? isItemInStock(item) : true;
   $: servingDescription = (item && item.serving_size && item.serving_unit)
     ? `${item.serving_size} ${item.serving_unit}`
     : '';

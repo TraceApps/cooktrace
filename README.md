@@ -14,7 +14,7 @@ No accounts, no telemetry, no cloud sync unless you opt in.</p>
   <a href="https://github.com/traceapps/cooktrace/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/traceapps/cooktrace?label=release&color=orange"></a>
   <a href="https://github.com/traceapps/cooktrace/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/traceapps/cooktrace/total?label=downloads&color=brightgreen"></a>
   <a href="https://github.com/traceapps/cooktrace/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/traceapps/cooktrace?style=social"></a>
-  <a href="https://traceapps.github.io/docs/getting-started/compose/"><img alt="Platform" src="https://img.shields.io/badge/platform-Web%20%7C%20Android%20%7C%20Docker-lightgrey"></a>
+  <a href="https://traceapps.github.io/docs/getting-started/compose/"><img alt="Platform" src="https://img.shields.io/badge/platform-Web%20%7C%20Android%20%7C%20Wear%20OS%20%7C%20Docker-lightgrey"></a>
   <br/>
   <a href="https://traceapps.github.io/docs/cooktrace/"><img alt="Documentation" src="https://img.shields.io/badge/docs-traceapps.github.io-8A2BE2?logo=readthedocs&logoColor=white"></a>
   <a href="https://github.com/traceapps/cooktrace/pkgs/container/cooktrace"><img alt="GHCR" src="https://img.shields.io/badge/ghcr.io-traceapps%2Fcooktrace-181717?logo=github&logoColor=white"></a>
@@ -36,7 +36,7 @@ No accounts, no telemetry, no cloud sync unless you opt in.</p>
 
 CookTrace runs as a single Docker container on your own hardware, with a PWA for the browser and a native Android app for your phone. No accounts on external services, no data leaving your network, no subscriptions.
 
-Third app in the Trace family alongside [NutriTrace](https://github.com/traceapps/nutritrace) and [LiftTrace](https://github.com/traceapps/lifttrace).
+Third app in the Trace family alongside [NutriTrace](https://github.com/traceapps/nutritrace), [LiftTrace](https://github.com/traceapps/lifttrace), and [NoteTrace](https://github.com/traceapps/notetrace).
 
 ## Principles
 
@@ -73,6 +73,8 @@ Third app in the Trace family alongside [NutriTrace](https://github.com/traceapp
 - **Multi-user + OIDC SSO.** Authentik, Keycloak, Pocket ID, Authelia, Auth0, Google. Auto-link verified emails, optional auto-register, admin-group claims, RP-initiated logout. → [full guide](https://traceapps.github.io/docs/auth/oidc/)
 - **Backups.** Full-DB zip with zip-slip / zip-bomb defenses, scheduled auto-backups, portable JSON export, Android local-backup zip. → [full guide](https://traceapps.github.io/docs/self-hosting/backups/)
 - **Native Android app.** Offline local mode or server-connected differential sync. → [full guide](https://traceapps.github.io/docs/mobile/install/)
+- **Wear OS.** A watch app for Wear OS 3 and up: your shopping list by aisle, ticked off with a trolley in one hand, and the cook you are in, with ingredients and steps as checklists, the timers a step asks for ringing on your wrist and showing on the watch face, and "I cooked this" at the end. It talks to your server itself, so it works in a shop with no signal, and it pairs itself when you sign in on the phone. → [full guide](https://traceapps.github.io/docs/cooktrace/wear/)
+- **Foldables (preliminary).** Half open like a book, a recipe opens like a cookbook, the ingredients on one side of the crease and the method on the other. Settings, Shopping, the cook diary and Manage split on the room they have, and dialogs, sheets, timers and Trace keep off the fold.
 
 ---
 
@@ -173,7 +175,7 @@ Svelte 5 (compat mode) + Vite 7 PWA · Capacitor 8 Android · Node.js + Express 
 
 ## Trace family
 
-Part of the **TraceApps** family. Sister apps: [NutriTrace](https://github.com/traceapps/nutritrace) for nutrition tracking, [LiftTrace](https://github.com/traceapps/lifttrace) for weightlifting. Full docs for all three at [traceapps.github.io/docs](https://traceapps.github.io/docs/).
+Part of the **TraceApps** family. Sister apps: [NutriTrace](https://github.com/traceapps/nutritrace) for nutrition tracking, [LiftTrace](https://github.com/traceapps/lifttrace) for weightlifting, [NoteTrace](https://github.com/traceapps/notetrace) for notes, tasks and reminders. Docs for the family at [traceapps.github.io/docs](https://traceapps.github.io/docs/).
 
 ---
 
@@ -189,7 +191,7 @@ CookTrace is free to self-host and always will be. No paid tier, nothing behind 
 
 Helping doesn't have to cost anything: starring the repo, reporting bugs with detail, and translating all count, and stars are how self-hosted projects get found.
 
-[![Ko-fi](https://img.shields.io/badge/Ko--fi-Toward_a_Mac_and_iPhone-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/traceapps) [![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-Sponsor_monthly-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/TraceApps)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Toward_a_Mac_and_iPhone-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/traceapps) [![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-Sponsor_monthly-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/TraceApps?metadata_app=cooktrace&metadata_from=readme)
 
 ## Disclaimer
 

@@ -16,6 +16,8 @@
   import { longpress } from '../lib/long-press.js';
   import { resolveAssetUrl } from '../lib/platform.js';
 
+  import { foldText } from '../lib/search-text.js';
+
   let entries = [];
   let loading = true;
   let loadError = null;
@@ -39,7 +41,7 @@
   // and the meal-type chip.
   let diarySearch = '';
   let mealFilter = ''; // '' | 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'other'
-  $: _diaryQuery = diarySearch.trim().toLowerCase();
+  $: _diaryQuery = foldText(diarySearch).trim();
 
   // All view branches read from displayEntries so the recipe filter,
   // meal-type chip, and text search apply uniformly to List / Month
@@ -50,9 +52,9 @@
     if (mealFilter)     list = list.filter(e => (e.meal_type || '') === mealFilter);
     if (_diaryQuery) {
       list = list.filter(e =>
-        ((e.recipe_name || '').toLowerCase().includes(_diaryQuery)) ||
-        ((e.notes       || '').toLowerCase().includes(_diaryQuery)) ||
-        ((e.cooked_by_full_name || e.cooked_by_username || '').toLowerCase().includes(_diaryQuery))
+        foldText(e.recipe_name).includes(_diaryQuery) ||
+        foldText(e.notes).includes(_diaryQuery) ||
+        foldText(e.cooked_by_full_name || e.cooked_by_username).includes(_diaryQuery)
       );
     }
     return list;
@@ -78,7 +80,7 @@
   function clearFilter() { filterRecipeId = null; }
 
   $: filteredFilterRecipes = filterSearch.trim()
-    ? planRecipes.filter(r => (r.name || '').toLowerCase().includes(filterSearch.trim().toLowerCase()))
+    ? planRecipes.filter(r => foldText(r.name).includes(foldText(filterSearch).trim()))
     : planRecipes;
 
   // Multi-photo entries store `photos` as a JSON array. Older single-
@@ -116,9 +118,15 @@
   // streak math stays correct regardless of which date window the
   // list view has loaded. Null while initially fetching.
   let stats = null;
-  async function loadStats() {
+  async function loadStats(retry = true) {
     try { stats = await NtApi.getCookDiaryStats(); }
-    catch { stats = null; }
+    catch (e) {
+      // A transient failure here used to hide the dashboard for the whole
+      // session. Keep whatever we already had and try once more.
+      console.warn('[diary] stats failed:', e?.message || e);
+      if (retry) { setTimeout(() => loadStats(false), 2000); return; }
+      if (!stats) stats = null;
+    }
   }
 
   // Heatmap — daily cook counts for the last 52 weeks. Independent of
@@ -313,7 +321,7 @@
     }
   }
   $: filteredPlanRecipes = planSearch.trim()
-    ? planRecipes.filter(r => r.name.toLowerCase().includes(planSearch.trim().toLowerCase()))
+    ? planRecipes.filter(r => foldText(r.name).includes(foldText(planSearch).trim()))
     : planRecipes;
 
   async function savePlan() {
@@ -407,9 +415,15 @@
          first, then 4-tile strip). Goes side-by-side on wide screens
          so the two summaries share one row instead of forming a tall
          column above the actual diary. -->
-    {#if stats && stats.total_cooks > 0}
+    {#if (stats && stats.total_cooks > 0) || heatmap.length > 0}
     <div class="diary-dashboard" transition:fade={{ duration: 160 }}>
-      <CookHeatmap data={heatmap} on:select={onHeatmapCellClick} />
+      <!-- Shown on its own data. It used to sit inside the stats condition, so a
+           single failed /api/cook-diary/stats call at launch took the whole
+           dashboard with it, silently and with no retry. -->
+      {#if heatmap.length > 0}
+        <CookHeatmap data={heatmap} on:select={onHeatmapCellClick} />
+      {/if}
+      {#if stats && stats.total_cooks > 0}
       <div class="stats-card">
         <div class="stat-tile">
           <span class="stat-value">{stats.cooks_this_week}</span>
@@ -440,6 +454,7 @@
           </div>
         {/if}
       </div>
+      {/if}
     </div>
     {/if}
 
@@ -869,8 +884,18 @@
     gap: 0;
     margin: 0 0 14px;
   }
+  /* Below the desktop tier the heatmap spans the full width and the stats sit
+     under it, rather than sharing a row: a year of weeks wants the width, and
+     the stats read fine as a 4-across strip. Desktop keeps them side by side. */
+  @media (max-width: 1279px) {
+    :global(html.wide-content) .diary-dashboard {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 14px;
+    }
+  }
   @media (min-width: 1280px) {
-    .diary-dashboard {
+    :global(html.wide-content) .diary-dashboard {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 320px;
       gap: 14px;
@@ -901,8 +926,8 @@
     border-radius: var(--radius-md);
     min-width: 0;
   }
-  @media (min-width: 1280px) {
-    .stats-card {
+  @media all {
+    :global(html.wide-content) .stats-card {
       grid-template-columns: 1fr 1fr;
       grid-template-rows: 1fr 1fr;
       gap: 8px;
@@ -957,7 +982,12 @@
   .diary-toolbar {
     position: sticky;
     top: calc(var(--page-top, var(--safe-top)) + 56px + var(--hamburger-row, 0px));
-    z-index: 15;
+    /* Below .page-header (z-index 10), not above it. The toolbar sticks 5px
+       higher than the header's 61px bottom edge, so at 15 its opaque bar
+       painted over the frosted header and cut a hard line into it. Underneath,
+       the header's blur covers that overlap and the toolbar still hides the
+       entries scrolling below it. */
+    z-index: 9;
     background: var(--bg);
     padding-top: 6px;
     margin: -6px 0 4px;
@@ -1038,14 +1068,14 @@
      screen. Each day-card becomes a self-contained bordered surface
      at wide widths so the visual break between days stays clear. */
   .day-grid { display: block; }
-  @media (min-width: 1200px) {
-    .day-grid {
+  @media all {
+    :global(html.wide-content) .day-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
       gap: 20px;
       align-items: start;
     }
-    .day-grid .day-group {
+    :global(html.wide-content) .day-grid .day-group {
       margin: 0;
       background: var(--surface-1);
       border: 1px solid var(--border);
@@ -1190,7 +1220,7 @@
   }
   /* Roomier month cells on wide screens so 3-5 cook pills fit per
      day without the name truncating. clamp() keeps growth sane. */
-  @media (min-width: 1280px) {
+  @media all {
     .cell { min-height: clamp(88px, 14vh, 180px); padding: 6px 7px; gap: 3px; }
   }
   .cell.dim { background: var(--bg); opacity: 0.6; }
@@ -1409,8 +1439,8 @@
   }
   /* Bigger tiles on wide viewports — 140px tiles read as thumbnail
      bricks on a 1920px monitor; 180px feels like an actual photo. */
-  @media (min-width: 1200px) {
-    .photo-grid {
+  @media all {
+    :global(html.wide-content) .photo-grid {
       grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
       gap: 12px;
     }

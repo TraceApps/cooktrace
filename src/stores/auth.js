@@ -131,6 +131,10 @@ async function _fetchAuthFromServer() {
     currentUser.set(user);
     if (user) localStorage.setItem('wl:userId', String(user.id));
     else       localStorage.removeItem('wl:userId');
+    // A paired watch talks to the server itself, so it needs this account's
+    // address and token. Sent on every sign-in, which is also what refreshes
+    // a token the watch has had refused.
+    if (user && isNative) import('../lib/wear-pairing.js').then(({ pairWatch }) => pairWatch()).catch(() => {});
     if (meData.csrf) localStorage.setItem('ct:csrf', meData.csrf);
     else             localStorage.removeItem('ct:csrf');
     // Cache for offline fallback
@@ -284,6 +288,31 @@ export async function logout() {
     logoutUrl = oidcData?.logoutUrl || null;
     try { localStorage.removeItem('ct:oidc_logout_hint'); } catch {}
   } catch {}
+  // Anything changed offline goes up before the session ends, and the copy
+  // this browser keeps is cleared afterwards so the next account can't read
+  // it. If it can't go up (signing out in a shop with no signal), ask first:
+  // clearing it would destroy work the user never saw fail.
+  if (!isNative) {
+    try {
+      const { flushOutbox, clearOffline, pendingCount } = await import('../lib/offline-api.js');
+      const sent = await flushOutbox().catch(() => false);
+      if (!sent && (await pendingCount()) > 0) {
+        const waiting = await pendingCount();
+        const { confirmDialog } = await import('./confirmDialog.js');
+        const { get: getStore } = await import('svelte/store');
+        const { _: t } = await import('svelte-i18n');
+        const say = getStore(t);
+        const ok = await confirmDialog({
+          title: say('sync.sign_out_waiting_title'),
+          message: say('sync.sign_out_waiting', { values: { count: waiting } }),
+          confirmText: say('sync.sign_out_anyway'),
+          dangerous: true,
+        });
+        if (!ok) return;
+      }
+      await clearOffline();
+    } catch { /* nothing queued, or no database */ }
+  }
   try { await fetch(_apiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include', headers: _authHeaders() }); } catch {}
   // Clear auth state — but keep cached data (foods, images, server URL)
   if (isNative) {
@@ -300,6 +329,8 @@ export async function logout() {
   localStorage.removeItem('ct:cachedUser');
   localStorage.removeItem('ct:csrf');
   currentUser.set(null);
+  // The watch should not keep a working token for an account that signed out.
+  if (isNative) import('../lib/wear-pairing.js').then(({ unpairWatch }) => unpairWatch()).catch(() => {});
   // Note: userMgmtActive is a server-wide flag, not per-session. Don't flip
   // it on logout — that hides the Login gate in App.svelte (needsLogin =
   // userMgmtActive && !currentUser) and leaves the user stuck in a half-

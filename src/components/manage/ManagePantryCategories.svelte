@@ -14,6 +14,8 @@
   import IconPicker from '../ui/IconPicker.svelte';
   import Spinner from '../ui/Spinner.svelte';
 
+  import { foldText } from '../../lib/search-text.js';
+
   let categories = [];
   let loading = true;
   let editingId = null;
@@ -28,7 +30,7 @@
 
   let filter = '';
   $: filtered = filter.trim()
-    ? categories.filter(c => c.name.toLowerCase().includes(filter.trim().toLowerCase()))
+    ? categories.filter(c => foldText(c.name).includes(foldText(filter).trim()))
     : categories;
   $: filteredEmpty = categories.length > 0 && filtered.length === 0;
 

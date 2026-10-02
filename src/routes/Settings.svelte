@@ -1,3 +1,13 @@
+<script context="module">
+  // The app wraps every route in {#key $location}, so each click in the
+  // Settings rail mounts a new Settings, rail included, and the rail would
+  // snap back to Profile. Its position lives here instead: restored when a
+  // Settings instance replaces another one (the old one is still fading
+  // out, or went a moment ago), reset when Settings is opened from
+  // elsewhere in the app.
+  const _railMemo = { top: 0, alive: 0, leftAt: 0 };
+</script>
+
 <script>
   // Thin router shell (mirrors NutriTrace / LiftTrace). Section bodies
   // live in components/settings/*.svelte and are dispatched to via
@@ -12,6 +22,7 @@
   // Sheet) and the shared CSS descendants need via :global.
 
   import { onMount, tick, afterUpdate, onDestroy } from 'svelte';
+  import { fold } from '../lib/fold.js';
   import { push, querystring } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
   import { slide, fade } from 'svelte/transition';
@@ -44,9 +55,12 @@
   import SettingsApiTokens       from '../components/settings/SettingsApiTokens.svelte';
   import SettingsWebhooks        from '../components/settings/SettingsWebhooks.svelte';
   import SettingsEmail           from '../components/settings/SettingsEmail.svelte';
+  import SettingsSupport         from '../components/settings/SettingsSupport.svelte';
   import SettingsAbout           from '../components/settings/SettingsAbout.svelte';
   import Profile                 from './Profile.svelte';
   import Sheet                   from '../components/ui/Sheet.svelte';
+
+  import { foldText } from '../lib/search-text.js';
 
   // ── Route param → current section ──────────────────────────────────────
   // svelte-spa-router route `/settings/:section` → params.section.
@@ -79,7 +93,7 @@
 
   // ── Settings search ────────────────────────────────────────────────────
   let settingsSearch = '';
-  $: settingsQuery = settingsSearch.toLowerCase().trim();
+  $: settingsQuery = foldText(settingsSearch).trim();
 
   // On mobile / narrow, typing into the search bar while on a
   // sub-page auto-navigates back to the index with the query so
@@ -113,6 +127,16 @@
   // transition (via _pillReady flag) so it doesn't jump from 0 on
   // initial mount.
   let _railEl;
+  onMount(() => {
+    const withinSettings = _railMemo.alive > 0 || Date.now() - _railMemo.leftAt < 1000;
+    _railMemo.alive += 1;
+    if (!withinSettings) _railMemo.top = 0;
+    else if (_railEl) _railEl.scrollTop = _railMemo.top;
+  });
+  onDestroy(() => {
+    _railMemo.alive -= 1;
+    _railMemo.leftAt = Date.now();
+  });
   let _pillY = 0;
   let _pillH = 0;
   let _pillVisible = false;
@@ -166,6 +190,7 @@
     serverconn:    { titleKey: 'settings.server.section',            icon: 'cloud' },
     updates:       { titleKey: 'settings.updates.section',           icon: 'system_update' },
     diagnostics:   { titleKey: 'settings.diagnostics.section',       icon: 'troubleshoot' },
+    support:       { titleKey: 'settings.support.section',           icon: 'volunteer_activism' },
     about:         { titleKey: 'settings.about.section',             icon: 'info' },
     profile:       { titleKey: 'profile.title',                      icon: 'person' },
   };
@@ -197,6 +222,7 @@
     serverconn:    SettingsServerConnection,
     updates:       SettingsUpdates,
     diagnostics:   SettingsDiagnostics,
+    support:       SettingsSupport,
     about:         SettingsAbout,
     profile:       Profile,
   };
@@ -225,7 +251,8 @@
     serverconn:    ['server','connection','sync','connect','disconnect','local mode','offline','standalone','android','native','url','login'],
     updates:       ['updates','update','upgrade','version','new version','changelog','release','releases','apk','install','download','check for updates','auto-check','channel','stable','dev','dev-latest','beta','github','server update','docker','compose','docker-compose','check frequency','check interval','how often','hourly','daily','manual','manual only','cadence','banner','notification'],
     diagnostics:   ['diagnostics','logs','verbose','console','export','bug','report','troubleshoot','crash'],
-    about:         ['about','version','cooktrace','license','source','github','donate','support'],
+    support:       ['support','donate','donation','sponsor','github sponsors','ko-fi','kofi','tip','star','report a bug','bug','translate','weblate','help'],
+    about:         ['about','version','cooktrace','license','source','github'],
   };
 
   // Visibility predicate for section-toggle rows. Only filters when
@@ -273,7 +300,7 @@
   async function _scheduleDeepLinkScroll(q) {
     await tick();
     await new Promise(r => setTimeout(r, 60));
-    const q_norm = q.toLowerCase().trim();
+    const q_norm = foldText(q).trim();
     if (!q_norm) return;
     const scope = document.querySelector('.subpage-view');
     if (!scope) return;
@@ -282,7 +309,7 @@
     );
     let hit = null;
     for (const el of candidates) {
-      if ((el.textContent || '').toLowerCase().includes(q_norm)) { hit = el; break; }
+      if (foldText(el.textContent).includes(q_norm)) { hit = el; break; }
     }
     if (!hit) return;
     const row = hit.closest('.setting-row') || hit;
@@ -395,6 +422,30 @@
   // renders a state-gated "Get Set Up" grid (Server / Goals / Wellness
   // / Appearance). CookTrace doesn't have equivalent state gates ready
   // yet; add when the surface exists.
+  // Half open like a book, the section list fills the panel on the left of the
+  // crease and the section itself the panel on the right, with the crease as
+  // the divider. The page's own left edge is measured rather than worked out
+  // from the sidebar's width, since a pinned sidebar, a rail and an overlay
+  // are all different numbers and a centred page would be none of them.
+  let paneEl, paneLeft = 0, paneW = 0;
+  function measurePane() {
+    const box = paneEl?.getBoundingClientRect();
+    paneLeft = box?.left ?? 0;
+    paneW = box?.width ?? 0;
+  }
+  onMount(() => {
+    measurePane();
+    const ro = new ResizeObserver(measurePane);
+    if (paneEl) ro.observe(paneEl);
+    return () => ro.disconnect();
+  });
+  // Folding moves the crease without resizing the page.
+  $: if ($fold !== undefined && paneEl) measurePane();
+  $: foldRailW = $fold?.posture === 'book' && paneW > 0 ? $fold.start - paneLeft : null;
+  // Only when both panels are left usable.
+  $: railSnap = foldRailW != null && foldRailW >= 200 && paneW - foldRailW >= 320;
+  $: hingeW = railSnap ? Math.max(0, $fold.end - $fold.start) : 0;
+
 </script>
 
 <!-- Settings section-list snippet. Defined at the top level so it's
@@ -520,6 +571,12 @@
     {/if}
   {/if}
 
+  <p class="settings-group-label">CookTrace</p>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'support')} class:active={currentSection === 'support'} aria-current={currentSection === 'support' ? 'page' : undefined} on:click={() => toggleSection('support')}>
+    <span class="material-symbols-rounded si">volunteer_activism</span>
+    <span>{$_('settings.support.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
   <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'about')} class:active={currentSection === 'about'} aria-current={currentSection === 'about' ? 'page' : undefined} on:click={() => toggleSection('about')}>
     <span class="material-symbols-rounded si">info</span>
     <span>{$_('settings.about.section')}</span>
@@ -569,12 +626,14 @@
 
   <div class="page-content settings-content" class:subpage-view={!!currentSection}>
 
-    <div class="settings-two-pane">
+    <div class="settings-two-pane" bind:this={paneEl} class:fold-snap={railSnap}
+      style={railSnap ? `--rail-w:${foldRailW}px; --hinge:${hingeW}px` : ''}>
 
       <!-- Left rail (desktop only, ≥1024px). Always shows the full
            section list so users can jump between sections without
            going back to the index. Hidden on mobile via CSS. -->
-      <aside class="settings-nav-rail" bind:this={_railEl}>
+      <aside class="settings-nav-rail" bind:this={_railEl}
+             on:scroll={() => { _railMemo.top = _railEl.scrollTop; }}>
         <!-- Sliding highlight pill (desktop rail). Mirrors LiftTrace. -->
         <div class="rail-active-pill"
              class:visible={_pillVisible}
@@ -1071,15 +1130,19 @@
   .settings-desktop-hero { display: none; }
   .settings-mobile-index { display: block; }
 
-  @media (min-width: 1024px) {
-    :global(html:not(.force-mobile-layout)) .settings-two-pane {
+  @media all {
+    :global(html.wide-content) .settings-two-pane {
       display: grid;
       grid-template-columns: 280px minmax(0, 1fr);
       gap: 24px;
       align-items: start;
     }
+    /* The pane's first card starts level with the rail's top edge.
+       .section-body's 12px top padding (right for the phone's stacked
+       view) pushed every section 12px below the rail here. */
+    :global(html.wide-content) .settings-pane :global(.section-body) { padding-top: 0; }
 
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail {
+    :global(html.wide-content) .settings-nav-rail {
       display: flex;
       flex-direction: column;
       gap: 2px;
@@ -1100,7 +1163,7 @@
       scrollbar-width: thin;
       scrollbar-color: var(--border) transparent;
     }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle) {
+    :global(html.wide-content) .settings-nav-rail :global(.section-toggle) {
       background: transparent;
       border: none;
       min-height: 36px;
@@ -1112,14 +1175,14 @@
       z-index: 1;
       transition: color 160ms ease;
     }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle:hover) {
+    :global(html.wide-content) .settings-nav-rail :global(.section-toggle:hover) {
       background: var(--surface-2);
     }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle.active) {
+    :global(html.wide-content) .settings-nav-rail :global(.section-toggle.active) {
       background: transparent;
       color: var(--accent);
     }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail .rail-active-pill {
+    :global(html.wide-content) .settings-nav-rail .rail-active-pill {
       position: absolute;
       left: 8px;
       right: 8px;
@@ -1131,35 +1194,35 @@
       z-index: 0;
       will-change: transform, height;
     }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail .rail-active-pill.visible {
+    :global(html.wide-content) .settings-nav-rail .rail-active-pill.visible {
       opacity: 1;
     }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail .rail-active-pill.ready {
+    :global(html.wide-content) .settings-nav-rail .rail-active-pill.ready {
       transition:
         transform 320ms cubic-bezier(0.32, 0.72, 0, 1),
         height 260ms cubic-bezier(0.32, 0.72, 0, 1),
         opacity 180ms ease;
     }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle:focus-visible) {
+    :global(html.wide-content) .settings-nav-rail :global(.section-toggle:focus-visible) {
       outline: 2px solid var(--accent);
       outline-offset: -2px;
       background: var(--surface-2);
     }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle .si) {
+    :global(html.wide-content) .settings-nav-rail :global(.section-toggle .si) {
       width: 24px;
       height: 24px;
       font-size: 18px;
     }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.section-toggle .chevron) { display: none; }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.settings-group-label) {
+    :global(html.wide-content) .settings-nav-rail :global(.section-toggle .chevron) { display: none; }
+    :global(html.wide-content) .settings-nav-rail :global(.settings-group-label) {
       margin: 12px 4px 4px;
       font-size: 10px;
       letter-spacing: 0.1em;
     }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail :global(.settings-group-label:first-child) {
+    :global(html.wide-content) .settings-nav-rail :global(.settings-group-label:first-child) {
       margin-top: 2px;
     }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail .settings-nav-empty {
+    :global(html.wide-content) .settings-nav-rail .settings-nav-empty {
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -1168,16 +1231,16 @@
       text-align: center;
       color: var(--text-3);
     }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail .settings-nav-empty :global(.material-symbols-rounded) {
+    :global(html.wide-content) .settings-nav-rail .settings-nav-empty :global(.material-symbols-rounded) {
       font-size: 28px;
       opacity: 0.7;
     }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail .settings-nav-empty p {
+    :global(html.wide-content) .settings-nav-rail .settings-nav-empty p {
       margin: 0;
       font-size: 12px;
       line-height: 1.4;
     }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail .settings-nav-clear {
+    :global(html.wide-content) .settings-nav-rail .settings-nav-clear {
       background: transparent;
       border: 1px solid var(--border);
       color: var(--text-2);
@@ -1187,14 +1250,14 @@
       font-weight: 600;
       cursor: pointer;
     }
-    :global(html:not(.force-mobile-layout)) .settings-nav-rail .settings-nav-clear:hover {
+    :global(html.wide-content) .settings-nav-rail .settings-nav-clear:hover {
       background: var(--surface-2);
       color: var(--text-1);
     }
 
     /* Desktop-only vs mobile-only content in the pane. */
-    :global(html:not(.force-mobile-layout)) .settings-mobile-index { display: none; }
-    :global(html:not(.force-mobile-layout)) .settings-desktop-hero { display: block; }
+    :global(html.wide-content) .settings-mobile-index { display: none; }
+    :global(html.wide-content) .settings-desktop-hero { display: block; }
   }
 
   /* Desktop welcome hero: profile card is expandable inline. */
@@ -1273,4 +1336,36 @@
     box-sizing: border-box;
   }
   .cp-apply { height: 44px; margin-top: 4px; width: 100%; }
+
+  /* Half open like a book, at any width. The two-pane layout above waits for
+     a desktop-sized viewport, which a foldable's inner display never reaches,
+     so this turns it on from the crease instead and brings the rail with it.
+     Same reasoning as the notes grid and the recipe layout. */
+  :global(html.fold-book:not(.force-mobile-layout)) .settings-two-pane.fold-snap {
+    display: grid;
+    grid-template-columns: var(--rail-w) minmax(0, 1fr);
+    gap: var(--hinge);
+    align-items: start;
+  }
+  :global(html.fold-book:not(.force-mobile-layout)) .settings-two-pane.fold-snap .settings-nav-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: sticky;
+    top: calc(var(--page-top, var(--safe-top)) + 12px);
+    max-height: calc(100dvh - var(--page-top, var(--safe-top)) - var(--nav-h, 0px) - var(--safe-bottom, 0px) - 24px);
+    overflow-y: auto;
+    padding: 10px 8px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-sizing: border-box;
+  }
+  :global(html.fold-book:not(.force-mobile-layout)) .settings-two-pane.fold-snap .settings-mobile-index {
+    display: none;
+  }
+  /* Same rail-level start as the wide two-pane above. */
+  :global(html.fold-book:not(.force-mobile-layout)) .settings-two-pane.fold-snap .settings-pane :global(.section-body) {
+    padding-top: 0;
+  }
 </style>

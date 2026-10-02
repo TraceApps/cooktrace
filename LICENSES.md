@@ -50,6 +50,20 @@ The [`recipe-scrapers`][rs] Python library is MIT-licensed. The recipe content i
 
 [rs]: https://github.com/hhursev/recipe-scrapers
 
+## Bundled assets
+
+| Asset | License | Where |
+| ----- | ------- | ----- |
+| **Inter** (UI typeface) | [SIL Open Font License 1.1][ofl] | `public/fonts/inter-*.woff2` |
+| **Material Symbols Rounded** (icons) | [Apache License 2.0][apache] | `public/fonts/material-symbols-rounded.woff2` |
+
+Fonts are served by your own instance, never from a CDN. One file per script
+subset, so a browser downloads only the scripts a page needs. Regenerate them
+with `scripts/fetch-fonts.mjs`.
+
+[ofl]: https://openfontlicense.org/
+[apache]: https://www.apache.org/licenses/LICENSE-2.0
+
 ## Third-party code dependencies
 
 Bundled Node.js dependencies (Express, better-sqlite3, Svelte, Capacitor plugins, etc.) each carry their own permissive licenses (MIT / Apache-2.0 / BSD variants). See `package.json` and `server/package.json` for the full dependency lists; run `npm ls --long` or `npx license-checker` in either directory for machine-readable output.

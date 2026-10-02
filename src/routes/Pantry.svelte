@@ -24,6 +24,7 @@
     buildVariantsByParent,
     topLevelItems,
     aggregateStock,
+    isItemInStock,
     matchesSearch,
     queryHitVariant,
     matchingVariants,
@@ -353,13 +354,18 @@
   // no name / brand / barcode / thumbnail.
   $: _allModeItems = searchSource !== 'all' ? [] : [
     ...(_isSourceActive('local')
-      ? (items || []).filter(f => query.trim() ? matchesSearch(f, query, buildVariantsByParent(items)) : false).map(f => ({ ...f, _source: 'local' }))
+      ? (query.trim() ? topLevelItems(items).filter(f => matchesSearch(f, variantsByParent, query)) : [])
+          .map(f => ({ ...f, _source: 'local' }))
       : []),
     ...(_isSourceActive('off')  ? offVisible.map(f  => ({ ...f, _source: 'off'  })) : []),
     ...(_isSourceActive('usda') ? usdaVisible.map(f => ({ ...f, _source: 'usda' })) : []),
     ...(_isSourceActive('nt')   ? ntVisible.map(f   => ({ ...f, _source: 'nt'   })) : []),
   ];
   function pickExternalResult(r) {
+    // A local row in All mode is an item the pantry already holds, so it
+    // opens like any other pantry row. Prefilling the create sheet from it
+    // would save a duplicate of something already there.
+    if (r?._source === 'local') { openItem(r); return; }
     // Open the sheet in create mode with the external-search result as
     // the prefill payload. No route navigation; user stays on Pantry.
     sheetPrefill = r;
@@ -857,12 +863,15 @@
   }
 
   async function quickToggle(it) {
-    // Quantity is the source of truth (v1.0). Marking out of stock
-    // sets qty to 0; marking back in sets it to null (untracked, in
-    // stock) so we don't have to invent a quantity. in_stock travels
-    // alongside as a server-schema mirror so existing reads keep working.
-    const nextInStock = Number(it.quantity) === 0; // currently out → going in
-    const nextQty = nextInStock ? null : 0;
+    // The current state comes from isItemInStock, the same read the card
+    // uses to draw the check. Deriving it from quantity here broke on a
+    // blank quantity: Number(null) === 0, so an untracked in-stock item
+    // looked out of stock and every tap marked it in again.
+    // Marking out sets qty to 0. Marking in keeps a positive quantity if
+    // there is one and otherwise sets 1, so On Hand shows the tap took
+    // effect instead of a blank that the sheet then misread.
+    const nextInStock = !isItemInStock(it);
+    const nextQty = nextInStock ? (Number(it.quantity) > 0 ? Number(it.quantity) : 1) : 0;
     const prevQty = it.quantity;
     const prevInStock = it.in_stock;
     items = items.map(i => i.id === it.id
@@ -1191,7 +1200,7 @@
             {@const stockAgg = aggregateStock(it, variantsByParent)}
             {@const isGen = stockAgg.isGeneric}
             {@const effExp = _effectiveExpiry(it, isGen)}
-            {@const inStockDisplay = isGen ? stockAgg.stocked > 0 : !!it.in_stock}
+            {@const inStockDisplay = isGen ? stockAgg.stocked > 0 : isItemInStock(it)}
             {@const expanded = expandedGenerics.has(it.id)}
             {@const variants = isGen ? (variantsByParent.get(it.id) || []) : []}
             <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
@@ -1362,12 +1371,14 @@
                 on:keydown={(e) => { if (e.key === 'Enter') pickExternalResult(r); }}>
                 {#if r.img_url}
                   <img class="item-thumb" src={r.img_url} alt="" loading="lazy" />
+                {:else if r._source === 'local'}
+                  <span class="material-symbols-rounded ext-stub-icon">{_catIconBySlug(_itemSlug(r))}</span>
                 {:else}
                   <span class="material-symbols-rounded ext-stub-icon">qr_code_scanner</span>
                 {/if}
                 <div class="item-body">
                   <div class="item-name">
-                    <span class="src-badge src-{r._source}">{r._source === 'off' ? 'OFF' : r._source === 'usda' ? 'USDA' : 'NT'}</span>
+                    <span class="src-badge src-{r._source}">{r._source === 'off' ? 'OFF' : r._source === 'usda' ? 'USDA' : r._source === 'nt' ? 'NT' : 'Pantry'}</span>
                     {r.name}
                     {#if r._source === 'off' && r.completeness != null}
                       <span class="completeness-dot" class:high={r.completeness >= 0.85}
@@ -1388,7 +1399,7 @@
                   {#if r.brand}<div class="item-notes">{r.brand}</div>{/if}
                   {#if r.barcode}<div class="item-qty" style="font-size:11px">{r.barcode}</div>{/if}
                 </div>
-                <span class="material-symbols-rounded ext-add">add_circle</span>
+                <span class="material-symbols-rounded ext-add">{r._source === 'local' ? 'chevron_right' : 'add_circle'}</span>
               </li>
             {/each}
           </ul>
@@ -1832,6 +1843,7 @@
   .src-badge.src-off  { background: #2e7d32; color: #fff; }
   .src-badge.src-usda { background: #1565c0; color: #fff; }
   .src-badge.src-nt   { background: #6a1b9a; color: #fff; }
+  .src-badge.src-local { background: var(--accent); color: #fff; }
 
   /* External-search results — no heading since the active source-chip
      already labels which API is being queried. */
@@ -1923,8 +1935,11 @@
      they're visible without switching filters. Tiles are small photo
      + name + "3d left" pill. Past-expiry tiles pick up a red tint. */
   .expiring-spotlight { display: none; }
-  @media (min-width: 1200px) {
-    .expiring-spotlight {
+  /* The expiring spotlight is a summary, not a layout: a foldable open flat
+     has ample room for it, and it was the only thing the 1200px gate held
+     back on this screen. */
+  @media all {
+    :global(html.wide-content) .expiring-spotlight {
       display: block;
       margin: 8px 0 14px;
       padding: 10px 12px;
@@ -1932,20 +1947,20 @@
       border: 1px solid color-mix(in srgb, var(--warning, #f59e0b) 30%, var(--border));
       border-radius: var(--radius-lg);
     }
-    .spotlight-head {
+    :global(html.wide-content) .spotlight-head {
       display: flex; align-items: center; gap: 8px;
       margin-bottom: 8px;
     }
     .spotlight-head .material-symbols-rounded { font-size: 18px; color: var(--warning, #f59e0b); }
     .spotlight-title { font-size: 13px; font-weight: 700; color: var(--text-1); }
-    .spotlight-count {
+    :global(html.wide-content) .spotlight-count {
       font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
       text-transform: uppercase;
       background: color-mix(in srgb, var(--warning, #f59e0b) 20%, transparent);
       color: var(--warning, #f59e0b);
       padding: 2px 8px; border-radius: 999px;
     }
-    .spotlight-all {
+    :global(html.wide-content) .spotlight-all {
       margin-left: auto;
       display: inline-flex; align-items: center; gap: 2px;
       background: transparent; border: none; cursor: pointer;
@@ -1953,14 +1968,14 @@
       padding: 4px 8px; border-radius: var(--radius-sm);
     }
     .spotlight-all:hover { color: var(--text-1); background: var(--surface-2); }
-    .spotlight-strip {
+    :global(html.wide-content) .spotlight-strip {
       display: flex; gap: 10px;
       overflow-x: auto;
       scrollbar-width: none;
       padding-bottom: 2px;
     }
     .spotlight-strip::-webkit-scrollbar { display: none; }
-    .spotlight-tile {
+    :global(html.wide-content) .spotlight-tile {
       flex: 0 0 auto;
       display: flex; align-items: center; gap: 8px;
       width: 220px;
@@ -1974,7 +1989,7 @@
     }
     .spotlight-tile:hover { transform: translateY(-1px); border-color: var(--accent-dim); }
     .spotlight-tile.past { border-color: color-mix(in srgb, var(--danger, #ef4444) 45%, var(--border)); }
-    .spotlight-photo {
+    :global(html.wide-content) .spotlight-photo {
       width: 40px; height: 40px; flex-shrink: 0;
       background: var(--surface-2); border-radius: var(--radius-sm);
       display: flex; align-items: center; justify-content: center;
@@ -1982,15 +1997,15 @@
     }
     .spotlight-photo img { width: 100%; height: 100%; object-fit: cover; }
     .spotlight-photo .material-symbols-rounded { font-size: 20px; color: var(--accent); opacity: 0.7; }
-    .spotlight-body {
+    :global(html.wide-content) .spotlight-body {
       display: flex; flex-direction: column; gap: 2px; min-width: 0;
     }
-    .spotlight-name {
+    :global(html.wide-content) .spotlight-name {
       font-size: 13px; font-weight: 600; color: var(--text-1);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       max-width: 150px;
     }
-    .spotlight-days {
+    :global(html.wide-content) .spotlight-days {
       font-size: 11px; font-weight: 600;
       color: var(--warning, #f59e0b);
     }

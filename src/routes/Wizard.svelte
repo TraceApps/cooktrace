@@ -37,8 +37,8 @@
   $: pwScore = passwordStrength(umPassword);
 
   $: STEPS = _isNativeLocal
-    ? ['welcome','name','prefs','done']
-    : ['welcome','account','prefs','done'];
+    ? ['welcome','name','prefs','updates','done']
+    : ['welcome','account','prefs','updates','done'];
   $: progress = ((step + 1) / STEPS.length) * 100;
 
   // ── Cooking prefs state ──────────────────────────────────────────────────
@@ -119,7 +119,22 @@
   // parity port from NutriTrace + LiftTrace's GA polish pass.
   let wizardDone = false;
 
+  // ── Update checks ────────────────────────────────────────────────────────
+  // Off unless it's answered here, so a new install contacts nothing on its
+  // own. Skipping the wizard leaves it off too, and the app says so once.
+  // An instance that already existed keeps checking (server/lib/update-check.js).
+  let updateChecks = false;
+
+  async function _saveUpdateChoice() {
+    try {
+      const { setAutoCheck, setServerUpdateCheck } = await import('../lib/updates.js');
+      setAutoCheck(updateChecks);
+      await setServerUpdateCheck(updateChecks);
+    } catch { /* single-user or offline: the device answer still stands */ }
+  }
+
   async function finish() {
+    await _saveUpdateChoice();
     const settingsToSave = {
       measurementSystem,
       energyUnit: energyUnitVal,
@@ -327,6 +342,21 @@
         </div>
 
       <!-- Done -->
+      {:else if STEPS[step] === 'updates'}
+        <h1 class="step-title">{$_('wizard_ct.updates.title')}</h1>
+        <p class="step-desc">{$_('wizard_ct.updates.desc')}</p>
+        <div class="upd-row">
+          <div class="upd-text">
+            <div class="upd-label">{$_('wizard_ct.updates.toggle')}</div>
+            <div class="upd-sub">{$_('wizard_ct.updates.toggle_sub')}</div>
+          </div>
+          <Toggle checked={updateChecks} on:change={e => updateChecks = e.detail} />
+        </div>
+        <p class="upd-note">{$_('wizard_ct.updates.note')}</p>
+        <div class="step-actions">
+          <button class="btn-primary" on:click={next}>{$_('wizard_ct.next')}</button>
+        </div>
+
       {:else if STEPS[step] === 'done'}
         <h1 class="step-title">You're all set</h1>
         <p class="step-desc">CookTrace is ready. Start by browsing or importing your first recipe.</p>
@@ -340,6 +370,12 @@
 </div>
 
 <style>
+  .upd-row { display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 14px 16px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+  .upd-text { display: flex; flex-direction: column; gap: 2px; text-align: left; }
+  .upd-label { font-size: 14px; font-weight: 600; color: var(--text-1); }
+  .upd-sub { font-size: 12px; color: var(--text-3); }
+  .upd-note { font-size: 12px; line-height: 1.5; color: var(--text-3); margin: 12px 2px 0; }
+
   /* Celebration screen shown briefly between finishing the wizard and
      landing on /recipes. Ported byte-for-byte from NutriTrace +
      LiftTrace so the cross-app onboarding closure feels identical. */

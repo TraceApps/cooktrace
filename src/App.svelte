@@ -3,7 +3,9 @@
   import { fade, fly, slide } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { portal } from './lib/portal.js';
+  import { initFold } from './lib/fold.js';
   import { isPullSyncExempt } from './lib/pull-sync.js';
+  import { offlineState } from './lib/offline-api.js';
   import { handleBack } from './lib/back-stack.js';
   import Router, { location } from 'svelte-spa-router';
 
@@ -11,6 +13,7 @@
   import Sidebar   from './components/layout/Sidebar.svelte';
   import UpdateBanner from './components/UpdateBanner.svelte';
   import TopTimerPill from './components/recipe/TopTimerPill.svelte';
+  import CookingNow from './components/recipe/CookingNow.svelte';
   import { cookModeActive } from './stores/cookMode.js';
   import Toast     from './components/ui/Toast.svelte';
   import ConfirmDialogMount from './components/ui/ConfirmDialogMount.svelte';
@@ -36,6 +39,18 @@
   $: _serverReachable = $syncState.online && !$syncState.connectionIssue;
   // The server answers but the sync is failing, as opposed to no network at all.
   $: _syncFailing = $syncState.online && !!$syncState.connectionIssue;
+  // The same badge for the web app, which keeps working offline in the
+  // browser: amber while anything is waiting, red if the server refuses it.
+  $: _webOffline = !isNative && ($offlineState.online === false || $offlineState.pending > 0);
+  $: _webFailing = !isNative && (!!$offlineState.error || ($offlineState.refused || []).length > 0);
+  // Tell them once, in their own words, what the server would not take.
+  let _toldRefused = 0;
+  $: if (!isNative && ($offlineState.refused || []).length > _toldRefused) {
+    _toldRefused = $offlineState.refused.length;
+    const _say = $offlineState.refused.map(r => $_('sync.refused', { values: { what: r.what, reason: r.reason } }));
+    import('./stores/toast.js').then(({ showError }) => _say.forEach(m => showError(m)));
+    import('./lib/offline-api.js').then(m => m.forgetRefused());
+  }
   // Reactive copy build. Fed by the sync engine's classifier; falls back
   // to the generic "Sync error" title + raw message when a non-connection
   // error is surfaced with showFailureBanner=true.
@@ -279,6 +294,14 @@
   // drill-in settings, no rail).
   $: if (typeof document !== 'undefined') {
     document.documentElement.classList.toggle('force-mobile-layout', !!$forceMobileLayout);
+    // Room for two panes beside whatever sidebar is pinned, rather than a
+    // desktop-sized viewport. A foldable's inner display is around 840px
+    // open flat, so a 1024px gate left it on the phone layout on the one
+    // screen with the most room. Matches NoteTrace.
+    document.documentElement.classList.toggle(
+      'wide-content',
+      !$forceMobileLayout && _viewportW - (sidebarPinned ? 280 : 0) >= 720,
+    );
   }
 
   $: if (typeof document !== 'undefined') {
@@ -296,6 +319,11 @@
   }
 
   onMount(async () => {
+    initFold();
+    // Update checks: a device that was already using the app keeps checking,
+    // a fresh one stays quiet until setup asks. Runs first so nothing above
+    // can skip it (see lib/updates.js).
+    import('./lib/updates.js').then(({ migrateAutoCheck }) => migrateAutoCheck()).catch(() => {});
     // Local-mode scheduled backup tick — JS-side scheduler that fires
     // exportLocalZip() when due. No-ops in PWA / server modes. See
     // src/lib/local-backup-scheduler.js for design notes.
@@ -314,6 +342,11 @@
           import('svelte-spa-router').then(({ push }) => push('/settings/updates'));
         });
       }).catch(() => { /* ignore */ });
+
+      // The clock the phone and the wrist share, while a cook is handed
+      // over. It sends nothing until there is one.
+      import('./lib/wear-timers.js').then(({ watchTimers }) => watchTimers())
+        .catch(() => { /* ignore */ });
 
       // Clean stale APKs from Directory.Data/updates/ on boot.
       import('./lib/updates.js').then(({ cleanUpdateCache }) => {
@@ -482,10 +515,36 @@
         mod.syncState.subscribe(v => syncState.set(v));
         mod.startNetworkMonitor();
         mod.fullSync();
-        setInterval(() => mod.fullSync(true), 30000);
-        import('@capacitor/app').then(({ App }) => {
-          App.addListener('resume', () => mod.fullSync());
+        // Pull every 30s while the app is actually in front of you. A WebView
+        // keeps its timers running when the app is backgrounded and the screen
+        // is off, and an app still on top with the screen off is not frozen,
+        // so an ungated interval keeps waking the radio with nobody looking.
+        // Stopping loses nothing: coming back fires a sync of its own.
+        let poll = null;
+        const startPolling = () => {
+          if (poll == null) poll = setInterval(() => mod.fullSync(true), 30000);
+        };
+        const stopPolling = () => {
+          if (poll != null) { clearInterval(poll); poll = null; }
+        };
+        startPolling();
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) stopPolling(); else startPolling();
         });
+        import('@capacitor/app').then(({ App }) => {
+          App.addListener('resume', () => {
+            startPolling();
+            mod.fullSync();
+            // A watch paired since this app was last opened, or a token that
+            // has been refreshed: either way the watch needs telling. Signing
+            // in is not the only moment that matters, and on an app that is
+            // already signed in it never happens at all.
+            import('./lib/wear-pairing.js').then(({ pairWatch }) => pairWatch()).catch(() => {});
+          });
+          App.addListener('pause', () => stopPolling());
+        });
+        // And on launch, once auth has settled.
+        setTimeout(() => import('./lib/wear-pairing.js').then(({ pairWatch }) => pairWatch()).catch(() => {}), 2500);
       });
     }
 
@@ -542,6 +601,12 @@
      and renders nothing when no timers are running. -->
 <TopTimerPill />
 
+<!-- What you have on the go, from anywhere. Cook mode survives closing the
+     app and more than one recipe can be in it, so without this a dish you
+     never formally finished is invisible until you remember which one it
+     was. Renders nothing when nothing is cooking. -->
+{#if !needsLogin}<CookingNow />{/if}
+
 <!-- In-app update banner (native only). Renders only if the OS-level
      notification permission is denied — grants suppress the banner and
      route through a shade notification instead. -->
@@ -555,11 +620,13 @@
       aria-label="Open menu"
     >
       <span class="material-symbols-rounded">menu</span>
-      {#if _syncModeActive && !_serverReachable}
+      {#if (_syncModeActive && !_serverReachable) || _webOffline || _webFailing}
         <!-- Amber while simply offline (nothing lost, it just hasn't gone yet),
              red when the server is reachable but the sync is failing. -->
-        <span class="conn-badge" class:conn-failing={_syncFailing} class:conn-offline={!_syncFailing}>
-          <span class="material-symbols-rounded" style="font-size:10px">{_syncFailing ? 'cloud_alert' : 'cloud_off'}</span>
+        {@const failing = _syncFailing || _webFailing}
+        <span class="conn-badge" class:conn-failing={failing} class:conn-offline={!failing}
+          aria-label={failing ? $_('sync.sync_failing') : (_webOffline ? $_('sync.pending_web', { values: { count: $offlineState.pending } }) : $_('sync.sync_offline'))}>
+          <span class="material-symbols-rounded" style="font-size:10px">{failing ? 'cloud_alert' : 'cloud_off'}</span>
         </span>
       {/if}
     </button>

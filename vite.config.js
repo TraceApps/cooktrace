@@ -44,7 +44,13 @@ export default defineConfig({
       // for the Svelte-side bridge.
       registerType: 'prompt',
       workbox: {
-        globPatterns: ['offline.html'],
+        // Precache the app itself, not just the fallback page: with only
+        // offline.html here a reload with no connection served a shell whose
+        // own JavaScript 404'd, and the installed app came back blank.
+        globPatterns: ['**/*.{js,mjs,css,html,woff2,woff,ttf,png,svg,ico,webmanifest}'],
+        globIgnores: ['vendor/**', 'icons/**', '**/*.map'],
+        // Some chunks (the editor, the importers) are over the 2 MiB default.
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         navigateFallback: null,
         navigateFallbackDenylist: [/.*/],
         cleanupOutdatedCaches: true,
@@ -58,6 +64,18 @@ export default defineConfig({
               cacheName: 'pages-cache',
               networkTimeoutSeconds: 3,
             }
+          },
+          {
+            // Recipe and pantry photos, kept as they are shown, so a recipe
+            // you cooked from last week still has its picture in a kitchen
+            // with no signal.
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/uploads/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'uploads-cache',
+              expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
           },
         ]
       },

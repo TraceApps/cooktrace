@@ -40,6 +40,7 @@ import { Router } from 'express';
 import db from '../../../db.js';
 import { wrap } from '../../../logger.js';
 import { requireScope } from '../../../middleware/bearer-auth.js';
+import { foldText } from '../../../lib/search-text.js';
 
 const router = Router();
 
@@ -123,8 +124,8 @@ router.get('/', wrap((req, res) => {
   const where = [`${_whereUser(u)}`, `deleted_at IS NULL`];
   const args = [..._userArgs(u)];
   if (q) {
-    where.push(`(LOWER(name) LIKE ? OR LOWER(COALESCE(description, '')) LIKE ?)`);
-    const like = `%${q.toLowerCase()}%`;
+    where.push(`(fold(name) LIKE ? OR fold(COALESCE(description, '')) LIKE ?)`);
+    const like = `%${foldText(q)}%`;
     args.push(like, like);
   }
   const whereSql = where.join(' AND ');

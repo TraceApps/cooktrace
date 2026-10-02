@@ -29,6 +29,7 @@
   import { scaleQty, displayQty, displayQtyParts, parseQty } from '../lib/qty.js';
   import { convertWithinFamily, convertQty, unitFamily } from '../lib/recipe-nutrition.js';
   import { resolveAssetUrl, isNative, getServerUrl } from '../lib/platform.js';
+  import { publishCooks as _publishCooks, readCooks as _readCooks } from '../lib/wear-pairing.js';
   import { portal } from '../lib/portal.js';
   import RecipeComments from '../components/recipe/RecipeComments.svelte';
   import KitchenGear from '../components/recipe/KitchenGear.svelte';
@@ -37,7 +38,10 @@
   import { startTimer, formatRemaining } from '../stores/cookTimers.js';
   import { cookModeActive } from '../stores/cookMode.js';
   import { currentUser } from '../stores/auth.js';
-  import { onDestroy, tick } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
+  import { fold } from '../lib/fold.js';
+  import { get } from 'svelte/store';
+  import { activeCooks, startCook, endCook, isCooking, describeCook, cookList } from '../stores/cooks.js';
   import { computeRecipeNutrition, computeRecipeMass, lookupCommonDensity } from '../lib/recipe-nutrition.js';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import { buildRecipeCardPages, buildRecipeShareText } from '../lib/recipe-card.js';
@@ -60,7 +64,12 @@
   // read-only view — the Edit / Delete buttons drop out and the
   // header shows the creator's byline so they know who to ask about
   // changes.
+  // can_edit comes from the server, which also covers a kitchen Sous
+  // Chef editing a recipe shared into that kitchen. The local checks
+  // stay as the fallback for responses that predate the field (the
+  // native local database, an older server).
   $: canEdit = !!recipe && (
+    recipe.can_edit === true ||
     recipe.user_id == null ||
     recipe.user_id === $currentUser?.id ||
     $currentUser?.role === 'admin'
@@ -245,18 +254,33 @@
   // surprise. cookMode itself is persisted so a reload mid-cook
   // returns you to cooking with checks intact.
   const _initialId = parseInt(params.id, 10);
-  let cookMode = Number.isFinite(_initialId) && typeof localStorage !== 'undefined'
-    && localStorage.getItem(`ct:cookmode:${_initialId}`) === '1';
+  // Which recipes are being cooked lives in one place now, so a cook is
+  // visible from anywhere rather than only from its own page, and so more
+  // than one can be underway: dinner in the oven while dessert is started.
+  $: cookMode = Number.isFinite(id) && !!$activeCooks[id];
   // One-shot cleanup: if we're not inside an active session on entry,
   // wipe any leftover checks. Catches both the legacy "persisted forever"
   // state from before this gate existed and any orphaned entries from
   // crashed sessions where End/I-made-this never ran.
-  if (!cookMode && Number.isFinite(_initialId) && typeof localStorage !== 'undefined') {
+  if (!isCooking(_initialId) && Number.isFinite(_initialId) && typeof localStorage !== 'undefined') {
     try {
       localStorage.removeItem(`ct:checks:${_initialId}:ing`);
       localStorage.removeItem(`ct:checks:${_initialId}:step`);
       localStorage.removeItem(`ct:checks:${_initialId}:tool`);
     } catch {}
+  }
+  // Walking to another recipe clears whatever that one has left over, since
+  // it is not being cooked.
+  let _cookModeFor = _initialId;
+  $: if (Number.isFinite(id) && id !== _cookModeFor) {
+    _cookModeFor = id;
+    if (!isCooking(id) && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(`ct:checks:${id}:ing`);
+        localStorage.removeItem(`ct:checks:${id}:step`);
+        localStorage.removeItem(`ct:checks:${id}:tool`);
+      } catch {}
+    }
   }
   let wakeLockSentinel = null;
   $: cookModeActive.set(cookMode);
@@ -276,12 +300,99 @@
     if (!Number.isFinite(rid) || typeof localStorage === 'undefined') return;
     try { localStorage.setItem(`ct:checks:${rid}:${kind}`, JSON.stringify([...set])); } catch {}
   }
-  function _saveCookMode(rid, on) {
-    if (!Number.isFinite(rid) || typeof localStorage === 'undefined') return;
+  // ── The watch's half of the cook ──────────────────────────────────────
+  // A paired watch shows what you are cooking and lets you tick steps off
+  // with floury hands. Several cooks can be underway, so what travels is the
+  // whole list rather than "the" cook: two devices editing one slot would
+  // spend their time overwriting each other. Either can tick, so every write
+  // is stamped and the later one wins.
+  const COOKS_AT = 'ct:cooksat';
+  function _cooksStamp() {
+    try { return Number(localStorage.getItem(COOKS_AT)) || 0; } catch { return 0; }
+  }
+
+  /**
+   * Which id the watch should be given. The watch asks YOUR SERVER for the
+   * recipe, and in the native app the id in the address is this phone's own,
+   * from its local mirror, not the server's. Sending the local one makes the
+   * watch fetch whatever recipe happens to hold that number on the server.
+   * Zero means there is nothing the watch could fetch: either the page has
+   * not settled, or this recipe has never reached the server.
+   */
+  function _watchRecipeId() {
+    if (!recipe || Number(recipe.id) !== id) return 0;
+    if (!isNative) return id;
+    return Number(recipe.server_id) || 0;
+  }
+
+  /** Every cook underway, as the watch needs to see it. */
+  function _cooksForWatch() {
+    return cookList(get(activeCooks))
+      .filter(c => c.serverId > 0)
+      .map(c => ({
+        serverRecipeId: c.serverId,
+        name: c.name || '',
+        steps: [..._loadChecks(c.localId, 'step')],
+        ingredients: [..._loadChecks(c.localId, 'ing')],
+      }));
+  }
+
+  // Every write to the Data Layer wakes the watch app to read it, so ticking
+  // six ingredients in a row should be one wake and not six. The stamp is
+  // taken when the burst settles, which is also what makes it the later word.
+  let _tellTimer = null;
+  function _tellWatch({ now = false } = {}) {
+    if (!isNative) return;
+    const send = () => {
+      _tellTimer = null;
+      const at = Date.now();
+      try { localStorage.setItem(COOKS_AT, String(at)); } catch {}
+      _publishCooks(_cooksForWatch(), at).catch(() => {});
+    };
+    if (_tellTimer != null) clearTimeout(_tellTimer);
+    // Starting or ending a cook goes at once: that is the handover itself,
+    // and waiting two seconds to send a recipe to a wrist is noticeable.
+    if (now) send();
+    else _tellTimer = setTimeout(send, 1500);
+  }
+  // Leaving the page mid-burst must not lose the last tick: the watch would
+  // then be showing a step you had already done.
+  onDestroy(() => { if (_tellTimer != null) { clearTimeout(_tellTimer); _tellTimer = null; _tellWatch({ now: true }); } });
+
+  /** The watch ticked something, or finished a dish. Take its word. */
+  async function _hearWatch() {
+    if (!isNative) return;
     try {
-      if (on) localStorage.setItem(`ct:cookmode:${rid}`, '1');
-      else    localStorage.removeItem(`ct:cookmode:${rid}`);
-    } catch {}
+      const theirs = await _readCooks(_cooksStamp());
+      if (!theirs) return;
+      const mine = get(activeCooks);
+      const byServer = new Map(
+        Object.entries(mine).map(([localId, v]) => [Number(v.serverId), Number(localId)]),
+      );
+      const seen = new Set();
+      for (const cook of theirs) {
+        const localId = byServer.get(Number(cook.serverRecipeId));
+        if (!localId) continue;
+        seen.add(localId);
+        _saveChecks(localId, 'step', new Set(cook.steps));
+        _saveChecks(localId, 'ing', new Set(cook.ingredients));
+        if (localId === id) {
+          stepChecks = new Set(cook.steps);
+          ingChecks = new Set(cook.ingredients);
+        }
+      }
+      // A dish the watch says is finished is finished here too.
+      for (const localId of byServer.values()) {
+        if (!seen.has(localId)) endCook(localId);
+      }
+      try { localStorage.setItem(COOKS_AT, String(Date.now())); } catch {}
+    } catch { /* no watch */ }
+  }
+
+  function _saveCookMode(rid, on) {
+    if (!Number.isFinite(rid)) return;
+    if (on) startCook(rid, { name: recipe?.name || '', img: recipe?.imgUrl || '', serverId: _watchRecipeId() });
+    else endCook(rid);
   }
   // Resolve a step's ref_ids → the actual ingredient objects from the
   // recipe's grouped-ingredients tree. Returns in refIds order so the
@@ -313,6 +424,7 @@
     else ingChecks.add(key);
     ingChecks = ingChecks;
     _saveChecks(id, 'ing', ingChecks);
+    _tellWatch();
   }
   function toggleStep(idx) {
     if (!cookMode) return; // see toggleIng
@@ -321,6 +433,7 @@
     else stepChecks.delete(idx);
     stepChecks = stepChecks;
     _saveChecks(id, 'step', stepChecks);
+    _tellWatch();
     // Marking a step done also marks off its linked ingredients as
     // used. Users who worked straight through the step without
     // checking each ingredient individually get the same end state as
@@ -395,27 +508,34 @@
   }
 
   async function startCookMode() {
-    cookMode = true;
     _saveCookMode(id, true);
+    // The wrist gets the recipe: this is the moment your hands stop being
+    // free and the phone stops being the thing you want to touch.
+    _tellWatch({ now: true });
     await _acquireWakeLock();
   }
   async function endCookMode() {
-    cookMode = false;
     _saveCookMode(id, false);
     // Session over — clear so the next cook starts fresh.
     resetChecks();
+    _tellWatch({ now: true });
     await _releaseWakeLock();
   }
   // If the user navigates away or backgrounds the tab, release the lock.
   // It auto-re-acquires on visibility return when cookMode is still
   // true. Native re-uses the same path — KeepAwake.keepAwake() is
   // idempotent (safe to call multiple times).
+  // One listener, taken away when this page goes. It used to be added and
+  // never removed, so every visit left another behind, each holding the
+  // recipe that was open when it was made and acting on it later.
+  const _onVisible = async () => {
+    if (document.visibilityState !== 'visible') return;
+    await _hearWatch();
+    if (cookMode) await _acquireWakeLock();
+  };
   if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', async () => {
-      if (cookMode && document.visibilityState === 'visible') {
-        await _acquireWakeLock();
-      }
-    });
+    document.addEventListener('visibilitychange', _onVisible);
+    onDestroy(() => document.removeEventListener('visibilitychange', _onVisible));
   }
 
   $: id = parseInt(params.id, 10);
@@ -431,6 +551,12 @@
     } finally {
       loading = false;
     }
+    // A cook already in progress when this page opens: the watch has no way
+    // of knowing unless it is told. Pressing Cook is not the only moment that
+    // matters, since cook mode survives closing the app.
+    if (recipe) { describeCook(id, { name: recipe.name, img: recipe.imgUrl || '', serverId: _watchRecipeId() }); _tellWatch({ now: true }); }
+    // And the watch may have ticked something off while the phone was shut.
+    _hearWatch();
     // Kick off the pantry load so the FDA box can render "~Xg per
     // serving" instead of "1 of N" once we have densities + per-piece
     // masses to work with. Non-blocking — the box re-renders when the
@@ -720,6 +846,37 @@
     }
   }
 
+  // Half open like a book: the ingredients on one page and the method on the
+  // other, with the crease between them, the way a cookbook lies open.
+  //
+  // This does not wait for the desktop breakpoint at 960px. A foldable's inner
+  // display is around 840px across, so that rule never fires on one, and two
+  // usable columns either side of the crease read better than a single wide
+  // one. It only snaps when both pages are left wide enough for a recipe.
+  let layoutEl, layoutLeft = 0, layoutW = 0;
+  function measureLayout() {
+    const box = layoutEl?.getBoundingClientRect();
+    layoutLeft = box?.left ?? 0;
+    layoutW = box?.width ?? 0;
+  }
+  onMount(() => {
+    measureLayout();
+    const ro = new ResizeObserver(measureLayout);
+    if (layoutEl) ro.observe(layoutEl);
+    return () => ro.disconnect();
+  });
+  // Folding moves the crease without resizing the page.
+  $: if ($fold !== undefined && layoutEl) measureLayout();
+  // Open flat counts too. The hinge is physically there either way, and a
+  // column boundary that lands on it reads far better than one that leaves the
+  // method column starting just left of the crease.
+  $: foldSnappable = $fold?.posture === 'book' || $fold?.posture === 'flat';
+  $: foldLeftW = foldSnappable && layoutW > 0 ? $fold.start - layoutLeft : null;
+  $: layoutHinge = foldSnappable ? Math.max(0, $fold.end - $fold.start) : 0;
+  $: layoutSnap = foldLeftW != null
+    && foldLeftW >= 280
+    && layoutW - foldLeftW - layoutHinge >= 280;
+
 </script>
 
 <div class="page-shell editor-page" class:cook-mode={cookMode} style="--editor-header-h: {editorHeaderH}px">
@@ -836,6 +993,12 @@
                 </a>
               </span>
             {/if}
+            {#if recipe.last_edited_by_name}
+              <span class="dot">·</span>
+              <span title={recipe.updated_at || ''}>
+                {$_('recipe_view_ct.last_edited_by', { values: { name: recipe.last_edited_by_name } })}
+              </span>
+            {/if}
             {#if recipe.last_cooked_at}
               <span class="dot">·</span>
               <span title={relativeTime(recipe.last_cooked_at)}>
@@ -938,7 +1101,8 @@
              • desktop (1280+): Ingredients(+KitchenGear) | Steps(+Notes) | Nutrition
              Cook History + Comments + Last Updated render full-width below
              outside this grid. -->
-        <div class="layout">
+        <div class="layout" bind:this={layoutEl} class:fold-snap={layoutSnap}
+          style={layoutSnap ? `--left-w:${foldLeftW}px; --hinge:${layoutHinge}px` : ''}>
         <div class="col col-left">
         <section class="section ingredients-section">
           <h2 class="section-title">
@@ -1488,8 +1652,11 @@
     gap: 12px;
     min-width: 0;
   }
-  @media (min-width: 960px) {
-    .recipe-header {
+  /* A tablet-tier layout, gated on the room available rather than a
+     960px viewport. A foldable open flat is about 852px, so it never
+     reached this and got the phone layout on its biggest screen. */
+  @media all {
+    :global(html.wide-content) .recipe-header{
       display: grid;
       grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
       gap: 28px;
@@ -1501,7 +1668,7 @@
        stretch to match the meta column's height (was producing
        blown-up heroes on recipes with shorter meta + tall source
        images). */
-    .recipe-header .hero {
+    :global(html.wide-content) .recipe-header .hero{
       aspect-ratio: 16 / 9;
       max-height: 480px;
       border-radius: var(--radius-lg);
@@ -1540,20 +1707,34 @@
     flex-direction: column;
     gap: 24px;
   }
-  @media (min-width: 960px) {
+  /* A tablet-tier layout, gated on the room available rather than a
+     960px viewport. A foldable open flat is about 852px, so it never
+     reached this and got the phone layout on its biggest screen. */
+  @media all {
     /* Wider screens get the genre-standard 16:9 hero — same fixed
        cover crop, just less vertical real-estate so the page below
        lands closer to the fold. */
-    .hero { aspect-ratio: 16 / 9; }
+    :global(html.wide-content) .hero { aspect-ratio: 16 / 9; }
 
-    .layout {
+    :global(html.wide-content) .layout{
       display: grid;
       grid-template-columns: minmax(280px, 0.85fr) 1.15fr;
       gap: 28px;
       align-items: flex-start;
     }
     /* On 2-col, Nutrition spans both columns and flows below. */
-    .col-right { grid-column: 1 / -1; }
+    /* Under the ingredients, not below everything. Spanning both columns put
+       nutrition and Recompute after the method column, which is much the
+       longer of the two, so they ended up stranded at the bottom with a large
+       void beside them. Desktop gives them their own third column; here the
+       ingredients column is where the room is. */
+    /* Bounded above, or the explicit rows leak into the desktop tier, which
+       only resets grid-column and would lose its third column. */
+    @media (max-width: 1279px) {
+      :global(html.wide-content) .col-left  { grid-column: 1; grid-row: 1; }
+      :global(html.wide-content) .col-mid   { grid-column: 2; grid-row: 1 / span 2; }
+      :global(html.wide-content) .col-right { grid-column: 1; grid-row: 2; }
+    }
     /* Sticky left column — Ingredients + Kitchen Gear stay in view as
        you scroll the steps. We deliberately don't set overflow-y here
        any more: setting it to auto forces overflow-x to be clipped
@@ -1562,23 +1743,47 @@
        Comments was. Trade: extremely long ingredient lists scroll
        the whole page rather than scrolling inside the column — fine
        for ~20-row recipes which is the realistic ceiling. */
-    .col-left {
-      position: sticky;
-      top: 16px;
+    /* Not sticky at this size. With no height cap the column runs past its
+       grid row and draws over the nutrition block below it, which put the
+       Recompute card on top of the ingredients. Desktop restores it below,
+       where the steps column is the taller of the two. */
+    :global(html.wide-content) .col-left{
+      position: static;
     }
   }
+  /* Prefixed to match the tablet tier's specificity. Without this the
+     two-column rules above, which now carry html.wide-content, outranked
+     these and desktop silently lost its third column. */
   @media (min-width: 1280px) {
-    .layout {
+    :global(html.wide-content) .layout {
       grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr) minmax(280px, 0.85fr);
       gap: 32px;
     }
-    .col-right {
+    :global(html.wide-content) .col-right {
       grid-column: auto;
       position: sticky;
       top: 16px;
       align-self: start;
     }
   }
+  /* Half open like a book: the crease is the gutter between the ingredients
+     and the method, and nutrition flows below across both pages. Placed after
+     the width breakpoints so it wins wherever both would apply. */
+  :global(html.fold-book) .layout.fold-snap,
+  :global(html.fold-flat) .layout.fold-snap {
+    display: grid;
+    grid-template-columns: var(--left-w) minmax(0, 1fr);
+    gap: var(--hinge);
+    align-items: flex-start;
+  }
+  :global(html.fold-book) .layout.fold-snap .col-left,
+  :global(html.fold-flat) .layout.fold-snap .col-left { grid-column: 1; grid-row: 1; }
+  :global(html.fold-book) .layout.fold-snap .col-mid,
+  :global(html.fold-flat) .layout.fold-snap .col-mid { grid-column: 2; grid-row: 1 / span 2; }
+  :global(html.fold-book) .layout.fold-snap .col-right,
+  :global(html.fold-flat) .layout.fold-snap .col-right { grid-column: 1; grid-row: 2; }
+  :global(html.fold-book) .layout.fold-snap .col-left { position: sticky; top: 16px; }
+
   /* Each column is itself a flex stack — Ingredients above Kitchen
      Gear, Steps above Notes, etc. */
   .col {
@@ -2649,5 +2854,38 @@
     }
     .nutrition-section { display: none !important; }  /* nutrition box renders poorly on B&W */
     @page { margin: 0.6in; }
+  }
+
+  /* The sticky ingredients column is a desktop behaviour: there the steps
+     column is reliably the taller one, so the sticky column has somewhere to
+     travel without escaping its row. */
+  @media (min-width: 1280px) {
+    :global(html.wide-content) .col-left {
+      position: sticky;
+      top: 16px;
+    }
+  }
+
+  /* Between the tablet tier and desktop, the meta column is narrow enough that
+     its text wraps taller than a 16:9 hero, leaving a large void under the
+     image (329px on a foldable at 852). Let the hero fill the row instead.
+     The img already covers, so it crops rather than distorts, and the
+     min-height keeps a recipe with almost no meta from collapsing it. */
+  @media (max-width: 1279px) {
+    /* Balanced columns here rather than 1.4fr/1fr. The meta column is what
+       drives the height at this width, and giving it more room costs fewer
+       wrapped lines than it costs the hero. */
+    :global(html.wide-content) .recipe-header {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    /* Fills the column so there is no large void beside the meta, but capped:
+       stretching it unbounded put a 645px image on an 883px screen. Measured
+       at 852 this lands at 396x520 with a 73px void. */
+    :global(html.wide-content) .recipe-header .hero {
+      align-self: stretch;
+      aspect-ratio: auto;
+      min-height: 260px;
+      max-height: min(60vh, 520px);
+    }
   }
 </style>

@@ -1,6 +1,8 @@
 <script>
   import { closeOnBack } from '../lib/back-stack.js';
   import { onMount, tick } from 'svelte';
+  import { fold } from '../lib/fold.js';
+  import { columnsAcrossFold, gridTemplateAcrossFold, columnForIndex } from '../lib/fold-core.js';
   import { push } from 'svelte-spa-router';
   import { fade } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
@@ -18,6 +20,8 @@
   import { buildRecipeCardPages, buildRecipeShareText } from '../lib/recipe-card.js';
   import { svgToPngBlob, shareBlobs } from '../lib/shopping-card.js';
   import { isNative, getServerUrl } from '../lib/platform.js';
+
+  import { foldText } from '../lib/search-text.js';
 
   let createSheetOpen = false;
   // Measured page-header height — exposed as --header-h on page-shell so
@@ -671,25 +675,25 @@
     return [...seen.values()];
   })();
   $: filteredShared = (() => {
-    const q = query.trim().toLowerCase();
+    const q = foldText(query).trim();
     let list = sharedRecipes;
     if (sharedCategorySlug) {
       list = list.filter(r => r.category && r.category.slug === sharedCategorySlug);
     }
     if (q) {
       list = list.filter(r =>
-        (r.name || '').toLowerCase().includes(q) ||
-        (r.description || '').toLowerCase().includes(q) ||
-        (r.tags || []).some(t => t.toLowerCase().includes(q)) ||
-        (r.category?.name || '').toLowerCase().includes(q) ||
-        (r.shared_by || '').toLowerCase().includes(q)
+        foldText(r.name).includes(q) ||
+        foldText(r.description).includes(q) ||
+        (r.tags || []).some(t => foldText(t).includes(q)) ||
+        foldText(r.category?.name).includes(q) ||
+        foldText(r.shared_by).includes(q)
       );
     }
     return _applySort([...list], $recipesSort);
   })();
 
   $: filtered = (() => {
-    const q = query.trim().toLowerCase();
+    const q = foldText(query).trim();
     // Optional mix-in: when the user has "Show Shared Recipes in My
     // Main List" on, append the /shared-with-me collection to the
     // owned recipes. Cards keep their existing shared_by badge + the
@@ -709,10 +713,10 @@
     }
     if (q) {
       list = list.filter(r =>
-        (r.name || '').toLowerCase().includes(q) ||
-        (r.description || '').toLowerCase().includes(q) ||
-        (r.tags || []).some(t => t.toLowerCase().includes(q)) ||
-        (r.category?.name || '').toLowerCase().includes(q)
+        foldText(r.name).includes(q) ||
+        foldText(r.description).includes(q) ||
+        (r.tags || []).some(t => foldText(t).includes(q)) ||
+        foldText(r.category?.name).includes(q)
       );
     }
     return _applySort([...list], $recipesSort);
@@ -800,6 +804,29 @@
     if (r?.total_minutes != null) return r.total_minutes;
     return (r?.prep_minutes || 0) + (r?.cook_minutes || 0) + (r?.rest_minutes || 0);
   }
+
+  // Half open like a book, the cards are dealt onto the two pages rather than
+  // across the crease, with an empty track where the hinge is. Measured from
+  // the grid itself, since the crease is reported in screen coordinates and
+  // this page sits beside whatever sidebar is pinned.
+  const CARD_MIN = 260;
+  const GRID_GAP = 14;
+  const GRID_PLAIN = `repeat(auto-fill, minmax(${CARD_MIN}px, 1fr))`;
+  let gridEl, gridLeft = 0, gridW = 0;
+  function measureGrid() {
+    const box = gridEl?.getBoundingClientRect();
+    gridLeft = box?.left ?? 0;
+    gridW = box?.width ?? 0;
+  }
+  onMount(() => {
+    measureGrid();
+    const ro = new ResizeObserver(measureGrid);
+    if (gridEl) ro.observe(gridEl);
+    return () => ro.disconnect();
+  });
+  $: if ($fold !== undefined && gridEl) measureGrid();
+  $: gridSplit = columnsAcrossFold({ width: gridW, left: gridLeft, gap: GRID_GAP, minCard: CARD_MIN, fold: $fold });
+  $: gridTemplate = gridTemplateAcrossFold(gridSplit, GRID_PLAIN);
 </script>
 
 <div class="page-shell" style="--header-h: {headerH}px">
@@ -1482,13 +1509,13 @@
         <p>{$_('routes.recipes.no_match', { values: { q: query } })}</p>
       </div>
     {:else}
-      <div class="grid">
-        {#each filtered as r (r.id)}
+      <div class="grid" bind:this={gridEl} style="grid-template-columns:{gridTemplate}">
+        {#each filtered as r, _i (r.id)}
           <button class="card recipe-card"
             class:selecting={selectMode}
             class:selected={selectMode && selectedIds.has(r.id)}
             class:has-cat={!!r.category?.color}
-            style={r.category?.color ? `--cat-color:${r.category.color}` : ''}
+            style="grid-column:{columnForIndex(_i, gridSplit)}; {r.category?.color ? `--cat-color:${r.category.color}` : ''}"
             use:longpress
             on:longpress={() => selectMode ? toggleSelected(r.id) : openCardMenu(r)}
             on:click={() => selectMode ? toggleSelected(r.id) : push(`/recipes/${r.id}`)}>

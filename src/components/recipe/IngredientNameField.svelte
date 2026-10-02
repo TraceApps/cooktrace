@@ -17,6 +17,9 @@
    * Combobox's single mode, which expects a real pick-or-create).
    */
   import { onMount, onDestroy, tick } from 'svelte';
+  import { get } from 'svelte/store';
+  import { fold } from '../../lib/fold.js';
+  import { placeAnchoredMenu } from '../../lib/fold-core.js';
   import { fade } from 'svelte/transition';
   import { portal } from '../../lib/portal.js';
 
@@ -99,16 +102,15 @@
     const r = inputEl.getBoundingClientRect();
     const { height: vh, offsetTop } = _viewport();
     const viewBottom = offsetTop + vh;
-    const POP_MAX_H = 240;
-    const GAP = 4;
-    const spaceBelow = viewBottom - r.bottom - 8;
-    const spaceAbove = r.top - offsetTop - 8;
-    const placeAbove = spaceBelow < 160 && spaceAbove > spaceBelow;
-    const top = placeAbove
-      ? Math.max(offsetTop + 8, r.top - GAP - Math.min(POP_MAX_H, spaceAbove))
-      : r.bottom + GAP;
-    const maxH = placeAbove ? Math.min(POP_MAX_H, spaceAbove) : Math.min(POP_MAX_H, spaceBelow);
-    popStyle = `top:${top}px;left:${r.left}px;width:${r.width}px;max-height:${Math.max(0, maxH)}px;`;
+    // The crease counts as the end of the room on a foldable lying open, so
+    // the suggestions are never cut in half by the hinge. `viewBottom` keeps
+    // the keyboard's own edge in the picture.
+    const place = placeAnchoredMenu({
+      anchorTop: r.top, anchorBottom: r.bottom,
+      viewportHeight: viewBottom, margin: offsetTop + 8,
+      maxHeight: 240, fold: get(fold),
+    });
+    popStyle = `top:${place.top}px;left:${r.left}px;width:${r.width}px;max-height:${place.maxHeight}px;`;
   }
   function _onViewportChange() { if (open) _reposition(); }
 

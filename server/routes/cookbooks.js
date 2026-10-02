@@ -6,6 +6,7 @@
  * (with insertion order as the tiebreaker).
  */
 import { Router } from 'express';
+import { localizeDataUrl } from '../lib/image-localizer.js';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
@@ -179,6 +180,25 @@ router.get('/shared-with-me', wrap((req, res) => {
 // access to are flagged `locked: true` with everything but id/name
 // scrubbed, so the shared cookbook doesn't become a discovery
 // mechanism that bypasses recipe-level permissions.
+// True when the cookbook reached this user through a kitchen where they
+// hold the Sous Chef role, and they are still a member. Mirrors the same
+// helper for recipes: a Sous Chef who can fix a shared recipe can also
+// file it, so the cookbook it belongs in is editable too. Read live, so
+// a demotion or a removal takes it away at once. Renaming, the cover,
+// and which recipes are in it are all edits; deleting the cookbook and
+// sharing it onward stay with its owner.
+function _canEditViaKitchen(cookbookId, userId) {
+  if (userId == null) return false;
+  return !!db.prepare(
+    `SELECT 1 FROM cookbook_shares s
+       JOIN kitchen_members m
+         ON m.kitchen_id = s.via_kitchen_id AND m.user_id = s.grantee_id
+      WHERE s.cookbook_id = ? AND s.grantee_id = ? AND s.via_kitchen_id IS NOT NULL
+        AND m.role = 'sous'
+      LIMIT 1`
+  ).get(cookbookId, userId);
+}
+
 router.get('/:id', wrap((req, res) => {
   const u = uid(req);
   const id = parseInt(req.params.id, 10);
@@ -278,6 +298,9 @@ router.get('/:id', wrap((req, res) => {
   res.json({
     ..._hydrate(cb, hydratedRecipes.length),
     recipes: hydratedRecipes,
+    // Same question the write routes ask, so the client's Edit controls
+    // match what the server will actually accept.
+    can_edit: isOwner || _canEditViaKitchen(id, u),
     ...(sharedRow ? {
       shared_with_me: true,
       shared_by: sharedRow.shared_by_username || null,
@@ -293,7 +316,8 @@ router.post('/', wrap((req, res) => {
   const name = (req.body?.name || '').toString().trim();
   if (!name) return res.status(400).json({ error: 'name required' });
   const description = req.body?.description ? String(req.body.description).trim() || null : null;
-  const cover_image_url = req.body?.cover_image_url ? String(req.body.cover_image_url).trim() || null : null;
+  // A cover taken with no connection arrives embedded; it becomes a file here.
+  const cover_image_url = req.body?.cover_image_url ? localizeDataUrl(String(req.body.cover_image_url).trim()) || null : null;
   const is_smart = req.body?.is_smart ? 1 : 0;
   // Validate + minify the smart filter. Drop unknown keys so the JSON
   // we store stays clean across schema iterations.
@@ -334,14 +358,16 @@ router.put('/:id', wrap((req, res) => {
   const existing = db.prepare(`SELECT * FROM cookbooks WHERE id = ? AND deleted_at IS NULL`).get(id);
   if (!existing) return res.status(404).json({ error: 'Not found' });
   const isOwner = (u == null && existing.user_id == null) || existing.user_id === u;
-  if (!isOwner) return res.status(403).json({ error: 'Forbidden' });
+  if (!isOwner && !_canEditViaKitchen(id, u)) return res.status(403).json({ error: 'Forbidden' });
 
   const name        = req.body?.name != null ? (String(req.body.name).trim() || existing.name) : existing.name;
   const description = req.body?.description !== undefined
     ? (req.body.description ? String(req.body.description).trim() : null)
     : existing.description;
+  // Same as create: a cover picked with no connection arrives as a data URL,
+  // and is written out as a file rather than stored whole in the row.
   const cover_image_url = req.body?.cover_image_url !== undefined
-    ? (req.body.cover_image_url ? String(req.body.cover_image_url).trim() : null)
+    ? (req.body.cover_image_url ? localizeDataUrl(String(req.body.cover_image_url).trim()) || null : null)
     : existing.cover_image_url;
   const sort_order  = req.body?.sort_order != null && Number.isFinite(parseInt(req.body.sort_order, 10))
     ? parseInt(req.body.sort_order, 10) : existing.sort_order;
@@ -407,7 +433,7 @@ router.post('/:id/recipes', wrap((req, res) => {
   const cb = db.prepare(`SELECT * FROM cookbooks WHERE id = ? AND deleted_at IS NULL`).get(id);
   if (!cb) return res.status(404).json({ error: 'Not found' });
   const isOwner = (u == null && cb.user_id == null) || cb.user_id === u;
-  if (!isOwner) return res.status(403).json({ error: 'Forbidden' });
+  if (!isOwner && !_canEditViaKitchen(id, u)) return res.status(403).json({ error: 'Forbidden' });
 
   const ids = Array.isArray(req.body?.recipe_ids) ? req.body.recipe_ids.map(n => parseInt(n, 10)).filter(Number.isFinite) : [];
   if (ids.length === 0) return res.status(400).json({ error: 'recipe_ids required' });
@@ -462,7 +488,7 @@ router.put('/:id/recipes/order', wrap((req, res) => {
   const cb = db.prepare(`SELECT * FROM cookbooks WHERE id = ? AND deleted_at IS NULL`).get(id);
   if (!cb) return res.status(404).json({ error: 'Not found' });
   const isOwner = (u == null && cb.user_id == null) || cb.user_id === u;
-  if (!isOwner) return res.status(403).json({ error: 'Forbidden' });
+  if (!isOwner && !_canEditViaKitchen(id, u)) return res.status(403).json({ error: 'Forbidden' });
   const ids = Array.isArray(req.body?.recipe_ids)
     ? req.body.recipe_ids.map(n => parseInt(n, 10)).filter(Number.isFinite)
     : [];
@@ -482,7 +508,7 @@ router.delete('/:id/recipes/:recipeId', wrap((req, res) => {
   const cb = db.prepare(`SELECT * FROM cookbooks WHERE id = ? AND deleted_at IS NULL`).get(id);
   if (!cb) return res.status(404).json({ error: 'Not found' });
   const isOwner = (u == null && cb.user_id == null) || cb.user_id === u;
-  if (!isOwner) return res.status(403).json({ error: 'Forbidden' });
+  if (!isOwner && !_canEditViaKitchen(id, u)) return res.status(403).json({ error: 'Forbidden' });
 
   db.prepare(`DELETE FROM recipe_cookbook_links WHERE cookbook_id = ? AND recipe_id = ?`).run(id, recipeId);
   res.json({ ok: true });

@@ -9,6 +9,179 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.0] - 2026-10-02
+
+CookTrace on your wrist, offline mode for a shop with no signal, kitchen roles for a shared household library, cooking more than one dish at once, preliminary foldable support, and Spanish.
+
+### Added
+
+- **CookTrace on your wrist.** A Wear OS app for watches on Wear OS 3 and up. Your shopping list by aisle, ticked off with a trolley in one hand, working with no signal. Press Cook on the phone and the recipe arrives as two checklists, ingredients and steps, and a step that says "simmer for 20 minutes" offers that timer. Several timers run at once and each buzzes on your wrist, "I cooked this" writes straight into your cook diary, and a tile and a watch face complication show what is left to buy or the timer running. Either device can tick something off and the other follows. [Wear OS](https://traceapps.github.io/docs/cooktrace/wear/).
+- **Offline mode.** Built for a supermarket with no signal: the shopping list opens, and you can add, tick, edit, remove and clear. Recipes, cookbooks, the pantry and the diary read from what the app has already seen, pictures included, and the installed app opens with no connection at all. The pantry, the cook diary, your recipes and their notes, settings, your profile, and photos of what you cooked, a recipe or a pantry item can all change offline, and go up on their own when the connection returns, with an amber cloud on the menu button while anything is waiting. Importing, sharing, kitchens, editing a cookbook, Trace and anything admin need a connection and say so; a change your server refuses is set aside and named in plain words. [Cook and shop without a connection](https://traceapps.github.io/docs/cooktrace/features/#offline).
+- **Kitchen roles, so a household can share one recipe library without sharing the keys to the server** ([#52](https://github.com/TraceApps/cooktrace/issues/52)). The Head Chef gives each member a role: a Sous Chef edits what is shared into the Kitchen, a Line Cook cooks from it. Deleting, sharing onward, visibility, category, rating and favorites stay with the recipe's owner. A Kitchen can also be handed to another member, the way out of the old "owner cannot leave" dead end. Thanks to @herver1971 for the idea and the first implementation in [#53](https://github.com/TraceApps/cooktrace/pull/53). [Kitchens](https://traceapps.github.io/docs/cooktrace/kitchens/).
+- **Cook more than one thing at once.** Start a second recipe while the first is still going, and a slim bar shows what is on the go from anywhere in the app: one tap goes back to the dish, or picks from several. Timers change color as they run down, and one that goes off names the dish it belongs to.
+- **Preliminary foldable support.** Half open like a book, the crease becomes a divider rather than something content sits across:
+  - A recipe opens like a cookbook: the ingredients on the page left of the fold, the method on the right.
+  - Settings puts its section list on one side and the section itself on the other.
+  - Shopping deals its aisles into columns, and the pantry spotlight shows when there is room for it.
+  - The cook diary keeps its toolbar under the header, and a year of cooking fits the width.
+  - Manage splits its rail and its grid on the room available.
+  - Dialogs, sheets, running timers and Trace keep off the crease, and a menu opened near it takes the roomier side.
+  - In laptop posture Trace sits on the half lying flat, leaving the recipe readable on the half standing up.
+  - Recipes, lists and photos still cross the fold freely, since an opened foldable is a bigger screen to read on.
+  - The same two-column layouts appear on a tablet or any wide window, not only on a desktop-sized screen.
+  - Diagnostics reports what the hinge is doing, so you can tell whether your phone reports one at all.
+- **Spanish.** Pick it in Settings → Regional & Units, or it follows your browser or phone. Translated by @herver1971 on Weblate. Thank you!
+- **Settings has a Support page**, next to About: Ko-fi and GitHub Sponsors, plus free ways to help (star the repo, report a bug, translate).
+
+### Changed
+
+- **Search ignores accents.** "oregano" finds "Orégano" and "cafe" finds "Café", in every search box, the REST API and the MCP tools, on names and brands alike. Text without accents matches exactly as before. Thanks to @herver1971 for the pantry fix in [#62](https://github.com/TraceApps/cooktrace/pull/62) that started it.
+- **Update checks are off until you turn them on, and your server does the asking.** Every browser and phone used to ask GitHub directly every 4 hours. Setup now asks, and a fresh install contacts nothing on its own. Existing installs keep checking as before, and `UPDATE_CHECK=off` keeps them off for good. Reported on r/selfhosted.
+- **Fonts are served by your own instance.** The app loaded its fonts from Google on every page load, so Google saw the address of everyone who opened it. Reported on r/selfhosted.
+- **The in-app updater reuses an update it already downloaded.** Coming back to Updates goes straight to installing, and the button says Install. Older downloads are cleared so they stop piling up on the phone.
+- **About links to the TraceApps family** instead of naming the other apps.
+- **A connection problem says what kind it was.** The diagnostic log records a timeout, an address that would not resolve, a refused connection or a rejected certificate, and how long it waited, where all of them used to read "Failed to fetch".
+
+### Fixed
+
+- **The Docker image starts on virtual machines whose CPU cannot run the PDF reader** ([#59](https://github.com/TraceApps/cooktrace/issues/59), thanks @bajtekv). It stopped with "Illegal instruction" before the server came up. Only PDF import is affected on such a machine now, and it says so.
+- **The check on a pantry item can be unticked again** ([#55](https://github.com/TraceApps/cooktrace/issues/55)). Ticking it, or restocking from the shopping list, puts 1 in On Hand, unticking sets 0, and the card, the button and the item's sheet agree. Thanks to @herver1971 for the report and the fix in [#56](https://github.com/TraceApps/cooktrace/pull/56).
+- **A cookbook cover uploads from Manage, and so does a recipe video** ([#63](https://github.com/TraceApps/cooktrace/issues/63), thanks @herver1971). Both said "Upload failed" and saved nothing, so a smart cookbook could not get a cover at all.
+- **The All search shows your own pantry.** With the All chip, or several sources pinned, the pantry part of the results was always empty. Your items appear badged as yours, and tapping one opens it.
+- **The cook dashboard no longer disappears after one failed request** at launch; the heatmap shows on its own data and the stats are retried.
+- **The shopping list's Add button fits on a phone** instead of running off the right edge.
+- **A file of the wrong type, or over the size limit, is turned away with a clear message** instead of a server error. A file that is too large says what the limit is.
+- **"A New Version Is Available" on the web says what it means, and Reload works.** A tab left open also notices a new version now.
+- **The Trace button no longer covers sheets and dialogs** opened on top of it.
+- **Settings on desktop:** pages line up with the section list beside them, and the list keeps its place when you open a section instead of scrolling back to Profile.
+
+### Security
+
+- **multer** bumped 2.3.0 to 2.4.0, closes [GHSA-3pph-fpjx-jg34](https://github.com/advisories/GHSA-3pph-fpjx-jg34) (moderate: an upload cut off at just the wrong moment could leave its file on disk). Both routes that write uploads to disk require signing in.
+- **undici** bumped 6.28.0 to 6.29.0, and the copy cheerio uses 7.29.0 to 7.30.0, closes [GHSA-3wwx-pv8p-q78v](https://github.com/advisories/GHSA-3wwx-pv8p-q78v) (moderate: a WebSocket server could crash the process). CookTrace opens no WebSocket connections.
+- **nodemailer** bumped 9.1.1 to 10.0.12, closes [GHSA-6vj9-mwq6-2f5v](https://github.com/advisories/GHSA-6vj9-mwq6-2f5v) (moderate: separate mail transports could share one TLS server name).
+- `npm audit` reports 0 vulnerabilities for the app and the server.
+
+---
+
+## [1.4.0-dev04] - 2026-09-29 (pre-release)
+
+A dev pre-release of the 1.4.0 minor. Spanish, a Support page in Settings, uploads that say what went wrong, and security updates.
+
+### Added
+
+- **Spanish.** CookTrace can be used in Spanish: pick it in Settings → Regional & Units, or it follows your browser or phone. Translated almost in full by @herver1971 on Weblate. Thank you!
+- **Settings has a Support page**, next to About: Ko-fi and GitHub Sponsors, plus free ways to help (star the repo, report a bug, translate). It replaces the support row that used to sit in About.
+
+### Changed
+
+- **The in-app updater reuses an update it already downloaded.** Coming back to Updates goes straight to installing instead of downloading the whole APK again, and the button says Install. Older downloads are cleared so they stop piling up on the phone.
+- **About links to the TraceApps family** instead of naming the other apps, a list that had already gone out of date.
+
+### Fixed
+
+- **A file of the wrong type, or over the size limit, is turned away with a clear message.** Uploading one answered with a server error instead of saying what was wrong. A file that is too large now says what the limit is.
+- **A cookbook cover uploads from Manage, and so does a recipe video.** Both said "Upload failed" and saved nothing, although the file had already reached your server. Manage → Cookbooks is the only place a smart cookbook gets its cover, so smart cookbooks could not have one at all. Thanks to @herver1971 for the report and the diagnosis in [#63](https://github.com/TraceApps/cooktrace/issues/63).
+- **A cookbook cover picked with no connection is saved as a picture file** once you are back online, not stored whole inside the cookbook, where it made every list of cookbooks heavier to load. Updating a cookbook now checks its cover the way creating one always did.
+- **The shopping list's Add button fits on a phone.** On a phone-width screen the button beside the item picker ran off the right edge, leaving only "+ A" showing.
+- **Settings pages line up with the section list** on desktop and foldables. Most pages started 12px below the list beside it.
+- **The Settings section list keeps its place** on desktop and foldables. Every click in it scrolled the list back to Profile.
+
+
+### Security
+
+- **multer** bumped 2.3.0 to 2.4.0, closes [GHSA-3pph-fpjx-jg34](https://github.com/advisories/GHSA-3pph-fpjx-jg34) (moderate: an upload cut off at just the wrong moment could leave its file behind on disk). Both routes that write uploads to disk require signing in.
+- **undici** bumped 6.28.0 to 6.29.0, and the copy cheerio uses 7.29.0 to 7.30.0, closes [GHSA-3wwx-pv8p-q78v](https://github.com/advisories/GHSA-3wwx-pv8p-q78v) (moderate: a WebSocket server could crash the process). CookTrace opens no WebSocket connections.
+- **nodemailer** bumped 9.1.1 to 10.0.12 on the server, closes [GHSA-6vj9-mwq6-2f5v](https://github.com/advisories/GHSA-6vj9-mwq6-2f5v) (moderate: separate mail transports could share one TLS server name). Removed from the web app's own dependencies, where nothing used it.
+- `npm audit` reports 0 vulnerabilities for the app and the server.
+---
+
+## [1.4.0-dev03] - 2026-09-27 (pre-release)
+
+A dev pre-release of the 1.4.0 minor. A first pass at foldables, and search that no longer cares about accents.
+
+### Added
+
+- **Preliminary foldable support.** Half open like a book, the crease becomes a divider rather than something content sits across:
+  - A recipe opens like a cookbook: the ingredients on the page left of the fold, the method on the right.
+  - Settings puts its section list on one side and the section itself on the other.
+  - Shopping deals its aisles into columns, and the pantry spotlight shows when there is room for it.
+  - The cook diary keeps its toolbar under the header, and a year of cooking fits the width.
+  - Manage splits its rail and its grid on the room available.
+  - Dialogs, sheets, running timers and Trace keep off the crease, and a menu opened near it takes the roomier side rather than being cut in half by the hinge.
+  - In laptop posture Trace sits on the half lying flat, leaving the recipe readable on the half standing up.
+  - Recipes, lists and photos still cross the fold freely, since an opened foldable is a bigger screen to read on.
+  - Diagnostics reports what the hinge is doing, so you can tell whether your phone reports one at all.
+
+### Fixed
+
+- **Search ignores accents.** Typing "oregano" finds "Orégano", "cafe" finds "Café", "limon" finds "Limón". This holds for the pantry, recipes, cookbooks, the cook diary, tags, units, the Manage lists, Settings, Trace, the public API and the MCP tools, on names and brands alike. A kitchen kept in Spanish, Portuguese, French or another language with accents no longer looks like the item is missing because nobody types the accent on a phone. Text without accents matches exactly as before. Thanks to @herver1971 for the report and the pantry fix in [#62](https://github.com/TraceApps/cooktrace/pull/62).
+- **The All search shows your own pantry again.** With the All chip, or several sources pinned, the pantry part of the results was always empty. Your items appear alongside the OFF, USDA and NutriTrace results now, badged as yours, and tapping one opens that item instead of starting a duplicate of it.
+- **The cook dashboard no longer disappears after one failed stats call.** A single failed request at launch hid the heatmap and the summary tiles for the whole session, with no retry. The heatmap shows on its own data now, and the stats call retries once.
+- **A connection problem says what kind it was.** When the app cannot reach your server, the diagnostic log records the kind of failure and how long it waited. A timeout, an address that would not resolve, a refused connection and a rejected certificate all used to read "Failed to fetch".
+
+### Security
+
+- No dependency changes. `npm audit --omit=dev` reports 0 vulnerabilities for the app and the server.
+
+---
+
+## [1.4.0-dev02] - 2026-09-25 (pre-release)
+
+Second dev pre-release of the 1.4.0 minor. Three fixes, each from a real
+install: the image not starting on some virtual machines, the in-app
+updater offering the watch build to phones, and the pantry stock check
+that could not be unticked.
+
+### Fixed
+- **The Docker image would not start on some virtual machines**, stopping with "Illegal instruction" before the server came up ([#59](https://github.com/TraceApps/cooktrace/issues/59), thanks @bajtekv). The PDF reader used for recipe imports loads a graphics library whose prebuilt binary needs CPU instructions that some virtual CPUs, including QEMU's default, do not provide. Loading it killed the whole process at startup, and that kind of crash cannot be caught. PDFs are now read in a separate short-lived process, so the server starts and runs normally everywhere, and on a machine whose CPU cannot run the reader only PDF import is affected, with a message saying so rather than a dead container. A PDF that takes more than a minute is given up on instead of holding the request open.
+- **The in-app updater can no longer hand a phone the watch build.** A release carries both APKs, and they share a package id so the watch app installs straight over the phone one. The updater took whichever `.apk` the release listed first, which is upload order and no promise at all. It now picks the phone's build by name, and offers nothing at all rather than a watch build.
+
+- **The check on a pantry item can be unticked again, and ticking it puts 1 in On Hand.** Tapping + on an item's photo marked it in stock but left On Hand blank, and from then on the check could not be unticked: every tap marked it in stock again, and the only way out was opening the item and typing 0. The item's own sheet also showed it as Out of Stock while the card showed it checked. Ticking now sets On Hand to 1 (or keeps the number that was there), unticking sets it to 0, and the card, the button and the sheet agree. [#55](https://github.com/TraceApps/cooktrace/issues/55)
+
+---
+
+## [1.4.0-dev01] - 2026-09-22 (pre-release)
+
+First dev pre-release of the 1.4.0 minor. Two headlines: CookTrace on a watch, with your shopping list and a recipe you can cook from, and offline mode, so a supermarket with no signal stops being a problem. Also in: kitchen roles, so a household can share a recipe library without sharing the keys to the server, update checks that are off until you ask for them, and fonts served by your own instance instead of Google.
+
+### Added
+
+- **Kitchen roles, so a household can share one recipe library without sharing the keys to the server** ([#52](https://github.com/TraceApps/cooktrace/issues/52)). A recipe shared into a Kitchen used to be read-only for everyone but its owner, so fixing a quantity meant asking them or making everyone an admin. Each member now has a role its Head Chef sets: a Sous Chef edits what is shared into the Kitchen, a Line Cook cooks from it. Deleting, sharing onward, visibility, category, rating and favourites stay with the owner. A Kitchen can also be handed to another member, which is the way out of the old "owner cannot leave" dead end. Thanks to @herver1971 for the idea and the first implementation in [#53](https://github.com/TraceApps/cooktrace/pull/53). [Kitchens](https://traceapps.github.io/docs/cooktrace/kitchens/).
+- **CookTrace on your wrist.** A Wear OS app for watches running Wear OS 3 and up. The shopping list is its home: your list by aisle, ticked off with a trolley in one hand, working in a shop with no signal. Press Cook on the phone and the recipe arrives on the watch as two checklists, ingredients and steps, and a step that says "simmer for 20 minutes" offers that timer rather than making you dial it. Several timers run at once and each buzzes on your wrist. "I cooked this" writes straight into your cook diary. Either device can tick something off and the other follows. [Wear OS](https://traceapps.github.io/docs/cooktrace/wear/).
+- **Offline mode** ([#211](https://github.com/TraceApps/nutritrace/issues/211) in NutriTrace, the same idea here). A supermarket with no signal is the case this is built for: your shopping list opens, you can add, tick, edit, remove and clear, and it is all there when you come back into range. Recipes, cookbooks, the pantry and the diary read from what this browser has already seen, pictures included, so you can cook from a recipe with no signal. What you change goes up on its own when the connection returns, as the very requests the app would have made. The menu button shows an amber cloud while anything is waiting. [Cook and shop without a connection](https://traceapps.github.io/docs/cooktrace/features/#offline).
+- **What else works in offline mode.** The pantry (adding, editing, removing, in or out of stock), the cook diary, your recipes and their notes, settings, your profile and picture, and photos everywhere you can attach one: what you cooked, a recipe's own photo, a cookbook cover and a pantry item.
+- **Offline mode says what it cannot reach.** Importing recipes, sharing a recipe or cookbook, kitchens and their members, Trace and anything admin need a connection. A change your server refuses is set aside and named in plain words, everything else still goes up, and the reason is written to the diagnostics log, while a server that is merely busy is retried instead.
+
+### Changed
+
+- **Update checks are off until you turn them on, and your server does the asking.** Every browser and phone used to ask GitHub directly every 4 hours. Setup now asks, skipping the question leaves checks off, and a fresh install contacts nothing on its own. Existing installs keep checking as before. `UPDATE_CHECK=off` keeps them off for good. Reported on r/selfhosted.
+
+### Fixed
+
+- **A list you have already opened is still there offline after your changes go up.** When queued work reached your server, the app dropped its copy of the lists that change touched so they would be read again, but nothing reads a screen you do not open. Come back offline without opening it and your shopping list said it needed a connection, empty. Those lists are read back the moment the change goes up now.
+- **A browser low on room keeps your shopping list.** Making space for something you changed cleared the whole copy at once, taking the list you were standing in the shop with. It now gives up the oldest half first, and only clears everything if that is still not enough. What the browser keeps also counts a read as recent use, so the list you look at is the last thing dropped rather than the first.
+- **"A New Version Is Available" on the web now says what it means, and Reload works.** The browser banner used the Android wording and its Reload button could do nothing at all, and a tab left open never noticed a new version. Same fix in all four Trace apps.
+- **Ticking things off on the phone no longer wakes the watch once per tap.** Each change was sent to the watch on its own, so a shop run kept the radio busy; they go in one batch now.
+- **The Trace button no longer covers what's on top of it.** It floated above every sheet and dialog, so wherever you had dragged it, it could sit over a title or a button. Same fix as NutriTrace [#233](https://github.com/TraceApps/nutritrace/issues/233).
+- **The installed app survives a reload with no connection.** It kept only a fallback page, so its own code came from the network and reopening it in a dead zone left a blank screen.
+- **Something deleted while online stays deleted when the connection goes.** An older copy of the list could be carried over, so what you removed came back the moment you were offline. Reported in testing.
+- **A photo kept offline is scaled to something a request comfortably carries**, so your server never turns it away after you have been told it was saved.
+- **Adding a photo with no connection no longer fails on an installed app.** The part of the app that keeps a photo was fetched from your server at the exact moment there was nothing to fetch from.
+- **A change made with no connection is answered in the shape that screen expects**, so nothing looks like it failed when it was saved and waiting.
+- **A picture kept offline holds its transparency, and an unusual camera format is converted rather than lost.** A drawing could come back with a black background, and an iPhone's HEIC would have been refused on arrival without saying so.
+- **The copy this browser keeps now has a ceiling**, and if storage runs out, what you have changed is kept and the copy makes way for it.
+- **A sync no longer empties the copy this browser keeps.** Everything was cleared once the queue went up, so losing signal again left you with nothing to look at.
+- **Work changed while a sync was running no longer waits for you to do something else** before it goes up.
+- **What a row created offline became is now remembered on disk**, not just while the page stays open, so a sync that stopped halfway can't leave work queued against an id your server never had.
+- **Fonts are served by your own instance.** The app loaded Inter and the icon font from Google on every page load, so Google saw the address of everyone who opened it, whatever your settings said. Reported on r/selfhosted.
+
+### Security
+
+- No security fixes this cycle. `npm audit` reports 0 vulnerabilities for the app and the server, and there are no open Dependabot alerts. The privacy changes above (fonts, update checks) came out of a review on r/selfhosted.
+
+---
+
 ## [1.3.0] - 2026-09-20
 
 Minor release. Big themes: CookTrace opens up to other software (a Model

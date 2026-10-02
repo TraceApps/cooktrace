@@ -10,6 +10,11 @@
   "sync": {
     "synced": "Synced",
     "syncing": "Syncing…",
+    "pending_web": "{count, plural, =0 {Offline. Your kitchen still works here.} one {Offline. # change is waiting to go up.} other {Offline. # changes are waiting to go up.}}",
+    "refused": "Your server would not accept {what}: {reason}",
+    "sign_out_waiting_title": "Changes are still waiting",
+    "sign_out_waiting": "{count, plural, one {# change has not reached your server yet. Signing out now discards it. Connect and try again to keep it.} other {# changes have not reached your server yet. Signing out now discards them. Connect and try again to keep them.}}",
+    "sign_out_anyway": "Sign Out Anyway",
     "sync_offline": "Offline",
     "sync_failing": "Can't reach the server",
     "not_synced": "Not synced yet",
@@ -152,6 +157,15 @@
     "add_step":           "Add Step",
     "add_group":          "Add Group"
   },
+  "cooking_now": {
+    "label":        "Cooking",
+    "untitled":     "A recipe",
+    "label_many":   "Cooking {n}",
+    "just_started": "just started",
+    "minutes":      "{n, plural, one {# min} other {# min}}",
+    "hours":        "{n}h {m}m",
+    "more":         "{n, plural, one {# more cooking} other {# more cooking}}"
+  },
   "recipe": {
     "prep_time":          "Prep Time",
     "cook_time":          "Cook Time",
@@ -189,8 +203,8 @@
     "kitchens":           { "section": "Kitchens" },
     "diagnostics":        { "section": "Diagnostics" },
     "updates":            { "section": "Updates" },
+    "support":            { "section": "Support" },
     "about":              { "section": "About" },
-    "support_dev":        { "section": "Support Development" },
     "diary":              { "section": "Diary" },
     "water":              { "section": "Water" },
     "foods":              { "section": "Foods" },
@@ -830,13 +844,21 @@
       "crash_available":        "Crash report available"
     },
     "about": {
-      "support_note": "CookTrace is free to self-host, always. The current goal is a Mac and an iPhone so the Trace apps can run properly on iOS.",
       "app_name":               "CookTrace",
       "federation_prefix":      "Optional federation with ",
       "federation_suffix":      " for nutrition tracking",
-      "family_prefix":          "Part of the ",
-      "family_suffix":          " family (with NutriTrace and LiftTrace)",
-      "support_dev":            "Support Development"
+      "family_line_prefix":     "Part of the ",
+      "family_line_suffix":     " family"
+    },
+    "support": {
+      "lead":                   "CookTrace is free and always will be. Support is optional and never unlocks anything.",
+      "other_ways":             "Other Ways to Help",
+      "star":                   "Star on GitHub",
+      "star_desc":              "Stars are how self-hosted projects get found.",
+      "report_bug":             "Report a Bug",
+      "report_bug_desc":        "A clear report fixes it for everyone who hits the same thing.",
+      "translate":              "Help Translate",
+      "translate_desc":         "Make CookTrace usable in your language, on Weblate."
     },
     "custom_color": {
       "saturation":             "Saturation",
@@ -977,13 +999,30 @@
   },
   "settings_kitchens_ct": {
     "toast": {
-      "kitchen_deleted":         "Kitchen deleted"
+      "kitchen_deleted":         "Kitchen deleted",
+      "can_edit_now":            "{name} can edit shared recipes",
+      "read_only_now":           "{name} can read shared recipes",
+      "all_can_edit":            "Everyone can edit shared recipes",
+      "all_read_only":           "Shared recipes are read-only again"
     },
     "um_required":               "User Management Required",
     "create_new_kitchen":        "Create a New Kitchen",
     "new_name_ph":               "Smith Family Kitchen",
-    "owner_badge":               "Owner",
+    "owner_badge":               "Head Chef",
+    "role_cook":                 "Line Cook",
+    "role_sous":                 "Sous Chef",
+    "role_owner":                 "Head Chef",
+    "role_for":                  "Role for {name}",
+    "invite_role":               "Role for the new member",
+    "hand_over":                 "Make Head Chef",
+    "roles_help":                "Who can do what in this Kitchen:",
+    "role_help_owner":                "invites and removes people, sets roles, and can delete the Kitchen",
+    "role_help_sous":                "edits the recipes and cookbooks shared into it",
+    "role_help_cook":                "cooks from them, read only, and is what everyone starts as",
+    "everyone_edits":            "Let Everyone Edit",
+    "nobody_edits":              "Make All Read-Only",
     "remove":                    "Remove",
+    "remove_member":                    "Remove {name} from this Kitchen",
     "leave":                     "Leave",
     "invite_username_ph":        "Username to invite",
     "delete_kitchen":            "Delete Kitchen"
@@ -1349,6 +1388,7 @@
     "done":                      "Done"
   },
   "recipe_view_ct": {
+    "last_edited_by":            "Last edited by {name}",
     "toast": {
       "recipe_deleted":          "Recipe deleted",
       "preparing_share":         "Preparing share…",
@@ -1540,6 +1580,13 @@
     "done":                      "Done"
   },
   "wizard_ct": {
+    "updates": {
+      "title": "Check For Updates",
+      "desc": "Your server can tell you when a new CookTrace is out.",
+      "toggle": "Check for updates automatically",
+      "toggle_sub": "It's how you hear about new features, fixes and security updates",
+      "note": "Your server asks GitHub every few hours whether a newer CookTrace is out. Nothing about you or your data is sent. You can change this any time in Settings, Updates."
+    },
     "welcome":                   "Welcome to CookTrace",
     "get_started":               "Get Started",
     "name_ph":                   "Your name",
@@ -1720,6 +1767,11 @@
     },
     "auto_check":            "Automatically Check for Updates",
     "auto_check_desc":       "Check for new releases in the background.",
+    "off_resting": "Off. Your server will not contact GitHub. Turn it on to hear about new features, fixes and security updates.",
+    "off_notice_title": "Update Checks Are Off",
+    "off_notice": "Nothing will tell you about new features, fixes or security updates. Turning checks on asks GitHub for the latest release every few hours, and sends nothing about you.",
+    "turn_on": "Turn On",
+    "not_now": "Not Now",
     "interval": {
       "label":       "Check Frequency",
       "desc":        "How often the app checks for a new release when open. Manual only turns off all auto-checks.",
@@ -1730,6 +1782,8 @@
       "manual":      "Manual Only"
     },
     "available_generic": "A New Version Is Available",
+    "ready_headline": "Update Ready",
+    "ready_cta": "Reload to get the latest version.",
     "banner_reload":     "Reload",
     "last_checked":          "Last Checked",
     "last_checked_never":    "Never",
@@ -1743,6 +1797,7 @@
     "no_release_notes":      "No release notes were published for this build.",
     "view_on_github":        "View on GitHub",
     "download_install":      "Download & Install",
+    "install_downloaded":    "Install",
     "downloading":           "Downloading… {percent}%",
     "install_starting":      "Opening installer…",
     "install_failed":        "Install failed. Try again.",

@@ -160,15 +160,11 @@
         saving = false;
         return;
       }
-      const res = await fetch(apiUrl('/api/auth/profile'), {
-        method: 'PUT',
-        credentials: 'include',
-        headers: _headers(),
-        body: JSON.stringify({ full_name, nickname, birthday, gender, avatar_url, email }),
-      });
-      const data = await res.json();
-      if (!res.ok) { showError(data.error || $_('profile.errors.save_failed')); return; }
-      currentUser.set(data.user);
+      // Through the API layer rather than a raw fetch, so a profile saved
+      // with no connection is queued like everything else and goes up when
+      // the connection returns (lib/offline-api.js).
+      const data = await NtApi.put('/api/auth/profile', { full_name, nickname, birthday, gender, avatar_url, email });
+      if (data?.user) currentUser.set(data.user);
       showSuccess($_('profile.saved'));
     } catch(e) {
       showError($_('profile.errors.save_failed'));

@@ -11,11 +11,13 @@
  * match so "Flour" and "flour" share one row).
  */
 import { Router } from 'express';
+import { localizeDataUrl } from '../lib/image-localizer.js';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { deriveSodiumSalt } from '../lib/nutrition-derive.js';
 import { dispatchWebhookEvent } from '../lib/webhooks.js';
+import { foldText } from '../lib/search-text.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -203,12 +205,12 @@ router.delete('/categories/:id', wrap((req, res) => {
 router.get('/', wrap((req, res) => {
   const u = uid(req);
   const stockOnly = req.query.in_stock === '1';
-  const q = req.query.q ? String(req.query.q).trim().toLowerCase() : '';
+  const q = req.query.q ? foldText(req.query.q).trim() : '';
 
   let sql = `SELECT * FROM pantry_items WHERE ${userClause(u)} AND deleted_at IS NULL`;
   const args = [...userArgs(u)];
   if (stockOnly) sql += ` AND in_stock = 1`;
-  if (q) { sql += ` AND LOWER(name) LIKE ?`; args.push(`%${q}%`); }
+  if (q) { sql += ` AND fold(name) LIKE ?`; args.push(`%${q}%`); }
   sql += ` ORDER BY name COLLATE NOCASE ASC`;
 
   const rows = db.prepare(sql).all(...args);
@@ -365,7 +367,8 @@ router.post('/', wrap((req, res) => {
     body.unit || null,
     body.expires_on || null,
     body.nt_food_id || null,
-    body.img_url || body.imgUrl || null,
+    // A photo taken with no connection arrives embedded; it becomes a file here.
+    localizeDataUrl(body.img_url || body.imgUrl || null),
     body.notes || null,
     categorySlug,
     categoryId,
@@ -476,7 +479,7 @@ router.put('/:id', wrap((req, res) => {
     body.unit !== undefined ? (body.unit || null) : existing.unit,
     body.expires_on !== undefined ? (body.expires_on || null) : existing.expires_on,
     body.nt_food_id !== undefined ? (body.nt_food_id || null) : existing.nt_food_id,
-    body.img_url !== undefined ? (body.img_url || body.imgUrl || null) : existing.img_url,
+    body.img_url !== undefined ? localizeDataUrl(body.img_url || body.imgUrl || null) : existing.img_url,
     body.notes !== undefined ? (body.notes || null) : existing.notes,
     nextCategorySlug,
     nextCategoryId,

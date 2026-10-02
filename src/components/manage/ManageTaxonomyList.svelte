@@ -20,6 +20,8 @@
   import { confirmDialog } from '../../stores/confirmDialog.js';
   import Spinner from '../ui/Spinner.svelte';
 
+  import { foldText } from '../../lib/search-text.js';
+
   export let title;
   export let description = '';
   export let loadFn;
@@ -49,8 +51,8 @@
     let out = items;
     if (unusedOnly) out = out.filter(i => (i.count || 0) === 0);
     if (filter.trim()) {
-      const q = filter.trim().toLowerCase();
-      out = out.filter(i => i.name.toLowerCase().includes(q));
+      const q = foldText(filter).trim();
+      out = out.filter(i => foldText(i.name).includes(q));
     }
     if (sortMode === 'most')  out = [...out].sort((a, b) => (b.count || 0) - (a.count || 0) || a.name.localeCompare(b.name));
     if (sortMode === 'least') out = [...out].sort((a, b) => (a.count || 0) - (b.count || 0) || a.name.localeCompare(b.name));

@@ -321,4 +321,21 @@
   .legend-cell[data-level="2"] { background: color-mix(in srgb, var(--accent) 50%, var(--surface-2)); }
   .legend-cell[data-level="3"] { background: color-mix(in srgb, var(--accent) 75%, var(--surface-2)); }
   .legend-cell[data-level="4"] { background: var(--accent); }
+
+  /* Between 768 and 1024 the fixed 16px cell needs 1007px for 53 weeks, so a
+     year of squares simply ran off the page: on a foldable open flat it
+     overflowed by 214px. Below the desktop tier the columns become fractions
+     of whatever width there is, and aspect-ratio keeps the cells square. */
+  @media (min-width: 768px) and (max-width: 1023px) {
+    /* Plain pixels, not fluid tracks. A year is 53 columns, and the 16px cell
+       the 768px tier sets needs 1007px, so it ran off the page by 214px on a
+       foldable open flat. 11px + 2px gap needs 687px, which fits every width
+       in this range including 768.
+
+       Sizing the columns as fractions with aspect-ratio square cells worked in
+       desktop Chromium and collapsed the cells to zero height in Android
+       WebView, leaving the card with a heading and an empty grid. Explicit
+       sizes avoid that circular sizing entirely. */
+    .hm-layout { --cell: 11px; --gap: 2px; }
+  }
 </style>

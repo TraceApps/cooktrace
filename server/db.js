@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { foldText } from './lib/search-text.js';
 
 const dbPath = process.env.DB_PATH || './cooktrace.db';
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -8,6 +9,12 @@ fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+
+// Accent-insensitive text search: `fold(name) LIKE '%cafe%'` finds "Café".
+// SQLite's own LIKE folds ASCII case and nothing else, so a pantry or recipe
+// named in Spanish, Portuguese or French could not be found without typing
+// the accent. Same definition the client searches with.
+db.function('fold', { deterministic: true }, (s) => foldText(s));
 
 // ── Core tables ────────────────────────────────────────────────────────────
 db.exec(`
@@ -283,6 +290,14 @@ if (!columnExists('recipes', 'rest_minutes')) {
 // reads or writes it today. Safe to drop in a future major.
 if (!columnExists('recipes', 'nt_meal_id')) {
   db.exec(`ALTER TABLE recipes ADD COLUMN nt_meal_id INTEGER`);
+}
+
+// Who last saved this recipe, when that was not its owner. A kitchen
+// Sous Chef can edit recipes shared into the kitchen, so a shared
+// library needs to answer "who changed step 3". NULL means the owner
+// saved it last, which is the case for every row before this column.
+if (!columnExists('recipes', 'last_edited_by')) {
+  db.exec(`ALTER TABLE recipes ADD COLUMN last_edited_by INTEGER REFERENCES users(id) ON DELETE SET NULL`);
 }
 
 // ai_chat_history was originally append-only with just created_at, but

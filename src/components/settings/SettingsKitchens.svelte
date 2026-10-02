@@ -16,6 +16,7 @@
   import { currentUser, userMgmtActive } from '../../stores/auth.js';
   import Spinner from '../ui/Spinner.svelte';
   import Combobox from '../ui/Combobox.svelte';
+  import ActionSheet from '../ui/ActionSheet.svelte';
 
   let kitchens = [];
   let loading = false;
@@ -26,6 +27,7 @@
   // Per-kitchen expanded panel state
   let openId = null;
   let members = {};      // { kitchenId: [member, ...] }
+  let inviteRole = 'member';  // Role the new member joins with
   let inviteName = '';        // Combobox picked value (display name string)
   let inviteTyped = '';       // Raw typed text (for freeform invite fallback)
   let inviteBusy = false;
@@ -105,7 +107,7 @@
     if (!username) return;
     inviteBusy = true;
     try {
-      await NtApi.addKitchenMember(kitchenId, username);
+      await NtApi.addKitchenMember(kitchenId, username, inviteRole);
       showSuccess(`Added ${username}`);
       inviteName = '';
       inviteTyped = '';
@@ -114,6 +116,60 @@
       kitchens = kitchens.map(k => k.id === kitchenId ? { ...k, member_count: (members[kitchenId] || []).length } : k);
     } catch (e) { showError(e.message || 'Could not add member'); }
     finally { inviteBusy = false; }
+  }
+
+  async function handOver(kitchenId, member) {
+    const name = member.full_name || member.username;
+    const ok = await confirmDialog({
+      title: `Make ${name} the Head Chef?`,
+      message: `${name} will own this Kitchen: inviting, removing and setting roles, and deleting it. You stay in the Kitchen as a Sous Chef, so you can still edit the recipes shared into it. Only ${name} can hand it back.`,
+      confirmText: 'Hand Over',
+      dangerous: true,
+    });
+    if (!ok) return;
+    try {
+      await NtApi.transferKitchen(kitchenId, member.user_id);
+      await load();
+      await loadMembers(kitchenId);
+      showSuccess(`${name} owns this Kitchen now`);
+    } catch (e) { showError(e.message || 'Could not hand over the Kitchen'); }
+  }
+
+  // The roles, named once. A native select opens the operating system's own
+  // list, which looks like nothing else in the app; this opens the same sheet
+  // everything else here opens.
+  $: roleName = {
+    member: $_('settings_kitchens_ct.role_cook'),
+    sous:   $_('settings_kitchens_ct.role_sous'),
+    owner:  $_('settings_kitchens_ct.role_owner'),
+  };
+  $: memberRoleActions = [
+    { label: roleName.member, icon: 'skillet',      value: 'member' },
+    { label: roleName.sous,   icon: 'edit_note',    value: 'sous'   },
+    // Handing the Kitchen over is not the same kind of act as the other two,
+    // and the sheet can say so where a line in a dropdown cannot.
+    { label: roleName.owner,  icon: 'stars',        value: 'owner', danger: true },
+  ];
+  $: inviteRoleActions = [
+    { label: roleName.member, icon: 'skillet',   value: 'member' },
+    { label: roleName.sous,   icon: 'edit_note', value: 'sous'   },
+  ];
+
+  /** Whose role is being picked, if anyone's. */
+  let rolePicker = null;
+  let invitePickerOpen = false;
+
+  /**
+   * A role chosen from the sheet. Head Chef is not a role you set on someone,
+   * it is the Kitchen changing hands, so it asks first and nothing is written
+   * until the answer is yes.
+   */
+  async function pickRole(value) {
+    const open = rolePicker;
+    rolePicker = null;
+    if (!open || value === open.member.role) return;
+    if (value === 'owner') { await handOver(open.kitchenId, open.member); return; }
+    setRole(open.kitchenId, open.member, value);
   }
 
   async function removeMember(kitchenId, member) {
@@ -193,6 +249,45 @@
   }
 
   function isOwner(k) { return k.role === 'owner'; }
+
+  // Kitchen roles. 'sous' may edit the recipes shared into this kitchen,
+  // 'member' is read-only and stays the default a member joins with.
+  function everyoneEdits(kitchenId) {
+    const rest = (members[kitchenId] || []).filter(m => m.role !== 'owner');
+    return rest.length > 0 && rest.every(m => m.role === 'sous');
+  }
+
+  async function setRole(kitchenId, member, role) {
+    const prev = member.role;
+    if (prev === role) return;
+    members[kitchenId] = (members[kitchenId] || []).map(m => m.user_id === member.user_id ? { ...m, role } : m);
+    try {
+      await NtApi.setKitchenMemberRole(kitchenId, member.user_id, role);
+      showSuccess(role === 'sous'
+        ? $_('settings_kitchens_ct.toast.can_edit_now', { values: { name: member.full_name || member.username } })
+        : $_('settings_kitchens_ct.toast.read_only_now', { values: { name: member.full_name || member.username } }));
+    } catch (e) {
+      members[kitchenId] = (members[kitchenId] || []).map(m => m.user_id === member.user_id ? { ...m, role: prev } : m);
+      showError(e.message || 'Could not change the role');
+    }
+  }
+
+  async function setAllRoles(kitchenId, role) {
+    const targets = (members[kitchenId] || []).filter(m => m.role !== 'owner' && m.role !== role);
+    if (targets.length === 0) return;
+    const ids = new Set(targets.map(m => m.user_id));
+    const prev = members[kitchenId];
+    members[kitchenId] = prev.map(m => ids.has(m.user_id) ? { ...m, role } : m);
+    try {
+      for (const m of targets) await NtApi.setKitchenMemberRole(kitchenId, m.user_id, role);
+      showSuccess(role === 'sous'
+        ? $_('settings_kitchens_ct.toast.all_can_edit')
+        : $_('settings_kitchens_ct.toast.all_read_only'));
+    } catch (e) {
+      members[kitchenId] = prev;
+      showError(e.message || 'Could not change the roles');
+    }
+  }
 </script>
 
 <div class="card settings-card">
@@ -266,6 +361,27 @@
                 </button>
               </div>
 
+              {#if isOwner(k) && (members[k.id] || []).some(m => m.role !== 'owner')}
+                <!-- Three roles in one sentence read as a wall. A line each,
+                     strongest first, is the shape of the thing being
+                     described and can be scanned rather than parsed. -->
+                <div class="role-help">
+                  <div class="roles">
+                    <p class="setting-desc roles-lead">{$_('settings_kitchens_ct.roles_help')}</p>
+                    <ul class="role-list">
+                      <li><b>{$_('settings_kitchens_ct.role_owner')}</b> {$_('settings_kitchens_ct.role_help_owner')}</li>
+                      <li><b>{$_('settings_kitchens_ct.role_sous')}</b> {$_('settings_kitchens_ct.role_help_sous')}</li>
+                      <li><b>{$_('settings_kitchens_ct.role_cook')}</b> {$_('settings_kitchens_ct.role_help_cook')}</li>
+                    </ul>
+                  </div>
+                  <button class="btn btn-secondary btn-sm" on:click={() => setAllRoles(k.id, everyoneEdits(k.id) ? 'member' : 'sous')}>
+                    {everyoneEdits(k.id)
+                      ? $_('settings_kitchens_ct.nobody_edits')
+                      : $_('settings_kitchens_ct.everyone_edits')}
+                  </button>
+                </div>
+              {/if}
+
               <div class="member-list">
                 {#each (members[k.id] || []) as m (m.user_id)}
                   <div class="member-row">
@@ -274,10 +390,31 @@
                       {#if m.role === 'owner'}<span class="badge">{$_('settings_kitchens_ct.owner_badge')}</span>{/if}
                       {#if m.user_id === $currentUser?.id}<span class="muted">(you)</span>{/if}
                     </span>
+                    {#if isOwner(k) && m.role !== 'owner'}
+                      <!-- Head Chef sits with the other roles because that is
+                           what it is. It is the one that cannot be taken back
+                           by the person choosing it, so it asks first and the
+                           picker goes back to where it was if the answer is
+                           no. -->
+                      <button class="role-pill"
+                        aria-haspopup="dialog"
+                        aria-label={$_('settings_kitchens_ct.role_for', { values: { name: m.full_name || m.username } })}
+                        on:click={() => rolePicker = { kitchenId: k.id, member: m }}>
+                        <span class="role-pill-text">{roleName[m.role] || roleName.member}</span>
+                        <span class="material-symbols-rounded" aria-hidden="true">expand_more</span>
+                      </button>
+                    {:else if m.role === 'sous'}
+                      <span class="badge">{$_('settings_kitchens_ct.role_sous')}</span>
+                    {/if}
                     {#if isOwner(k) && m.user_id !== $currentUser?.id}
-                      <button class="btn-link danger" on:click={() => removeMember(k.id, m)}>{$_('settings_kitchens_ct.remove')}</button>
+                      <button class="btn-icon-sm danger"
+                        title={$_('settings_kitchens_ct.remove')}
+                        aria-label={$_('settings_kitchens_ct.remove_member', { values: { name: m.full_name || m.username } })}
+                        on:click={() => removeMember(k.id, m)}>
+                        <span class="material-symbols-rounded">person_remove</span>
+                      </button>
                     {:else if m.user_id === $currentUser?.id && !isOwner(k)}
-                      <button class="btn-link danger" on:click={() => removeMember(k.id, m)}>{$_('settings_kitchens_ct.leave')}</button>
+                      <button class="btn btn-danger btn-sm" on:click={() => removeMember(k.id, m)}>{$_('settings_kitchens_ct.leave')}</button>
                     {/if}
                   </div>
                 {/each}
@@ -300,13 +437,20 @@
                       on:create={() => invite(k.id)}
                     />
                   </div>
+                  <button class="role-pill"
+                    aria-haspopup="dialog"
+                    aria-label={$_('settings_kitchens_ct.invite_role')}
+                    on:click={() => invitePickerOpen = true}>
+                    <span class="role-pill-text">{roleName[inviteRole] || roleName.member}</span>
+                    <span class="material-symbols-rounded" aria-hidden="true">expand_more</span>
+                  </button>
                   <button class="btn btn-secondary" on:click={() => invite(k.id)}
                     disabled={inviteBusy || (!inviteName.trim() && !inviteTyped.trim())}>
                     {inviteBusy ? 'Adding…' : 'Add'}
                   </button>
                 </div>
                 <div class="kitchen-actions">
-                  <button class="btn-link danger" on:click={() => deleteKitchen(k)}>{$_('settings_kitchens_ct.delete_kitchen')}</button>
+                  <button class="btn btn-danger btn-sm" on:click={() => deleteKitchen(k)}>{$_('settings_kitchens_ct.delete_kitchen')}</button>
                 </div>
               {/if}
             </div>
@@ -316,6 +460,21 @@
     {/if}
   {/if}
 </div>
+
+<ActionSheet
+  open={rolePicker != null}
+  title={rolePicker ? (rolePicker.member.full_name || rolePicker.member.username) : ''}
+  actions={memberRoleActions}
+  on:select={e => pickRole(e.detail.value)}
+  on:cancel={() => rolePicker = null}
+/>
+
+<ActionSheet
+  bind:open={invitePickerOpen}
+  title={$_('settings_kitchens_ct.invite_role')}
+  actions={inviteRoleActions}
+  on:select={e => inviteRole = e.detail.value}
+/>
 
 <style>
   .card.settings-card {
@@ -437,12 +596,73 @@
   .member-list { display: flex; flex-direction: column; gap: 4px; }
   .member-row {
     display: flex; align-items: center; justify-content: space-between;
+    gap: 10px;
     padding: 6px 0;
     font-size: 13px;
   }
-  .member-name { display: inline-flex; align-items: center; gap: 6px; }
+  .member-name { display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+  .member-row .role-picker { margin-left: auto; }
+  .role-help {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; padding: 2px 0 8px;
+  }
+  .roles { flex: 1 1 260px; min-width: 0; }
+  .roles-lead { margin: 0 0 4px; }
+  .role-list {
+    list-style: none;
+    margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: 2px;
+    font-size: 13px; color: var(--text-2);
+  }
+  .role-list b { color: var(--text-1); font-weight: 600; }
   .invite-row { display: flex; gap: 8px; margin-top: 4px; align-items: center; }
   .invite-row .input { flex: 1; }
   .invite-picker { flex: 1; min-width: 0; }
-  .kitchen-actions { display: flex; justify-content: flex-end; padding-top: 6px; }
+  .kitchen-actions { display: flex; justify-content: flex-end; padding-top: 10px; }
+
+  /* Small versions of the page's buttons, for a row that is a line of text
+     high. Same shapes, less of them. */
+  .btn-sm { padding: 6px 11px; font-size: 12px; }
+  .btn-danger {
+    background: rgba(255,92,92,0.14);
+    color: var(--danger);
+    border-color: rgba(255,92,92,0.3);
+  }
+  .btn-danger:hover { background: rgba(255,92,92,0.22); }
+  /* The one control that holds what you can do to a member. */
+  .btn-icon-sm {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; flex: 0 0 auto;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-2);
+    cursor: pointer;
+  }
+  .btn-icon-sm:hover { background: var(--surface-3); color: var(--text-1); }
+  /* The role control. A native select opens the operating system's list,
+     which is the one thing on this page that looks like another app; this is
+     an ordinary button that opens the sheet everything else here opens. */
+  .role-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    flex: 0 0 auto;
+    height: 32px;
+    padding: 0 6px 0 11px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full, 999px);
+    color: var(--text-1);
+    font-size: 12px; font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color var(--dur-fast, 0.12s), background var(--dur-fast, 0.12s);
+  }
+  .role-pill:hover { border-color: var(--accent); background: var(--surface-3); }
+  .role-pill:active { transform: scale(0.97); }
+  .role-pill .material-symbols-rounded { font-size: 18px; color: var(--text-2); }
+  .role-pill-text { overflow: hidden; text-overflow: ellipsis; }
+
+  .btn-icon-sm.danger { color: var(--danger); border-color: rgba(255,92,92,0.3); }
+  .btn-icon-sm.danger:hover { background: rgba(255,92,92,0.14); color: var(--danger); }
+  .btn-icon-sm .material-symbols-rounded { font-size: 18px; }
 </style>

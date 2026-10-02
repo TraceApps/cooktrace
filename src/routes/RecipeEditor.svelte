@@ -24,6 +24,8 @@
   import { parseQty, formatQty } from '../lib/qty.js';
   import Spinner from '../components/ui/Spinner.svelte';
 
+  import { foldText } from '../lib/search-text.js';
+
   // Units where decimal qtys feel awkward — auto-format to fractions
   // (0.25 cup → 1/4 cup, 0.5 tsp → 1/2 tsp). Volume-y units only;
   // grams / ml / oz / lb stay as decimals because fractions read worse.
@@ -218,11 +220,11 @@
     closePantryPicker();
   }
   $: pantryPickerFiltered = (() => {
-    const q = pantryPickerQuery.trim().toLowerCase();
+    const q = foldText(pantryPickerQuery).trim();
     if (!q) return pantryPickerRows;
     return pantryPickerRows.filter(p =>
-      (p.name || '').toLowerCase().includes(q) ||
-      (p.brand || '').toLowerCase().includes(q));
+      foldText(p.name).includes(q) ||
+      foldText(p.brand).includes(q));
   })();
   let notes = '';
   // Sparse object keyed by nutriment id — only populated keys persist.
@@ -411,8 +413,8 @@
     }
     videoUploading = true;
     try {
-      const res = await NtApi.uploadImage(file); // same multipart handler accepts video
-      const url = res?.url || res?.path || '';
+      // Same multipart handler accepts video. It returns the URL as a string.
+      const url = await NtApi.uploadImage(file);
       if (!url) throw new Error('Upload failed');
       videoUrl = url;
       showSuccess($_('recipe_editor_ct.toast.video_uploaded'));

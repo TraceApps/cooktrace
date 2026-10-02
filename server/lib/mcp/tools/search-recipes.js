@@ -9,6 +9,7 @@
 import { z } from 'zod';
 import db from '../../../db.js';
 import { toolResult, toolError } from '../_util.js';
+import { foldText } from '../../search-text.js';
 
 const MAX_LIMIT = 50;
 const DEFAULT_LIMIT = 20;
@@ -34,13 +35,13 @@ export function registerSearchRecipes(server, { userId }) {
       // Escape LIKE wildcards so a recipe named "50% Whole Wheat" is
       // searchable by "50%" without matching every row.
       const escaped = q.replace(/[\\%_]/g, c => '\\' + c);
-      const like = `%${escaped}%`;
+      const like = `%${foldText(escaped)}%`;
       const rows = db.prepare(
         `SELECT id, name, description, servings, prep_minutes, cook_minutes, total_minutes, rating, tags
            FROM recipes
           WHERE user_id = ?
             AND deleted_at IS NULL
-            AND (name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
+            AND (fold(name) LIKE ? ESCAPE '\\' OR fold(description) LIKE ? ESCAPE '\\')
           ORDER BY name COLLATE NOCASE ASC
           LIMIT ?`
       ).all(userId, like, like, cap);

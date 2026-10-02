@@ -17,6 +17,8 @@
   import Combobox from '../ui/Combobox.svelte';
   import Spinner from '../ui/Spinner.svelte';
 
+  import { foldText } from '../../lib/search-text.js';
+
   let cookbooks = [];
   let categories = [];
   let tagOptions = [];
@@ -42,7 +44,7 @@
 
   let filter = '';
   $: filtered = filter.trim()
-    ? cookbooks.filter(cb => cb.name.toLowerCase().includes(filter.trim().toLowerCase()))
+    ? cookbooks.filter(cb => foldText(cb.name).includes(foldText(filter).trim()))
     : cookbooks;
   $: filteredEmpty = cookbooks.length > 0 && filtered.length === 0;
 
@@ -123,8 +125,9 @@
     if (!file) return;
     coverUploading = true;
     try {
-      const res = await NtApi.uploadImage(file);
-      const url = res?.url || res?.path || '';
+      // uploadImage hands back the URL itself, a string, from every client
+      // (web, native, offline). Reading .url off it always came back empty.
+      const url = await NtApi.uploadImage(file);
       if (!url) throw new Error('Upload failed');
       // Update either the in-edit form (so user sees it before save)
       // or the row directly (when not in edit mode).

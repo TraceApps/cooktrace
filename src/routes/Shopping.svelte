@@ -17,6 +17,7 @@
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import DateInput from '../components/ui/DateInput.svelte';
   import { longpress } from '../lib/long-press.js';
+  import { foldText } from '../lib/search-text.js';
   import {
     buildShoppingCardSvg, buildShoppingText,
     svgToPngBlob, shareBlob, shareText,
@@ -415,9 +416,12 @@
       if (!p) continue;
       const patch = { in_stock: 1 };
       const prev = { in_stock: p.in_stock ? 1 : 0 };
-      // Pantry treats quantity 0 as out of stock, so clear it too.
+      // An item sitting at 0 would still read as out of stock, so give it
+      // the same 1 the pantry card's check button writes. Both ways of
+      // marking something in stock then leave the same On Hand. A count
+      // the user already recorded is left alone.
       if (p.quantity != null && Number(p.quantity) === 0) {
-        patch.quantity = null;
+        patch.quantity = 1;
         prev.quantity = p.quantity;
       }
       try {
@@ -754,7 +758,7 @@
     }
   }
   $: filteredPickerRecipes = pickerSearch.trim()
-    ? pickerRecipes.filter(r => r.name.toLowerCase().includes(pickerSearch.trim().toLowerCase()))
+    ? pickerRecipes.filter(r => foldText(r.name).includes(foldText(pickerSearch).trim()))
     : pickerRecipes;
 
   async function addFromRecipe(r) {
@@ -1279,7 +1283,9 @@
      action is unmissable at every viewport width. */
   .quick-add {
     display: grid;
-    grid-template-columns: 1fr 64px auto;
+    /* minmax(0, ...) rather than a bare 1fr, which cannot shrink below the
+       item picker's own width and pushed Add off the right edge of a phone. */
+    grid-template-columns: minmax(0, 1fr) 64px auto;
     gap: 8px;
     margin-bottom: 12px;
     align-items: center;
@@ -1310,7 +1316,7 @@
   .input:focus { outline: 2px solid var(--accent-dim); border-color: var(--accent); }
   /* Very narrow phones: tighten so the Add label doesn't wrap. */
   @media (max-width: 380px) {
-    .quick-add { grid-template-columns: 1fr 54px auto; gap: 6px; }
+    .quick-add { grid-template-columns: minmax(0, 1fr) 54px auto; gap: 6px; }
     .qa-add { padding: 0 10px; }
   }
 
@@ -1358,7 +1364,10 @@
      so short cards stack into the gap under a tall neighbour instead of
      every row being as tall as its tallest card. Row gap is 0 because
      the vertical gap is folded into each span. */
-  @media (min-width: 1200px) {
+  /* auto-fill already picks the column count, so the only thing the 1200px
+     gate did was keep a foldable (about 852px, two columns of 400) on the
+     phone layout. */
+  @media all {
     .groups-grid:not(.flat-mode) {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
@@ -1370,7 +1379,7 @@
   }
 
   .group { margin-bottom: 16px; }
-  @media (min-width: 1200px) {
+  @media all {
     .groups-grid:not(.flat-mode) .group {
       margin: 0;
       background: var(--surface-1);
@@ -1390,7 +1399,7 @@
      auto-collapse (see script) this makes the wall condense as you
      sweep through the store. */
   .groups-grid:not(.flat-mode) .group.done .group-title-text { color: var(--text-3); }
-  @media (min-width: 1200px) {
+  @media all {
     .groups-grid:not(.flat-mode) .group.done {
       background: color-mix(in srgb, var(--accent) 6%, var(--surface-1));
       border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
