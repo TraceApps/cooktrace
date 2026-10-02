@@ -60,6 +60,9 @@ CookTrace on your wrist, offline mode for a shop with no signal, kitchen roles f
 - **multer** bumped 2.3.0 to 2.4.0, closes [GHSA-3pph-fpjx-jg34](https://github.com/advisories/GHSA-3pph-fpjx-jg34) (moderate: an upload cut off at just the wrong moment could leave its file on disk). Both routes that write uploads to disk require signing in.
 - **undici** bumped 6.28.0 to 6.29.0, and the copy cheerio uses 7.29.0 to 7.30.0, closes [GHSA-3wwx-pv8p-q78v](https://github.com/advisories/GHSA-3wwx-pv8p-q78v) (moderate: a WebSocket server could crash the process). CookTrace opens no WebSocket connections.
 - **nodemailer** bumped 9.1.1 to 10.0.12, closes [GHSA-6vj9-mwq6-2f5v](https://github.com/advisories/GHSA-6vj9-mwq6-2f5v) (moderate: separate mail transports could share one TLS server name).
+- **fast-uri** bumped 3.1.7 to 3.1.8, closes [GHSA-hrr3-gc8f-f4qj](https://github.com/advisories/GHSA-hrr3-gc8f-f4qj) (moderate: a host written with percent-encoded letters was not normalized the same way). It only comes in through the MCP server, which is off by default.
+- **ip-address** bumped 10.7.0 to 10.7.3, closes [GHSA-j6r3-76f7-8jcv](https://github.com/advisories/GHSA-j6r3-76f7-8jcv) and [GHSA-h3mg-xc3c-68pw](https://github.com/advisories/GHSA-h3mg-xc3c-68pw) (moderate: subnet checks across IPv4 and IPv6, and unbounded work on a long IPv6 address). It only comes in through the MCP server's rate limiter.
+- **brace-expansion** bumped 5.0.9 to 5.0.12 and 2.1.4 to 2.1.7, closes [GHSA-q2hr-2g5m-vwhr](https://github.com/advisories/GHSA-q2hr-2g5m-vwhr) (moderate: slow expansion of a crafted pattern). Build tooling only; neither the app nor the server uses it.
 - `npm audit` reports 0 vulnerabilities for the app and the server.
 
 ---
