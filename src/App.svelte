@@ -423,7 +423,8 @@
             }
           }
         });
-        // Deep link callbacks: cooktrace://oidc-callback?token=…
+        // Deep link callbacks: cooktrace://oidc-callback?code=… (or ?token=…
+        // from servers older than the single-use code hand-off)
         App.addListener('appUrlOpen', async ({ url }) => {
           console.log('[app] deep link received:', url);
           try {
@@ -433,9 +434,22 @@
             if (host === 'oidc-callback') {
               const errMsg = params.get('error');
               const linked = params.get('linked');
-              const token = params.get('token');
-              const idTokenHint = params.get('id_token_hint');
-              const providerId  = params.get('provider_id');
+              let token = params.get('token');
+              let idTokenHint = params.get('id_token_hint');
+              let providerId  = params.get('provider_id');
+              const code = params.get('code');
+              if (code && !errMsg) {
+                try {
+                  const { redeemHandoff } = await import('./lib/oidc-app-handoff.js');
+                  const data = await redeemHandoff(code);
+                  token = data.token;
+                  idTokenHint = data.id_token_hint || null;
+                  providerId = data.provider_id != null ? String(data.provider_id) : null;
+                } catch (e) {
+                  import('./stores/toast.js').then(({ showError }) => showError(e?.message || 'Sign-in failed'));
+                  return;
+                }
+              }
               if (errMsg) {
                 import('./stores/toast.js').then(({ showError }) => showError(decodeURIComponent(errMsg)));
               } else if (linked) {
