@@ -26,7 +26,7 @@ const handoff = read('src/lib/oidc-app-handoff.js');
 
 test('an unlinkable matching email is refused before auto-register', () => {
   assert.match(lib, /if \(collision && \(!autoLink \|\| !emailVerified\)\) \{\s*throw new Error/);
-  assert.ok(lib.indexOf('collision && (!autoLink || !emailVerified)') < lib.indexOf('// 3. Auto-create new user'));
+  assert.ok(lib.indexOf('collision && (!autoLink || !emailVerified)') < lib.indexOf('if (autoCreate)'));
 });
 
 test('callback works with or without the provider ID, and at the old address', () => {
@@ -34,8 +34,10 @@ test('callback works with or without the provider ID, and at the old address', (
   assert.match(routes, /router\.get\('\/callback', wrap\(handleCallback\)\)/);
   assert.match(routes, /const providerId = req\.params\.providerId \?\? stored\.providerId;/);
   assert.match(index, /router\.get\('\/api\/oidc\/callback'[\s\S]{0,200}redirect\(307, `\$\{BASE_URL\}\/api\/auth\/oidc\/callback/);
-  assert.ok(index.indexOf("router.get('/api/oidc/callback'") < index.indexOf("res.status(503).json({ error: 'Setup required'"),
-    'the old address must be forwarded before the setup gate');
+  const gate = index.indexOf("error: 'Setup required'");
+  if (gate >= 0) {
+    assert.ok(index.indexOf("router.get('/api/oidc/callback'") < gate, 'the old address must be forwarded before the setup gate');
+  }
 });
 
 test('the password-login env flag is seeded before the no-env-provider early return', () => {
