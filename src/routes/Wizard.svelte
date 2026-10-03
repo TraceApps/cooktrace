@@ -5,7 +5,10 @@
   import { cubicOut } from 'svelte/easing';
   import { DB } from '../lib/db.js';
   import { bulkSet } from '../stores/settings.js';
-  import { currentUser, userMgmtActive, setupRequired, loadAuthState } from '../stores/auth.js';
+  import { currentUser, userMgmtActive, setupRequired, loadAuthState, signInProblem } from '../stores/auth.js';
+  import { get } from 'svelte/store';
+  import { cookieBlockedByHttp, droppedCookieReason } from '../lib/cookie-check.js';
+  import CookieWarning from '../components/ui/CookieWarning.svelte';
   import { validatePassword, passwordStrength } from '../lib/validation.js';
   import { showError } from '../stores/toast.js';
   import { isNative, getServerUrl, apiUrl } from '../lib/platform.js';
@@ -18,6 +21,16 @@
   const _isNativeLocal        = isNative && !getServerUrl();
   const _isPwa                = !isNative;
   const _forceAccountCreation = _isPwa && $setupRequired;
+
+  // A new account signs straight in, so a plain-HTTP page with an HTTPS-only
+  // cookie would loop here too. Say so on the account step (cookie-check.js).
+  let _authStatus = null;
+  if (_isPwa) {
+    fetch(apiUrl('/api/auth/status'), { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { _authStatus = d; if (cookieBlockedByHttp(d)) signInProblem.set('http'); })
+      .catch(() => {});
+  }
 
   let step = 0;
   let dir  = 1;
@@ -103,6 +116,12 @@
         throw new Error(e.error || `Registration failed (${res.status})`);
       }
       await loadAuthState();
+      // The account exists, but the browser didn't keep the sign-in cookie,
+      // so every later step would fail. Stop and say why.
+      if (_isPwa && !get(currentUser)) {
+        signInProblem.set(droppedCookieReason(_authStatus));
+        return;
+      }
       next();
     } catch (e) {
       umError = e.message;
@@ -226,6 +245,9 @@
 
         {#if enableUserMgmt}
           <div class="um-form" transition:fly={{ y: 10, duration: 200 }}>
+            {#if $signInProblem}
+              <CookieWarning reason={$signInProblem} />
+            {/if}
             <p class="um-section-label">{$_('wizard_ct.admin_account')}</p>
 
             <div class="form-row-2">

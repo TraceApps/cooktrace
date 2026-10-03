@@ -19,6 +19,11 @@ export const userMgmtActive = writable(false);
 
 /** True when the server has no users yet — PWA must show setup screen */
 export const setupRequired = writable(false);
+// Why the last sign-in didn't stick, if it didn't ('http' | 'dropped'), so
+// the login page can say so. A store, not page state, because the login page
+// is torn down and rebuilt when the user flips on and back off. See
+// lib/cookie-check.js.
+export const signInProblem = writable(null);
 
 // Synthetic local user for native standalone mode (no server configured).
 // full_name is overridden at load time from the localUserName setting (set
