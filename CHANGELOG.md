@@ -9,7 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [1.4.1] - 2026-10-03
+## [1.4.1-dev01] - 2026-10-03 (pre-release)
 
 A hotfix: Tandoor exports import again, single sign-on fixes, and share links that open for everyone.
 
