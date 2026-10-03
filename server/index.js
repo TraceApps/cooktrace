@@ -30,7 +30,7 @@ import ntFederationRoutes from './routes/nt-federation.js';
 import notifyRoutes       from './routes/notify.js';
 import unitsRoutes        from './routes/units.js';
 import cookbooksRoutes    from './routes/cookbooks.js';
-import shareRoutes        from './routes/share.js';
+import shareRoutes, { getPublicRecipe } from './routes/share.js';
 import kitchensRoutes     from './routes/kitchens.js';
 import updatesRoutes      from './routes/updates.js';
 import apiTokensRoutes    from './routes/api-tokens.js';
@@ -48,6 +48,7 @@ import { seedOidcFromEnv } from './lib/oidc-env.js';
 // Initialise DB (runs schema)
 import db from './db.js';
 import { isPrivateUploadPath, UPLOAD_RESPONSE_HEADERS } from './lib/upload-paths.js';
+import { publicRecipeHead, injectPublicHead, publicPageHtml } from './lib/public-recipe-meta.js';
 
 // Seed config from env vars if provided (env vars take priority over UI)
 seedSmtpFromEnv();
@@ -260,6 +261,25 @@ try {
 } catch (e) {
   logger.warn(`[server] could not pre-template dist/index.html: ${e.message}`);
 }
+
+// A public recipe link. Same app page, with the recipe's name, a line about
+// it, and its photo in <head> so chat apps can preview the link. An unknown
+// or removed token still gets the page (it says the link is gone) but with
+// a 404, so a preview shows nothing.
+router.get('/r/:token', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('Referrer-Policy', 'no-referrer');
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  if (!_indexHtmlTemplated) return res.sendFile(_indexHtmlPath);
+  const html = publicPageHtml(_indexHtmlTemplated, BASE_URL);
+  const recipe = getPublicRecipe(req.params.token);
+  if (!recipe) return res.status(404).set('Content-Type', 'text/html').send(html);
+  const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0].trim();
+  const origin = `${proto}://${req.headers['x-forwarded-host'] || req.get('host')}`;
+  const pageUrl = `${origin}${BASE_URL}/r/${encodeURIComponent(req.params.token)}`;
+  const head = publicRecipeHead(recipe, { origin, basePath: BASE_URL, pageUrl });
+  res.set('Content-Type', 'text/html').send(injectPublicHead(html, head));
+});
 
 // SPA fallback — serves the templated index.html for any route under BASE_URL.
 // Express 5 / path-to-regexp 8 requires named splat syntax for catch-alls;

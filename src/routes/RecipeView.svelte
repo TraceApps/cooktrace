@@ -28,7 +28,7 @@
   import { dateFormat } from '../stores/settings.js';
   import { scaleQty, displayQty, displayQtyParts, parseQty } from '../lib/qty.js';
   import { convertWithinFamily, convertQty, unitFamily } from '../lib/recipe-nutrition.js';
-  import { resolveAssetUrl, isNative, getServerUrl } from '../lib/platform.js';
+  import { resolveAssetUrl, isNative, getServerUrl, publicRecipeUrl } from '../lib/platform.js';
   import { publishCooks as _publishCooks, readCooks as _readCooks } from '../lib/wear-pairing.js';
   import { portal } from '../lib/portal.js';
   import RecipeComments from '../components/recipe/RecipeComments.svelte';
@@ -648,7 +648,7 @@
         token = res.share_token;
         recipe = { ...recipe, share_token: token };
       }
-      const url = `${window.location.origin}/#/r/${token}`;
+      const url = publicRecipeUrl(token);
       if (navigator.share) {
         try {
           await navigator.share({ title: recipe.name, url });

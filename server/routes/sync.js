@@ -108,8 +108,12 @@ const TABLES = {
       'name', 'description', 'img_url', 'servings', 'prep_minutes', 'cook_minutes', 'total_minutes', 'rest_minutes',
       'ingredients', 'steps', 'tags', 'tools', 'source_url', 'video_url', 'notes',
       'visibility', 'rating', 'yield_text', 'last_cooked_at', 'cook_count',
-      'nutrition', 'favorite', 'category_id', 'share_token',
+      'nutrition', 'favorite', 'category_id',
     ],
+    // Sent to devices so they know a public link exists, never taken from
+    // them: only POST/DELETE /api/recipes/:id/share set it. A device still
+    // holding a removed link would otherwise bring it back with its next edit.
+    pullCols: ['share_token'],
     parents: { category_id: 'recipe_categories' },
     softDelete: true,
   },
@@ -362,7 +366,7 @@ router.get('/pull', wrap((req, res) => {
     // column and SQLite's local `DEFAULT (datetime('now'))` stamps
     // every synced row with the pull-time clock — every recipe ends
     // up looking like it was created on first-connect day.
-    const cols = ['id', ...spec.cols, 'created_at', 'updated_at'];
+    const cols = ['id', ...spec.cols, ...(spec.pullCols || []), 'created_at', 'updated_at'];
     if (spec.softDelete) cols.push('deleted_at');
     // Sort self-referencing tables so parents come before children in
     // the pull payload. The client's dbApplyPull scans server_id →

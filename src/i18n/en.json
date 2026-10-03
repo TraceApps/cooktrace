@@ -1434,7 +1434,11 @@
     "steps":                     "Steps",
     "no_steps":                  "No steps yet.",
     "notes":                     "Notes",
-    "powered_by_html":           "Powered by <strong>CookTrace</strong>."
+    "powered_by_html":           "Powered by <strong>CookTrace</strong>.",
+    "gone":                      "This share link no longer works.",
+    "gone_hint":                 "Ask the person who shared it for a new link.",
+    "load_failed":               "Couldn't load the recipe. Check your connection and try again.",
+    "retry":                     "Try Again"
   },
   "barcode_scanner": {
     "toast": {

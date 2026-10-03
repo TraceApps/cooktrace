@@ -11,11 +11,15 @@ import { wrap } from '../logger.js';
 
 const router = Router();
 
-router.get('/:token', wrap((req, res) => {
-  const token = String(req.params.token || '').trim();
-  if (!token || token.length < 8 || token.length > 64) {
-    return res.status(400).json({ error: 'Invalid token' });
-  }
+/**
+ * The recipe behind a public token, projected to a clean read-only view
+ * (no user_id, visibility, or anything else that could leak account
+ * details). Null when the token is unknown or removed, or the recipe was
+ * deleted. Also used for the link-preview tags on /r/<token>.
+ */
+export function getPublicRecipe(token) {
+  token = String(token || '').trim();
+  if (!token || token.length < 8 || token.length > 64) return null;
   // Lookup is index-backed (idx_recipes_share_token).
   const row = db.prepare(
     `SELECT r.*, rc.name AS category_name, rc.slug AS category_slug, rc.color AS category_color,
@@ -25,10 +29,8 @@ router.get('/:token', wrap((req, res) => {
        LEFT JOIN users u ON u.id = r.user_id
       WHERE r.share_token = ? AND r.deleted_at IS NULL`
   ).get(token);
-  if (!row) return res.status(404).json({ error: 'Not found' });
+  if (!row) return null;
 
-  // Project a clean read-only view. We strip user_id, visibility, and
-  // anything else that could leak account details.
   const _safeJson = (s, fallback) => {
     if (!s) return fallback;
     try { return JSON.parse(s); } catch { return fallback; }
@@ -47,7 +49,7 @@ router.get('/:token', wrap((req, res) => {
     return [{ name: '', items: ingredients }];
   })();
 
-  res.json({
+  return {
     id: row.id,
     name: row.name,
     description: row.description,
@@ -73,7 +75,18 @@ router.get('/:token', wrap((req, res) => {
     category: row.category_name ? {
       name: row.category_name, slug: row.category_slug, color: row.category_color,
     } : null,
-  });
+  };
+}
+
+router.get('/:token', wrap((req, res) => {
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  const token = String(req.params.token || '').trim();
+  if (!token || token.length < 8 || token.length > 64) {
+    return res.status(400).json({ error: 'Invalid token' });
+  }
+  const recipe = getPublicRecipe(token);
+  if (!recipe) return res.status(404).json({ error: 'Not found' });
+  res.json(recipe);
 }));
 
 export default router;

@@ -7,16 +7,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Shared recipe links show a preview in chat apps**: the recipe's name, a line about it, and its photo. Links are now a plain address (`/r/...`) instead of a `#/` one, which a server never sees. Links copied before this still open.
+
 ### Fixed
 
 - **Signing in through SSO with an email that already has an account no longer creates a second account.** When the identity provider doesn't mark the email verified (Authentik's default since 2025.10), the sign-in is refused with a pointer to link the provider from your profile, instead of landing you in a new, empty account.
 - **SSO works with Authelia 4.39 and later out of the box.** Email, username and groups are read from the provider's userinfo when the ID token leaves them out.
 - **The SSO callback also works without the provider number, and at `/api/oidc/callback`**, the address older docs gave. Both used to end on a blank page.
 - **`OIDC_ENABLE_EMAIL_PASSWORD_LOGIN` works for providers added in Settings.** It was ignored unless a provider was also defined through env vars.
+- **Shared recipe links open for people without an account.** On a server with accounts, the link showed the sign-in screen instead of the recipe.
+- **Share links from the Android app point at your server.** They used the app's own internal address, which opened nothing for anyone else, and ignored a server set up under a subpath.
 
 ### Security
 
 - **The Android app's SSO sign-in no longer passes the session token through the `cooktrace://` link**, which another app could intercept. The link carries a single-use code that only the app that started the sign-in can redeem.
+- **Share link tokens come from a secure random source.** They were made with `Math.random()`, which can be predicted from its own output.
+- **A removed share link stays removed.** A phone still holding the old link could bring it back with its next edit to the recipe, and a device could set a link of its own choosing. The link is now only set by creating or removing it.
+- **Shared recipe pages are kept out of search engines** and don't pass their address on to sites the recipe links to.
 
 ---
 

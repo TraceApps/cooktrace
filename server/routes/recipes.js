@@ -942,13 +942,10 @@ router.delete('/:id/share', wrap((req, res) => {
 }));
 
 function _randomToken(byteLen) {
-  // Base64url encoding via Buffer (Node 18+).
-  const buf = Buffer.alloc(byteLen);
-  for (let i = 0; i < byteLen; i++) buf[i] = Math.floor(Math.random() * 256);
-  return buf.toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  // From the system's secure random source. Math.random() is predictable
+  // from its own output, so a token made with it could be worked out from
+  // links the person had already seen.
+  return crypto.randomBytes(byteLen).toString('base64url');
 }
 
 // ── DELETE /:id/cooks/:cookId — soft-delete a cook entry ───────────────

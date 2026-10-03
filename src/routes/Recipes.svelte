@@ -19,7 +19,7 @@
   import { confirmDialog } from '../stores/confirmDialog.js';
   import { buildRecipeCardPages, buildRecipeShareText } from '../lib/recipe-card.js';
   import { svgToPngBlob, shareBlobs } from '../lib/shopping-card.js';
-  import { isNative, getServerUrl } from '../lib/platform.js';
+  import { isNative, getServerUrl, publicRecipeUrl } from '../lib/platform.js';
 
   import { foldText } from '../lib/search-text.js';
 
@@ -360,7 +360,7 @@
   }
   function shareLinkUrl(token) {
     if (typeof window === 'undefined' || !token) return '';
-    return `${window.location.origin}/#/r/${token}`;
+    return publicRecipeUrl(token);
   }
   async function openShareDialog(recipe) {
     shareDialogRecipe = recipe;

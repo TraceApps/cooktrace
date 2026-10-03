@@ -39,13 +39,13 @@
         cache: 'no-store',
       });
       if (!res.ok) {
-        if (res.status === 404) loadError = 'This share link is no longer valid.';
-        else loadError = `Server error (${res.status})`;
+        loadError = res.status === 404 || res.status === 400 ? 'gone' : 'failed';
         return;
       }
       recipe = await res.json();
-    } catch (e) {
-      loadError = e.message || 'Could not load recipe';
+      document.title = recipe.name || document.title;
+    } catch {
+      loadError = 'failed';
     } finally {
       loading = false;
     }
@@ -73,9 +73,14 @@
       </div>
     {:else if loadError}
       <div class="state error">
-        <span class="material-symbols-rounded">error</span>
-        <h2>{loadError}</h2>
-        <p>Ask the person who shared this for an updated link.</p>
+        <span class="material-symbols-rounded">{loadError === 'gone' ? 'link_off' : 'cloud_off'}</span>
+        {#if loadError === 'gone'}
+          <h2>{$_('public_recipe_ct.gone')}</h2>
+          <p>{$_('public_recipe_ct.gone_hint')}</p>
+        {:else}
+          <h2>{$_('public_recipe_ct.load_failed')}</h2>
+          <button class="btn btn-primary" on:click={load}>{$_('public_recipe_ct.retry')}</button>
+        {/if}
       </div>
     {:else if recipe}
       {#if recipe.img_url}
