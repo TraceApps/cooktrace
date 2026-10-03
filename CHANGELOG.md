@@ -7,9 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Added
+---
 
-- **Shared recipe links show a preview in chat apps**: the recipe's name, a line about it, and its photo. Links are now a plain address (`/r/...`) instead of a `#/` one, which a server never sees. Links copied before this still open.
+## [1.4.1] - 2026-10-03
+
+A hotfix: Tandoor exports import again, single sign-on fixes, and share links that open for everyone.
 
 ### Fixed
 
@@ -19,7 +21,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **The SSO callback also works without the provider number, and at `/api/oidc/callback`**, the address older docs gave. Both used to end on a blank page.
 - **`OIDC_ENABLE_EMAIL_PASSWORD_LOGIN` works for providers added in Settings.** It was ignored unless a provider was also defined through env vars.
 - **Signing in on a plain-HTTP address says what's wrong instead of looping.** The sign-in cookie only works over HTTPS unless `INSECURE_COOKIES=1` is set, so signing in from an `http://` address dropped you back on the login page with no error. The sign-in and setup screens now explain it and link to the fix, the app no longer flashes before sending you back, and the server log says so too.
-- **Shared recipe links open for people without an account.** On a server with accounts, the link showed the sign-in screen instead of the recipe.
+- **Shared recipe links open for people without an account.** On a server with accounts, the link showed the sign-in screen instead of the recipe. Links are now a plain address (`/r/...`) instead of a `#/` one; links copied before this still open.
 - **Share links from the Android app point at your server.** They used the app's own internal address, which opened nothing for anyone else, and ignored a server set up under a subpath.
 - **The app no longer loads behind the sign-in screen.** Opened signed out, it asked the server for your data and was refused before the sign-in screen replaced it. It now waits to learn who is signed in.
 - **Trace set up through the server's environment variables shows as set up in the Android app.** The app asked without its sign-in, so the server refused and Trace looked unconfigured.
@@ -32,6 +34,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **A removed share link stays removed.** A phone still holding the old link could bring it back with its next edit to the recipe, and a device could set a link of its own choosing. The link is now only set by creating or removing it.
 - **Shared recipe pages are kept out of search engines** and don't pass their address on to sites the recipe links to.
 - **Uploaded files get unguessable names.** The random part of the name was made with `Math.random()`, which can be predicted from its own output.
+- `npm audit` reports 0 vulnerabilities for the app and the server.
 
 ---
 
