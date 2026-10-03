@@ -1561,7 +1561,7 @@ function _saveZipImage(bytes, ext) {
   try {
     fs.mkdirSync(_UPLOADS_DIR, { recursive: true });
     const safeExt = /^[a-z0-9]{2,5}$/.test(ext) ? ext : 'jpg';
-    const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${safeExt}`;
+    const filename = `${Date.now()}-${crypto.randomBytes(12).toString('hex')}.${safeExt}`;
     const filePath = path.join(_UPLOADS_DIR, filename);
     fs.writeFileSync(filePath, bytes);
     return `/uploads/${filename}`;
