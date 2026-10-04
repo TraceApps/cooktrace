@@ -215,6 +215,49 @@ First-class "Import from Photo" entry on the Recipes create menu. Standalone `Ph
 ### ~~Recipe-import dedup~~ *(done)*
 `dedup: 'skip' | 'force'` parameter on the import endpoint checks case-insensitive name and `source_url` matches (see `server/routes/recipes.js:963`).
 
+### Import from a video
+Aimed at 1.5.0. Mealie (3.13+) and Norish both import recipes from video
+links; neither makes step pictures (both turn speech or captions into text),
+so that and "watch this step" are where CookTrace can do better. Audited
+2026-10-04 against their code and a live YouTube test. In layers:
+
+1. **Link to the written recipe, no AI.** Read the video's title,
+   description and chapters (yt-dlp, about 28 MB in the image). When the
+   description links a recipe page (common), import that page with the normal
+   importer and attach the video and its thumbnail.
+2. **Trace from captions.** Otherwise send the auto-captions (with
+   timestamps) and description to Trace, with any provider including local
+   ones. Thumbnail becomes the photo, chapters become step titles. No download
+   and no speech-to-text needed: captions came through in testing.
+3. **"Watch this step."** Trace returns where each step starts; each step gets
+   a button that plays the video from there. Neither competitor has it.
+4. **Speech-to-text when there are no captions** (TikTok, Instagram,
+   uncaptioned videos): download the audio and send it to an OpenAI-compatible
+   transcription endpoint (OpenAI, Groq, local Whisper) or Gemini's own audio
+   input. Needs a separate audio model setting.
+5. **Upload or share a video file, with real step pictures.** A saved clip
+   avoids every platform wall; grab a frame at each step's start for the
+   step's photo (per-step photos already exist). Needs ffmpeg (about 125 MB).
+   Optionally Gemini watches the clip and reads on-screen text, which covers
+   silent videos.
+
+Plus an Android share target (share a YouTube or TikTok link into CookTrace).
+Server-only, like the Enhanced tier: local mode can't run yt-dlp, and import
+already needs a connection. Scope 1.5 as layers 1 to 3 and the share target;
+4 and 5 are stretch or 1.6.
+
+Traps found in testing and in their issue trackers: YouTube now withholds
+video and audio streams (bot check, proof-of-origin tokens), so only captions,
+description and tiny storyboards are reliable there; caption fetching needs
+specific yt-dlp client modes; yt-dlp must be bumped every few weeks or sites
+stop working; Instagram and TikTok often need the user's cookies (copy
+Norish's per-user saved cookies); try the cheap sources first (linked page,
+captions, post text) before paid speech-to-text; cap length and size before
+downloading; say clearly when a site needs sign-in; never let the prompt
+invent quantities. Downloading media is against YouTube's terms; reading
+captions and descriptions is lighter. Unverified: Instagram and TikTok
+fetching, and Gemini taking a YouTube link directly.
+
 ### PDF import via server-side OCR
 Deferred to v2.
 
