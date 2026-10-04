@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.4.1-dev02] - 2026-10-04 (pre-release)
+
+Imports now say what they skipped, and importing a recipe you already have opens it.
+
 ### Fixed
 
 - **Imports say what they skipped** ([#72](https://github.com/TraceApps/cooktrace/issues/72), thanks @joeShuff). After a bulk import, the summary reads "Imported 119 of 121 Recipes" and lists each recipe skipped as a duplicate, linked to the one you already have, apart from any that failed.
