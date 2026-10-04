@@ -169,9 +169,6 @@ Recipe picker in the Shopping "+" menu, filter to items not already in pantry.
 ### ~~URL recipe scraper~~ *(done, Phase 4)*
 `POST /api/recipes/scrape`, schema.org/Recipe JSON-LD parser, SSRF-guarded fetcher, wired into "+" menu.
 
-### Grocery list from the plan uses the planned servings
-Each planned cook stores a serving count, but the list adds the recipe's original amounts. Scale each recipe by planned servings over the recipe's servings. Comes up in nearly every "which app should I use" thread ("recipe is for 4, we are 2").
-
 ### One shopping list per Kitchen
 Lists belong to an account today; Kitchens share recipes, not the list, so households share a login to share a list. A Kitchen list would fix that, and needs the sync fix under Android App (an older change must not win) first.
 
@@ -196,12 +193,30 @@ Timer rail embedded inline in the cook-mode-bar (was floating globally). `cookMo
 
 ### ~~Cook more than one thing at once~~ *(done, 1.4.0)*
 
-### Household members in the planner
-An idea from a Reddit request: people in the household with their own diets (gluten-free, low sodium, dairy-free) and the days they're home (a child there 4 days a week), feeding the plan's portions and warnings. One set of dietary preferences per account today.
+### Plan your week (1.5 candidate)
+What Mealime users miss now that it's closing (2026-10-21), built on what CookTrace already knows: recipe quantities, the pantry with expiry, and planned cooks with servings. Audited 2026-10-04 against Mealime's help center, store listings and the shutdown threads, and against CookTrace's code. One flow: pick the week, see what it costs you to shop and what it uses up, shop from one list.
 
----
+**Phase 1: foundations and the bugs under them.**
+- A shared quantity library on the server (port `parseQty` and the unit families from `qty.js` and `recipe-nutrition.js`), used by every list builder. Today `Number("1/2")` drops fractional amounts from the list, and `/from-recipe` writes raw "1/2" into a number column.
+- The plan's grocery list scales each recipe by its planned servings (stored on the diary row, never used), merges the same ingredient across recipes with unit conversion (1 cup + 120 ml), and keeps every origin: a `sources` list per shopping row (recipe, diary entry, amount), synced and offline like the rest.
+- Plan a Cook asks for servings (defaulting to the recipe's or the household's).
+- Fix the recipe card's Plan action (`/diary?plan=<id>` is never read), scale the amounts shown inside steps, and compute the pantry match on Android (empty there today).
 
-## Importers
+**Phase 2: a Week view and the list's detail sheet.**
+- Cook Diary gains a Week view beside List, Month and Photos: seven days with each planned cook as a card (photo, servings stepper, meal chip), plus an unscheduled "This week" tray for people who plan a pool of meals rather than days, as Mealime did.
+- A plan summary card on the Week view, in the style of the diary's stat tiles: meals planned, items to buy, items already in the pantry, expiring items this plan uses. One button builds or refreshes the list for that week.
+- Tap a shopping item to open a sheet: the total, what each recipe needs and on which day, pantry stock and variants, a size hint where the pantry or common densities know one ("medium potato, about 200 g"), and notes. Edit and aisle stay in the long-press menu. Two panes on a foldable or tablet.
+
+**Phase 3: plans that waste less.**
+- "Uses up" on the Week view: a strip like the pantry's expiring spotlight, listing perishables the plan only partly uses or that are expiring, each with recipes that use them too. Ranked by shared ingredients with what's planned, pantry match and expiry; honest without package sizes, more precise once pantry items can say what they come in (an optional pack size, later).
+- "Build my week": choose how many dinners and servings; get a set ranked by pantry match, shared ingredients, variety and not cooked recently, with a swap button on each card and the summary updating live. Works without AI; Trace can do the same in conversation (`plan_cook` gains servings).
+
+**Phase 4: the household.**
+- Household members under Settings: name, diet, allergies, dislikes, and the days they're home (a child there four days a week). Planned servings default to who's home that day.
+- Allergen and diet warnings on recipe cards, the Week view and the list ("contains gluten: Sam"), from a keyword map over ingredient names plus the allergens Open Food Facts reports for scanned pantry items. Replaces the wizard's dietary question, which is stored but never used today.
+
+Not planned: a curated recipe catalog (CookTrace has none to offer), grocery-delivery hand-off (partner keys, US-only), hands-free wave-to-advance (Cook Mode has voice). Design rules: reuse `Sheet`, chips, stat tiles and the spotlight strip rather than new one-off modals; every new surface works offline and on Android; foldables split where there's room.
+
 
 ### ~~Mealie / Tandoor / Paprika / schema.org JSON~~ *(done, Phase 7)*
 Auto-detected from paste/upload. Paprika `.paprikarecipes` archive (zip of gzipped JSON, multi-recipe).
