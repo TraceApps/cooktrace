@@ -419,11 +419,13 @@ export const CtApiNative = {
         try {
           const recipes = await importPaprikaArchive(blob);
           const created = [];
+          const skipped = [];
           for (const r of recipes) {
             const saved = await _saveImportedRecipeLocal(this, r, { addToPantry, applyTags });
             if (saved) created.push(saved);
+            else if (r?.name) skipped.push({ name: r.name, existing_id: (await _findImportDuplicateLocal(r))?.id || null });
           }
-          return { recipes: created, count: created.length };
+          return { recipes: created, count: created.length, skipped };
         } catch (e) {
           if (!/no \.paprikarecipe/i.test(e.message || '')) throw e;
           // Not a Paprika archive — fall through to generic ZIP scan.
@@ -435,7 +437,13 @@ export const CtApiNative = {
     } else {
       throw new Error('importRecipe requires `text` or `file`');
     }
-    return _saveImportedRecipeLocal(this, recipe, { addToPantry, applyTags });
+    const saved = await _saveImportedRecipeLocal(this, recipe, { addToPantry, applyTags });
+    if (!saved && recipe?.name) {
+      // Same shape as the server's duplicate answer.
+      const existing = await _findImportDuplicateLocal(recipe);
+      return { skipped: true, reason: 'duplicate', existing_id: existing?.id || null, name: recipe.name };
+    }
+    return saved;
   },
 
   async scanRecipeZip(file) {
@@ -503,23 +511,11 @@ export const CtApiNative = {
         const saved = await _saveImportedRecipeLocal(this, entry.recipe, { addToPantry, applyTags, dedup });
         let targetRecipeId = saved?.id;
         if (!saved) {
-          skipped.push({ name: entry.recipe?.name || '?' });
           // Re-resolve the existing recipe so timeline events still
-          // land on it. Match the same way _saveImportedRecipeLocal
-          // does (case-insensitive name, then source_url).
-          if (entry.recipe?.name) {
-            const lower = entry.recipe.name.toLowerCase().trim();
-            const existing = (await _query(
-              `SELECT id FROM recipes
-                WHERE user_id = ? AND deleted_at IS NULL AND LOWER(name) = ? LIMIT 1`,
-              [LOCAL_USER_ID, lower]
-            ))[0] || (entry.recipe.source_url ? (await _query(
-              `SELECT id FROM recipes
-                WHERE user_id = ? AND deleted_at IS NULL AND source_url = ? LIMIT 1`,
-              [LOCAL_USER_ID, entry.recipe.source_url]
-            ))[0] : null);
-            targetRecipeId = existing?.id || null;
-          }
+          // land on it, and so the summary can link to it.
+          const existing = await _findImportDuplicateLocal(entry.recipe);
+          targetRecipeId = existing?.id || null;
+          skipped.push({ name: entry.recipe?.name || '?', existing_id: targetRecipeId });
         } else {
           imported.push(saved);
         }
@@ -1553,6 +1549,25 @@ export const NtApiNative = CtApiNative;
  *   dedup        'skip' (default) | 'force' | 'replace'
  * @returns {object|null}   the saved recipe row, or null when skipped
  */
+async function _findImportDuplicateLocal(r) {
+  // The recipe an import would duplicate: case-insensitive name first,
+  // then source_url. Mirrors the server's _findImportDuplicate.
+  const lower = String(r?.name || '').toLowerCase().trim();
+  let existing = lower ? (await _query(
+    `SELECT id, name, source_url FROM recipes
+      WHERE user_id = ? AND deleted_at IS NULL AND LOWER(name) = ? LIMIT 1`,
+    [LOCAL_USER_ID, lower]
+  ))[0] : null;
+  if (!existing && r?.source_url) {
+    existing = (await _query(
+      `SELECT id, name, source_url FROM recipes
+        WHERE user_id = ? AND deleted_at IS NULL AND source_url = ? LIMIT 1`,
+      [LOCAL_USER_ID, r.source_url]
+    ))[0];
+  }
+  return existing || null;
+}
+
 async function _saveImportedRecipeLocal(api, r, opts = {}) {
   const { addToPantry = true, dedup = 'skip' } = opts;
   if (!r?.name) return null;
@@ -1562,20 +1577,7 @@ async function _saveImportedRecipeLocal(api, r, opts = {}) {
   // existing recipe alone. 'replace' updates the existing row.
   // 'force' creates a duplicate (the pre-dedup behaviour).
   if (dedup !== 'force') {
-    const lower = r.name.toLowerCase().trim();
-    const existingByName = (await _query(
-      `SELECT id, name, source_url FROM recipes
-        WHERE user_id = ? AND deleted_at IS NULL AND LOWER(name) = ? LIMIT 1`,
-      [LOCAL_USER_ID, lower]
-    ))[0];
-    let existing = existingByName;
-    if (!existing && r.source_url) {
-      existing = (await _query(
-        `SELECT id, name, source_url FROM recipes
-          WHERE user_id = ? AND deleted_at IS NULL AND source_url = ? LIMIT 1`,
-        [LOCAL_USER_ID, r.source_url]
-      ))[0];
-    }
+    const existing = await _findImportDuplicateLocal(r);
     if (existing) {
       if (dedup === 'skip') return null;
       if (dedup === 'replace') {

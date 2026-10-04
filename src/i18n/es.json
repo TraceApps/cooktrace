@@ -1097,7 +1097,18 @@
     "opt_replace": "Reemplazar por la versión importada",
     "opt_force": "Permitir duplicados",
     "cancel": "Cancelar",
-    "import_another": "Importar otro"
+    "import_another": "Importar otro",
+    "dup_label": "Si la receta ya existe",
+    "opt_skip": "Omitirla",
+    "summary_all": "{count, plural, one {Se importó # receta} other {Se importaron # recetas}}",
+    "summary_partial": "Se importaron {imported} de {total} recetas",
+    "summary_find": "Las encontrarás en la pestaña Recetas.",
+    "summary_dupes": "{count, plural, one {Se omitió # duplicado} other {Se omitieron # duplicados}}",
+    "summary_failed": "{count, plural, one {No se pudo importar # receta} other {No se pudieron importar # recetas}}",
+    "dupes_heading": "Duplicados omitidos",
+    "dupes_hint": "Ya existe una receta con el mismo nombre o enlace de origen. Para importarlas de todos modos, elige Permitir duplicados en Si la receta ya existe e importa de nuevo.",
+    "failed_heading": "No importadas",
+    "toast_imported": "{count, plural, one {Se importó # receta} other {Se importaron # recetas}}"
   },
   "settings_federation_ct": {
     "toast": {
@@ -1307,7 +1318,10 @@
     "toast": {
       "recipe_imported": "Receta importada",
       "url_batch_limit": "Hasta 100 URL por tanda. Divídelas en tandas más pequeñas.",
-      "pick_one_url": "Elige al menos una URL para guardar."
+      "pick_one_url": "Elige al menos una URL para guardar.",
+      "already_exists": "Esta receta ya existe. Abriéndola.",
+      "already_exists_short": "Esta receta ya existe.",
+      "imported_no_steps": "Receta importada, pero el origen no tenía pasos de preparación. Agrégalos en el editor."
     },
     "title": "Importar desde una URL",
     "link_to_pantry": "Vincular los ingredientes con la despensa",
@@ -1390,6 +1404,12 @@
     "toast": {
       "paste_or_pick": "Primero pega una receta o elige un archivo",
       "recipe_imported": "Receta importada",
+      "already_exists": "Esta receta ya existe. Abriéndola.",
+      "already_exists_short": "Esta receta ya existe.",
+      "imported_no_steps": "Receta importada, pero el origen no tenía pasos de preparación. Agrégalos en el editor.",
+      "archive_imported": "{count, plural, one {Se importó # receta} other {Se importaron # recetas}}",
+      "archive_imported_skipped": "{count, plural, one {Se importó # receta} other {Se importaron # recetas}}; {skipped, plural, one {se omitió # duplicado} other {se omitieron # duplicados}}",
+      "archive_all_duplicates": "Nada nuevo que importar: {skipped, plural, one {# receta ya existe} other {las # recetas ya existen}}",
       "new_link_generated": "Se generó un enlace nuevo",
       "link_revoked": "Enlace revocado",
       "copied": "Copiado al portapapeles",

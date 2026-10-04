@@ -8,7 +8,7 @@
   import { _ } from 'svelte-i18n';
   import { formatDuration } from '../lib/duration.js';
   import { NtApi } from '../lib/api.js';
-  import { showError, showSuccess } from '../stores/toast.js';
+  import { showError, showSuccess, showInfo } from '../stores/toast.js';
   import { pageBanners, bannerStyle, aiEnabled, aiKeyVerified, recipesSort, mixSharedIntoRecipes } from '../stores/settings.js';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import ImportFromFileDialog from '../components/recipe/ImportFromFileDialog.svelte';
@@ -111,13 +111,30 @@
       pasteText = '';
       clearPasteFile();
       if (result?.recipes && Array.isArray(result.recipes)) {
-        showSuccess(`Imported ${result.count} recipes`);
+        const count = result.count || 0;
+        const skipped = Array.isArray(result.skipped) ? result.skipped.length : 0;
+        if (count === 0) {
+          showInfo($_('recipes_page.toast.archive_all_duplicates', { values: { skipped } }));
+        } else if (skipped > 0) {
+          showSuccess($_('recipes_page.toast.archive_imported_skipped', { values: { count, skipped } }));
+        } else {
+          showSuccess($_('recipes_page.toast.archive_imported', { values: { count } }));
+        }
         await load();
+      } else if (result?.skipped) {
+        // Already in the catalog: nothing was written, so open the
+        // recipe it matched instead of a new one.
+        if (result.existing_id) {
+          showInfo($_('recipes_page.toast.already_exists'));
+          push(`/recipes/${result.existing_id}`);
+        } else {
+          showInfo($_('recipes_page.toast.already_exists_short'));
+        }
       } else {
         const created = result;
         const stepCount = (created.steps || []).reduce((n, s) => n + (s?.text ? 1 : 0), 0);
         if (stepCount === 0) {
-          showError("Imported — but the source had no cooking steps. Open it to add them manually.");
+          showError($_('recipes_page.toast.imported_no_steps'));
         } else {
           showSuccess($_('recipes_page.toast.recipe_imported'));
         }

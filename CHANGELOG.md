@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Imports say what they skipped** ([#72](https://github.com/TraceApps/cooktrace/issues/72), thanks @joeShuff). After a bulk import, the summary reads "Imported 119 of 121 Recipes" and lists each recipe skipped as a duplicate, linked to the one you already have, apart from any that failed.
+- **Importing a recipe you already have opens it.** Importing it again from a link, pasted text or a file showed a "no cooking steps" warning and opened an empty page. It now says the recipe already exists and opens yours.
+- **A Paprika archive no longer counts recipes you already have as imported.**
+
 ---
 
 ## [1.4.1-dev01] - 2026-10-03 (pre-release)
