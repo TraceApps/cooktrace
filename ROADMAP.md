@@ -204,7 +204,7 @@ What Mealime users miss now that it's closing (2026-10-21), built on what CookTr
 - Mealime exports import in full: the community exporter's schema.org files lose their photo (a relative `../images/` path inside the zip), the user's notes (`comment`) and the original link (`isBasedOn`).
 
 **Phase 2: a Week view and the list's detail sheet.**
-- Cook Diary gains a Week view beside List, Month and Photos: seven days with each planned cook as a card (photo, servings stepper, meal chip), plus an unscheduled "This week" tray for people who plan a pool of meals rather than days, as Mealime did.
+- Cook Diary gains a Week view beside List, Month and Photos, which stay as they are. It is one timeline: days behind you show what you cooked (photo, rating, Cooked), days ahead show each planned cook as a card (photo, servings stepper, meal chip), and today's plan has Mark as Cooked. Plus an unscheduled "This week" tray for people who plan a pool of meals rather than days, as Mealime did.
 - A plan summary card on the Week view, in the style of the diary's stat tiles: meals planned, items to buy, items already in the pantry, expiring items this plan uses. One button builds or refreshes the list for that week.
 - Tap a shopping item to open a sheet: the total, what each recipe needs and on which day, pantry stock and variants, a size hint where the pantry or common densities know one ("medium potato, about 200 g"), and notes. Edit and aisle stay in the long-press menu. Two panes on a foldable or tablet.
 
@@ -223,7 +223,7 @@ What Mealime users miss now that it's closing (2026-10-21), built on what CookTr
   - Always labeled as a help, not a guarantee: worked out from ingredient names and labels, check packaging. The README's disclaimer already covers allergies.
 - Replaces the wizard's dietary question, which is stored but never used today.
 
-Not planned: a curated recipe catalog (CookTrace has none to offer), grocery-delivery hand-off (partner keys, US-only), hands-free wave-to-advance (Cook Mode has voice). Design rules: reuse `Sheet`, chips, stat tiles and the spotlight strip rather than new one-off modals; every new surface works offline and on Android; foldables split where there's room.
+Not planned: a curated recipe catalog (CookTrace has none to offer), grocery-delivery hand-off (partner keys, US-only), hands-free wave-to-advance (Cook Mode has voice). Design rules: reuse `Sheet`, chips, stat tiles and the spotlight strip rather than new one-off modals; every new surface works offline and on Android; foldables split where there's room. Each phase updates the docs in the same work (cooktrace/diary.md, shopping.md, pantry.md, recipes.md, settings.md, import.md and features.md as they apply), on `docs/dev` until release. Mockups: the "CookTrace Plan Your Week" design canvas (2026-10-04).
 
 
 ### ~~Mealie / Tandoor / Paprika / schema.org JSON~~ *(done, Phase 7)*
