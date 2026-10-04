@@ -193,6 +193,9 @@ Timer rail embedded inline in the cook-mode-bar (was floating globally). `cookMo
 
 ### ~~Cook more than one thing at once~~ *(done, 1.4.0)*
 
+### Messages that read professionally (1.5)
+A sweep of every toast, summary and error line (about 450 toast calls, 54 still hardcoded in English) to one house style: lead with the result ("Recipe saved", "Imported 119 of 121 Recipes"); give the reason only when something went wrong ("Couldn't save the recipe: the server is offline."); name the next step when there is one ("Opening it."); no filler ("All set", "Oops"), no exclamation marks, no em dashes; toasts and body text in sentence case, titles and buttons in title case. Hardcoded strings move to `en.json` with Spanish alongside. The import messages were done first, in 1.4.1. Same pass in NutriTrace, LiftTrace and NoteTrace, which share the toast patterns.
+
 ### Plan your week (1.5 candidate)
 What Mealime users miss now that it's closing (2026-10-21), built on what CookTrace already knows: recipe quantities, the pantry with expiry, and planned cooks with servings. Audited 2026-10-04 against Mealime's help center, store listings and the shutdown threads, and against CookTrace's code. One flow: pick the week, see what it costs you to shop and what it uses up, shop from one list.
 
