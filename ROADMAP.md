@@ -201,6 +201,7 @@ What Mealime users miss now that it's closing (2026-10-21), built on what CookTr
 - The plan's grocery list scales each recipe by its planned servings (stored on the diary row, never used), merges the same ingredient across recipes with unit conversion (1 cup + 120 ml), and keeps every origin: a `sources` list per shopping row (recipe, diary entry, amount), synced and offline like the rest.
 - Plan a Cook asks for servings (defaulting to the recipe's or the household's).
 - Fix the recipe card's Plan action (`/diary?plan=<id>` is never read), scale the amounts shown inside steps, and compute the pantry match on Android (empty there today).
+- Mealime exports import in full: the community exporter's schema.org files lose their photo (a relative `../images/` path inside the zip), the user's notes (`comment`) and the original link (`isBasedOn`).
 
 **Phase 2: a Week view and the list's detail sheet.**
 - Cook Diary gains a Week view beside List, Month and Photos: seven days with each planned cook as a card (photo, servings stepper, meal chip), plus an unscheduled "This week" tray for people who plan a pool of meals rather than days, as Mealime did.
@@ -213,7 +214,14 @@ What Mealime users miss now that it's closing (2026-10-21), built on what CookTr
 
 **Phase 4: the household.**
 - Household members under Settings: name, diet, allergies, dislikes, and the days they're home (a child there four days a week). Planned servings default to who's home that day.
-- Allergen and diet warnings on recipe cards, the Week view and the list ("contains gluten: Sam"), from a keyword map over ingredient names plus the allergens Open Food Facts reports for scanned pantry items. Replaces the wizard's dietary question, which is stored but never used today.
+- Allergens, stored once and shown where a decision is made. Nothing holds allergens today.
+  - Vocabulary: the EU's 14 allergens, using Open Food Facts' codes (`en:gluten`, `en:milk`, `en:eggs`, `en:nuts`, `en:peanuts`, `en:soybeans`, `en:sesame-seeds`, `en:fish`, `en:crustaceans`, `en:molluscs`, `en:celery`, `en:mustard`, `en:sulphur-dioxide-and-sulphites`, `en:lupin`); they cover the US's nine.
+  - Stored on pantry items (`allergens` and `traces`, JSON arrays of codes): filled from Open Food Facts when a product is scanned or looked up, shown and editable as chips in the item sheet with where they came from ("from the label", "you set this").
+  - Stored on household members (allergies, diet, dislikes), the people the warnings are for.
+  - Worked out for recipes, not stored: the linked pantry items' allergens, plus a keyword map over ingredient names for unlinked ones ("flour", "soy sauce", "parmesan"), plus a per-recipe correction (add or remove, for a gluten-free flour the map can't know). Computed with the pantry match, on the server and on Android.
+  - Shown: a warning chip on recipe cards naming who it affects ("Gluten · Sam"); in the recipe view a line under the title and a mark on the ingredient responsible; on Week view cards; in the shopping item sheet; and "Build my week" leaves out conflicts by default. "May contain" (traces) is shown apart from "contains".
+  - Always labeled as a help, not a guarantee: worked out from ingredient names and labels, check packaging. The README's disclaimer already covers allergies.
+- Replaces the wizard's dietary question, which is stored but never used today.
 
 Not planned: a curated recipe catalog (CookTrace has none to offer), grocery-delivery hand-off (partner keys, US-only), hands-free wave-to-advance (Cook Mode has voice). Design rules: reuse `Sheet`, chips, stat tiles and the spotlight strip rather than new one-off modals; every new surface works offline and on Android; foldables split where there's room.
 
