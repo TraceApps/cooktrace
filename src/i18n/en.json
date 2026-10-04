@@ -1044,7 +1044,18 @@
     "opt_replace":               "Replace with the Imported Version",
     "opt_force":                 "Allow Duplicates",
     "cancel":                    "Cancel",
-    "import_another":            "Import Another"
+    "import_another":            "Import Another",
+    "dup_label":                 "If a Recipe Already Exists",
+    "opt_skip":                  "Skip It",
+    "summary_all":               "Imported {count, plural, one {# Recipe} other {# Recipes}}",
+    "summary_partial":           "Imported {imported} of {total} Recipes",
+    "summary_find":              "Find them on the Recipes tab.",
+    "summary_dupes":             "{count, plural, one {# duplicate skipped} other {# duplicates skipped}}",
+    "summary_failed":            "{count, plural, one {# recipe couldn't be imported} other {# recipes couldn't be imported}}",
+    "dupes_heading":             "Duplicates Skipped",
+    "dupes_hint":                "A recipe with the same name or source link already exists. To import these anyway, set If a Recipe Already Exists to Allow Duplicates and import again.",
+    "failed_heading":            "Not Imported",
+    "toast_imported":            "Imported {count, plural, one {# recipe} other {# recipes}}"
   },
   "settings_federation_ct": {
     "toast": {
@@ -1254,7 +1265,10 @@
     "toast": {
       "recipe_imported":         "Recipe imported",
       "url_batch_limit":         "Up to 100 URLs per batch. Split into smaller batches.",
-      "pick_one_url":            "Pick at least one URL to save."
+      "pick_one_url":            "Pick at least one URL to save.",
+      "already_exists":          "This recipe already exists. Opening it.",
+      "already_exists_short":    "This recipe already exists.",
+      "imported_no_steps":       "Recipe imported, but the source had no cooking steps. Add them in the editor."
     },
     "title":                     "Import from URL",
     "link_to_pantry":            "Link Ingredients to Pantry",
@@ -1337,6 +1351,12 @@
     "toast": {
       "paste_or_pick":           "Paste a recipe or pick a file first",
       "recipe_imported":         "Recipe imported",
+      "already_exists":          "This recipe already exists. Opening it.",
+      "already_exists_short":    "This recipe already exists.",
+      "imported_no_steps":       "Recipe imported, but the source had no cooking steps. Add them in the editor.",
+      "archive_imported":        "Imported {count, plural, one {# recipe} other {# recipes}}",
+      "archive_imported_skipped": "Imported {count, plural, one {# recipe} other {# recipes}}; {skipped, plural, one {# duplicate skipped} other {# duplicates skipped}}",
+      "archive_all_duplicates":  "Nothing new to import: {skipped, plural, one {# recipe already exists} other {all # recipes already exist}}",
       "new_link_generated":      "New link generated",
       "link_revoked":            "Link revoked",
       "copied":                  "Copied to clipboard",

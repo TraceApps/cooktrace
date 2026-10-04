@@ -176,7 +176,9 @@ const _CtApiHttp = {
       applyTags: !!opts.applyTags,
       importCategories: opts.importCategories !== false,
     };
-    return this._imgFromApi(await this.post('/api/recipes/scrape', body));
+    const res = await this.post('/api/recipes/scrape', body);
+    // { skipped, existing_id } when the recipe is already in the catalog.
+    return res?.skipped ? res : this._imgFromApi(res);
   },
   async importRecipe({ text, file, addToPantry = true, applyTags = false, importCategories = true } = {}) {
     if (file) {
@@ -186,14 +188,15 @@ const _CtApiHttp = {
       form.append('applyTags', applyTags ? 'true' : 'false');
       form.append('importCategories', importCategories ? 'true' : 'false');
       const res = await this._fetch('POST', '/api/recipes/import', form, true);
-      // Paprika archive returns { recipes, count }; single returns a row.
-      if (res?.recipes) return { recipes: res.recipes.map(r => this._imgFromApi(r)), count: res.count };
-      return this._imgFromApi(res);
+      // Paprika archive returns { recipes, count, skipped }; single returns
+      // a row, or { skipped, existing_id } for a duplicate.
+      if (res?.recipes) return { recipes: res.recipes.map(r => this._imgFromApi(r)), count: res.count, skipped: res.skipped || [] };
+      return res?.skipped ? res : this._imgFromApi(res);
     }
     const body = { text, addToPantry, applyTags, importCategories };
     const res = await this.post('/api/recipes/import', body);
-    if (res?.recipes) return { recipes: res.recipes.map(r => this._imgFromApi(r)), count: res.count };
-    return this._imgFromApi(res);
+    if (res?.recipes) return { recipes: res.recipes.map(r => this._imgFromApi(r)), count: res.count, skipped: res.skipped || [] };
+    return res?.skipped ? res : this._imgFromApi(res);
   },
   // Bulk zip import (Mealie / Tandoor / Paprika backups). Two-step:
   // scan returns a manifest the UI renders as a picker; commit writes

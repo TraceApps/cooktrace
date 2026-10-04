@@ -14,6 +14,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 
 - **A Tandoor export imports** ([#72](https://github.com/TraceApps/cooktrace/issues/72), thanks @joeShuff). Tandoor packs each recipe in its own zip inside the export, which the importer never opened, so every Tandoor export failed with "No JSON files found". Each recipe now comes in with its own picture.
+- **Imports say what they skipped** ([#72](https://github.com/TraceApps/cooktrace/issues/72), thanks @joeShuff). After a bulk import, the summary reads "Imported 119 of 121 Recipes" and lists each recipe skipped as a duplicate, linked to the one you already have, apart from any that failed.
+- **Importing a recipe you already have opens it.** Importing it again from a link, pasted text or a file showed a "no cooking steps" warning and opened an empty page. It now says the recipe already exists and opens yours.
+- **A Paprika archive no longer counts recipes you already have as imported.**
 - **Signing in through SSO with an email that already has an account no longer creates a second account.** When the identity provider doesn't mark the email verified (Authentik's default since 2025.10), the sign-in is refused with a pointer to link the provider from your profile, instead of landing you in a new, empty account.
 - **SSO works with Authelia 4.39 and later out of the box.** Email, username and groups are read from the provider's userinfo when the ID token leaves them out.
 - **The SSO callback also works without the provider number, and at `/api/oidc/callback`**, the address older docs gave. Both used to end on a blank page.

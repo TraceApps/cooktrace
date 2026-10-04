@@ -1143,7 +1143,8 @@ router.post('/scrape', wrap(async (req, res) => {
 
   const row = _saveImportedRecipe(u, parsed, { addToPantry, applyTags, importCategories, dedup, creatorUsername: req.user?.username || null });
   if (!row) {
-    return res.status(200).json({ skipped: true, reason: 'duplicate', _import_tier: usedTier });
+    const existing = _findImportDuplicate(u, parsed);
+    return res.status(200).json({ skipped: true, reason: 'duplicate', existing_id: existing?.id || null, name: parsed.name, _import_tier: usedTier });
   }
   res.status(201).json({ ...row, _import_tier: usedTier });
 }));
@@ -1299,6 +1300,25 @@ function _aiConfigForUser(u) {
   return null;
 }
 
+// The recipe an import would duplicate: case-insensitive name first,
+// then source_url. Returns { id } or null. _saveImportedRecipe skips on
+// a match (dedup 'skip'), and the routes report the match's id so the
+// client can open it instead of a recipe that was never written.
+function _findImportDuplicate(u, parsed) {
+  const lower = String(parsed?.name || '').toLowerCase().trim();
+  let existing = lower ? db.prepare(
+    `SELECT id FROM recipes
+      WHERE ${_whereUser(u)} AND deleted_at IS NULL AND lower(name) = ? LIMIT 1`
+  ).get(...[..._userArgs(u), lower]) : null;
+  if (!existing && parsed?.source_url) {
+    existing = db.prepare(
+      `SELECT id FROM recipes
+        WHERE ${_whereUser(u)} AND deleted_at IS NULL AND source_url = ? LIMIT 1`
+    ).get(...[..._userArgs(u), parsed.source_url]);
+  }
+  return existing || null;
+}
+
 // Shared writer used by /scrape, /import, and /import-file. Takes a
 // parsed recipe shape and persists it with the same flow as POST /.
 function _saveImportedRecipe(u, parsed, opts = {}) {
@@ -1318,17 +1338,7 @@ function _saveImportedRecipe(u, parsed, opts = {}) {
     dedup = 'skip',
   } = opts;
   if (dedup !== 'force' && parsed?.name) {
-    const lower = String(parsed.name).toLowerCase().trim();
-    let existing = db.prepare(
-      `SELECT id FROM recipes
-        WHERE ${_whereUser(u)} AND deleted_at IS NULL AND lower(name) = ? LIMIT 1`
-    ).get(...[..._userArgs(u), lower]);
-    if (!existing && parsed.source_url) {
-      existing = db.prepare(
-        `SELECT id FROM recipes
-          WHERE ${_whereUser(u)} AND deleted_at IS NULL AND source_url = ? LIMIT 1`
-      ).get(...[..._userArgs(u), parsed.source_url]);
-    }
+    const existing = _findImportDuplicate(u, parsed);
     if (existing) {
       if (dedup === 'skip') return null;
       // dedup === 'replace' falls through and gets re-inserted; the
@@ -1708,18 +1718,9 @@ router.post('/import-zip/commit', _zipImportUpload.single('file'), wrap(async (r
       // so timeline events still land on the existing recipe.
       let targetRecipeId = row?.id || null;
       if (!row) {
-        skippedDup.push({ idx: i, name: recipe?.name || `(item ${i})` });
-        const lower = String(recipe?.name || '').toLowerCase().trim();
-        if (lower) {
-          const existing = db.prepare(
-            `SELECT id FROM recipes
-              WHERE ${_whereUser(u)} AND deleted_at IS NULL AND lower(name) = ? LIMIT 1`
-          ).get(...[..._userArgs(u), lower]) || (recipe.source_url ? db.prepare(
-            `SELECT id FROM recipes
-              WHERE ${_whereUser(u)} AND deleted_at IS NULL AND source_url = ? LIMIT 1`
-          ).get(...[..._userArgs(u), recipe.source_url]) : null);
-          targetRecipeId = existing?.id || null;
-        }
+        const existing = _findImportDuplicate(u, recipe);
+        targetRecipeId = existing?.id || null;
+        skippedDup.push({ idx: i, name: recipe?.name || `(item ${i})`, existing_id: targetRecipeId });
       } else {
         created.push(row);
       }
@@ -1842,16 +1843,19 @@ router.post('/import', _importUpload.single('file'), wrap(async (req, res) => {
     try { recipes = await importPaprikaArchive(f.buffer); }
     catch (e) { return res.status(400).json({ error: e.message }); }
     const created = [];
+    const skipped = [];
     for (const r of recipes) {
       try {
         const row = _saveImportedRecipe(u, r, { addToPantry, applyTags, importCategories, creatorUsername });
-        created.push(row);
+        // null = a duplicate that was skipped, not a recipe written.
+        if (row) created.push(row);
+        else skipped.push({ name: r?.name || '', existing_id: _findImportDuplicate(u, r)?.id || null });
       } catch (e) {
         // Continue on per-recipe failure — most archives have many.
       }
     }
-    if (created.length === 0) return res.status(400).json({ error: 'No recipes could be imported' });
-    return res.status(201).json({ recipes: created, count: created.length });
+    if (created.length === 0 && skipped.length === 0) return res.status(400).json({ error: 'No recipes could be imported' });
+    return res.status(created.length ? 201 : 200).json({ recipes: created, count: created.length, skipped });
   }
 
   // Single recipe — text body or single-file upload.
@@ -1871,6 +1875,10 @@ router.post('/import', _importUpload.single('file'), wrap(async (req, res) => {
 
   try {
     const row = _saveImportedRecipe(u, parsed, { addToPantry, applyTags, importCategories, creatorUsername });
+    if (!row) {
+      const existing = _findImportDuplicate(u, parsed);
+      return res.status(200).json({ skipped: true, reason: 'duplicate', existing_id: existing?.id || null, name: parsed?.name || '' });
+    }
     return res.status(201).json(row);
   } catch (e) {
     return res.status(e.status || 500).json({ error: e.message || 'Import failed' });
