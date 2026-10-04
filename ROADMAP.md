@@ -3,25 +3,7 @@
 Ideas and planned enhancements. Grouped by area. No commitment to order or timeline.
 Items marked ~~strikethrough~~ have been implemented.
 
-Last refreshed at v1.4.0-dev02 (2026-09-25).
-
----
-
-## Planned for v1.1.0
-
-### Full i18n Coverage
-
-Baseline as of v1.0.0 is ~50% coverage: 535 keys in `en.json`, ~500 strings still hardcoded across the 76 `.svelte` files (roughly 346 in text content + 285 in attributes, minus overlap). Section headers and some routes are covered; SettingsEmail, SettingsKitchens, cookbook sharing UI, most dialogs, and most attribute strings (placeholder, title, aria-label) are not.
-
-Scope:
-
-- Extract every remaining user-facing string into a key
-- Extend `en.json` to the full set
-- Stub matching keys in `sv.json` so the community translator can fill
-- Add a CI lint rule that fails if a new component adds hardcoded English (Svelte template `>Some Text<` or `placeholder="Some Text"` without a `$_()` wrap), so coverage doesn't backslide after this release
-- Sizing: 1-2 focused days
-
-Apply the same sweep to LT and NT in their respective v1.1.0 releases once the CT pattern is proven.
+Last refreshed 2026-10-04, after v1.4.0 (v1.4.1 in testing).
 
 ---
 
@@ -106,6 +88,9 @@ Single-column kitchen view stays; verify on narrow tablets in landscape.
 ### ~~Public share links~~ *(done, Phase 6 + 12)*
 `recipes.share_token` mint / rotate / revoke via long-press menu. Public read at `/r/<token>` works without auth, scoped to a single recipe. `/api/r/:token` endpoint bypasses the setup-required gate.
 
+### ~~Link previews for shared recipes~~ *(done on dev, next minor release)*
+A shared `/r/` link shows the recipe's name, a line about it and its photo in chat apps.
+
 ### PDF / square / letter alternate card templates
 Only the SVG Pinterest card exists today; no PDF endpoint.
 
@@ -115,6 +100,9 @@ Only the SVG Pinterest card exists today; no PDF endpoint.
 ---
 
 ## Kitchens (multi-user households)
+
+### ~~Kitchen roles~~ *(done, 1.4.0, #52)*
+Head Chef, Sous Chef and Line Cook, plus handing a Kitchen to another member.
 
 ### ~~Kitchen Auto-Share Your Recipes~~ *(done, Phase 19, v1.0.0-rc.5)*
 Per-user `kitchen_members.auto_share` flag. Turning it on backfills every recipe you own into the Kitchen; new recipes you create thereafter fan out automatically. New members joining later pick up existing auto-sharers' recipes.
@@ -165,6 +153,9 @@ Column + Expiring Soon filter chip + card pill (warn / past states).
 ### ~~FDA-style Nutrition Facts box + sodium↔salt auto-derive~~ *(done, Phase 2)*
 `visibleNutriments` setting + per-recipe nutrition entry.
 
+### Merge pantry items, or group them as variants
+Asked in [discussion #57](https://github.com/TraceApps/cooktrace/discussions/57). Multi-select already exists (long-press) with only Delete. Add a merge: pick the main item and turn the others into its variants, keeping recipe links. Plus a true merge for plain duplicates ("Medium tomato" into "Tomato") that repoints recipe links and removes the duplicate.
+
 ---
 
 ## Shopping List
@@ -177,6 +168,12 @@ Recipe picker in the Shopping "+" menu, filter to items not already in pantry.
 
 ### ~~URL recipe scraper~~ *(done, Phase 4)*
 `POST /api/recipes/scrape`, schema.org/Recipe JSON-LD parser, SSRF-guarded fetcher, wired into "+" menu.
+
+### Grocery list from the plan uses the planned servings
+Each planned cook stores a serving count, but the list adds the recipe's original amounts. Scale each recipe by planned servings over the recipe's servings. Comes up in nearly every "which app should I use" thread ("recipe is for 4, we are 2").
+
+### One shopping list per Kitchen
+Lists belong to an account today; Kitchens share recipes, not the list, so households share a login to share a list. A Kitchen list would fix that, and needs the sync fix under Android App (an older change must not win) first.
 
 ---
 
@@ -197,6 +194,11 @@ Global running-timer store with WebAudio chime, browser notification, +1 min / S
 ### ~~Cook Mode inline timer rail~~ *(done, Phase 15)*
 Timer rail embedded inline in the cook-mode-bar (was floating globally). `cookModeActive` store hands off between App.svelte and RecipeView.
 
+### ~~Cook more than one thing at once~~ *(done, 1.4.0)*
+
+### Household members in the planner
+An idea from a Reddit request: people in the household with their own diets (gluten-free, low sodium, dairy-free) and the days they're home (a child there 4 days a week), feeding the plan's portions and warnings. One set of dietary preferences per account today.
+
 ---
 
 ## Importers
@@ -212,11 +214,16 @@ First-class "Import from Photo" entry on the Recipes create menu. Standalone `Ph
 
 ### ~~CookTrace export passthrough~~ *(done, Phase 7)*
 
+### ~~Tandoor export (zip of zips)~~ *(done, 1.4.1, #72)*
+
+### Ingredient line parser gaps
+From [discussion #57](https://github.com/TraceApps/cooktrace/discussions/57): ranges ("4 - 5 roma tomatoes" became qty 4, name "- 5 roma tomatoes"), size words left in the name ("15-ounce can", "Large can", "medium"), and prep after a comma ("onion, diced"). The name feeds pantry auto-link, so these become junk pantry items. Also match before creating (tomato/tomatoes). Check exact source pages first; the reporter was asked for URLs.
+
 ### ~~Recipe-import dedup~~ *(done)*
 `dedup: 'skip' | 'force'` parameter on the import endpoint checks case-insensitive name and `source_url` matches (see `server/routes/recipes.js:963`).
 
 ### Import from a video
-Aimed at 1.5.0. Mealie (3.13+) and Norish both import recipes from video
+An idea, not scheduled. Mealie (3.13+) and Norish both import recipes from video
 links; neither makes step pictures (both turn speech or captions into text),
 so that and "watch this step" are where CookTrace can do better. Audited
 2026-10-04 against their code and a live YouTube test. In layers:
@@ -243,8 +250,8 @@ so that and "watch this step" are where CookTrace can do better. Audited
 
 Plus an Android share target (share a YouTube or TikTok link into CookTrace).
 Server-only, like the Enhanced tier: local mode can't run yt-dlp, and import
-already needs a connection. Scope 1.5 as layers 1 to 3 and the share target;
-4 and 5 are stretch or 1.6.
+already needs a connection. A first version would be layers 1 to 3 and the
+share target; 4 and 5 later.
 
 Traps found in testing and in their issue trackers: YouTube now withholds
 video and audio streams (bot check, proof-of-origin tokens), so only captions,
@@ -313,19 +320,8 @@ Settings → NutriTrace federation: URL + access token + Test button. Server pro
 ### Auto-log cooked-recipe → NT diary
 Server proxy `/api/nt/log-meal` exists; missing the client-side wiring to fire it from CookLogDialog.
 
-### Model Context Protocol (MCP) server
-
-Expose CookTrace to external AI clients (Claude Desktop, Cursor, Codex, VS Code) the same way NutriTrace does starting with `v1.2.0-dev01`. Recipe / pantry / shopping / cook-diary workflows are inherently conversational, which is exactly what agent-driven tools shine at. "What can I make from what's in the pantry?" → "add these to shopping" → "I cooked it, mark done" is one continuous back-and-forth.
-
-Off by default; opt in with `MCP_ENABLED=1` env + a new `mcp:read` scope on the token. Write and destructive tiers gated behind `MCP_WRITE_ENABLED=1` + `mcp:write` and `MCP_DESTROY_ENABLED=1` + `mcp:destroy` respectively, matching the NT model. Each destructive call also requires `confirm: true` in the arguments.
-
-Natural tool set (~15, most map directly from Trace AI):
-
-- **Read**: `search_recipes`, `get_recipe`, `find_recipes_from_pantry`, `get_pantry`, `get_shopping_list`, `get_cookbooks`, `get_cookbook`, `get_cook_diary`
-- **Write**: `log_cook`, `plan_cook`, `add_to_shopping`, `add_to_pantry`, `set_pantry_stock`, `add_to_cookbook`
-- **Destructive**: `delete_shopping_item`, `remove_from_pantry`, `create_recipe`, `import_recipe_from_url`
-
-Wait until NT's MCP has real usage feedback (~week or two after the v1.2.0 stable release) so any design tweaks land in NT first, then port. Roughly 2-4 days of work; see the NT `server/lib/mcp/` layout for the exact pattern to replicate.
+### ~~Model Context Protocol (MCP) server~~ *(done, 1.2.0)*
+Off by default (`MCP_ENABLED=1`), with read, write and destructive tiers each behind its own flag and token scope.
 
 ---
 
@@ -398,8 +394,12 @@ Full-backup dump + schema-driven restore extended to cover `cookbook_shares`, `k
 ### ~~Bundle splitting~~ *(done, Phase 14)*
 `manualChunks` + `wrap()` lazy-loaded routes. Initial bundle dropped from 843KB to 392KB (uncompressed, 248→118KB gzipped). Manage, Settings, Wizard, and PublicRecipe ship as their own chunks.
 
-### Native cook-day reminders via Capacitor LocalNotifications
-Mirror the `notifLocalEnabled` toggle. Server-side push works; the local-alarm mirror doesn't yet.
+### ~~Wear OS app~~ *(done, 1.4.0)*
+
+### ~~Preliminary foldable support~~ *(done, 1.4.0)*
+
+### Sync: an older change must not win
+Found 2026-10-04 while answering a Reddit question. The phone's sync push applies whatever a device sends, with no timestamp check, so an offline edit brings back an item someone else cleared, and an offline clear removes an item someone unticked since (both reproduced against a real server). The web app's offline queue is safe: an edit to a removed item is refused and named. Keep a deletion unless the edit is newer, skip a stale delete, and add offline-sync tests for both directions. Check NutriTrace, LiftTrace and NoteTrace, which share the pattern.
 
 ---
 
@@ -408,46 +408,17 @@ Mirror the `notifLocalEnabled` toggle. Server-side push works; the local-alarm m
 ### ~~Trace panel duplicate `trace` block~~ *(done, Phase 19)*
 Merged duplicate `trace` block in en.json that was dropping raw keys (`trace.panel_sub`) into the AI panel.
 
-### Full coverage sweep (v1.1.0)
-See top of file.
+### ~~Full i18n retrofit~~ *(done, 1.1.0)*
+
+### Strings that slipped back, and a lint rule
+About 30 hardcoded English strings are back in templates (CookbookView, SettingsUserManagement, Recipes, ManageTaxonomyList, CookHeatmap and others). Move them to `en.json`, and add the CI check from the original plan that fails on new hardcoded text.
 
 ---
 
 ## Offline
 
-### Offline PWA editing (family-wide, after the next main release)
-
-Bring NoteTrace's browser offline model here, so the installed web app works in a
-dead zone the way the Android app does. This is set for every Trace app once the
-next main release is out. Order agreed 2026-09-20: NutriTrace first, then
-LiftTrace, then CookTrace.
-
-The pattern to copy (NoteTrace `src/lib/offline-api.js` + `offline-edits.js`):
-Workbox caches the app shell, an IndexedDB mirror answers reads when the server
-can't be reached, an outbox holds edits and shows them at once, new rows get
-temporary ids that are mapped to real ids after they go up, and the queue is sent
-through the existing sync push endpoint so the server merges browser edits exactly
-as it merges the phone's. A Web Lock stops two tabs sending at once and a
-BroadcastChannel keeps them in step.
-
-Deliberately NOT the Service Worker Background Sync API: Safari doesn't support
-it, and iOS is the main reason for the work. Flush from the page instead, with
-retries backing off from 3s to 30s plus `online` events.
-
-The sidebar sync pill and the amber / red colour rule are already in place here,
-so the state has somewhere to show.
-
-iOS caveats to plan for: Safari evicts site data after about 7 days of no use
-unless the PWA is on the Home Screen, so queued-but-unsent work needs to be
-visible and installing needs a nudge.
-
-CookTrace specifics:
-
-- Cover recipes, the pantry, the shopping list, cook logs, and settings.
-- Still online afterwards: recipe imports by URL, image uploads, Trace AI, and
-  anything admin.
-- First slice: read recipes you have opened and tick the shopping list offline,
-  since that is the one people do standing in a shop.
+### ~~Offline PWA editing~~ *(done, 1.4.0)*
+The installed web app opens and works with no connection: shopping list, pantry, diary, recipes and settings edit offline and go up when it's back; imports, sharing, Kitchens, Trace and admin say they need a connection.
 
 ---
 
@@ -477,5 +448,4 @@ Borderline. Complete rewrite, cleaner API. Deferred unless iterating on OIDC. Mo
 ## Out of scope (until requested)
 
 - Multi-database (Postgres etc.), SQLite-only, intentionally
-- Built-in barcode scanner (use Pantry add-by-name)
-- Native iOS app
+- Native iOS app, until there's a Mac and an iPhone to build and test it on (the Ko-fi fund)
