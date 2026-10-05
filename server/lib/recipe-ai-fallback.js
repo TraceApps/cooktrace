@@ -173,6 +173,29 @@ async function _callProvider(cfg, systemPrompt, userText) {
 export function isCompatibleProvider(provider) {
   return provider === 'custom' || provider === 'oai-compat';
 }
+
+/**
+ * The AI an import uses, in this order: the user's own provider with a key;
+ * else the server's (AI_* env vars, keyless when it is an OpenAI-compatible
+ * endpoint); else the user's own keyless OpenAI-compatible endpoint. The
+ * server's AI stays ahead of a keyless user endpoint, which may only be
+ * reachable from the user's browser (http://localhost:11434). Null when
+ * there is none.
+ */
+export function importAiConfig(user, env) {
+  const { provider, apiKey, model, baseUrl } = user || {};
+  if (provider && apiKey) return { provider, apiKey, model: model || '', baseUrl: baseUrl || '' };
+  if (env.AI_API_KEY || (isCompatibleProvider(env.AI_PROVIDER) && env.AI_BASE_URL)) {
+    return {
+      provider: env.AI_PROVIDER || 'claude',
+      apiKey:   env.AI_API_KEY || '',
+      model:    env.AI_MODEL || '',
+      baseUrl:  env.AI_BASE_URL || '',
+    };
+  }
+  if (isCompatibleProvider(provider) && baseUrl) return { provider, apiKey: '', model: model || '', baseUrl };
+  return null;
+}
 function _defaultModel(provider) {
   return ({
     claude: 'claude-haiku-4-5-20251001',
