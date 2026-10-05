@@ -43,6 +43,8 @@ A hotfix: Tandoor exports import again, single sign-on fixes, and share links th
 - **Trace set up through the server's environment variables shows as set up in the Android app.** The app asked without its sign-in, so the server refused and Trace looked unconfigured.
 - **Your custom and hidden units load after signing in on the web** without a reload. Opened signed out, the app tried to load them before you signed in and then gave up.
 - **The installed app works when CookTrace is served from a subpath.** With `BASE_URL` set (say `/cooktrace`), every visit after the first sent the app's requests to the site root instead, online and offline. Thanks @kgenerozov for the fix in LiftTrace and NutriTrace.
+- **Trace works with OpenAI-compatible endpoints that stream unless told not to** ([nutritrace#258](https://github.com/TraceApps/nutritrace/issues/258), reported by @jsapede). Chat answers and smart recipe import failed with "Unexpected non-whitespace character after JSON"; every request now asks for a single answer.
+- **Smart recipe import works with an OpenAI-compatible endpoint set on the server, or one without an API key.** With `AI_PROVIDER=oai-compat` it failed with "Unknown AI provider", and a keyless endpoint such as Ollama counted as not set up.
 
 ### Security
 
