@@ -90,7 +90,7 @@ function _condenseHtml(html, sourceUrl) {
  * aiCfg shape: { provider, apiKey, model, baseUrl }
  */
 export async function aiExtractRecipe(html, sourceUrl, aiCfg) {
-  if (!aiCfg?.provider || !aiCfg?.apiKey) {
+  if (!aiCfg?.provider || !(aiCfg.apiKey || (isCompatibleProvider(aiCfg.provider) && aiCfg.baseUrl))) {
     throw new Error('AI not configured');
   }
   const condensed = _condenseHtml(html, sourceUrl);
@@ -161,9 +161,17 @@ async function _callProvider(cfg, systemPrompt, userText) {
     case 'claude': return _callClaude(apiKey, model, systemPrompt, userText);
     case 'openai': return _callOpenAI(apiKey, model, systemPrompt, userText);
     case 'gemini': return _callGemini(apiKey, model, systemPrompt, userText);
-    case 'custom': return _callOpenAI(apiKey || 'no-key', model, systemPrompt, userText, (cfg.baseUrl || '').replace(/\/+$/, ''));
+    // 'custom' is the app's name for an OpenAI-compatible endpoint,
+    // 'oai-compat' the server's (AI_PROVIDER).
+    case 'custom':
+    case 'oai-compat': return _callOpenAI(apiKey || 'no-key', model, systemPrompt, userText, (cfg.baseUrl || '').replace(/\/+$/, ''));
     default: throw new Error(`Unknown AI provider: ${provider}`);
   }
+}
+
+// OpenAI-compatible endpoints (Ollama, LM Studio...) often need no API key.
+export function isCompatibleProvider(provider) {
+  return provider === 'custom' || provider === 'oai-compat';
 }
 function _defaultModel(provider) {
   return ({
@@ -195,14 +203,15 @@ async function _callClaude(apiKey, model, systemPrompt, userText) {
 }
 
 async function _callOpenAI(apiKey, model, systemPrompt, userText, baseUrl = 'https://api.openai.com') {
+  const headers = { 'content-type': 'application/json', 'accept': 'application/json' };
+  // Some self-hosted endpoints (Ollama in particular) reject a placeholder key.
+  if (apiKey && apiKey !== 'no-key') headers['Authorization'] = `Bearer ${apiKey}`;
   const res = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'content-type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({
       model,
+      stream: false,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userText },

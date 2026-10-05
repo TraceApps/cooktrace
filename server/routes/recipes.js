@@ -15,7 +15,7 @@ import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { dispatchWebhookEvent } from '../lib/webhooks.js';
 import { ensurePantryItems } from './pantry.js';
 import { scrapeRecipe, fetchRecipeHtml, extractFromHtml } from '../lib/recipe-scraper.js';
-import { aiExtractRecipe } from '../lib/recipe-ai-fallback.js';
+import { aiExtractRecipe, isCompatibleProvider } from '../lib/recipe-ai-fallback.js';
 import { scrapeWithRecipeScrapers, isRecipeScrapersAvailable } from '../lib/recipe-scrapers-bridge.js';
 import { importRecipeFromText, importPaprikaArchive, scanRecipeZip, scanLoadedZip, loadRecipeZip, readImageFromLoadedZip, readZipImageBytes, mealieEventImagePaths } from '../lib/recipe-importers.js';
 import { extractText, detectFileType } from '../lib/text-extractors.js';
@@ -1287,12 +1287,14 @@ function _aiConfigForUser(u) {
   const apiKey   = _userSetting(u, 'aiApiKey');
   const model    = _userSetting(u, 'aiModel');
   const baseUrl  = _userSetting(u, 'aiBaseUrl');
-  if (provider && apiKey) return { provider, apiKey, model: model || '', baseUrl: baseUrl || '' };
-  // Fall back to env-configured AI (same key as /api/ai/chat uses).
-  if (process.env.AI_API_KEY) {
+  if (provider && (apiKey || (isCompatibleProvider(provider) && baseUrl))) {
+    return { provider, apiKey: apiKey || '', model: model || '', baseUrl: baseUrl || '' };
+  }
+  // Fall back to env-configured AI (same settings as /api/ai/chat uses).
+  if (process.env.AI_API_KEY || (isCompatibleProvider(process.env.AI_PROVIDER) && process.env.AI_BASE_URL)) {
     return {
       provider: process.env.AI_PROVIDER || 'claude',
-      apiKey:   process.env.AI_API_KEY,
+      apiKey:   process.env.AI_API_KEY || '',
       model:    process.env.AI_MODEL || '',
       baseUrl:  process.env.AI_BASE_URL || '',
     };
