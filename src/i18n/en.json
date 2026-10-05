@@ -305,6 +305,11 @@
     },
     "server":             { "section": "Server Connection" }
   },
+  "attach_image": {
+    "button": "Attach Image",
+    "camera": "Camera",
+    "gallery": "Gallery"
+  },
   "login": {
     "subtitle":             "Sign in to your account",
     "username":             "Username",

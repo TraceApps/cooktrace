@@ -16,6 +16,7 @@
   import { tick, onMount } from 'svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
+  import AttachImageButton from './AttachImageButton.svelte';
   import { closeOnBack } from '../../lib/back-stack.js';
   import { _ } from 'svelte-i18n';
   import TraceFace from './TraceFace.svelte';
@@ -900,10 +901,9 @@ When you write to the user's data, summarise what you did briefly and concretely
   }
   let _voicePrefix = null;
 
-  let _imageInput;
-  function _attachClick() { _imageInput?.click(); }
-  function _onImagePicked(e) {
-    const f = e.target.files?.[0];
+  // From the shared attach button: an array of image Files. Trace takes one.
+  function _useImageFiles(files) {
+    const f = files?.[0];
     if (!f) return;
     if (!/^image\//.test(f.type)) { showError($_('trace_ai_ct.toast.pick_image')); return; }
     const reader = new FileReader();
@@ -913,7 +913,6 @@ When you write to the user's data, summarise what you did briefly and concretely
       attachedImage = { base64, mimeType: f.type || 'image/jpeg', preview: dataUrl };
     };
     reader.readAsDataURL(f);
-    e.target.value = '';
   }
   function _clearImage() { attachedImage = null; }
 
@@ -1147,11 +1146,8 @@ When you write to the user's data, summarise what you did briefly and concretely
       {/if}
 
       <footer class="panel-input">
-        <input type="file" accept="image/*" bind:this={_imageInput} on:change={_onImagePicked} style="display:none" />
-        <button class="attach-btn" on:click={_attachClick} disabled={busy}
-          aria-label="Attach Image" title="Attach Image">
-          <span class="material-symbols-rounded">photo_camera</span>
-        </button>
+        <AttachImageButton disabled={busy} title={$_('attach_image.button')}
+          on:files={e => _useImageFiles(e.detail)} />
         <!-- In-chat voice button removed for parity with NutriTrace +
              LiftTrace. Voice input lives only on the FAB hold gesture
              (Smart Log) and on dedicated voice surfaces (Smart Log
@@ -1613,20 +1609,6 @@ When you write to the user's data, summarise what you did briefly and concretely
     flex-shrink: 0;
   }
   /* Attach (photo_camera) — round, border-only, accent on hover. */
-  .attach-btn {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 50%;
-    width: 40px; height: 40px;
-    cursor: pointer;
-    color: var(--text-3);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-    transition: color var(--dur-fast), border-color var(--dur-fast);
-  }
-  .attach-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
-  .attach-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .attach-btn .material-symbols-rounded { font-size: 20px; }
   .mic-btn.recording {
     background: color-mix(in srgb, var(--danger) 18%, transparent);
     border-color: var(--danger);

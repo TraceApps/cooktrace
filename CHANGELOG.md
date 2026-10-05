@@ -25,6 +25,10 @@ Imports now say what they skipped, and importing a recipe you already have opens
 
 A hotfix: Tandoor exports import again, single sign-on fixes, and share links that open for everyone.
 
+### Changed
+
+- **Trace's attach button offers Camera or Gallery on phones and in the Android app**, the same as the other Trace apps. Each choice goes straight to the camera or the photo picker; on a computer the button opens the file picker.
+
 ### Fixed
 
 - **A Tandoor export imports** ([#72](https://github.com/TraceApps/cooktrace/issues/72), thanks @joeShuff). Tandoor packs each recipe in its own zip inside the export, which the importer never opened, so every Tandoor export failed with "No JSON files found". Each recipe now comes in with its own picture.
@@ -38,6 +42,7 @@ A hotfix: Tandoor exports import again, single sign-on fixes, and share links th
 - **The app no longer loads behind the sign-in screen.** Opened signed out, it asked the server for your data and was refused before the sign-in screen replaced it. It now waits to learn who is signed in.
 - **Trace set up through the server's environment variables shows as set up in the Android app.** The app asked without its sign-in, so the server refused and Trace looked unconfigured.
 - **Your custom and hidden units load after signing in on the web** without a reload. Opened signed out, the app tried to load them before you signed in and then gave up.
+- **The installed app works when CookTrace is served from a subpath.** With `BASE_URL` set (say `/cooktrace`), every visit after the first sent the app's requests to the site root instead, online and offline. Thanks @kgenerozov for the fix in LiftTrace and NutriTrace.
 
 ### Security
 
