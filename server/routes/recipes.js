@@ -15,7 +15,7 @@ import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { dispatchWebhookEvent } from '../lib/webhooks.js';
 import { ensurePantryItems } from './pantry.js';
 import { scrapeRecipe, fetchRecipeHtml, extractFromHtml } from '../lib/recipe-scraper.js';
-import { aiExtractRecipe, isCompatibleProvider } from '../lib/recipe-ai-fallback.js';
+import { aiExtractRecipe, importAiConfig } from '../lib/recipe-ai-fallback.js';
 import { scrapeWithRecipeScrapers, isRecipeScrapersAvailable } from '../lib/recipe-scrapers-bridge.js';
 import { importRecipeFromText, importPaprikaArchive, scanRecipeZip, scanLoadedZip, loadRecipeZip, readImageFromLoadedZip, readZipImageBytes, mealieEventImagePaths } from '../lib/recipe-importers.js';
 import { extractText, detectFileType } from '../lib/text-extractors.js';
@@ -1283,23 +1283,12 @@ function _userSetting(u, key) {
 // fall back to the server-side AI env config when they have nothing
 // of their own. Returns null when no usable config exists.
 function _aiConfigForUser(u) {
-  const provider = _userSetting(u, 'aiProvider');
-  const apiKey   = _userSetting(u, 'aiApiKey');
-  const model    = _userSetting(u, 'aiModel');
-  const baseUrl  = _userSetting(u, 'aiBaseUrl');
-  if (provider && (apiKey || (isCompatibleProvider(provider) && baseUrl))) {
-    return { provider, apiKey: apiKey || '', model: model || '', baseUrl: baseUrl || '' };
-  }
-  // Fall back to env-configured AI (same settings as /api/ai/chat uses).
-  if (process.env.AI_API_KEY || (isCompatibleProvider(process.env.AI_PROVIDER) && process.env.AI_BASE_URL)) {
-    return {
-      provider: process.env.AI_PROVIDER || 'claude',
-      apiKey:   process.env.AI_API_KEY || '',
-      model:    process.env.AI_MODEL || '',
-      baseUrl:  process.env.AI_BASE_URL || '',
-    };
-  }
-  return null;
+  return importAiConfig({
+    provider: _userSetting(u, 'aiProvider'),
+    apiKey:   _userSetting(u, 'aiApiKey'),
+    model:    _userSetting(u, 'aiModel'),
+    baseUrl:  _userSetting(u, 'aiBaseUrl'),
+  }, process.env);
 }
 
 // The recipe an import would duplicate: case-insensitive name first,
