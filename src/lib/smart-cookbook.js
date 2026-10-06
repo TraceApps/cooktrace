@@ -11,6 +11,18 @@
  * Tags match without regard to case, and a recipe needs every listed tag.
  */
 
+/** A filter as saved: known criteria only, numbers as numbers. */
+export function cleanSmartFilter(f) {
+  const clean = {};
+  if (!f || typeof f !== 'object') return clean;
+  if (Number.isFinite(parseInt(f.category_id, 10))) clean.category_id = parseInt(f.category_id, 10);
+  if (Array.isArray(f.tags)) clean.tags = f.tags.map(s => String(s).trim()).filter(Boolean);
+  if (f.favorites_only === true) clean.favorites_only = true;
+  if (Number.isFinite(parseInt(f.min_rating, 10))) clean.min_rating = parseInt(f.min_rating, 10);
+  if (Number.isFinite(parseInt(f.max_total_minutes, 10))) clean.max_total_minutes = parseInt(f.max_total_minutes, 10);
+  return clean;
+}
+
 /** The saved filter from a cookbook row, or null when it has none. */
 export function parseSmartFilter(json) {
   if (json == null || json === '') return null;
@@ -47,4 +59,17 @@ export function matchesSmartFilter(recipe, filter) {
     if (!want.every(t => have.has(t))) return false;
   }
   return true;
+}
+
+/** A saved filter (JSON) with its category id put through `map` (an id
+ *  in, an id or undefined out). Undefined leaves it as is. Category ids
+ *  differ between a phone and the server, so sync translates them. */
+export function mapSmartFilterCategory(json, map) {
+  if (!json) return json;
+  let f;
+  try { f = typeof json === 'string' ? JSON.parse(json) : json; } catch { return json; }
+  if (!f || typeof f !== 'object' || f.category_id == null) return json;
+  const to = map(f.category_id);
+  if (to == null) return json;
+  return JSON.stringify({ ...f, category_id: to });
 }

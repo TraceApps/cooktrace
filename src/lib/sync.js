@@ -19,7 +19,9 @@ import {
   dbGetPendingChanges, dbGetPendingSettingsForPush,
   dbSetServerId, dbApplyPull,
   dbGetMeta, dbSetMeta, dbMarkSettingsSynced, dbMarkTableSynced,
+  SYNC_PARENTS,
 } from './db-native.js';
+import { mapSmartFilterCategory } from './smart-cookbook.js';
 
 let _syncInFlight = null;
 let _interval = null;
@@ -442,33 +444,88 @@ async function _reconcileLocalPhotoUrls(onProgress) {
   return { total: jobs.length, uploaded, cleared };
 }
 
+// Local id → server id for one table, read once per push.
+async function _serverIdMap(db, table, cache) {
+  if (!cache[table]) {
+    const r = await db.query(`SELECT id, server_id FROM ${table}`, []);
+    cache[table] = new Map((r?.values || []).map(x => [x.id, x.server_id || null]));
+  }
+  return cache[table];
+}
+
+// Ids the phone stores are its own; the server's differ. Each id column
+// goes up as the server's id. A parent the server hasn't seen yet is
+// pending in this same push, so its local id goes up and is listed in
+// _local_fks for the server to map once that parent is in.
+async function _toServerIds(db, row, fks, cache) {
+  const localFks = [];
+  for (const [fk, parentTable] of Object.entries(fks)) {
+    if (row[fk] == null) continue;
+    const map = await _serverIdMap(db, parentTable, cache);
+    if (!map.has(row[fk])) row[fk] = null;          // the parent is gone from the phone
+    else if (map.get(row[fk])) row[fk] = map.get(row[fk]);
+    else localFks.push(fk);
+  }
+  if (localFks.length) row._local_fks = localFks;
+  return row;
+}
+
 async function pushChanges() {
   const pending = await dbGetPendingChanges();
   const settings = await dbGetPendingSettingsForPush();
+  const { getDb } = await import('./db-native.js');
+  const db = await getDb();
+  const ids = {};
 
   const tablesToSend = {};
   let total = 0;
   for (const [table, rows] of Object.entries(pending)) {
     if (!Array.isArray(rows) || rows.length === 0) continue;
-    if (table === 'disabled_units' || table === 'recipe_cookbook_links') continue;
-    tablesToSend[table] = rows.map(r => {
-      const out = { ...r, client_id: r.id, server_id: r.server_id || null };
-      delete out.id;
-      delete out.sync_status;
-      return out;
-    });
+    if (table === 'disabled_units' || table === 'recipe_cookbook_links' || table === 'deletes') continue;
+    const out = [];
+    for (const r of rows) {
+      const row = { ...r, client_id: r.id, server_id: r.server_id || null };
+      delete row.id;
+      delete row.sync_status;
+      await _toServerIds(db, row, SYNC_PARENTS[table] || {}, ids);
+      if (table === 'cookbooks' && row.smart_filter_json) {
+        const cats = await _serverIdMap(db, 'recipe_categories', ids);
+        let local = false;
+        row.smart_filter_json = mapSmartFilterCategory(row.smart_filter_json, id => {
+          if (cats.get(id)) return cats.get(id);
+          local = true;
+        });
+        if (local) row._local_filter_category = true;
+      }
+      out.push(row);
+    }
+    tablesToSend[table] = out;
     total += rows.length;
   }
   if (Array.isArray(pending.disabled_units) && pending.disabled_units.length) {
     tablesToSend.disabled_units = pending.disabled_units.map(r => ({ abbr: r.abbr }));
   }
   if (Array.isArray(pending.recipe_cookbook_links) && pending.recipe_cookbook_links.length) {
-    tablesToSend.recipe_cookbook_links = pending.recipe_cookbook_links.map(r => ({
-      cookbook_id: r.cookbook_id, recipe_id: r.recipe_id, sort_order: r.sort_order ?? 0,
-    }));
+    const links = [];
+    for (const r of pending.recipe_cookbook_links) {
+      links.push(await _toServerIds(db, {
+        cookbook_id: r.cookbook_id, recipe_id: r.recipe_id, sort_order: r.sort_order ?? 0,
+      }, { cookbook_id: 'cookbooks', recipe_id: 'recipes' }, ids));
+    }
+    tablesToSend.recipe_cookbook_links = links;
   }
+  // Rows deleted outright here, by server id.
+  const deletes = {};
+  for (const d of pending.deletes || []) {
+    if (d.table_name === 'recipe_cookbook_links') {
+      (deletes.recipe_cookbook_links ||= []).push({ cookbook_id: d.server_id, recipe_id: d.recipe_server_id });
+    } else {
+      (deletes[d.table_name] ||= []).push(d.server_id);
+    }
+  }
+  const deleteIds = (pending.deletes || []).map(d => d.id);
 
-  if (total === 0 && settings.length === 0
+  if (total === 0 && settings.length === 0 && deleteIds.length === 0
       && !tablesToSend.disabled_units && !tablesToSend.recipe_cookbook_links) {
     return { pushed: 0 };
   }
@@ -476,7 +533,9 @@ async function pushChanges() {
   const res = await fetch(apiUrl('/api/sync/push'), {
     method: 'POST',
     headers: _headers(),
-    body: JSON.stringify({ tables: tablesToSend, settings }),
+    // fk_ids: 'server' tells the server the id columns already hold its
+    // own ids, apart from those listed in _local_fks.
+    body: JSON.stringify({ tables: tablesToSend, settings, deletes, fk_ids: 'server' }),
   });
   if (!res.ok) {
     if (res.status === 401) await _handleSyncAuthError();
@@ -521,6 +580,23 @@ async function pushChanges() {
   }
   if (settings.length) {
     await dbMarkSettingsSynced(settings.map(s => ({ key: s.key, updated_at: s.updated_at })));
+  }
+  // Links that went up: synced once the cookbook and the recipe both
+  // have a server id (a parent that failed to go in keeps it pending).
+  // Same sort_order as sent, so a reorder made meanwhile goes up next.
+  for (const l of pending.recipe_cookbook_links || []) {
+    await db.run(
+      `UPDATE recipe_cookbook_links SET sync_status = 'synced'
+        WHERE cookbook_id = ? AND recipe_id = ? AND sort_order IS ?
+          AND EXISTS (SELECT 1 FROM cookbooks WHERE id = ? AND server_id IS NOT NULL)
+          AND EXISTS (SELECT 1 FROM recipes WHERE id = ? AND server_id IS NOT NULL)`,
+      [l.cookbook_id, l.recipe_id, l.sort_order, l.cookbook_id, l.recipe_id]
+    );
+  }
+  // Deletes the server took. An older server doesn't answer `deleted`;
+  // they wait for it to update.
+  if (deleteIds.length && body.deleted) {
+    await db.run(`DELETE FROM sync_deletes WHERE id IN (${deleteIds.map(() => '?').join(',')})`, deleteIds);
   }
   return { pushed: total };
 }

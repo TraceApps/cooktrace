@@ -37,6 +37,7 @@ import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { isEmptyForGuard } from '../lib/recipe-guards.js';
 import { autoShareNewRecipe } from '../lib/auto-share.js';
 import { dispatchWebhookEvent } from '../lib/webhooks.js';
+import { mapSmartFilterCategory } from '../lib/smart-cookbook.js';
 
 // Option E guard (2026-08-11): the recipe UPDATE path replaces nested
 // JSON fields (ingredients/steps/tags/tools/nutrition) wholesale. A
@@ -147,7 +148,7 @@ const TABLES = {
   },
   recipe_comments: {
     cols: ['recipe_id', 'parent_id', 'body'],
-    parents: { recipe_id: 'recipes' },
+    parents: { recipe_id: 'recipes', parent_id: 'recipe_comments' },
     softDelete: true,
   },
   ai_chat_history: {
@@ -156,6 +157,9 @@ const TABLES = {
     softDelete: false,
   },
 };
+
+// Tables a device deletes rows from outright (no deleted_at column).
+const DELETABLE = ['recipe_categories', 'pantry_categories', 'custom_units', 'ai_chat_history'];
 
 // Process tables in dependency order so parents land first within a
 // single push and child FKs can resolve against the freshly-minted ids.
@@ -170,6 +174,10 @@ const PUSH_ORDER = [
 router.post('/push', wrap((req, res) => {
   const u = uid(req);
   const tables = req.body?.tables || {};
+  // Apps that send fk_ids: 'server' put the server's own ids in id
+  // columns, apart from those listed in a row's _local_fks. Older apps
+  // send the phone's ids.
+  const serverIds = req.body?.fk_ids === 'server';
 
   const idMaps = {};       // tableName → { client_id: server_id }
   const results = {};
@@ -184,6 +192,8 @@ router.post('/push', wrap((req, res) => {
     const spec = TABLES[name];
     const rows = tables[name];
     idMaps[name] = idMaps[name] || {};
+    // A table that fails rolls back, and so do the ids it handed out.
+    const idsBefore = { ...idMaps[name] };
     results[name] = [];
 
     const insertSql = _buildInsertSql(name, spec);
@@ -193,7 +203,9 @@ router.post('/push', wrap((req, res) => {
 
     const txn = db.transaction(() => {
       for (const row of rows) {
-        const translated = _translateParents(row, spec, idMaps);
+        const translated = _translateParents(row, spec, idMaps, u, serverIds);
+        if (!translated) continue; // its parent didn't go in; the app sends it again next sync
+        if (name === 'cookbooks') _translateFilterCategory(translated, idMaps, serverIds);
         let values = spec.cols.map(c => _coerce(translated[c]));
         const val = (col) => values[spec.cols.indexOf(col)];
         const deleted = spec.softDelete && translated.deleted_at != null;
@@ -209,10 +221,12 @@ router.post('/push', wrap((req, res) => {
           if (name === 'recipes') {
             values = _guardRecipeValuesForUpdate(values, spec, existing);
           }
+          // deleted_at only on tables that have one (categories and
+          // units don't), or the statement has one value too many.
           db.prepare(updateSql).run(
             ...values,
             translated.updated_at || _now(),
-            spec.softDelete ? (translated.deleted_at ?? null) : null,
+            ...(spec.softDelete ? [translated.deleted_at ?? null] : []),
             row.server_id
           );
           results[name].push({ client_id: row.client_id, server_id: row.server_id });
@@ -234,7 +248,7 @@ router.post('/push', wrap((req, res) => {
             u,
             ...values,
             translated.updated_at || _now(),
-            spec.softDelete ? (translated.deleted_at ?? null) : null
+            ...(spec.softDelete ? [translated.deleted_at ?? null] : [])
           );
           const serverId = info.lastInsertRowid;
           results[name].push({ client_id: row.client_id, server_id: serverId });
@@ -259,7 +273,7 @@ router.post('/push', wrap((req, res) => {
       webhookEvents.push(...tableEvents);
       if (tableNewlyChecked) shoppingNewlyChecked = true;
     }
-    catch (e) { results[name] = { error: e.message || 'push failed' }; }
+    catch (e) { results[name] = { error: e.message || 'push failed' }; idMaps[name] = idsBefore; }
   }
 
   // ── disabled_units: replace-by-set ────────────────────────────────
@@ -278,13 +292,47 @@ router.post('/push', wrap((req, res) => {
     try { txn(); } catch {}
   }
 
+  // ── Deletes from the device ─────────────────────────────────────────
+  // Rows the device removed outright, by server id: categories, units
+  // and chat (no deleted_at), and links taken out of a cookbook (the
+  // link push only adds). Applied before the links below, so a link
+  // taken out and put back in on the phone ends up in. Same effect as
+  // the REST deletes: a
+  // category's recipes and pantry items keep going, without it.
+  const deletes = req.body?.deletes;
+  const deleted = {};
+  if (serverIds && deletes && typeof deletes === 'object') {
+    const ids = v => (Array.isArray(v) ? v : []).map(n => parseInt(n, 10)).filter(Number.isFinite);
+    const txn = db.transaction(() => {
+      for (const t of DELETABLE) {
+        const list = ids(deletes[t]);
+        const del = db.prepare(`DELETE FROM ${t} WHERE id = ? AND ${userClause(u)}`);
+        for (const id of list) del.run(id, ...userArgs(u));
+        if (list.length) deleted[t] = list.length;
+      }
+      const links = Array.isArray(deletes.recipe_cookbook_links) ? deletes.recipe_cookbook_links : [];
+      const own = db.prepare(`SELECT 1 FROM cookbooks WHERE id = ? AND ${userClause(u)}`);
+      const del = db.prepare(`DELETE FROM recipe_cookbook_links WHERE cookbook_id = ? AND recipe_id = ?`);
+      for (const l of links) {
+        const cb = parseInt(l?.cookbook_id, 10), r = parseInt(l?.recipe_id, 10);
+        if (Number.isFinite(cb) && Number.isFinite(r) && own.get(cb, ...userArgs(u))) del.run(cb, r);
+      }
+      if (links.length) deleted.recipe_cookbook_links = links.length;
+    });
+    // Kept by the device until the server answers `deleted`.
+    try { txn(); } catch (e) { for (const k of Object.keys(deleted)) delete deleted[k]; console.warn('[sync] deletes failed:', e?.message); }
+  }
+
   // ── recipe_cookbook_links: translate FKs, replace per cookbook ────
   if (Array.isArray(tables.recipe_cookbook_links)) {
-    const translated = tables.recipe_cookbook_links.map(r => ({
-      cookbook_id: idMaps.cookbooks?.[r.cookbook_id] || r.cookbook_id,
-      recipe_id:   idMaps.recipes?.[r.recipe_id]   || r.recipe_id,
-      sort_order:  r.sort_order ?? 0,
-    })).filter(r => r.cookbook_id && r.recipe_id);
+    // Same rules as the rows above: ids are mapped, and a link only goes
+    // into this account's own cookbook, to a recipe it may add there
+    // (its own, or one shared with it, as POST /api/cookbooks/:id/recipes).
+    const linkSpec = { parents: { cookbook_id: 'cookbooks', recipe_id: 'recipes' } };
+    const translated = tables.recipe_cookbook_links
+      .map(r => _translateParents({ ...r }, linkSpec, idMaps, u, serverIds, { recipes: _recipeLinkable, cookbooks: _ownsRow }))
+      .filter(r => r && r.cookbook_id && r.recipe_id)
+      .map(r => ({ cookbook_id: r.cookbook_id, recipe_id: r.recipe_id, sort_order: r.sort_order ?? 0 }));
     // Option E guard (2026-08-11): additive-only. Prior behavior
     // DELETE-then-INSERTed all links for every cookbook in the
     // payload, so a stale client whose local cache had fewer links
@@ -294,8 +342,12 @@ router.post('/push', wrap((req, res) => {
     // sync push only adds. Insertion order per link is preserved via
     // sort_order on the row.
     const txn = db.transaction(() => {
-      const ins = db.prepare(
-        `INSERT OR IGNORE INTO recipe_cookbook_links (cookbook_id, recipe_id, sort_order) VALUES (?, ?, ?)`
+      // A link already there takes the device's order: devices that send
+      // fk_ids send only links added or reordered on them.
+      const ins = db.prepare(serverIds
+        ? `INSERT INTO recipe_cookbook_links (cookbook_id, recipe_id, sort_order) VALUES (?, ?, ?)
+           ON CONFLICT(cookbook_id, recipe_id) DO UPDATE SET sort_order = excluded.sort_order`
+        : `INSERT OR IGNORE INTO recipe_cookbook_links (cookbook_id, recipe_id, sort_order) VALUES (?, ?, ?)`
       );
       for (const r of translated) ins.run(r.cookbook_id, r.recipe_id, r.sort_order);
     });
@@ -319,7 +371,7 @@ router.post('/push', wrap((req, res) => {
     try { txn(); } catch {}
   }
 
-  res.json({ tables: results });
+  res.json({ tables: results, deleted });
 
   try {
     for (const [event, data] of webhookEvents) dispatchWebhookEvent(u, event, data);
@@ -357,7 +409,11 @@ function _mealCookedEvent(val) {
 router.get('/pull', wrap((req, res) => {
   const u = uid(req);
   const since = (typeof req.query.since === 'string' && req.query.since) || '1970-01-01T00:00:00';
-  const now = _now();
+  // Server time, taken before the queries, so a write racing this pull
+  // is picked up by the next one (>= below makes an overlap harmless:
+  // pulls are upserts). Rows are picked by synced_at, the server's
+  // time of the write, not updated_at, the device's time of the edit.
+  const now = new Date().toISOString().replace('T', ' ').replace('Z', '');
 
   const out = {};
   for (const [name, spec] of Object.entries(TABLES)) {
@@ -382,7 +438,7 @@ router.get('/pull', wrap((req, res) => {
     const orderBy = selfRef ? ` ORDER BY ${selfRef[0]} ASC, id ASC` : '';
     out[name] = db.prepare(
       `SELECT ${cols.join(', ')} FROM ${name}
-        WHERE ${userClause(u)} AND updated_at > ?${orderBy}`
+        WHERE ${userClause(u)} AND synced_at >= ?${orderBy}`
     ).all(...userArgs(u), since);
   }
 
@@ -397,10 +453,22 @@ router.get('/pull', wrap((req, res) => {
       WHERE ${userClause(u).replace(/user_id/g, 'c.user_id')}`
   ).all(...userArgs(u));
 
+  // Rows deleted outright since the last pull, for the device to drop.
+  out.deletions = {};
+  // Ids never come back in normal use (AUTOINCREMENT); one that exists
+  // again was put back by a restore, so it isn't gone.
+  for (const r of db.prepare(
+    `SELECT table_name, row_id FROM sync_deletions WHERE ${userClause(u)} AND synced_at >= ?`
+  ).all(...userArgs(u), since)) {
+    if (!DELETABLE.includes(r.table_name)) continue;
+    if (db.prepare(`SELECT 1 FROM ${r.table_name} WHERE id = ?`).get(r.row_id)) continue;
+    (out.deletions[r.table_name] ||= []).push(r.row_id);
+  }
+
   // Settings: only the keys that changed since the last pull.
   out.settings = db.prepare(
     `SELECT key, value, updated_at FROM user_settings
-      WHERE ${userClause(u)} AND updated_at > ?`
+      WHERE ${userClause(u)} AND synced_at >= ?`
   ).all(...userArgs(u), since);
 
   res.json({ now, tables: out });
@@ -416,20 +484,54 @@ function _coerce(v) {
   return v;
 }
 
-function _translateParents(row, spec, idMaps) {
+// Whether account u may point a row at this parent.
+function _ownsRow(table, id, u) {
+  const p = db.prepare(`SELECT user_id FROM ${table} WHERE id = ?`).get(id);
+  return !!p && ((u == null && p.user_id == null) || (u != null && p.user_id === u));
+}
+// A recipe: its own, or one shared with it (comments, cooked entries and
+// shopping items can be about a shared recipe).
+function _recipeLinkable(table, id, u) {
+  if (_ownsRow(table, id, u)) return true;
+  return u != null && !!db.prepare(
+    `SELECT 1 FROM recipe_shares WHERE recipe_id = ? AND grantee_id = ?`
+  ).get(id, u);
+}
+const PARENT_CHECKS = { recipes: _recipeLinkable };
+
+// Id columns in a pushed row, as the server's ids. A parent created in
+// the same push is mapped from the app's id. Any other id must be a row
+// this account may point at, or it's dropped: an id from the phone's own
+// numbering (older apps) or another account's row never links across.
+// Returns null when a parent created in this push didn't go in, so the
+// row waits for the next sync.
+function _translateParents(row, spec, idMaps, u, serverIds, checks = PARENT_CHECKS) {
   if (!spec.parents) return row;
   const out = { ...row };
+  const local = new Set(Array.isArray(row._local_fks) ? row._local_fks : []);
   for (const [fk, parentTable] of Object.entries(spec.parents)) {
     const raw = out[fk];
     if (raw == null) continue;
-    const map = idMaps[parentTable];
-    if (map && map[raw]) out[fk] = map[raw];
-    // else: leave as-is. If the FK matches an existing server row it'll
-    // resolve; otherwise the column either accepts NULL via ON DELETE
-    // SET NULL semantics or surfaces a constraint error the client
-    // retries on next sync.
+    const mapped = idMaps[parentTable]?.[raw];
+    if (local.has(fk)) {
+      if (!mapped) return null;
+      out[fk] = mapped;
+      continue;
+    }
+    // Older apps: a parent from this same push is still found by its
+    // app id, as before.
+    if (!serverIds && mapped) { out[fk] = mapped; continue; }
+    const ok = (checks[parentTable] || _ownsRow)(parentTable, raw, u);
+    if (!ok) out[fk] = null;
   }
   return out;
+}
+
+// A smart cookbook's category, sent as the app's id when the category
+// went up in this same push.
+function _translateFilterCategory(row, idMaps, serverIds) {
+  if (!row._local_filter_category && serverIds) return;
+  row.smart_filter_json = mapSmartFilterCategory(row.smart_filter_json, id => idMaps.recipe_categories?.[id]);
 }
 
 function _buildInsertSql(table, spec) {

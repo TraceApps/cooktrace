@@ -16,7 +16,7 @@
 
 import { getDb, LOCAL_USER_ID } from './db-native.js';
 import { resolveAssetUrl } from './platform.js';
-import { matchesSmartFilter } from './smart-cookbook.js';
+import { cleanSmartFilter, matchesSmartFilter } from './smart-cookbook.js';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
 // ── Small utilities ──────────────────────────────────────────────────
@@ -176,6 +176,16 @@ function _cookbookFromRow(row) {
   out.smart_filter = _parseJson(out.smart_filter_json, null);
   out.coverImageUrl = resolveAssetUrl(out.cover_image_url) || '';
   return out;
+}
+
+// Note a row deleted outright here so the next sync deletes it on the
+// server too. Only rows the server has (a server_id); one made here and
+// never synced just goes.
+async function _noteDelete(table, id) {
+  const r = (await _query(`SELECT server_id FROM ${table} WHERE id = ?`, [id]))[0];
+  if (r?.server_id) {
+    await _run(`INSERT INTO sync_deletes (table_name, server_id) VALUES (?, ?)`, [table, r.server_id]);
+  }
 }
 
 // A smart cookbook's recipes, newest first, by the same rules as the
@@ -1201,6 +1211,7 @@ export const CtApiNative = {
     return (await _query(`SELECT * FROM recipe_categories WHERE id = ?`, [id]))[0];
   },
   async deleteRecipeCategory(id) {
+    await _noteDelete('recipe_categories', id);
     await _run(`UPDATE recipes SET category_id = NULL WHERE category_id = ?`, [id]);
     await _run(`DELETE FROM recipe_categories WHERE id = ?`, [id]);
     return { ok: true };
@@ -1261,6 +1272,7 @@ export const CtApiNative = {
     return (await _query(`SELECT * FROM pantry_categories WHERE id = ?`, [id]))[0];
   },
   async deletePantryCategory(id) {
+    await _noteDelete('pantry_categories', id);
     await _run(`UPDATE pantry_items SET category_id = NULL WHERE category_id = ?`, [id]);
     await _run(`DELETE FROM pantry_categories WHERE id = ?`, [id]);
     return { ok: true };
@@ -1323,6 +1335,7 @@ export const CtApiNative = {
     return (await _query(`SELECT * FROM custom_units WHERE id = ?`, [id]))[0];
   },
   async deleteCustomUnit(id) {
+    await _noteDelete('custom_units', id);
     await _run(`DELETE FROM custom_units WHERE id = ?`, [id]);
     return { ok: true };
   },
@@ -1375,7 +1388,9 @@ export const CtApiNative = {
     const id = await _runInsert(
       `INSERT INTO cookbooks (user_id, name, slug, description, cover_image_url, is_smart, smart_filter_json, sort_order, sync_status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-      [LOCAL_USER_ID, d.name, slug, d.description || null, d.cover_image_url || null, _bool(d.is_smart), _stringify(d.smart_filter), max + 1]
+      // The filter is kept as the server keeps it (smart-cookbook.js).
+      [LOCAL_USER_ID, d.name, slug, d.description || null, d.cover_image_url || null, _bool(d.is_smart),
+       d.is_smart && d.smart_filter && typeof d.smart_filter === 'object' ? JSON.stringify(cleanSmartFilter(d.smart_filter)) : null, max + 1]
     );
     const cb = _cookbookFromRow((await _query(`SELECT * FROM cookbooks WHERE id = ?`, [id]))[0]);
     cb.recipe_count = await _cookbookCount(cb);
@@ -1392,7 +1407,7 @@ export const CtApiNative = {
     const cover = d.cover_image_url !== undefined ? (d.cover_image_url || null) : existing.cover_image_url;
     const isSmart = d.is_smart !== undefined ? _bool(d.is_smart) : existing.is_smart;
     let filterJson = existing.smart_filter_json;
-    if (isSmart && d.smart_filter && typeof d.smart_filter === 'object') filterJson = _stringify(d.smart_filter);
+    if (isSmart && d.smart_filter && typeof d.smart_filter === 'object') filterJson = JSON.stringify(cleanSmartFilter(d.smart_filter));
     if (!isSmart) filterJson = null;
     await _run(
       `UPDATE cookbooks SET name = ?, description = ?, cover_image_url = ?, is_smart = ?, smart_filter_json = ?, updated_at = datetime('now'), sync_status = 'pending' WHERE id = ?`,
@@ -1417,10 +1432,27 @@ export const CtApiNative = {
         [id, recipeIds[i], max + 1 + i]
       );
       if ((r?.changes?.changes ?? r?.changes ?? 0) > 0) added++;
+      // Put back before the removal went up: the removal is off.
+      await _run(
+        `DELETE FROM sync_deletes WHERE table_name = 'recipe_cookbook_links'
+            AND server_id = (SELECT server_id FROM cookbooks WHERE id = ?)
+            AND recipe_server_id = (SELECT server_id FROM recipes WHERE id = ?)`,
+        [id, recipeIds[i]]
+      );
     }
     return { ok: true, added };
   },
   async removeRecipeFromCookbook(id, recipeId) {
+    // The server only hears of a removal through sync_deletes; a link
+    // push only adds.
+    const cb = (await _query(`SELECT server_id FROM cookbooks WHERE id = ?`, [id]))[0];
+    const r = (await _query(`SELECT server_id FROM recipes WHERE id = ?`, [recipeId]))[0];
+    if (cb?.server_id && r?.server_id) {
+      await _run(
+        `INSERT INTO sync_deletes (table_name, server_id, recipe_server_id) VALUES ('recipe_cookbook_links', ?, ?)`,
+        [cb.server_id, r.server_id]
+      );
+    }
     await _run(`DELETE FROM recipe_cookbook_links WHERE cookbook_id = ? AND recipe_id = ?`, [id, recipeId]);
     return { ok: true };
   },
@@ -1436,7 +1468,7 @@ export const CtApiNative = {
   async reorderCookbookRecipes(id, recipeIds) {
     for (let i = 0; i < recipeIds.length; i++) {
       await _run(
-        `UPDATE recipe_cookbook_links SET sort_order = ? WHERE cookbook_id = ? AND recipe_id = ?`,
+        `UPDATE recipe_cookbook_links SET sort_order = ?, sync_status = 'pending' WHERE cookbook_id = ? AND recipe_id = ?`,
         [i, id, recipeIds[i]]
       );
     }
@@ -1516,6 +1548,11 @@ export const CtApiNative = {
     return { ok: true };
   },
   async clearAiChat() {
+    await _run(
+      `INSERT INTO sync_deletes (table_name, server_id)
+       SELECT 'ai_chat_history', server_id FROM ai_chat_history WHERE user_id = ? AND server_id IS NOT NULL`,
+      [LOCAL_USER_ID]
+    );
     await _run(`DELETE FROM ai_chat_history WHERE user_id = ?`, [LOCAL_USER_ID]);
     return { ok: true };
   },

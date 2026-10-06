@@ -25,6 +25,8 @@ export const CLAIM_NULL = [
   'recipes', 'pantry_items', 'cook_diary', 'shopping_list',
   'recipe_categories', 'pantry_categories', 'custom_units',
   'disabled_units', 'cookbooks', 'ai_chat_history', 'notification_log',
+  // Deletes waiting for devices to pull: they follow the rows they removed.
+  'sync_deletions',
 ];
 
 const ORPHAN_EXTRA_COUNTS = [];

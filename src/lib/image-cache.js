@@ -213,7 +213,7 @@ export async function cacheAllImages(onProgress) {
 
   // Cookbooks — cover images.
   try {
-    const cookbooks = await fetch(`${serverUrl}/api/recipes/cookbooks`, { headers }).then(r => r.json());
+    const cookbooks = await fetch(`${serverUrl}/api/cookbooks`, { headers }).then(r => r.json());
     if (Array.isArray(cookbooks)) for (const c of cookbooks) addUrl(c.cover_image_url);
   } catch {}
 
