@@ -37,9 +37,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Smart cookbooks show how many recipes they hold** ([#76](https://github.com/TraceApps/cooktrace/issues/76), thanks @herver1971). The cookbooks list, shared cookbooks and the Android app said "0 recipes" for every smart cookbook, and a plain cookbook still counted recipes you had deleted.
 - **Smart cookbooks open with their recipes in the Android app** ([#76](https://github.com/TraceApps/cooktrace/issues/76)). They opened empty, and renaming one there turned it into an empty plain cookbook.
 - **Changing a cookbook's cover in the Android app works.** It failed with an error.
+- **The Android app syncs what it creates, edits and deletes.** A recipe or pantry item could land in the wrong category on the server, and recipe categories, pantry categories, custom units and Trace chat made on the phone never reached it.
+- **An edit made offline reaches your other devices.** One that synced after another device's last sync was skipped there; after this update every device catches up once.
+- **Deletes sync both ways in the Android app**: categories, custom units and Trace chat, and recipes taken out of a cookbook. A recipe added to an existing cookbook on the phone no longer drops off at the next sync.
+- **Smart cookbooks filtered by category show the right recipes on the phone and the server**, whichever one they were made on.
+- **Cookbook covers are kept for offline use in the Android app.**
+- **The Recipes, Shared and Cookbooks switch highlights the tab you're on.** It could sit off to one side until the page was resized.
 
 ### Security
 
+- **The Android app can no longer link your data to another account's.** A synced recipe, pantry item, shopping item or cookbook link could point at a category, item, recipe or cookbook belonging to someone else on the server, including adding your recipes to their cookbooks. The server now accepts a link only to something the account owns or was shared.
 - **The image proxy passes images only.** For its image hosts it passed through whatever came back from the app's own address, a web page included, before sign-in. Anything that isn't an image is refused now, and images can't act as a page.
 - **The recipe share card can't run script or leak a private recipe.** A quote in a recipe's image link ran script as the app when the card was opened, a private recipe's card could be kept by a shared cache, a recipe with no owner gave its card to anyone signed in, and its picture took its address from the request. The card now escapes what it shows, isn't cached, blocks script, and follows the recipe's own sharing: a recipe shared with you shows its card too.
 - **A password reset link can no longer be pointed at someone else's site.** The link took its address from the request, so anyone could ask for another person's reset with a forged host and have the real email, token included, send them to it. Reset, invite and recipe sharing emails now link to `PUBLIC_URL` when it's set, or to an address an admin uses. Links also keep the `BASE_URL` subpath now.

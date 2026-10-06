@@ -623,8 +623,24 @@
   $: if (viewMode || sharedRecipes.length || cookbooks.length || recipes.length) {
     if (typeof window !== 'undefined') tick().then(_measureVtPill);
   }
-  if (typeof window !== 'undefined') {
-    window.addEventListener('resize', () => tick().then(_measureVtPill));
+  // The buttons change width after that first measure: the icon font
+  // loads (until then an icon is its name, "auto_stories", in text) and
+  // the counts arrive. Measure again whenever a button resizes, so the
+  // pill sits on the active button rather than where it was.
+  let vtResize = null;
+  onMount(() => {
+    const remeasure = () => tick().then(_measureVtPill);
+    window.addEventListener('resize', remeasure);
+    if (typeof ResizeObserver !== 'undefined') vtResize = new ResizeObserver(() => _measureVtPill());
+    document.fonts?.ready?.then(remeasure);
+    return () => {
+      window.removeEventListener('resize', remeasure);
+      vtResize?.disconnect();
+      vtResize = null;
+    };
+  });
+  $: if (vtResize) {
+    for (const el of [vtContainer, vtBtnRecipes, vtBtnShared, vtBtnCookbooks]) if (el) vtResize.observe(el);
   }
 
   // Category filter — driven by a clickable chip row OR a `?category=<slug>`

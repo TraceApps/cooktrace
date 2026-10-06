@@ -19,6 +19,7 @@
 
 import { CapacitorSQLite, SQLiteConnection } from '@capacitor-community/sqlite';
 import { isNative } from './platform.js';
+import { mapSmartFilterCategory } from './smart-cookbook.js';
 
 export const LOCAL_USER_ID = 1;
 const DB_NAME = 'cooktrace_local';
@@ -293,6 +294,15 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_chat_user ON ai_chat_history(user_id, created_at);
 
   -- Sync infrastructure tables — not mirrored on the server side.
+  -- Rows deleted outright on this device that the server still has, by
+  -- server id, sent with the next push. A cookbook link carries both ids.
+  CREATE TABLE IF NOT EXISTS sync_deletes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    table_name TEXT NOT NULL,
+    server_id  INTEGER NOT NULL,
+    recipe_server_id INTEGER
+  );
+
   CREATE TABLE IF NOT EXISTS sync_meta (
     key   TEXT PRIMARY KEY,
     value TEXT
@@ -602,6 +612,29 @@ const SYNC_TABLES = [
   'ai_chat_history',
 ];
 
+/** Which local row each synced id column points at, per table. Mirrors
+ *  TABLES[...].parents in server/routes/sync.js. Ids differ between the
+ *  phone and the server, so these columns are translated both ways: on
+ *  pull (server id to local id) and on push (local id to server id). */
+// Unique per account, so one made on two devices is one row.
+const NATURAL_KEYS = { recipe_categories: 'slug', pantry_categories: 'slug', cookbooks: 'slug', custom_units: 'abbr' };
+// Timestamps from either side, comparable as text.
+const _ts = v => String(v || '').replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
+
+export const SYNC_DELETABLE = ['recipe_categories', 'pantry_categories', 'custom_units', 'ai_chat_history'];
+
+export const SYNC_PARENTS = {
+  recipes: { category_id: 'recipe_categories' },
+  pantry_items: {
+    category_id: 'pantry_categories',
+    generic_parent_id: 'pantry_items',
+    nutrition_source_variant_id: 'pantry_items',
+  },
+  cook_diary: { recipe_id: 'recipes' },
+  shopping_list: { pantry_id: 'pantry_items', recipe_id: 'recipes' },
+  recipe_comments: { recipe_id: 'recipes', parent_id: 'recipe_comments' },
+};
+
 /** All rows with sync_status='pending' grouped by table. */
 export async function dbGetPendingChanges() {
   if (!isNative) return {};
@@ -620,9 +653,12 @@ export async function dbGetPendingChanges() {
     [LOCAL_USER_ID]
   );
   out.disabled_units = dis?.values || [];
-  // recipe_cookbook_links: composite key. Push the full set; cheap.
-  const links = await db.query(`SELECT cookbook_id, recipe_id, sort_order FROM recipe_cookbook_links`, []);
+  // recipe_cookbook_links: the links added or reordered here since the
+  // last push. The server keeps the rest.
+  const links = await db.query(`SELECT cookbook_id, recipe_id, sort_order FROM recipe_cookbook_links WHERE sync_status = 'pending'`, []);
   out.recipe_cookbook_links = links?.values || [];
+  const dels = await db.query(`SELECT * FROM sync_deletes ORDER BY id`, []);
+  out.deletes = dels?.values || [];
   return out;
 }
 
@@ -679,19 +715,6 @@ export async function dbSetServerId(table, clientId, serverId, snapshotUpdatedAt
 export async function dbApplyPull(payload) {
   if (!isNative || !payload?.tables) return;
   const db = await getDb();
-  const parents = {
-    category_id: ['recipe_categories', 'pantry_categories'],
-    recipe_id: ['recipes'],
-    pantry_id: ['pantry_items'],
-    cookbook_id: ['cookbooks'],
-    parent_id: ['recipe_comments'],
-    // Variant feature (Issue #4). Both FKs point back at pantry_items;
-    // translate server ids to local ids on pull so a parent or
-    // nutrition-source variant referenced before its own row arrives
-    // resolves correctly across the same pull payload.
-    generic_parent_id: ['pantry_items'],
-    nutrition_source_variant_id: ['pantry_items'],
-  };
 
   // Build a per-table { server_id → local_id } map by scanning the
   // local server_id column once. Re-scanned per pull so it picks up
@@ -703,13 +726,10 @@ export async function dbApplyPull(payload) {
     return m;
   }
 
-  async function translateFK(value, candidates) {
+  async function translateFK(value, table) {
     if (value == null) return null;
-    for (const t of candidates) {
-      const m = await mapFor(t);
-      if (m.has(value)) return m.get(value);
-    }
-    return null;
+    const m = await mapFor(table);
+    return m.has(value) ? m.get(value) : null;
   }
 
   for (const [table, rows] of Object.entries(payload.tables)) {
@@ -717,17 +737,38 @@ export async function dbApplyPull(payload) {
     if (table === 'disabled_units' || table === 'recipe_cookbook_links' || table === 'settings') continue;
 
     for (const row of rows) {
-      const existing = (await db.query(
-        `SELECT id, sync_status FROM ${table} WHERE server_id = ? LIMIT 1`,
+      let existing = (await db.query(
+        `SELECT * FROM ${table} WHERE server_id = ? LIMIT 1`,
         [row.id]
       ))?.values?.[0];
+      // One made here before it synced, with the same name (slug) as one
+      // made elsewhere: they're the same, and inserting a second would
+      // break the unique name and stop every sync. Join them.
+      const key = NATURAL_KEYS[table];
+      if (!existing && key && row[key] != null) {
+        existing = (await db.query(
+          `SELECT * FROM ${table} WHERE user_id = ? AND ${key} = ? AND server_id IS NULL LIMIT 1`,
+          [LOCAL_USER_ID, row[key]]
+        ))?.values?.[0];
+        if (existing) await db.run(`UPDATE ${table} SET server_id = ? WHERE id = ?`, [row.id, existing.id]);
+      }
 
-      // Translate FK columns from server ids to local ids.
+      // Translate FK columns from server ids to local ids, each through
+      // its own parent table (a pantry item's category_id is a pantry
+      // category, never a recipe category). Parents in the same pull
+      // resolve too: parent tables come first, and self-references
+      // (variants, replies) arrive parent first.
+      const parents = SYNC_PARENTS[table] || {};
       const translated = { ...row };
-      for (const [fk, candidates] of Object.entries(parents)) {
+      for (const [fk, parentTable] of Object.entries(parents)) {
         if (fk in translated && translated[fk] != null) {
-          translated[fk] = await translateFK(translated[fk], candidates);
+          translated[fk] = await translateFK(translated[fk], parentTable);
         }
+      }
+      // A smart cookbook's category is an id too.
+      if (table === 'cookbooks' && translated.smart_filter_json) {
+        const cats = await mapFor('recipe_categories');
+        translated.smart_filter_json = mapSmartFilterCategory(translated.smart_filter_json, id => cats.get(id));
       }
 
       // Local pending edits shouldn't be overwritten by the server's
@@ -739,8 +780,12 @@ export async function dbApplyPull(payload) {
       // Milk sits in the pull payload would leave Greenwise stuck at
       // its stale generic_parent_id until the next push cleared the
       // pending flag AND another server-side change bumped updated_at.
+      // Only where the server's copy is newer than the edit waiting here,
+      // or this side has none: every push comes back in the next pull, and
+      // that echo of an earlier push must not undo a newer edit.
       if (existing && existing.sync_status === 'pending') {
-        const fkKeys = Object.keys(parents).filter(k => k in translated);
+        const serverNewer = _ts(translated.updated_at) > _ts(existing.updated_at);
+        const fkKeys = Object.keys(parents).filter(k => k in translated && (serverNewer || existing[k] == null));
         if (fkKeys.length) {
           const setClause = fkKeys.map(k => `${k} = ?`).join(', ');
           const setValues = fkKeys.map(k => translated[k]);
@@ -777,6 +822,22 @@ export async function dbApplyPull(payload) {
     }
   }
 
+  // Rows the server deleted outright: drop them here too, like the REST
+  // deletes do (a category's recipes and pantry items stay, without it).
+  const gone = payload.tables.deletions;
+  if (gone && typeof gone === 'object') {
+    const children = { recipe_categories: 'recipes', pantry_categories: 'pantry_items' };
+    for (const [table, ids] of Object.entries(gone)) {
+      if (!SYNC_DELETABLE.includes(table) || !Array.isArray(ids)) continue;
+      for (const sid of ids) {
+        const local = (await db.query(`SELECT id FROM ${table} WHERE server_id = ?`, [sid]))?.values?.[0];
+        if (!local) continue;
+        if (children[table]) await db.run(`UPDATE ${children[table]} SET category_id = NULL WHERE category_id = ?`, [local.id]);
+        await db.run(`DELETE FROM ${table} WHERE id = ?`, [local.id]);
+      }
+    }
+  }
+
   // disabled_units: replace local set with server set.
   if (Array.isArray(payload.tables.disabled_units)) {
     await db.run(`DELETE FROM disabled_units WHERE user_id = ?`, [LOCAL_USER_ID]);
@@ -789,21 +850,32 @@ export async function dbApplyPull(payload) {
   }
 
   // recipe_cookbook_links: translate FKs server→local, then replace
-  // local set for each cookbook present in the payload.
+  // local set for every cookbook the server has. Its links here become
+  // the server's, apart from links added here that haven't gone up yet
+  // and links taken out here that the server hasn't heard about yet. A
+  // cookbook whose last link went on another device ends up empty.
   if (Array.isArray(payload.tables.recipe_cookbook_links)) {
     const cookbookMap = await mapFor('cookbooks');
     const recipeMap = await mapFor('recipes');
+    const removed = new Set(((await db.query(
+      `SELECT server_id, recipe_server_id FROM sync_deletes WHERE table_name = 'recipe_cookbook_links'`, []
+    ))?.values || []).map(d => `${d.server_id}:${d.recipe_server_id}`));
     const links = payload.tables.recipe_cookbook_links
+      .filter(l => !removed.has(`${l.cookbook_id}:${l.recipe_id}`))
       .map(l => ({
         cookbook_id: cookbookMap.get(l.cookbook_id),
         recipe_id: recipeMap.get(l.recipe_id),
         sort_order: l.sort_order ?? 0,
       }))
       .filter(l => l.cookbook_id && l.recipe_id);
-    const cookbookIds = [...new Set(links.map(l => l.cookbook_id))];
-    if (cookbookIds.length) {
-      const ph = cookbookIds.map(() => '?').join(',');
-      await db.run(`DELETE FROM recipe_cookbook_links WHERE cookbook_id IN (${ph})`, cookbookIds);
+    const known = [...cookbookMap.values()];
+    if (known.length) {
+      const ph = known.map(() => '?').join(',');
+      await db.run(
+        `DELETE FROM recipe_cookbook_links
+          WHERE cookbook_id IN (${ph}) AND COALESCE(sync_status, 'synced') != 'pending'`,
+        known
+      );
     }
     for (const l of links) {
       await db.run(

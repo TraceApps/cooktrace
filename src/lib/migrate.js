@@ -272,6 +272,8 @@ export async function wipeLocalData() {
     'recipes', 'pantry_items', 'cook_diary', 'shopping_list',
     'recipe_categories', 'pantry_categories', 'cookbooks', 'recipe_cookbook_links',
     'recipe_comments', 'custom_units', 'disabled_units',
+    // Deletes noted for the old server must not reach the one pulled next.
+    'sync_deletes',
   ];
   let touched = 0;
   for (const t of tables) {

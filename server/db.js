@@ -853,6 +853,80 @@ db.exec(`
   }
 }
 
+// ── Sync cursor ────────────────────────────────────────────────────────────
+// synced_at is the SERVER's clock time of the last write to a row, stamped
+// by triggers so every write path (REST routes, sync push, restore) is
+// covered. /api/sync/pull filters on it. updated_at can't serve as the
+// pull cursor: a device stamps updated_at when the user edits, which may
+// be long before the edit reaches the server, so an offline edit could
+// land behind another device's last pull and never be sent to it.
+// Rows that predate the column get the time it was added, so every
+// device pulls everything once and picks up edits it missed before.
+{
+  const STAMP = `strftime('%Y-%m-%d %H:%M:%f', 'now')`;
+  for (const t of ['recipe_categories', 'pantry_categories', 'custom_units', 'cookbooks', 'recipes',
+                   'pantry_items', 'cook_diary', 'shopping_list', 'recipe_comments', 'ai_chat_history']) {
+    if (!columnExists(t, 'synced_at')) {
+      db.exec(`ALTER TABLE ${t} ADD COLUMN synced_at TEXT`);
+      db.exec(`UPDATE ${t} SET synced_at = ${STAMP} WHERE synced_at IS NULL`);
+    }
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_${t}_synced ON ${t}(synced_at)`);
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS trg_${t}_synced_ins AFTER INSERT ON ${t}
+      BEGIN UPDATE ${t} SET synced_at = ${STAMP} WHERE id = NEW.id; END;
+      CREATE TRIGGER IF NOT EXISTS trg_${t}_synced_upd AFTER UPDATE ON ${t}
+      BEGIN UPDATE ${t} SET synced_at = ${STAMP} WHERE id = NEW.id; END;
+    `);
+  }
+  if (!columnExists('user_settings', 'synced_at')) {
+    db.exec(`ALTER TABLE user_settings ADD COLUMN synced_at TEXT`);
+    db.exec(`UPDATE user_settings SET synced_at = ${STAMP} WHERE synced_at IS NULL`);
+  }
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS trg_user_settings_synced_ins AFTER INSERT ON user_settings
+    BEGIN UPDATE user_settings SET synced_at = ${STAMP} WHERE user_id IS NEW.user_id AND key = NEW.key; END;
+    CREATE TRIGGER IF NOT EXISTS trg_user_settings_synced_upd AFTER UPDATE ON user_settings
+    BEGIN UPDATE user_settings SET synced_at = ${STAMP} WHERE user_id IS NEW.user_id AND key = NEW.key; END;
+  `);
+  // Tables without a deleted_at column lose rows outright. Each delete
+  // is noted here so /api/sync/pull can tell devices to drop the row too.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sync_deletions (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      table_name TEXT NOT NULL,
+      row_id     INTEGER NOT NULL,
+      synced_at  TEXT NOT NULL DEFAULT (${STAMP})
+    );
+    CREATE INDEX IF NOT EXISTS idx_sync_deletions_user ON sync_deletions(user_id, synced_at);
+  `);
+  // Only while the account is there: deleting an account removes its
+  // rows too, and there's no device left to tell.
+  for (const t of ['recipe_categories', 'pantry_categories', 'custom_units', 'ai_chat_history']) {
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS trg_${t}_sync_del AFTER DELETE ON ${t}
+      FOR EACH ROW WHEN OLD.user_id IS NULL OR EXISTS (SELECT 1 FROM users WHERE id = OLD.user_id)
+      BEGIN INSERT INTO sync_deletions (user_id, table_name, row_id) VALUES (OLD.user_id, '${t}', OLD.id); END;
+    `);
+  }
+  // A year is far longer than any device stays offline between syncs.
+  db.exec(`DELETE FROM sync_deletions WHERE synced_at < strftime('%Y-%m-%d %H:%M:%f', 'now', '-365 days')`);
+
+  // The chat's updated_at trigger above fires on any update that leaves
+  // updated_at alone, which the stamp itself is; it would overwrite a
+  // device's edit time with the server's. Only a write to the message
+  // itself counts.
+  db.exec(`
+    DROP TRIGGER IF EXISTS trg_ai_chat_history_updated_at_upd;
+    CREATE TRIGGER trg_ai_chat_history_updated_at_upd
+    AFTER UPDATE OF role, content ON ai_chat_history
+    FOR EACH ROW WHEN NEW.updated_at IS OLD.updated_at
+    BEGIN
+      UPDATE ai_chat_history SET updated_at = datetime('now') WHERE id = NEW.id;
+    END;
+  `);
+}
+
 // ── Seed default app_config rows ───────────────────────────────────────────
 {
   const seeds = [

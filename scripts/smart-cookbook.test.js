@@ -80,7 +80,7 @@ test('the server counts what opening the cookbook shows', () => {
 });
 
 test('the Android app opens and counts a smart cookbook by its filter', () => {
-  assert.match(nativeJs, /import \{ matchesSmartFilter \} from '\.\/smart-cookbook\.js'/);
+  assert.match(nativeJs, /import \{[^}]*\bmatchesSmartFilter\b[^}]*\} from '\.\/smart-cookbook\.js'/);
   assert.doesNotMatch(nativeJs, /SELECT COUNT\(\*\) FROM recipe_cookbook_links l WHERE l\.cookbook_id = c\.id/);
   const open = nativeJs.slice(nativeJs.indexOf('async getCookbook(id)'));
   assert.match(open.slice(0, open.indexOf('\n  },')), /out\.is_smart\s*\? await _smartCookbookRecipes\(out\.smart_filter \|\| \{\}\)/);

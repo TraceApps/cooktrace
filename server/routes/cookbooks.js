@@ -22,7 +22,7 @@ import {
   buildStockSet,
   buildCategoryMap,
 } from '../lib/recipe-hydrate.js';
-import { matchesSmartFilter, parseSmartFilter } from '../lib/smart-cookbook.js';
+import { cleanSmartFilter, matchesSmartFilter, parseSmartFilter } from '../lib/smart-cookbook.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -324,14 +324,7 @@ router.post('/', wrap((req, res) => {
   // we store stays clean across schema iterations.
   let smart_filter_json = null;
   if (is_smart && req.body?.smart_filter && typeof req.body.smart_filter === 'object') {
-    const f = req.body.smart_filter;
-    const clean = {};
-    if (Number.isFinite(parseInt(f.category_id, 10))) clean.category_id = parseInt(f.category_id, 10);
-    if (Array.isArray(f.tags)) clean.tags = f.tags.map(s => String(s).trim()).filter(Boolean);
-    if (f.favorites_only === true) clean.favorites_only = true;
-    if (Number.isFinite(parseInt(f.min_rating, 10))) clean.min_rating = parseInt(f.min_rating, 10);
-    if (Number.isFinite(parseInt(f.max_total_minutes, 10))) clean.max_total_minutes = parseInt(f.max_total_minutes, 10);
-    smart_filter_json = JSON.stringify(clean);
+    smart_filter_json = JSON.stringify(cleanSmartFilter(req.body.smart_filter));
   }
   let slug = _slugify(name);
   let n = 2;
@@ -381,14 +374,7 @@ router.put('/:id', wrap((req, res) => {
   let nextFilterJson = existing.smart_filter_json;
   if (req.body?.is_smart !== undefined) nextIsSmart = req.body.is_smart ? 1 : 0;
   if (nextIsSmart && req.body?.smart_filter && typeof req.body.smart_filter === 'object') {
-    const f = req.body.smart_filter;
-    const clean = {};
-    if (Number.isFinite(parseInt(f.category_id, 10))) clean.category_id = parseInt(f.category_id, 10);
-    if (Array.isArray(f.tags)) clean.tags = f.tags.map(s => String(s).trim()).filter(Boolean);
-    if (f.favorites_only === true) clean.favorites_only = true;
-    if (Number.isFinite(parseInt(f.min_rating, 10))) clean.min_rating = parseInt(f.min_rating, 10);
-    if (Number.isFinite(parseInt(f.max_total_minutes, 10))) clean.max_total_minutes = parseInt(f.max_total_minutes, 10);
-    nextFilterJson = JSON.stringify(clean);
+    nextFilterJson = JSON.stringify(cleanSmartFilter(req.body.smart_filter));
   }
   if (!nextIsSmart) nextFilterJson = null;
 
