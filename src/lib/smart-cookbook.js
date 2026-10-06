@@ -1,0 +1,50 @@
+/**
+ * Which recipes a smart cookbook holds, from its saved filter.
+ *
+ * Identical copies live at server/lib/smart-cookbook.js (the server) and
+ * src/lib/smart-cookbook.js (the Android app's own database), so a smart
+ * cookbook holds the same recipes on both. scripts/smart-cookbook.test.js
+ * keeps the two the same.
+ *
+ * Supported criteria, every one that is set must match:
+ *   { category_id, tags: [], favorites_only, min_rating, max_total_minutes }
+ * Tags match without regard to case, and a recipe needs every listed tag.
+ */
+
+/** The saved filter from a cookbook row, or null when it has none. */
+export function parseSmartFilter(json) {
+  if (json == null || json === '') return null;
+  if (typeof json === 'object') return json;
+  try { return JSON.parse(json); } catch { return null; }
+}
+
+function _tagsOf(raw) {
+  let arr = raw;
+  if (typeof raw === 'string') {
+    try { arr = JSON.parse(raw || '[]'); } catch { arr = []; }
+  }
+  return new Set((Array.isArray(arr) ? arr : []).map(t => String(t).toLowerCase()));
+}
+
+/** True when a recipe row (not deleted) matches the filter. */
+export function matchesSmartFilter(recipe, filter) {
+  if (!recipe || !filter || typeof filter !== 'object') return false;
+  if (recipe.deleted_at != null) return false;
+  if (Number.isFinite(filter.category_id)) {
+    if (recipe.category_id == null || Number(recipe.category_id) !== filter.category_id) return false;
+  }
+  if (filter.favorites_only && Number(recipe.favorite) !== 1) return false;
+  if (Number.isFinite(filter.min_rating)) {
+    if (recipe.rating == null || !(Number(recipe.rating) >= filter.min_rating)) return false;
+  }
+  if (Number.isFinite(filter.max_total_minutes)) {
+    const total = (Number(recipe.prep_minutes) || 0) + (Number(recipe.cook_minutes) || 0);
+    if (!(total <= filter.max_total_minutes)) return false;
+  }
+  const want = Array.isArray(filter.tags) ? filter.tags.map(s => String(s).toLowerCase()) : [];
+  if (want.length > 0) {
+    const have = _tagsOf(recipe.tags);
+    if (!want.every(t => have.has(t))) return false;
+  }
+  return true;
+}
