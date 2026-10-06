@@ -34,6 +34,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **The installed app works when CookTrace is served from a subpath.** With `BASE_URL` set (say `/cooktrace`), every visit after the first sent the app's requests to the site root instead, online and offline. Thanks @kgenerozov for the fix in LiftTrace and NutriTrace.
 - **Trace works with OpenAI-compatible endpoints that stream unless told not to** ([nutritrace#258](https://github.com/TraceApps/nutritrace/issues/258), reported by @jsapede). Chat answers and smart recipe import failed with "Unexpected non-whitespace character after JSON"; every request now asks for a single answer.
 - **Smart recipe import works with an OpenAI-compatible endpoint set on the server, or one without an API key.** With `AI_PROVIDER=oai-compat` it failed with "Unknown AI provider", and a keyless endpoint such as Ollama counted as not set up.
+- **Smart cookbooks show how many recipes they hold** ([#76](https://github.com/TraceApps/cooktrace/issues/76), thanks @herver1971). The cookbooks list, shared cookbooks and the Android app said "0 recipes" for every smart cookbook, and a plain cookbook still counted recipes you had deleted.
+- **Smart cookbooks open with their recipes in the Android app** ([#76](https://github.com/TraceApps/cooktrace/issues/76)). They opened empty, and renaming one there turned it into an empty plain cookbook.
+- **Changing a cookbook's cover in the Android app works.** It failed with an error.
 
 ### Security
 
