@@ -10,6 +10,8 @@
  * sending so we don't blow through token limits on long pages.
  */
 import * as cheerio from 'cheerio';
+import { logger } from '../logger.js';
+import { fetchChecked, serviceBase } from './ssrf-guard.js';
 
 // Cap the HTML payload sent to the LLM. Recipes virtually never need
 // more than this; oversized pages get truncated.
@@ -164,9 +166,37 @@ async function _callProvider(cfg, systemPrompt, userText) {
     // 'custom' is the app's name for an OpenAI-compatible endpoint,
     // 'oai-compat' the server's (AI_PROVIDER).
     case 'custom':
-    case 'oai-compat': return _callOpenAI(apiKey || 'no-key', model, systemPrompt, userText, (cfg.baseUrl || '').replace(/\/+$/, ''));
+    case 'oai-compat': return _callOpenAI(apiKey || 'no-key', model, systemPrompt, userText, (cfg.baseUrl || '').replace(/\/+$/, ''), cfg);
     default: throw new Error(`Unknown AI provider: ${provider}`);
   }
+}
+
+// A user's own AI address, through the address check. The owner sees why
+// an address was refused; anyone else the same message as for one that
+// doesn't answer, so it can't map which names exist on the network.
+function _sendToUserEndpoint(cfg) {
+  return async (url, init) => {
+    try {
+      return await fetchChecked(url, init, { allowPrivate: !!cfg.allowPrivate, allowPrivateEnvHint: 'ALLOW_PRIVATE_AI_URLS', maxRedirects: 3 });
+    } catch (e) {
+      if (cfg.allowPrivate || /cloud-metadata/.test(e.message)) throw e;
+      if (/addresses are|resolve host/.test(e.message)) throw new Error('Could not reach the AI address');
+      throw e;
+    }
+  };
+}
+
+// A provider's refusal for the user: its status and its own short error
+// message ("model not found"), never the raw reply, which goes to the log.
+async function _providerError(name, res) {
+  const raw = await res.text().catch(() => '');
+  logger.warn(`[recipe-ai] ${name} returned ${res.status}: ${raw.slice(0, 500)}`);
+  let message = '';
+  try {
+    const e = JSON.parse(raw)?.error;
+    message = typeof e === 'string' ? e : (typeof e?.message === 'string' ? e.message : '');
+  } catch {}
+  return new Error(`${name} returned ${res.status}${message ? `: ${message.slice(0, 200)}` : ''}`);
 }
 
 // OpenAI-compatible endpoints (Ollama, LM Studio...) often need no API key.
@@ -184,16 +214,17 @@ export function isCompatibleProvider(provider) {
  */
 export function importAiConfig(user, env) {
   const { provider, apiKey, model, baseUrl } = user || {};
-  if (provider && apiKey) return { provider, apiKey, model: model || '', baseUrl: baseUrl || '' };
+  if (provider && apiKey) return { provider, apiKey, model: model || '', baseUrl: baseUrl || '', source: 'user' };
   if (env.AI_API_KEY || (isCompatibleProvider(env.AI_PROVIDER) && env.AI_BASE_URL)) {
     return {
       provider: env.AI_PROVIDER || 'claude',
       apiKey:   env.AI_API_KEY || '',
       model:    env.AI_MODEL || '',
       baseUrl:  env.AI_BASE_URL || '',
+      source:   'server',
     };
   }
-  if (isCompatibleProvider(provider) && baseUrl) return { provider, apiKey: '', model: model || '', baseUrl };
+  if (isCompatibleProvider(provider) && baseUrl) return { provider, apiKey: '', model: model || '', baseUrl, source: 'user' };
   return null;
 }
 function _defaultModel(provider) {
@@ -220,16 +251,20 @@ async function _callClaude(apiKey, model, systemPrompt, userText) {
       messages: [{ role: 'user', content: userText }],
     }),
   });
-  if (!res.ok) throw new Error(`Claude returned ${res.status}: ${await res.text().catch(() => '')}`);
+  if (!res.ok) throw await _providerError('Claude', res);
   const data = await res.json();
   return data.content?.[0]?.text || '';
 }
 
-async function _callOpenAI(apiKey, model, systemPrompt, userText, baseUrl = 'https://api.openai.com') {
+async function _callOpenAI(apiKey, model, systemPrompt, userText, baseUrl = 'https://api.openai.com', cfg = {}) {
   const headers = { 'content-type': 'application/json', 'accept': 'application/json' };
   // Some self-hosted endpoints (Ollama in particular) reject a placeholder key.
   if (apiKey && apiKey !== 'no-key') headers['Authorization'] = `Bearer ${apiKey}`;
-  const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+  // An endpoint a user typed in goes through the address check, on every
+  // redirect hop too; the server's own (AI_* env vars) is the owner's.
+  const send = cfg.source === 'user' ? _sendToUserEndpoint(cfg) : fetch;
+  const base = cfg.source === 'user' ? (serviceBase(baseUrl) ?? baseUrl) : baseUrl;
+  const res = await send(`${base}/v1/chat/completions`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -241,7 +276,7 @@ async function _callOpenAI(apiKey, model, systemPrompt, userText, baseUrl = 'htt
       ],
     }),
   });
-  if (!res.ok) throw new Error(`OpenAI returned ${res.status}: ${await res.text().catch(() => '')}`);
+  if (!res.ok) throw await _providerError('OpenAI', res);
   const data = await res.json();
   return data.choices?.[0]?.message?.content || '';
 }
@@ -255,7 +290,7 @@ async function _callGemini(apiKey, model, systemPrompt, userText) {
       contents: [{ role: 'user', parts: [{ text: userText }] }],
     }),
   });
-  if (!res.ok) throw new Error(`Gemini returned ${res.status}: ${await res.text().catch(() => '')}`);
+  if (!res.ok) throw await _providerError('Gemini', res);
   const data = await res.json();
   return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 }

@@ -37,6 +37,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Security
 
+- **Accounts can't use recipe import to read services on your own network.** An address inside it (directly, through a name, or through a redirect) could be imported and the page sent to an AI address the account chose. Only the owner (an admin, or a single-user install) can now import from your network; `ALLOW_PRIVATE_RECIPE_URLS=1` lets every account.
+- **An AI address an account sets is checked before smart import uses it.** Other accounts can't point it inside your network unless `ALLOW_PRIVATE_AI_URLS=1`, and a failed request shows its status and the provider's own message, not the raw reply.
+- **Push notifications and the NutriTrace link never reach cloud-metadata addresses** and check every redirect. NutriTrace food search passes back only food fields, and a failed push test no longer shows the raw reply.
 - **The Android app's SSO sign-in no longer passes the session token through the `cooktrace://` link**, which another app could intercept. The link carries a single-use code that only the app that started the sign-in can redeem.
 - **Share link tokens come from a secure random source.** They were made with `Math.random()`, which can be predicted from its own output.
 - **A removed share link stays removed.** A phone still holding the old link could bring it back with its next edit to the recipe, and a device could set a link of its own choosing. The link is now only set by creating or removing it.
