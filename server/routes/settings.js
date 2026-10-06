@@ -6,8 +6,9 @@ import { isServerOnlyKey } from '../lib/server-only-keys.js';
 import { fetchChecked, serviceBase } from '../lib/ssrf-guard.js';
 
 // Push services usually live on the home network, so that's allowed for
-// every account; the address is still checked on every redirect hop.
-const _sendPush = (url, init) => fetchChecked(url, init, { allowPrivate: true, maxRedirects: 3 });
+// every account; the address is still checked, and a redirect only
+// followed on the same server.
+const _sendPush = (url, init) => fetchChecked(url, init, { allowPrivate: true, maxRedirects: 3, sameOrigin: true });
 
 // The service's own short error ("unauthorized"), never its raw reply.
 async function _pushErrorMessage(resp) {
