@@ -145,6 +145,17 @@ export function serviceBase(url) {
   return (u.origin + u.pathname).replace(/\/+$/, '');
 }
 
+/**
+ * Whether a redirect from `from` to `to` stays on the same server: the
+ * same origin, or http to https on the same host and default ports (a
+ * reverse proxy's upgrade).
+ */
+export function isSameServer(from, to) {
+  const a = new URL(from), b = new URL(to);
+  if (a.origin === b.origin) return true;
+  return a.protocol === 'http:' && b.protocol === 'https:' && a.hostname === b.hostname && !a.port && !b.port;
+}
+
 const _proxied = !!(process.env.HTTP_PROXY || process.env.HTTPS_PROXY || process.env.http_proxy || process.env.https_proxy);
 
 /**
@@ -171,7 +182,7 @@ export async function fetchChecked(url, init = {}, { allowPrivate = false, allow
     const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
     if (!location || hop >= maxRedirects) return res;
     const next = new URL(location, parsed);
-    const crossOrigin = next.origin !== parsed.origin;
+    const crossOrigin = !isSameServer(parsed, next);
     if (crossOrigin && sameOrigin) return res;
     try { await res.body?.cancel(); } catch {}
     target = next.toString();

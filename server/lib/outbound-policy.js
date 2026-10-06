@@ -3,9 +3,10 @@
 //
 // Features made for services on the home network (push, Mealie, CookTrace,
 // NutriTrace, Navidrome) allow it for everyone and don't ask here.
-// Features made for the public web ask ownerOrOptIn(): the owner (a
-// single-user install, or an admin) may; other accounts only when the
-// owner sets that feature's ALLOW_PRIVATE_* variable.
+// Features made for the public web ask ownerOrOptIn(): an admin may; other
+// accounts only when the owner sets that feature's ALLOW_PRIVATE_* variable.
+// A single-user install has no sign-in, so every visitor would count as
+// the owner; there only the variable opens it.
 import { userMgmtActive } from '../middleware/auth.js';
 
 export function envOn(value) {
@@ -13,5 +14,5 @@ export function envOn(value) {
 }
 
 export function ownerOrOptIn(req, envVar) {
-  return !userMgmtActive() || req?.user?.role === 'admin' || envOn(process.env[envVar]);
+  return (userMgmtActive() && req?.user?.role === 'admin') || envOn(process.env[envVar]);
 }

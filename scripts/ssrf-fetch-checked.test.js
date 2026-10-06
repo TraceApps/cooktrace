@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import http from 'node:http';
 import dns from 'node:dns/promises';
-import { fetchChecked, serviceBase, isLinkLocalOrCloudMeta, isPrivateOrLoopback } from '../server/lib/ssrf-guard.js';
+import { fetchChecked, serviceBase, isLinkLocalOrCloudMeta, isPrivateOrLoopback, isSameServer } from '../server/lib/ssrf-guard.js';
 
 async function server(handler) {
   const s = http.createServer(handler);
@@ -127,4 +127,13 @@ test('a service address keeps only its origin and path', () => {
   assert.equal(serviceBase('https://jelly.example/jf#frag'), 'https://jelly.example/jf');
   assert.equal(serviceBase('ftp://x'), null);
   assert.equal(serviceBase('not a url'), null);
+});
+
+test('a redirect stays on the same server only for its origin or an https upgrade', () => {
+  assert.equal(isSameServer('http://music.lan/rest/ping', 'http://music.lan/rest/x'), true);
+  assert.equal(isSameServer('http://music.lan/rest/ping', 'https://music.lan/rest/ping'), true);
+  assert.equal(isSameServer('http://music.lan:4533/', 'https://music.lan/'), false, 'a port changes the server');
+  assert.equal(isSameServer('https://music.lan/', 'http://music.lan/'), false, 'never a downgrade');
+  assert.equal(isSameServer('http://music.lan/', 'https://evil.example/'), false);
+  assert.equal(isSameServer('http://127.0.0.1:1/', 'http://localhost:1/'), false);
 });
