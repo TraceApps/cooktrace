@@ -48,7 +48,7 @@ A hotfix: Tandoor exports import again, single sign-on fixes, and share links th
 
 ### Security
 
-- **Accounts can't use recipe import to read services on your own network.** An address inside it (directly, through a name, or through a redirect) could be imported and the page sent to an AI address the account chose. Only the owner (an admin, or a single-user install) can now import from your network; `ALLOW_PRIVATE_RECIPE_URLS=1` lets every account.
+- **Accounts can't use recipe import to read services on your own network.** An address inside it (directly, through a name, or through a redirect) could be imported and the page sent to an AI address the account chose. Only an admin can now import from your network; `ALLOW_PRIVATE_RECIPE_URLS=1` opens it to every account, and to a single-user install, which has no sign-in.
 - **An AI address an account sets is checked before smart import uses it.** Other accounts can't point it inside your network unless `ALLOW_PRIVATE_AI_URLS=1`, and a failed request shows its status and the provider's own message, not the raw reply.
 - **Push notifications and the NutriTrace link never reach cloud-metadata addresses** and check every redirect. NutriTrace food search passes back only food fields, and a failed push test no longer shows the raw reply.
 - **The Android app's SSO sign-in no longer passes the session token through the `cooktrace://` link**, which another app could intercept. The link carries a single-use code that only the app that started the sign-in can redeem.
