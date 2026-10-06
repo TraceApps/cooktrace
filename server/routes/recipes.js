@@ -2211,8 +2211,15 @@ router.get('/:id/card.png', wrap(async (req, res) => {
   if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
   const recipe = db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(id);
   if (!recipe) return res.status(404).json({ error: 'Not found' });
-  // Allow public access to group-shared recipes; require auth for private.
-  if (recipe.visibility !== 'group' && (!req.user || (recipe.user_id != null && recipe.user_id !== req.user.id))) {
+  // Who may see the card is who may see the recipe (GET /:id): its owner,
+  // anyone it is shared with, and everyone when it is group-visible. This
+  // used to differ: a shared recipe's card was refused, and a recipe with
+  // no owner gave its card to anyone signed in.
+  const u = uid(req);
+  const isOwner = (u == null && recipe.user_id == null) || recipe.user_id === u;
+  const isShared = !isOwner && u != null
+    && !!db.prepare(`SELECT 1 FROM recipe_shares WHERE recipe_id = ? AND grantee_id = ?`).get(id, u);
+  if (!isOwner && !isShared && recipe.visibility !== 'group') {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -2227,10 +2234,15 @@ router.get('/:id/card.png', wrap(async (req, res) => {
 
   // SVG card — 600 × 800 portrait. Hero image embedded via <image> if we
   // can resolve to an absolute URL, else pure typography.
-  const safeName = String(recipe.name || 'Recipe').replace(/[<&]/g, '');
-  const safeSub = subtitle.replace(/[<&]/g, '');
-  const heroSection = recipe.img_url ? `
-    <image href="${_absoluteUrl(req, recipe.img_url)}" x="0" y="0" width="600" height="500" preserveAspectRatio="xMidYMid slice" />
+  // Escaped, not stripped: "Mac & Cheese" stays as typed, and nothing in a
+  // name or an image link can become markup. The card is an SVG served from
+  // this origin, so an unescaped quote in img_url used to add an event
+  // handler that ran as the app when the card was opened.
+  const name = String(recipe.name || 'Recipe');
+  const safeSub = _escapeXml(subtitle);
+  const heroUrl = _absoluteUrl(req, recipe.img_url);
+  const heroSection = heroUrl ? `
+    <image href="${_escapeXml(heroUrl)}" x="0" y="0" width="600" height="500" preserveAspectRatio="xMidYMid slice" />
     <rect x="0" y="380" width="600" height="120" fill="url(#grad)" />
   ` : `
     <rect x="0" y="0" width="600" height="500" fill="#0A0B0F" />
@@ -2247,22 +2259,38 @@ router.get('/:id/card.png', wrap(async (req, res) => {
   </defs>
   <rect width="600" height="800" fill="#0A0B0F" />
   ${heroSection}
-  <text x="40" y="560" font-family="system-ui, sans-serif" font-size="40" font-weight="800" fill="#FFFFFF">${_textWrap(safeName, 22)}</text>
+  <text x="40" y="560" font-family="system-ui, sans-serif" font-size="40" font-weight="800" fill="#FFFFFF">${_textWrap(name, 22)}</text>
   ${safeSub ? `<text x="40" y="660" font-family="system-ui, sans-serif" font-size="20" fill="#A1A8B8">${safeSub}</text>` : ''}
   <text x="40" y="760" font-family="system-ui, sans-serif" font-size="14" fill="#4FFFB0" font-weight="700" letter-spacing="2">COOKTRACE</text>
 </svg>`;
 
   res.setHeader('Content-Type', 'image/svg+xml');
-  res.setHeader('Cache-Control', 'public, max-age=300');
+  // The card can be someone's private recipe: no cache keeps it, as for the
+  // rest of /api. The policy stops any script in the SVG, as a backstop.
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' https: http: data:; style-src 'unsafe-inline'; sandbox");
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.send(svg);
 }));
 
+// An image link the card may show: a web address, or one of this app's own
+// paths, kept on this origin (the card is only served to someone signed in,
+// so it is always opened from here). It used to be made absolute with the
+// request's Host, which the sender controls. Anything else (javascript:,
+// data:, //host) leaves the card without its picture.
+const _BASE_PATH = (process.env.BASE_URL || '').replace(/\/$/, '');
 function _absoluteUrl(req, path) {
   if (!path) return '';
-  if (/^https?:\/\//.test(path)) return path;
-  const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-  const host = req.headers['x-forwarded-host'] || req.headers.host || '';
-  return `${proto}://${host}${path.startsWith('/') ? '' : '/'}${path}`;
+  const p = String(path).trim();
+  if (/^https?:\/\//i.test(p)) return p;
+  if (!p.startsWith('/') || p.startsWith('//')) return '';
+  return _BASE_PATH && !p.startsWith(_BASE_PATH + '/') ? `${_BASE_PATH}${p}` : p;
+}
+
+function _escapeXml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
 function _textWrap(text, perLine) {
@@ -2278,7 +2306,7 @@ function _textWrap(text, perLine) {
   }
   if (cur) lines.push(cur);
   if (lines.length > 3) lines.length = 3;
-  return lines.map((l, i) => i === 0 ? l : `<tspan x="40" dy="48">${l}</tspan>`).join('');
+  return lines.map((l, i) => i === 0 ? _escapeXml(l) : `<tspan x="40" dy="48">${_escapeXml(l)}</tspan>`).join('');
 }
 
 // ── Comments ────────────────────────────────────────────────────────────
