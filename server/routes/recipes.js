@@ -9,6 +9,7 @@
  * management) leaves user_id NULL.
  */
 import { Router } from 'express';
+import { linkBase } from '../lib/public-url.js';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
@@ -878,15 +879,13 @@ router.post('/:id/shares', wrap((req, res) => {
   // configured or any individual send throws.
   if (newGrantees.length > 0 && isEmailConfigured()) {
     const sharerName = req.user?.full_name || req.user?.username || null;
-    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-    const host  = req.headers['x-forwarded-host']  || req.headers.host || '';
-    const baseUrl = `${proto}://${host}`;
+    const baseUrl = linkBase(req);
     const viewUrl = `${baseUrl}/#/recipes/${id}`;
     const granteeEmails = db.prepare(
       `SELECT id, email FROM users WHERE id IN (${newGrantees.map(() => '?').join(',')})`
     ).all(...newGrantees);
     for (const row of granteeEmails) {
-      if (!row.email) continue;
+      if (!row.email || !baseUrl) continue;
       sendRecipeShared(row.email, viewUrl, recipe.name, sharerName)
         .catch(e => logger.debug?.(`[share] email to ${row.email} failed: ${e.message}`));
     }
