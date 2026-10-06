@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { rememberAdminOrigin } from './lib/public-url.js';
 // Forward-proxy support (#177). Self-installs an undici
 // EnvHttpProxyAgent as the global fetch dispatcher when
 // HTTP_PROXY / HTTPS_PROXY / NO_PROXY (or lowercase equivalents)
@@ -151,6 +152,12 @@ router.use('/uploads', express.static(uploadsPath, {
 router.use('/api/proxy', proxyRoutes);
 
 router.use(authenticate);   // attach req.user on every request
+// Remember the address an admin uses, so emailed links (password reset,
+// invite, sharing) go there instead of to whatever Host a request claims.
+router.use((req, res, next) => {
+  if (req.user?.role === 'admin') rememberAdminOrigin(req);
+  next();
+});
 router.use(csrfProtect);   // CSRF protection for cookie-based sessions
 
 // ── Request logging ────────────────────────────────────────────────────────

@@ -136,6 +136,7 @@ The most-asked knobs. Full list at [docs/self-hosting/env-vars](https://traceapp
 | `UPLOADS_PATH` | `/data/uploads` | Uploaded images and server-side backups. |
 | `PORT` | `3003` | Port the server listens on inside the container (3001 before 1.3.0). |
 | `BASE_URL` | - | Mount at a subpath, e.g. `/cooktrace`. |
+| `PUBLIC_URL` | - | The full address people open the app at, subpath included (e.g. `https://recipes.example.com`). Links in emails (password reset, invites, sharing) use it. Unset, they use an address an admin has opened the app at. |
 | `LOG_LEVEL` | `info` | `error` \| `warn` \| `info` \| `debug`. |
 | `INSECURE_COOKIES` | unset | Set to `1` on plain-HTTP LAN deployments so the auth cookie isn't dropped. See [LAN-HTTP notes](https://traceapps.github.io/docs/getting-started/lan-http/). |
 | `MAX_SESSION_HOURS` | `8760` | Session-length cap in hours. Lower for shared / kiosk machines. |

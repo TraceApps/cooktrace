@@ -17,6 +17,7 @@
  * dedup log keeps us safe across server restarts.
  */
 import db from '../db.js';
+import { linkBase } from './public-url.js';
 import { logger } from '../logger.js';
 import { notifyCookDay, notifyShoppingNudge, notifyExpiryDigest } from './push-notify.js';
 import { sendWeeklySummaryEmail } from '../email.js';
@@ -182,7 +183,7 @@ async function _checkWeeklySummary(userId, today) {
 function _appOrigin() {
   // Best-effort: use APP_ORIGIN env var if set; otherwise null and the
   // email helper substitutes a sensible default in its CTA buttons.
-  return process.env.APP_ORIGIN || process.env.PUBLIC_URL || null;
+  return process.env.APP_ORIGIN || linkBase(null) || null;
 }
 
 // Pantry expiration digest. Fires once per day at the user's picked
