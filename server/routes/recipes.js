@@ -16,6 +16,7 @@ import { dispatchWebhookEvent } from '../lib/webhooks.js';
 import { ensurePantryItems } from './pantry.js';
 import { scrapeRecipe, fetchRecipeHtml, extractFromHtml } from '../lib/recipe-scraper.js';
 import { aiExtractRecipe, importAiConfig } from '../lib/recipe-ai-fallback.js';
+import { ownerOrOptIn } from '../lib/outbound-policy.js';
 import { scrapeWithRecipeScrapers, isRecipeScrapersAvailable } from '../lib/recipe-scrapers-bridge.js';
 import { importRecipeFromText, importPaprikaArchive, scanRecipeZip, scanLoadedZip, loadRecipeZip, readImageFromLoadedZip, readZipImageBytes, mealieEventImagePaths } from '../lib/recipe-importers.js';
 import { extractText, detectFileType } from '../lib/text-extractors.js';
@@ -1002,7 +1003,7 @@ function _recomputeCookAggregates(recipeId) {
 async function _scrapeUrlOnly(url, opts = {}) {
   const errors = [];
   let html, finalUrl;
-  try { ({ html, finalUrl } = await fetchRecipeHtml(url)); }
+  try { ({ html, finalUrl } = await fetchRecipeHtml(url, { allowPrivate: !!opts.allowPrivate })); }
   catch (e) { return { parsed: null, usedTier: null, errors: [e.message] }; }
 
   const engine   = opts.engine   || 'standard';
@@ -1074,10 +1075,10 @@ router.post('/scrape', wrap(async (req, res) => {
   // tier is unavailable for this request (e.g. local-Android client).
   const engine   = _userSetting(u, 'urlImportEngine')   || 'standard';
   const fallback = _userSetting(u, 'urlImportFallback') || 'standard';
-  const aiCfg    = _aiConfigForUser(u);
+  const aiCfg    = _aiConfigForUser(u, req);
 
   let html, finalUrl;
-  try { ({ html, finalUrl } = await fetchRecipeHtml(url)); }
+  try { ({ html, finalUrl } = await fetchRecipeHtml(url, { allowPrivate: ownerOrOptIn(req, 'ALLOW_PRIVATE_RECIPE_URLS') })); }
   catch (e) { return res.status(400).json({ error: e.message }); }
 
   let parsed = null;
@@ -1180,8 +1181,8 @@ router.post('/batch-scrape', wrap(async (req, res) => {
 
   const engine   = _userSetting(u, 'urlImportEngine')   || 'standard';
   const fallback = _userSetting(u, 'urlImportFallback') || 'standard';
-  const aiCfg    = _aiConfigForUser(u);
-  const scrapeOpts = { engine, fallback, aiCfg };
+  const aiCfg    = _aiConfigForUser(u, req);
+  const scrapeOpts = { engine, fallback, aiCfg, allowPrivate: ownerOrOptIn(req, 'ALLOW_PRIVATE_RECIPE_URLS') };
 
   // Small concurrent pool. Workers pull from a shared index so we don't
   // need a queue library for a one-shot batch.
@@ -1282,13 +1283,17 @@ function _userSetting(u, key) {
 // Build an AI config object for a user from their stored settings, or
 // fall back to the server-side AI env config when they have nothing
 // of their own. Returns null when no usable config exists.
-function _aiConfigForUser(u) {
-  return importAiConfig({
+function _aiConfigForUser(u, req) {
+  const cfg = importAiConfig({
     provider: _userSetting(u, 'aiProvider'),
     apiKey:   _userSetting(u, 'aiApiKey'),
     model:    _userSetting(u, 'aiModel'),
     baseUrl:  _userSetting(u, 'aiBaseUrl'),
   }, process.env);
+  // A user's own endpoint is reached through the address check; the
+  // server's (AI_* env vars) is the owner's and is trusted as is.
+  if (cfg?.source === 'user') cfg.allowPrivate = ownerOrOptIn(req, 'ALLOW_PRIVATE_AI_URLS');
+  return cfg;
 }
 
 // The recipe an import would duplicate: case-insensitive name first,

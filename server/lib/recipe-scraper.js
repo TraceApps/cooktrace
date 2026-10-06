@@ -4,33 +4,26 @@
  *
  * Defenses:
  *   - http/https only
- *   - blocks private/loopback IPs (basic SSRF guard — node will reject
- *     localhost/private subnets too via their public-DNS resolution path)
+ *   - every address the host resolves to is checked, the connection goes
+ *     only to those addresses, and every redirect hop is checked the same
+ *     way (ssrf-guard.js fetchChecked). Cloud-metadata and link-local
+ *     addresses are always refused; private and loopback ones unless the
+ *     caller allows them (the owner, or ALLOW_PRIVATE_RECIPE_URLS=1)
  *   - 8s timeout
  *   - 5MB max response size
  *   - User-Agent header so blogs don't 403 us
  */
 import * as cheerio from 'cheerio';
+import { fetchChecked } from './ssrf-guard.js';
 
 const MAX_BYTES   = 5 * 1024 * 1024;
 const TIMEOUT_MS  = 8000;
 const UA = 'CookTrace/1.0 (+https://github.com/traceapps/cooktrace; recipe scraper)';
 
-const PRIVATE_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1']);
-const PRIVATE_PREFIXES = ['10.', '127.', '192.168.', '169.254.'];
+const MAX_REDIRECTS = 5;
 
-function _isPrivateHost(host) {
-  if (!host) return true;
-  if (PRIVATE_HOSTS.has(host)) return true;
-  if (PRIVATE_PREFIXES.some(p => host.startsWith(p))) return true;
-  // 172.16.0.0 – 172.31.255.255
-  const m = host.match(/^172\.(\d+)\./);
-  if (m && +m[1] >= 16 && +m[1] <= 31) return true;
-  return false;
-}
-
-export async function scrapeRecipe(rawUrl) {
-  const { html, finalUrl } = await fetchRecipeHtml(rawUrl);
+export async function scrapeRecipe(rawUrl, opts = {}) {
+  const { html, finalUrl } = await fetchRecipeHtml(rawUrl, opts);
   const recipe = _extractRecipe(html, finalUrl);
   if (!recipe) throw new Error('No schema.org/Recipe data found on that page');
   return recipe;
@@ -41,29 +34,30 @@ export async function scrapeRecipe(rawUrl) {
  * scrapeRecipe but return the raw HTML so callers can re-parse it
  * with a different strategy (recipe-scrapers sidecar, AI fallback).
  */
-export async function fetchRecipeHtml(rawUrl) {
+export async function fetchRecipeHtml(rawUrl, { allowPrivate = false } = {}) {
   let url;
   try { url = new URL(rawUrl); }
   catch { throw new Error('Not a valid URL'); }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     throw new Error('Only http(s) URLs are supported');
   }
-  if (_isPrivateHost(url.hostname)) {
-    throw new Error('Refused: private / loopback hostnames are not allowed');
-  }
 
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   let res;
   try {
-    res = await fetch(url, {
+    res = await fetchChecked(url.toString(), {
       headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml' },
       signal: ctrl.signal,
-      redirect: 'follow',
-    });
+    }, { allowPrivate, allowPrivateEnvHint: 'ALLOW_PRIVATE_RECIPE_URLS', maxRedirects: MAX_REDIRECTS });
   } catch (e) {
     clearTimeout(t);
     if (e.name === 'AbortError') throw new Error('Request timed out');
+    // The owner sees why an address was refused. Anyone else gets the same
+    // message as for an address that doesn't answer, so the refusal can't
+    // be used to learn which names exist on the server's network.
+    if (allowPrivate && /addresses are|resolve host/.test(e.message)) throw e;
+    if (/http and https|Invalid URL|cloud-metadata/.test(e.message)) throw e;
     throw new Error('Could not fetch URL');
   }
   clearTimeout(t);

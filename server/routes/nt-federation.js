@@ -15,6 +15,7 @@ import { Router } from 'express';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
+import { fetchChecked, serviceBase } from '../lib/ssrf-guard.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -34,8 +35,9 @@ function _config(userId) {
   const token = _getSetting(userId, 'ntInstanceToken');
   const enabled = _getSetting(userId, 'ntFederationEnabled');
   if (!url || !token) return null;
-  if (!/^https?:\/\//.test(url)) return null;
-  return { url: url.replace(/\/$/, ''), token, enabled: !!enabled };
+  const base = serviceBase(url);
+  if (!base) return null;
+  return { url: base, token, enabled: !!enabled };
 }
 
 // Resolve a possibly-relative image path against the NT origin so the
@@ -48,11 +50,49 @@ function _absoluteUrl(origin, urlPath) {
   return origin.replace(/\/$/, '') + (urlPath.startsWith('/') ? urlPath : '/' + urlPath);
 }
 
+const _str = v => (typeof v === 'string' && v ? v.slice(0, 2000) : null);
+const _num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+// A NutriTrace food (its /api/v1/foods shape), field by field.
+function _ntFood(f) {
+  const nutrition = {};
+  if (f.nutrition && typeof f.nutrition === 'object') {
+    for (const [k, v] of Object.entries(f.nutrition)) {
+      if (typeof v === 'number' && Number.isFinite(v) && /^[a-z0-9_-]{1,40}$/i.test(k)) nutrition[k] = v;
+    }
+  }
+  return {
+    id: _num(f.id) ?? _str(f.id),
+    name: _str(f.name),
+    brand: _str(f.brand),
+    category: _str(f.category),
+    barcode: _str(f.barcode),
+    portion: _num(f.portion),
+    unit: _str(f.unit),
+    notes: _str(f.notes),
+    nutrition,
+    created_at: _str(f.created_at),
+    updated_at: _str(f.updated_at),
+  };
+}
+
+// What went wrong, without the other server's words: a refused address
+// says so, anything else is a failed connection.
+function _linkError(e) {
+  const m = String(e?.message || '');
+  if (/addresses are not allowed|addresses are blocked/.test(m)) return m;
+  if (e?.name === 'AbortError' || /aborted/i.test(m)) return 'NutriTrace didn\'t answer in time';
+  return 'Could not reach NutriTrace';
+}
+
 async function _ntFetch(cfg, path, opts = {}) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const res = await fetch(cfg.url + path, {
+    // NutriTrace usually lives on the home network, so that's allowed for
+    // every account; the address is still checked (never cloud metadata),
+    // on every redirect hop, and the connection pinned to it.
+    const res = await fetchChecked(cfg.url + path, {
       ...opts,
       headers: {
         'Authorization': `Bearer ${cfg.token}`,
@@ -60,7 +100,7 @@ async function _ntFetch(cfg, path, opts = {}) {
         ...(opts.headers || {}),
       },
       signal: ctrl.signal,
-    });
+    }, { allowPrivate: true, maxRedirects: 3 });
     return res;
   } finally { clearTimeout(t); }
 }
@@ -68,17 +108,23 @@ async function _ntFetch(cfg, path, opts = {}) {
 router.post('/test', wrap(async (req, res) => {
   const u = uid(req);
   // Allow inline override so the Settings page can test before saving.
-  const url = (req.body?.url || _getSetting(u, 'ntInstanceUrl') || '').replace(/\/$/, '');
+  const raw = req.body?.url || _getSetting(u, 'ntInstanceUrl') || '';
   const token = req.body?.token || _getSetting(u, 'ntInstanceToken');
-  if (!url || !token) return res.status(400).json({ ok: false, error: 'URL and token required' });
-  if (!/^https?:\/\//.test(url)) return res.status(400).json({ ok: false, error: 'URL must start with http(s)://' });
+  if (!raw || !token) return res.status(400).json({ ok: false, error: 'URL and token required' });
+  const url = serviceBase(raw);
+  if (!url) return res.status(400).json({ ok: false, error: 'URL must start with http(s)://' });
   try {
     const ntRes = await _ntFetch({ url, token }, '/api/auth/me');
     if (!ntRes.ok) return res.json({ ok: false, error: `NutriTrace returned ${ntRes.status}` });
     const body = await ntRes.json().catch(() => ({}));
-    return res.json({ ok: true, user: body.user || null });
+    // Only the name the Settings page shows, not whatever the address answered.
+    const who = body?.user;
+    const user = who && typeof who === 'object'
+      ? { username: typeof who.username === 'string' ? who.username : null, name: typeof who.name === 'string' ? who.name : null }
+      : null;
+    return res.json({ ok: true, user });
   } catch (e) {
-    return res.json({ ok: false, error: e.message || 'Connection failed' });
+    return res.json({ ok: false, error: _linkError(e) });
   }
 }));
 
@@ -93,11 +139,7 @@ router.get('/foods', wrap(async (req, res) => {
     // 401's any bearer token regardless of validity.
     const ntRes = await _ntFetch(cfg, '/api/v1/foods' + (q ? '?q=' + encodeURIComponent(q) : ''));
     if (!ntRes.ok) {
-      const text = await ntRes.text().catch(() => '');
-      return res.status(502).json({
-        error: `NutriTrace returned ${ntRes.status} ${ntRes.statusText || ''}`.trim()
-          + (text && text.length < 240 ? `: ${text}` : ''),
-      });
+      return res.status(502).json({ error: `NutriTrace returned ${ntRes.status} ${ntRes.statusText || ''}`.trim() });
     }
     const body = await ntRes.json();
     // v1 wire shape: { items: [...], total, limit, offset } with
@@ -106,16 +148,21 @@ router.get('/foods', wrap(async (req, res) => {
     // already consume so neither needs to know about wire-version
     // differences.
     const items = Array.isArray(body?.items) ? body.items : (Array.isArray(body) ? body : []);
-    res.json(items.map(f => ({
-      ...f,
-      serving_size: f.serving_size != null ? f.serving_size : f.portion,
-      serving_unit: f.serving_unit || f.unit || null,
-      // Rewrite NT's relative `/uploads/...` image paths to absolute
-      // URLs against the NT origin. Without this the picker's <img>
-      // resolves them against cooktrace's own origin and 404's.
-      img_url: _absoluteUrl(cfg.url, f.img_url || f.image_url || null),
-    })));
-  } catch (e) { res.status(502).json({ error: e.message || 'Federation request failed' }); }
+    // Only NutriTrace's food fields go back, never whatever else the
+    // address answered: it may point anywhere on the home network.
+    res.json(items.filter(f => f && typeof f === 'object').map(f => {
+      const food = _ntFood(f);
+      return {
+        ...food,
+        serving_size: _num(f.serving_size) ?? food.portion,
+        serving_unit: _str(f.serving_unit) || food.unit,
+        // Rewrite NT's relative `/uploads/...` image paths to absolute
+        // URLs against the NT origin. Without this the picker's <img>
+        // resolves them against cooktrace's own origin and 404's.
+        img_url: _absoluteUrl(cfg.url, _str(f.img_url) || _str(f.image_url) || _str(f.imgUrl)),
+      };
+    }));
+  } catch (e) { res.status(502).json({ error: _linkError(e) }); }
 }));
 
 // ── POST /import-foods — bulk-import NT foods into the pantry ─────────
@@ -268,7 +315,7 @@ router.post('/log-meal', wrap(async (req, res) => {
     });
     if (!ntRes.ok) return res.status(502).json({ error: `NutriTrace returned ${ntRes.status}` });
     res.json(await ntRes.json());
-  } catch (e) { res.status(502).json({ error: e.message || 'Federation request failed' }); }
+  } catch (e) { res.status(502).json({ error: _linkError(e) }); }
 }));
 
 export default router;
