@@ -37,6 +37,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Security
 
+- **Names in emails can no longer carry markup.** A name, or a title someone shared, went into the email as-is, so HTML or a link typed into it became real markup in the recipient's inbox. Affected the SMTP test and invite emails, the recipe shared with you email, and recipe names in the weekly summary. Everything an email shows is escaped now.
 - **Accounts can't use recipe import to read services on your own network.** An address inside it (directly, through a name, or through a redirect) could be imported and the page sent to an AI address the account chose. Only an admin can now import from your network; `ALLOW_PRIVATE_RECIPE_URLS=1` opens it to every account, and to a single-user install, which has no sign-in.
 - **An AI address an account sets is checked before smart import uses it.** Other accounts can't point it inside your network unless `ALLOW_PRIVATE_AI_URLS=1`, and a failed request shows its status and the provider's own message, not the raw reply.
 - **Push notifications and the NutriTrace link never reach cloud-metadata addresses** and follow a redirect only on the same server. NutriTrace food search passes back only food fields, a failed push test no longer shows the raw reply, and the open `/api/proxy` checks every redirect.
