@@ -1,0 +1,1830 @@
+{
+  "nav": {
+    "recipes":  "Recettes",
+    "pantry":   "Provisions",
+    "diary":    "Journal",
+    "shopping": "Courses",
+    "manage":   "Gérer",
+    "settings": "Réglages"
+  },
+  "sync": {
+    "synced": "Synchronisé",
+    "syncing": "Synchronisation…",
+    "pending_web": "{count, plural, =0 {Hors ligne. Ta cuisine fonctionne toujours ici.} one {Hors ligne. # modification attend d'être envoyée.} other {Hors ligne. # modifications attendent d'être envoyées.}}",
+    "refused": "Ton serveur n'a pas accepté {what} : {reason}",
+    "sign_out_waiting_title": "Des modifications sont encore en attente",
+    "sign_out_waiting": "{count, plural, one {# modification n'a pas encore atteint ton serveur. Si tu te déconnectes maintenant, elle sera perdue. Reconnecte-toi et réessaie pour la garder.} other {# modifications n'ont pas encore atteint ton serveur. Si tu te déconnectes maintenant, elles seront perdues. Reconnecte-toi et réessaie pour les garder.}}",
+    "sign_out_anyway": "Se déconnecter quand même",
+    "sync_offline": "Hors ligne",
+    "sync_failing": "Impossible d'atteindre le serveur",
+    "not_synced": "Pas encore synchronisé",
+    "retry":            "Réessayer",
+    "retrying":         "Nouvelle tentative…",
+    "dismiss_message":  "Masquer le message de synchronisation",
+    "error_title":      "Échec de la synchronisation",
+    "connection": {
+      "server_fallback":  "serveur",
+      "no_network_title": "Pas de connexion réseau",
+      "cant_reach_title": "Impossible d'atteindre {host}",
+      "reconnect":        "Reconnecte-toi à Internet.",
+      "server_error":     "Le serveur a renvoyé HTTP {status}. Réessaie dans un instant.",
+      "mobile_data":      "Tu es connecté via les données mobiles. Ce serveur nécessite peut-être ton Wi-Fi ou un VPN.",
+      "check_connection": "Vérifie ton Wi-Fi, ton VPN ou ton serveur.",
+      "saved_locally":    "Tes modifications sont enregistrées localement et seront synchronisées automatiquement."
+    }
+  },
+  "routes": {
+    "recipes":  {
+      "title": "Recettes",
+      "search_placeholder": "Rechercher des recettes…",
+      "new_recipe": "Nouvelle recette",
+      "empty_title": "Pas encore de recettes",
+      "empty_desc": "Ajoute ta première recette pour commencer.",
+      "create_cta": "Créer une recette",
+      "no_match": "Aucune recette ne correspond à « {q} »."
+    },
+    "pantry":   {
+      "title": "Provisions",
+      "search_placeholder": "Rechercher dans les provisions…",
+      "empty_title": "Tes provisions sont vides",
+      "empty_desc": "Ajoute des ingrédients ici, ou enregistre une recette. Chaque ingrédient que tu utilises remplit automatiquement tes provisions.",
+      "add_item": "Ajouter un produit",
+      "no_match": "Aucun résultat pour « {q} »."
+    },
+    "diary":    {
+      "title": "Journal",
+      "empty_title": "Rien de noté pour l'instant",
+      "empty_desc": "Marque une recette comme cuisinée depuis sa page, ou prévoit-en une pour une date future.",
+      "plan_cook": "Prévoir une cuisson",
+      "no_matches_title": "Aucun résultat",
+      "no_matches_desc": "Aucune entrée de journal trouvée pour {name} sur la période actuelle.",
+      "this_recipe": "cette recette",
+      "clear_filter": "Effacer le filtre"
+    },
+    "shopping": {
+      "title": "Courses",
+      "empty_title": "La liste est vide",
+      "empty_desc": "Ajoute des produits ci-dessus, ou récupère les ingrédients manquants d'une recette.",
+      "add_from_recipe": "Ajouter depuis une recette",
+      "add_placeholder": "Ajouter un produit…",
+      "group_by_label": "Grouper par",
+      "group_by_aisle": "Par rayon",
+      "group_by_recipe": "Par recette",
+      "group_by_flat": "Sans groupe",
+      "uncategorized": "Non classé",
+      "other": "Autre",
+      "change_aisle": "Changer de rayon",
+      "delete": "Supprimer",
+      "aisle_help": "Choisis un rayon connu ou tape un nouveau nom. Les produits ajoutés plus tard depuis la même catégorie de provisions utiliseront automatiquement son rayon par défaut.",
+      "aisle_placeholder": "ex. Fruits et légumes, Produits laitiers, Boulangerie…",
+      "aisle_set": "OK",
+      "aisle_none": "Sans rayon",
+      "hide_checked": "Masquer les cochés",
+      "show_checked_n": "Afficher {n} cochés"
+    },
+    "settings": { "title": "Réglages" }
+  },
+  "common": {
+    "sign_out":     "Se déconnecter",
+    "log_out":      "Se déconnecter",
+    "signing_out":  "Déconnexion…",
+    "experimental": "Expérimental",
+    "hide":         "Masquer",
+    "save":         "Enregistrer",
+    "saving":       "Enregistrement…",
+    "cancel":       "Annuler",
+    "delete":       "Supprimer",
+    "back":         "Retour",
+    "edit":         "Modifier",
+    "done":         "Terminé",
+    "close":        "Fermer",
+    "clear":        "Effacer",
+    "loading":      "Chargement…",
+    "signed_in":    "Connecté",
+    "signed_out":   "Déconnecté",
+    "linked":       "Lié",
+    "unlinked":     "Non lié",
+    "admin":        "admin",
+    "errors": {
+      "cant_reach_server": "Impossible d'atteindre le serveur",
+      "failed":            "Échec",
+      "unlink_failed":     "Impossible de délier"
+    }
+  },
+  "pantry_sheet": {
+    "name":      "Nom",
+    "brand":     "Marque",
+    "barcode":   "Code-barres",
+    "on_hand":   "Quantité",
+    "variants":  "Variantes",
+    "expires_on":"Expire le",
+    "expires_on_hint":"(facultatif, aide à repérer ce qui périt)"
+  },
+  "trace": {
+    "panel_label":         "Chat de ton coach IA",
+    "panel_sub":           "Ton assistant IA pour la cuisine et les recettes",
+    "welcome_name":        "Salut, je suis {name} !",
+    "welcome_desc":        "Demande-moi tout sur les recettes, les provisions, les plans de repas ou les courses. J'ai accès à tes données de cuisine et je peux trouver des recettes, les ajuster, noter ce que tu as cuisiné, et te dire ce que tu peux faire avec ce que tu as en stock.",
+    "chip_pantry":         "Cuisiner avec mes provisions",
+    "chip_pantry_ask":     "Qu'est-ce que je peux cuisiner avec ce qui est dans mes provisions ?",
+    "chip_suggestion":     "Suggestion de recette",
+    "chip_suggestion_ask": "Suggère-moi une recette pour ce soir.",
+    "chip_recent":         "Cuisinés récemment",
+    "chip_recent_ask":     "Quelles recettes ai-je cuisinées récemment ?",
+    "chip_shopping":       "Liste de courses",
+    "chip_shopping_ask":   "Monte une liste de courses pour cette semaine.",
+    "ask_placeholder":     "Demande à {name}…",
+    "listening":           "Écoute…",
+    "clear_conversation":  "Effacer la conversation",
+    "clear_confirm_title":   "Effacer cette conversation ?",
+    "clear_confirm_message": "Les messages de cette conversation seront supprimés. Cette action est irréversible.",
+    "clear_confirm_ok":      "Effacer",
+    "attach_image":        "Joindre une image"
+  },
+  "editor": {
+    "name_required":      "Nom *",
+    "description":        "Description",
+    "rating":             "Note",
+    "prep_min":           "Préparation (min)",
+    "cook_min":           "Cuisson (min)",
+    "rest_min":           "Repos (min)",
+    "total_min":          "Total (min)",
+    "yield":              "Rendement",
+    "category":           "Catégorie",
+    "source_url":         "URL de la source",
+    "video_url":          "URL de la vidéo",
+    "add_ingredient":     "Ajouter un ingrédient",
+    "add_step":           "Ajouter une étape",
+    "add_group":          "Ajouter un groupe"
+  },
+  "cooking_now": {
+    "label":        "En cuisine",
+    "untitled":     "Une recette",
+    "label_many":   "En cuisine {n}",
+    "just_started": "entamée",
+    "minutes":      "{n, plural, one {# min} other {# min}}",
+    "hours":        "{n}h {m}m",
+    "more":         "{n, plural, one {# cuisson en plus} other {# cuissons en plus}}"
+  },
+  "recipe": {
+    "prep_time":          "Temps de préparation",
+    "cook_time":          "Temps de cuisson",
+    "rest_time":          "Temps de repos",
+    "total_time":         "Temps total",
+    "servings":           "Portions",
+    "serving_singular":   "Portion",
+    "ingredients":        "Ingrédients",
+    "instructions":       "Instructions",
+    "kitchen_gear":       "Matériel de cuisine",
+    "video_instructions": "Instructions vidéo",
+    "notes":              "Notes",
+    "nutrition":          "Nutrition",
+    "cook_history":       "Historique de cuisine",
+    "cook_mode":          "Mode Cuisine",
+    "tags":               "Tags"
+  },
+  "settings": {
+    "appearance": {
+      "section":          "Apparence",
+      "theme":            "Thème",
+      "accent_color":     "Couleur d'accent",
+      "navigation_style": "Style de navigation"
+    },
+    "regional":           {
+      "section":  "Régional et unités",
+      "language": "Langue"
+    },
+    "cooking":            { "section": "Cuisine" },
+    "nutrition":          { "section": "Nutrition" },
+    "server_connection":  { "section": "Connexion au serveur" },
+    "email":              { "section": "E-mail (SMTP)" },
+    "backup":             { "section": "Sauvegarde et restauration" },
+    "import":             { "section": "Importer depuis une autre app" },
+    "kitchens":           { "section": "Cuisines" },
+    "diagnostics":        { "section": "Diagnostics" },
+    "updates":            { "section": "Mises à jour" },
+    "support":            { "section": "Support" },
+    "about":              { "section": "À propos" },
+    "diary":              { "section": "Journal" },
+    "water":              { "section": "Eau" },
+    "foods":              { "section": "Aliments" },
+    "categories":         { "section": "Catégories" },
+    "nutrients":          { "section": "Nutriments" },
+    "goals":              { "section": "Objectifs" },
+    "body_stats":         { "section": "Mesures corporelles" },
+    "statistics":         { "section": "Statistiques" },
+    "connected_services": { "section": "Sources d'aliments" },
+    "ai":                 { "section": "Assistant IA" },
+    "notifications":      { "section": "Notifications" },
+    "wellness":           { "section": "Bien-être" },
+    "sharing":            { "section": "Partage d'aliments" },
+    "profile_hero": {
+      "label_fallback":  "Mon profil",
+      "subtitle_empty":  "Tape pour ajouter ton nom et ta photo"
+    },
+    "authentication":     { "section": "Authentification" },
+    "apitokens":          { "section": "Jetons API" },
+    "webhooks":           { "section": "Webhooks" },
+    "users": {
+      "section":              "Utilisateurs",
+      "users_heading":        "Utilisateurs",
+      "add_user":             "+ Ajouter un utilisateur",
+      "username":             "Nom d'utilisateur",
+      "username_required":    "Nom d'utilisateur *",
+      "full_name":            "Nom complet (facultatif)",
+      "password_required":    "Mot de passe *",
+      "confirm_required":     "Confirmer *",
+      "role":                 "Rôle",
+      "role_admin":           "admin",
+      "role_user":            "utilisateur",
+      "role_self_suffix":     "(toi)",
+      "create":               "Créer",
+      "creating":             "Création…",
+      "delete_user_title":    "Supprimer {name} ?",
+      "delete_user_message":  "Toutes les données de cet utilisateur — aliments, repas, entrées de journal, réglages — seront supprimées. Cette action est irréversible.",
+      "delete":               "Supprimer",
+      "promote_title":        "Promouvoir {name} ?",
+      "promote_message":      "Cette personne pourra gérer les utilisateurs, le partage, la configuration e-mail et les fournisseurs OIDC.",
+      "promote_confirm":      "Promouvoir",
+      "demote_title":         "Rétrograder {name} ?",
+      "demote_message":       "Cette personne perdra l'accès admin. Tu pourras la promouvoir de nouveau plus tard.",
+      "demote_confirm":       "Rétrograder",
+      "reset_password":       "Réinitialiser le mot de passe",
+      "reset_password_prompt": "Définir un nouveau mot de passe pour {name}\n\n(8 caractères minimum, avec majuscule, minuscule, chiffre et caractère spécial.)",
+      "invite_user":          "Inviter un utilisateur",
+      "invite_user_explainer": "Envoie un lien d'inscription pour que l'utilisateur choisisse son propre mot de passe. Recommandé.",
+      "email_optional":       "E-mail (facultatif)",
+      "send_invite":          "Envoyer l'invitation",
+      "generate_link":        "Générer un lien d'invitation",
+      "invite_sent":          "Invitation envoyée",
+      "invite_sent_to":       "Invitation envoyée à {email}",
+      "user_fallback":        "utilisateur",
+      "share_link_intro":     "Partage ce lien :",
+      "copy":                 "Copier",
+      "copy_link":            "Copier le lien",
+      "add_user_show":        "Ajouter un utilisateur manuellement",
+      "add_user_hide":        "Masquer l'ajout manuel",
+      "add_user_explainer":   "Tu définis toi-même le nom d'utilisateur et le mot de passe, puis tu les partages avec l'utilisateur. Utile si SMTP n'est pas configuré ou pour un usage hors ligne.",
+      "create_directly":      "Créer l'utilisateur",
+      "session_duration":     "Durée de session",
+      "session_never":        "N'expire jamais",
+      "session_8h":           "8 heures",
+      "session_1d":           "1 jour",
+      "session_7d":           "7 jours",
+      "session_30d":          "30 jours",
+      "session_90d":          "90 jours",
+      "session_1y":           "1 an",
+      "save":                 "Enregistrer",
+      "disable_um":           "Désactiver la gestion des utilisateurs",
+      "disable_um_subtitle":  "Supprime tous les comptes utilisateurs et repasse en mode mono-utilisateur",
+      "disable_um_title":     "Désactiver la gestion des utilisateurs ?",
+      "disable_um_message":   "Ceci supprimera tous les comptes utilisateurs et leurs données ne pourront pas être récupérées. L'application repassera en mode mono-utilisateur.",
+      "disable_um_confirm":   "Désactiver et tout supprimer",
+      "enable_um":            "Activer la gestion des utilisateurs",
+      "enable_um_subtitle":   "Ajoute plusieurs comptes utilisateurs avec des données et réglages séparés",
+      "create_admin_account": "Créer un compte administrateur",
+      "create_admin_explainer": "Le premier compte est toujours administrateur. Toutes les données existantes de ce serveur — aliments, repas, journal — lui seront attribuées.",
+      "enable_create":        "Activer et créer l'admin",
+      "enabling":             "Activation…",
+      "toast_user_created":   "Utilisateur ajouté",
+      "toast_user_deleted":   "Utilisateur supprimé",
+      "toast_password_reset": "Mot de passe réinitialisé",
+      "toast_role_changed":   "{name} est maintenant {role}",
+      "toast_um_enabled":     "Gestion des utilisateurs activée",
+      "toast_um_disabled":    "Gestion des utilisateurs désactivée",
+      "toast_invite_sent":    "Invitation envoyée",
+      "toast_link_copied":    "Copié !",
+      "err_username_required": "Le nom d'utilisateur est requis",
+      "err_passwords_mismatch": "Les mots de passe ne correspondent pas",
+      "err_username_password_required": "Nom d'utilisateur et mot de passe requis",
+      "err_registration_failed": "Échec de l'inscription",
+      "err_failed_to_add":    "Échec de l'ajout de l'utilisateur",
+      "err_could_not_change_role": "Impossible de changer le rôle",
+      "err_could_not_reset_password": "Impossible de réinitialiser le mot de passe",
+      "err_could_not_reach_server": "Impossible d'atteindre le serveur"
+    },
+    "server":             { "section": "Connexion au serveur" }
+  },
+  "login": {
+    "subtitle":             "Connecte-toi à ton compte",
+    "username":             "Nom d'utilisateur",
+    "username_placeholder": "Saisis ton nom d'utilisateur",
+    "password":             "Mot de passe",
+    "password_placeholder": "Saisis ton mot de passe",
+    "sign_in":              "Se connecter",
+    "signing_in":           "Connexion…",
+    "forgot_password":      "Mot de passe oublié ?",
+    "locked_out":           "Accès bloqué ?",
+    "sso_sign_in_with":     "Se connecter avec {provider}",
+    "sso_or":               "ou",
+    "no_signin_methods":    "Aucune méthode de connexion disponible. Interroge ton administrateur.",
+    "errors": {
+      "failed": "Échec de la connexion"
+    },
+    "recovery": {
+      "confirm":           "Ceci supprimera tous les comptes utilisateurs. Tes données d'aliments et de journal seront conservées. Continuer ?",
+      "explainer":         "Si tu n'as jamais défini de comptes utilisateurs volontairement, tu peux désactiver la gestion des utilisateurs. <strong>Ceci supprimera tous les comptes utilisateurs.</strong> Tes données d'aliments et de journal seront conservées.",
+      "token_prompt":      "Saisis le <code>RECOVERY_TOKEN</code> de l'environnement de ton serveur :",
+      "token_placeholder": "Jeton de récupération",
+      "action":            "Désactiver la gestion des utilisateurs et réinitialiser",
+      "disabling":         "Désactivation…",
+      "failed":            "Échec de la récupération",
+      "success":           "Gestion des utilisateurs désactivée — tu es maintenant en mode mono-utilisateur",
+      "done":              "La gestion des utilisateurs a été désactivée.<br>Redirection…"
+    }
+  },
+  "forgot_password": {
+    "title":             "Réinitialiser le mot de passe",
+    "intro":             "Saisis ton adresse e-mail et nous t'enverrons un lien pour réinitialiser ton mot de passe.",
+    "email_label":       "Adresse e-mail",
+    "send_link":         "Envoyer le lien de réinitialisation",
+    "sending":           "Envoi…",
+    "back_to_signin":    "Retour à la connexion",
+    "sent":              "Si un compte existe pour <strong>{email}</strong>, un lien de réinitialisation a été envoyé. Vérifie ta boîte de réception."
+  },
+  "reset_password": {
+    "title":               "Nouveau mot de passe",
+    "verifying":           "Vérification du lien…",
+    "invalid_link":        "Ce lien de réinitialisation est invalide ou a expiré.",
+    "request_new":         "Demander un nouveau lien",
+    "success":             "Mot de passe mis à jour. Redirection…",
+    "set_for":             "Définis un nouveau mot de passe pour <strong>{username}</strong>",
+    "new_password":        "Nouveau mot de passe",
+    "confirm_password":    "Confirmer le mot de passe",
+    "password_placeholder": "8 caractères min., majuscule, minuscule, chiffre, symbole",
+    "submit":              "Définir le nouveau mot de passe",
+    "saving":              "Enregistrement…",
+    "errors": {
+      "required": "Le mot de passe est requis",
+      "mismatch": "Les mots de passe ne correspondent pas",
+      "failed":   "Échec de la réinitialisation"
+    }
+  },
+  "profile": {
+    "title":                "Profil",
+    "personal_info":        "Informations personnelles",
+    "security":             "Sécurité",
+    "change_photo":         "Changer la photo",
+    "full_name":            "Nom complet",
+    "full_name_placeholder": "Ton nom complet",
+    "email_placeholder":    "Utilisé pour les réinitialisations de mot de passe",
+    "nickname":             "Surnom / nom d'affichage",
+    "nickname_placeholder": "Comment dois-je t'appeler ?",
+    "birthday":             "Anniversaire",
+    "gender":               "Sexe",
+    "gender_unset":         "Je préfère ne pas le dire",
+    "change_password":      "Changer le mot de passe",
+    "set_password":         "Définir un mot de passe",
+    "current_password":     "Mot de passe actuel",
+    "confirm_new_password": "Confirmer le nouveau mot de passe",
+    "saved":                "Profil enregistré",
+    "password_changed":     "Mot de passe modifié",
+    "linked_accounts":      "Comptes liés",
+    "no_linked_accounts":   "Aucun fournisseur d'identité lié pour l'instant.",
+    "link_with":            "Lier avec",
+    "unlink":               "Détacher",
+    "danger_zone":          "Zone de danger",
+    "delete_account":       "Supprimer mon compte",
+    "delete_account_explainer": "Supprime définitivement ton compte et toutes les données associées — aliments, repas, journal, bien-être, réglages.",
+    "delete_account_title": "Supprimer ton compte ?",
+    "delete_account_message": "Tes aliments, tes repas, ton journal, tes réglages et tes données de bien-être seront définitivement supprimés. Cette action est irréversible.",
+    "delete_account_confirm": "Supprimer le compte",
+    "deleting":             "Suppression…",
+    "account_deleted":      "Compte supprimé",
+    "errors": {
+      "save_failed":            "Impossible d'enregistrer le profil",
+      "upload_failed":          "Échec de l'envoi",
+      "password_change_failed": "Impossible de changer le mot de passe",
+      "delete_account_failed":  "Impossible de supprimer le compte"
+    }
+  },
+  "wizard": {
+    "nav": {
+      "skip":         "Passer",
+      "get_started":  "Commencer",
+      "next":         "Suivant",
+      "finish":       "Terminer"
+    },
+    "welcome": {
+      "title": "Bienvenue sur CookTrace",
+      "desc":  "Ton suiveur de nutrition personnel. On va tout mettre en place en une minute environ."
+    },
+    "name": {
+      "title":       "Comment dois-je t'appeler ?",
+      "desc":        "Utilisé dans les salutations, le menu latéral et ton assistant IA. Tu pourras le changer plus tard dans les Réglages.",
+      "placeholder": "Ton nom (facultatif)"
+    },
+    "usermgmt": {
+      "create_account_title": "Crée ton compte",
+      "create_account_desc":  "Configure ton compte administrateur pour sécuriser ta instance CookTrace. Tu pourras inviter d'autres utilisateurs plus tard depuis les Réglages.",
+      "multi_user_title":     "Support multi-utilisateurs",
+      "multi_user_desc":      "CookTrace peut fonctionner en mode mono-utilisateur (par défaut) ou en mode multi-utilisateurs avec des connexions et réinitialisations de mot de passe séparées. Tu pourras toujours l'activer plus tard dans les Réglages."
+    },
+    "units": {
+      "title": "Système de mesure",
+      "desc":  "Comment mesures-tu les choses ?"
+    },
+    "gender": {
+      "title": "Quel est ton sexe ?",
+      "desc":  "Utilisé pour calculer tes besoins en calories."
+    },
+    "dob": {
+      "title": "Quand es-tu né(e) ?",
+      "desc":  "Ton âge influe sur ton métabolisme."
+    },
+    "height": {
+      "title": "Quelle est ta taille ?",
+      "desc":  "Utilisée pour estimer tes besoins en calories."
+    },
+    "weight": {
+      "title": "Quel est ton poids ?"
+    },
+    "target": {
+      "title": "Quel est ton poids cible ?"
+    },
+    "activity": {
+      "title": "À quel point es-tu actif(ve) ?",
+      "desc":  "Influe sur tes besoins quotidiens en calories."
+    },
+    "integrations": {
+      "title": "Intégrations",
+      "desc":  "Connecte des services facultatifs. Passe ceux dont tu n'as pas besoin — tu pourras les configurer plus tard dans les Réglages."
+    },
+    "notifications": {
+      "title": "Garde le cap",
+      "desc":  "Reçois des rappels utiles et célèbre tes réussites. Tu pourras personnaliser tout ceci plus tard dans les Réglages."
+    },
+    "summary": {
+      "title": "Tes objectifs quotidiens",
+      "desc":  "Calculés à partir de tes statistiques avec la formule de Mifflin-St Jeor."
+    },
+    "skip_modal": {
+      "title":    "Passer la configuration ?",
+      "desc":     "Tu pourras configurer tes objectifs, tes unités et tes intégrations à tout moment depuis <strong>Réglages</strong>. En attendant, les objectifs caloriques ne seront pas calculés automatiquement.",
+      "continue": "Continuer la configuration",
+      "skip_now": "Passer pour l'instant"
+    }
+  },
+  "diary": {
+    "add_food":          "Ajouter un aliment",
+    "notes_placeholder": "Comment s'est passée la journée ? Sommeil, énergie, faim, fringales…",
+    "nav": {
+      "previous_day":  "Jour précédent",
+      "next_day":      "Jour suivant",
+      "jump_to_date":  "Aller à la date"
+    },
+    "actions": {
+      "cancel_selection":      "Annuler la sélection",
+      "delete_selected":       "Supprimer la sélection",
+      "log_water":             "Noter l'eau",
+      "log_water_long":        "Eau — note ta consommation d'eau",
+      "nutrition_summary":     "Résumé nutritionnel",
+      "nutrition_summary_long": "Résumé nutritionnel — détail complet des nutriments du jour",
+      "body_stats":            "Mesures corporelles",
+      "body_stats_long":       "Mesures corporelles — note ton poids, ton taux de masse grasse et tes mensurations"
+    },
+    "toast": {
+      "body_stats_saved": "Mesures corporelles enregistrées",
+      "updated":          "Mis à jour",
+      "item_removed":     "Produit supprimé",
+      "activity_removed": "Activité supprimée"
+    },
+    "errors": {
+      "note_save_failed":     "Échec de l'enregistrement de la note",
+      "name_required":        "Saisis un nom",
+      "nothing_to_save":      "Rien à enregistrer",
+      "activity_save_failed": "Impossible d'enregistrer l'activité",
+      "activity_delete_failed": "Impossible de supprimer l'activité"
+    },
+    "activity": {
+      "section":              "Activité",
+      "tap_to_add":           "Tape pour ajouter une activité",
+      "add":                  "Ajouter une activité",
+      "add_to_diary":         "Ajouter au journal",
+      "save_changes":         "Enregistrer les modifications",
+      "title_add":            "Ajouter une activité",
+      "title_edit":           "Modifier l'activité",
+      "field_name":           "Activité",
+      "field_name_placeholder": "ex. Randonnée du matin",
+      "field_kcal":           "Calories brûlées",
+      "field_kcal_placeholder": "kcal",
+      "field_duration":       "Durée",
+      "field_duration_placeholder": "minutes",
+      "field_distance":       "Distance",
+      "field_distance_placeholder": "ex. 10 km",
+      "field_optional":       "(facultatif)",
+      "saving":               "Ajout…",
+      "estimated_short":      "est.",
+      "wellness_hint":        "Les entraînements synchronisés depuis ton appareil sont dans Bien-être",
+      "not_counted":          "non compté — le wearable s'en charge",
+      "policy_chip":          "Règle : le wearable l'emporte. Modifiable dans Réglages → Journal.",
+      "actions": {
+        "edit":   "Modifier",
+        "delete": "Supprimer"
+      },
+      "errors": {
+        "name_required": "Le nom est requis",
+        "kcal_required": "Les calories sont requises"
+      }
+    }
+  },
+  "foods": {
+    "search_placeholder":      "Rechercher des aliments ou scanner un code-barres…",
+    "scan_barcode":            "Scanner un code-barres",
+    "add_new":                 "Ajouter",
+    "n_selected":              "{n} sélectionné(s)",
+    "add_n":                   "Ajouter {n}",
+    "adding":                  "Ajout…",
+    "add_selected_to_diary":   "Ajouter la sélection au journal",
+    "search_in":               "Rechercher dans {source}",
+    "searching_in":            "Recherche dans {source}…",
+    "no_results_in":           "Aucun résultat dans {source}",
+    "sources": {
+      "local":       "Local",
+      "from_others": "Des autres"
+    },
+    "toast": {
+      "deleted": "Supprimé",
+      "cloned":  "Cloné"
+    }
+  },
+  "smart_log": {
+    "placeholder": "au petit-déjeuner j'ai mangé 2 œufs et du pain grillé"
+  },
+  "goals": {
+    "save_goal": "Enregistrer l'objectif",
+    "toast": {
+      "goal_saved":       "Objectif enregistré",
+      "water_goal_saved": "Objectif d'eau enregistré",
+      "template_saved":   "Modèle enregistré",
+      "template_applied": "« {name} » appliqué"
+    }
+  },
+  "food_editor": {
+    "name_placeholder":  "Nom de l'aliment",
+    "brand_placeholder": "Marque (facultatif)",
+    "saved":             "Enregistré",
+    "added_to_diary":    "Ajouté au journal",
+    "errors": {
+      "name_required": "Saisis un nom"
+    }
+  },
+  "meal_editor": {
+    "meal_name_placeholder":   "Nom du repas",
+    "recipe_name_placeholder": "Nom de la recette",
+    "errors": {
+      "no_ingredients": "Ajoute au moins un ingrédient"
+    }
+  },
+  "pantry": {
+    "title":              "Provisions",
+    "add_item":           "Ajouter un produit",
+    "search_placeholder": "Rechercher dans les provisions…",
+    "scan_barcode":       "Scanner un code-barres",
+    "filters": {
+      "all":           "Tout",
+      "in_stock":      "En stock",
+      "out":           "En rupture",
+      "all_categories": "Toutes les catégories",
+      "uncategorized":  "Non classé",
+      "select_multiple": "Sélection",
+      "cancel_select":   "Annuler"
+    },
+    "external": {
+      "searching_in":  "Recherche dans {source}…",
+      "no_results_in": "Aucun résultat dans {source}",
+      "sources": {
+        "local": "Provisions",
+        "off":   "OFF",
+        "usda":  "USDA"
+      }
+    },
+    "actions": {
+      "edit":            "Modifier",
+      "select_multiple": "Sélection multiple",
+      "delete":          "Supprimer",
+      "mark_in_stock":   "Marquer en stock",
+      "mark_out_stock":  "Marquer en rupture"
+    },
+    "bulk": {
+      "selected":   "{n} sélectionné(s)",
+      "select_all": "Tout sélectionner",
+      "clear":      "Effacer",
+      "delete":     "Supprimer",
+      "confirm_title":   "Supprimer {n} produits des provisions ?",
+      "confirm_message": "Les recettes qui y font référence restent ; cela les retire simplement de tes provisions."
+    }
+  },
+  "pantry_editor": {
+    "title_add":    "Ajouter un produit aux provisions",
+    "title_edit":   "Modifier un produit des provisions",
+    "cards": {
+      "photo":      "Photo",
+      "basic_info": "Informations de base",
+      "inventory":  "Inventaire",
+      "category":   "Catégorie",
+      "notes":      "Notes",
+      "nutrition":  "Nutrition",
+      "danger":     "Zone de danger"
+    },
+    "fields": {
+      "name":         "Nom",
+      "name_placeholder": "Farine tout usage",
+      "brand":        "Marque",
+      "brand_placeholder": "ex. King Arthur",
+      "barcode":      "Code-barres",
+      "serving_size": "Taille de portion",
+      "serving_unit": "Unité",
+      "on_hand":      "Quantité",
+      "in_stock":     "En stock",
+      "in_stock_desc": "Pilote la pastille « X / Y en provisions » sur chaque carte de recette.",
+      "category_none": "Aucune",
+      "notes_placeholder": "Où tu le ranges, la date d'expiration, autre chose…"
+    },
+    "actions": {
+      "share_to_off":   "Partager vers OFF",
+      "refresh_off":    "Actualiser depuis OFF",
+      "uploading":      "Envoi…",
+      "loading":        "Chargement…",
+      "submitted":      "Envoyé !",
+      "updated":        "Mis à jour !",
+      "show_all_nutrients": "Afficher tous les nutriments",
+      "show_less":      "Afficher moins",
+      "remove":         "Retirer des provisions"
+    },
+    "linked": {
+      "linked":    "Lié : changer la taille de portion ajuste proportionnellement tous les nutriments",
+      "unlinked":  "Non lié : les valeurs de nutriments restent inchangées quand tu modifies la taille de portion"
+    },
+    "errors": {
+      "name_required":  "Le nom est requis",
+      "save_failed":    "Échec de l'enregistrement",
+      "off_lookup_failed": "Échec de la recherche OFF",
+      "off_not_found":  "Introuvable sur Open Food Facts",
+      "share_no_barcode": "Ajoute un code-barres pour partager",
+      "refresh_no_barcode": "Ajoute ou scanne d'abord un code-barres"
+    }
+  },
+  "diary_entry": {
+    "title_add":  "Ajouter au journal",
+    "title_edit": "Modifier l'entrée de journal",
+    "save_changes": "Enregistrer les modifications",
+    "submit":     "Ajouter au journal",
+    "fields": {
+      "date":  "Date",
+      "notes": "Notes",
+      "notes_hint": "(qu'est-ce que ça a donné ?)",
+      "photos": "Photos",
+      "photos_hint": "(facultatif — ajoute-en autant que tu veux)"
+    },
+    "actions": {
+      "open_recipe":  "Ouvrir la recette",
+      "mark_cooked":  "Marquer comme cuisinée",
+      "delete":       "Supprimer"
+    }
+  },
+  "settings_added": {
+    "food_sources":     { "section": "Sources d'aliments" },
+    "off": {
+      "section":          "Open Food Facts",
+      "enable":           "Activer Open Food Facts",
+      "enable_desc":      "Recherche les codes-barres dans la base de données alimentaire mondiale communautaire. Aucun compte n'est requis pour les recherches ; il n'est nécessaire que pour envoyer des modifications via Partager vers OFF.",
+      "search_language":  "Langue de recherche",
+      "search_country":   "Pays de recherche",
+      "upload_country":   "Pays d'envoi",
+      "username":         "Nom d'utilisateur du compte",
+      "username_hint":    "Facultatif — requis uniquement pour envoyer des modifications.",
+      "password":         "Mot de passe du compte",
+      "create_account":   "Créer un compte OFF →"
+    },
+    "usda": {
+      "section":          "USDA FoodData Central",
+      "enable":           "Activer USDA FoodData",
+      "enable_desc":      "Recherche dans la base de données nutritionnelle du USDA quand tu ajoutes des produits aux provisions.",
+      "get_key":          "Obtenir une clé API gratuite →",
+      "api_key":          "Clé API"
+    },
+    "barcode_scanner": {
+      "section":          "Lecteur de codes-barres",
+      "beep":             "Bip au scan",
+      "beep_desc":        "Confirmation sonore brève quand un code-barres est reconnu.",
+      "flashlight":       "Voler automatique",
+      "flashlight_desc":  "Allume automatiquement la lampe-torche de la caméra arrière quand le scanner s'ouvre (web uniquement — la version native utilise les contrôles de l'interface caméra du système)."
+    },
+    "federation":       { "section": "Fédération NutriTrace" }
+  },
+  "accept_invite": {
+    "title":                "Créer un compte",
+    "verifying":            "Vérification de l'invitation…",
+    "invalid_link":         "Ce lien d'invitation est invalide ou a expiré. Demande-en un nouveau à ton administrateur.",
+    "success":              "Compte créé ! Redirection…",
+    "intro":                "Tu as été invité(e) sur CookTrace. Choisis un nom d'utilisateur et un mot de passe pour commencer.",
+    "intro_with_email":     "Tu as été invité(e) en tant que <strong>{email}</strong>. Choisis un nom d'utilisateur et un mot de passe pour commencer.",
+    "username_label":       "Nom d'utilisateur *",
+    "username_placeholder": "Choisis un nom d'utilisateur",
+    "full_name_label":      "Nom complet (facultatif)",
+    "full_name_placeholder": "Ton nom",
+    "password_label":       "Mot de passe *",
+    "confirm_label":        "Confirmer le mot de passe *",
+    "submit":               "Créer le compte",
+    "creating":             "Création du compte…",
+    "errors": {
+      "username_required": "Le nom d'utilisateur est requis",
+      "failed":            "Échec de la création du compte"
+    }
+  },
+  "settings_page": {
+    "toast": {
+      "copy_failed":            "Échec de la copie, sélectionne le texte manuellement",
+      "no_log_file":            "Pas encore de fichier de log, active le mode diagnostic et reproduis d'abord le problème"
+    },
+    "profile_hero": {
+      "admin_badge":            "Admin",
+      "tap_to_setup":           "Tape pour configurer ton profil"
+    },
+    "group": {
+      "display":                "Affichage",
+      "integrations":           "Intégrations",
+      "admin":                  "Admin"
+    },
+    "appearance": {
+      "theme":                  "Thème",
+      "accent_color":           "Couleur d'accent",
+      "navigation_style":       "Style de navigation",
+      "persistent_sidebar":     "Barre latérale persistante",
+      "persistent_sidebar_desc": "La barre latérale reste ouverte et décale le contenu de la page au lieu de se superposer.",
+      "start_page":             "Page de démarrage",
+      "reduce_motion":          "Réduire les animations",
+      "page_banners":           "Bannières de page",
+      "page_banners_desc":      "Style d'en-tête en haut de chaque page. Animée est une barre compacte en dégradé d'accent avec un style de mouvement au choix ; Dégradé est la même barre, statique ; Désactivé est un en-tête glass classique.",
+      "banner_animated":        "Animée",
+      "banner_gradient":        "Dégradé",
+      "banner_off":             "Désactivée",
+      "animation_style":        "Style d'animation",
+      "animation_style_desc":   "Shimmer est un balayage doux en blanc, Drift est une rotation lente de teinte, Pulse est une respiration douce, Aurora est un nuage de lumière teinté d'accent. Tous respectent « Réduire les animations ».",
+      "anim_shimmer":           "Shimmer",
+      "anim_drift":             "Drift",
+      "anim_pulse":             "Pulse",
+      "anim_aurora":            "Aurora"
+    },
+    "regional": {
+      "language":               "Langue",
+      "language_desc":          "Langue de l'interface. Une traduction peut retarder d'une ou deux versions par rapport à l'anglais ; les chaînes manquantes basculent sur l'anglais.",
+      "date_format":            "Format de date",
+      "date_natural":           "D MMM YYYY",
+      "time_format":            "Format d'heure",
+      "measurement_system":     "Système de mesure",
+      "imperial":               "Impérial",
+      "metric":                 "Métrique",
+      "energy":                 "Énergie"
+    },
+    "cooking": {
+      "default_servings":       "Portions par défaut",
+      "show_shared":            "Afficher les recettes partagées dans ma liste principale",
+      "url_import_engine":      "Moteur d'import par URL",
+      "url_engine_desc_standard_html": "<strong>Standard</strong> lit les données schema.org/Recipe de la page. Gratuit et rapide ; fonctionne sur la plupart des grands sites de recettes.",
+      "url_engine_desc_enhanced_html": "<strong>Amélioré</strong> lance recipe-scrapers, qui a des extracteurs spécifiques pour ~300 sites populaires et retombe sur schema.org pour le reste.",
+      "url_engine_desc_smart_html":  "<strong>Intelligent</strong> passe la page à ton Trace AI. Plus lent et consomme ta quota IA, mais récupère des recettes sur des sites qui bloquent les scrapers ou masquent leur contenu dans un balisage non standard.",
+      "engine_standard":        "Standard",
+      "engine_enhanced":        "Amélioré",
+      "engine_enhanced_server_suffix": " (serveur requis)",
+      "engine_smart":           "Intelligent",
+      "engine_smart_required_suffix": " (Trace AI requis)",
+      "smart_note":             "Intelligent envoie chaque import par URL à ton IA, qui consomme la quota de ton fournisseur à chaque collage. Standard ou Amélioré sont gratuits et gèrent la plupart des sites ; pense à ne définir Intelligent qu'en secours.",
+      "enhanced_fallback":      "Repli : Amélioré",
+      "enhanced_fallback_desc": "Si le serveur est injoignable ou que recipe-scrapers n'est pas installé, retombe sur ceci.",
+      "shopping_list":          "Liste de courses",
+      "default_grouping":       "Groupement par défaut",
+      "group_by_aisle":         "Par rayon",
+      "group_by_recipe":        "Par recette",
+      "group_by_flat":          "Sans groupe",
+      "checked_items":          "Produits cochés",
+      "sink_to_bottom":         "Envoyer en bas",
+      "hide":                   "Masquer"
+    },
+    "pantry_search": {
+      "section":                "Recherche dans les provisions",
+      "default_source":         "Source de recherche par défaut",
+      "default_source_desc":    "La pastille de source avec laquelle s'ouvre la page Provisions. Tout étend à toutes les bases activées ; Mes provisions démarre dans ta bibliothèque locale.",
+      "source_all":             "Tout",
+      "source_local":           "Mes provisions"
+    },
+    "off": {
+      "section":                "Open Food Facts",
+      "enable":                 "Activer Open Food Facts",
+      "search_language":        "Langue de recherche",
+      "search_country":         "Pays de recherche",
+      "upload_country":         "Pays d'envoi",
+      "auto":                   "Auto",
+      "account_username":       "Nom d'utilisateur du compte",
+      "off_username_ph":        "nom d'utilisateur OFF",
+      "account_password":       "Mot de passe du compte",
+      "off_password_ph":        "mot de passe OFF"
+    },
+    "usda": {
+      "section":                "USDA FoodData Central",
+      "enable":                 "Activer USDA FoodData",
+      "api_key":                "Clé API",
+      "api_key_ph":             "Colle ta clé API USDA ici"
+    },
+    "nutritrace": {
+      "section":                "NutriTrace"
+    },
+    "scanner": {
+      "section":                "Lecteur de codes-barres",
+      "beep_on_scan":           "Bip au scan"
+    },
+    "diag": {
+      "mode":                   "Mode diagnostic",
+      "view_logs":              "Voir les logs de diagnostic",
+      "logs_desc_prefix":       "Lignes récentes de la console de l'application. Utiles pour les rapports de bug ; copie-les ou partage-les dans une ",
+      "logs_desc_github":       "issue GitHub",
+      "logs_desc_android":      " Sur Android avec le mode diagnostic activé, tu peux aussi partager le fichier de log persistant ou tout rapport de crash capturé.",
+      "logs_desc_suffix":       " Rien n'est envoyé nulle part automatiquement.",
+      "crash_available":        "Rapport de crash disponible"
+    },
+    "about": {
+      "app_name":               "CookTrace",
+      "federation_prefix":      "Fédération facultative avec ",
+      "federation_suffix":      " pour le suivi nutritionnel",
+      "family_line_prefix":     "Fait partie de la famille ",
+      "family_line_suffix":     ""
+    },
+    "support": {
+      "lead":                   "CookTrace est gratuit et le restera toujours. Le support est facultatif et ne débloque jamais rien.",
+      "other_ways":             "Autres façons d'aider",
+      "star":                   "Mettre une étoile sur GitHub",
+      "star_desc":              "Les étoiles, c'est ainsi que les projets auto-hébergés sont trouvés.",
+      "report_bug":             "Signaler un bug",
+      "report_bug_desc":        "Un rapport clair le corrige pour tout le monde qui y est confronté.",
+      "translate":              "Aider à traduire",
+      "translate_desc":         "Rends CookTrace utilisable dans ta langue, sur Weblate."
+    },
+    "custom_color": {
+      "saturation":             "Saturation",
+      "lightness":              "Luminosité",
+      "hex_code":               "Code hex",
+      "apply":                  "Appliquer la couleur"
+    }
+  },
+  "backup_page": {
+    "toast": {
+      "deleted":                "Supprimé",
+      "restored_reloading":     "Restauré, rechargement…",
+      "all_data_cleared":       "Toutes les données effacées",
+      "clear_failed":           "Échec de l'effacement : {msg}",
+      "all_settings_cleared":   "Tous les réglages effacés",
+      "exported":               "Exporté",
+      "backup_saved":           "Sauvegarde enregistrée",
+      "imported_reloading":     "Importé, rechargement",
+      "imported":               "Importé"
+    },
+    "full_backup":              "Sauvegarde complète",
+    "auto_backup":              "Sauvegarde automatique",
+    "env_lock_pill":            "Verrouillé par l'env",
+    "env_lock_title":           "Verrouillé par les variables d'environnement BACKUP_SCHEDULE / BACKUP_TIME / BACKUP_RETENTION",
+    "schedule":                 "Planification",
+    "daily":                    "Quotidienne",
+    "weekly":                   "Hebdomadaire",
+    "monthly":                  "Mensuelle",
+    "time":                     "Heure",
+    "keep_last":                "Conserver les",
+    "col_name":                 "Nom",
+    "col_created":              "Créé le",
+    "col_size":                 "Taille",
+    "restore_from_zip":         "Restaurer depuis un ZIP",
+    "portable_json":            "Export JSON portable",
+    "export_json":              "Exporter en JSON",
+    "import_json":              "Importer un JSON",
+    "danger_zone":              "Zone de danger",
+    "clear_all_data":           "Effacer toutes les données",
+    "clear_all_settings":       "Effacer tous les réglages"
+  },
+  "settings_import_nt": {
+    "toast": {
+      "pick_pantry_first":       "Choisis d'abord un produit des provisions pour les lier comme variantes.",
+      "name_generic_first":      "Donne d'abord un nom au nouveau produit générique."
+    },
+    "federation_disabled":       "Fédération NutriTrace désactivée",
+    "import_from_nt":            "Importer depuis NutriTrace",
+    "select_all":                "Tout sélectionner",
+    "select_none":               "Ne rien sélectionner",
+    "import_as":                 "Importer comme",
+    "mode_flat":                 "Nouveaux produits à plat",
+    "mode_variants_existing":    "Variantes d'un produit existant",
+    "mode_variants_new":         "Variantes d'un nouveau produit générique",
+    "mark_in_stock":             "Marquer les produits importés en stock",
+    "cancel":                    "Annuler",
+    "import_more":               "Importer davantage"
+  },
+  "settings_email_ct": {
+    "toast": {
+      "smtp_host_required":      "Test SMTP échoué : hôte requis",
+      "invalid_email":           "Saisis une adresse e-mail valide"
+    },
+    "hint":                      "Utilisé pour les réinitialisations de mot de passe et les invitations",
+    "smtp_host":                 "Hôte SMTP",
+    "port":                      "Port",
+    "username":                  "E-mail ou nom d'utilisateur",
+    "username_ph":               "nom d'utilisateur ou e-mail SMTP",
+    "password":                  "Mot de passe",
+    "password_ph":               "mot de passe SMTP ou mot de passe applicatif",
+    "from_address":              "Adresse expéditrice",
+    "send_test_email":           "Envoyer un e-mail de test",
+    "cancel":                    "Annuler",
+    "send":                      "Envoyer"
+  },
+  "settings_trace_ct": {
+    "toast": {
+      "fill_fields":             "Remplis d'abord le fournisseur, la clé API et le modèle",
+      "connected":               "Trace AI connecté, l'assistant est prêt"
+    },
+    "enable_assistant":          "Activer l'assistant Trace",
+    "provider":                  "Fournisseur",
+    "base_url":                  "URL de base",
+    "base_url_desc":             "point d'accès /v1/chat/completions",
+    "model":                     "Modèle",
+    "custom_model_id":           "ID de modèle personnalisé",
+    "assistant_name":            "Nom de l'assistant",
+    "assistant_name_ph":         "Trace",
+    "chef_hat":                  "Chapeau de cuisinier",
+    "env_lock_banner":           "Configuré par variables d'environnement, les modifications sont désactivées.",
+    "enable_desc":               "Bouton de chat flottant sur chaque page. Utilise ta propre clé de fournisseur IA, jamais partagée.",
+    "enable_desc_locked":        "Bouton de chat flottant sur chaque page. Le serveur fournit l'IA.",
+    "server_default":            "Défaut du serveur",
+    "smart_log":                 "Smart Log",
+    "voice_lang":                "Langue de la saisie vocale",
+    "voice_lang_desc":           "Langue pour laquelle le micro écoute. Par défaut, la langue de ton appareil ; modifie si tu parles une langue différente de celle de ton appareil.",
+    "voice_langs": {
+      "auto": "Auto (langue de l'appareil)",
+      "en_US": "Anglais (US)",
+      "en_GB": "Anglais (R-U)",
+      "it_IT": "Italien",
+      "es_ES": "Espagnol (Espagne)",
+      "es_MX": "Espagnol (Mexique)",
+      "fr_FR": "Français",
+      "de_DE": "Allemand",
+      "pt_BR": "Portugais (Brésil)",
+      "pt_PT": "Portugais (Portugal)",
+      "nl_NL": "Néerlandais",
+      "pl_PL": "Polonais",
+      "ru_RU": "Russe",
+      "sv_SE": "Suédois",
+      "da_DK": "Danois",
+      "nb_NO": "Norvégien",
+      "fi_FI": "Finlandais",
+      "cs_CZ": "Tchèque",
+      "tr_TR": "Turc",
+      "ja_JP": "Japonais",
+      "ko_KR": "Coréen",
+      "zh_CN": "Chinois (simplifié)",
+      "zh_TW": "Chinois (traditionnel)",
+      "hi_IN": "Hindi",
+      "ar_SA": "Arabe"
+    }
+  },
+  "settings_users_ct": {
+    "toast": {
+      "invite_revoked":          "Invitation révoquée",
+      "invite_email_or_blank":   "Saisis une adresse e-mail valide ou laisse vide pour générer un lien partageable",
+      "cant_create_invite":      "Impossible de créer l'invitation"
+    },
+    "pending_invites":           "Invitations en attente",
+    "require_strong_passwords":  "Exiger des mots de passe robustes",
+    "session_duration":          "Durée de session",
+    "session_never":             "N'expire jamais",
+    "disable_um":                "Désactiver la gestion des utilisateurs",
+    "enable_um":                 "Activer la gestion des utilisateurs",
+    "create_admin_account":      "Créer un compte administrateur"
+  },
+  "settings_kitchens_ct": {
+    "toast": {
+      "kitchen_deleted":         "Cuisine supprimée",
+      "can_edit_now":            "{name} peut modifier les recettes partagées",
+      "read_only_now":           "{name} peut lire les recettes partagées",
+      "all_can_edit":            "Tout le monde peut modifier les recettes partagées",
+      "all_read_only":           "Les recettes partagées sont de nouveau en lecture seule"
+    },
+    "um_required":               "Gestion des utilisateurs requise",
+    "create_new_kitchen":        "Créer une nouvelle cuisine",
+    "new_name_ph":               "Cuisine de la famille Martin",
+    "owner_badge":               "Chef",
+    "role_cook":                 "Cuisinier",
+    "role_sous":                 "Sous-chef",
+    "role_owner":                 "Chef",
+    "role_for":                  "Rôle de {name}",
+    "invite_role":               "Rôle du nouveau membre",
+    "hand_over":                 "Nommer chef",
+    "roles_help":                "Ce que chacun peut faire dans cette cuisine :",
+    "role_help_owner":                "invite et retire des personnes, définit les rôles, et peut supprimer la cuisine",
+    "role_help_sous":                "modifie les recettes et livres de recettes qui y sont partagés",
+    "role_help_cook":                "cuisine à partir d'eux, lecture seule, et c'est le rôle de départ de tout le monde",
+    "everyone_edits":            "Autoriser tout le monde à modifier",
+    "nobody_edits":              "Tout passer en lecture seule",
+    "remove":                    "Retirer",
+    "remove_member":                    "Retirer {name} de cette cuisine",
+    "leave":                     "Quitter",
+    "invite_username_ph":        "Nom d'utilisateur à inviter",
+    "delete_kitchen":            "Supprimer la cuisine"
+  },
+  "settings_import_ct": {
+    "import_section":            "Importer depuis une autre app",
+    "import_desc_html":          "Dépose une sauvegarde zip <strong>Mealie</strong>, un export <strong>Tandoor</strong> ou une archive <code>.paprikarecipes</code> <strong>Paprika</strong>. Nous la scannerons, te montrerons tout son contenu, et tu pourras cocher quelles recettes importer.",
+    "select_all":                "Tout sélectionner",
+    "select_none":               "Ne rien sélectionner",
+    "transfer_images":           "Transférer les images de l'archive",
+    "keep_tags":                 "Garder les tags de la source",
+    "opt_replace":               "Remplacer par la version importée",
+    "opt_force":                 "Autoriser les doublons",
+    "cancel":                    "Annuler",
+    "import_another":            "Importer un autre"
+  },
+  "settings_federation_ct": {
+    "toast": {
+      "url_token_required":      "Saisis d'abord une URL et un jeton d'accès"
+    },
+    "connect_to_nt":             "Se connecter à NutriTrace",
+    "instance_url":              "URL de l'instance",
+    "access_token":              "Jeton d'accès",
+    "access_token_ph":           "jeton Bearer depuis NutriTrace"
+  },
+  "settings_nutrition_ct": {
+    "visibility":                "Visibilité des valeurs nutritionnelles",
+    "defaults":                  "Valeurs par défaut",
+    "show_all":                  "Tout afficher"
+  },
+  "settings_auth_extra": {
+    "toast": {
+      "issuer_client_required":     "L'URL de l'émetteur et l'ID client sont requis",
+      "redirect_required":          "Au moins une URI de redirection est requise",
+      "cant_reach_server":          "Impossible d'atteindre le serveur",
+      "provider_deleted":           "Fournisseur supprimé",
+      "need_active_provider":       "Ajoute au moins un fournisseur OIDC actif avant de désactiver la connexion par mot de passe."
+    },
+    "user_mgmt_required":            "La gestion des utilisateurs est requise",
+    "admin_only":                    "Admin uniquement",
+    "discovery_ok":                  "Découverte OK",
+    "discovery_failed":              "Échec de la découverte",
+    "provider_type":                 "Type de fournisseur",
+    "display_name":                  "Nom d'affichage",
+    "scope":                         "Portée",
+    "token_endpoint_auth_method":    "Méthode d'authentification du point d'accès jeton",
+    "auto_link_desc_html":           "Quand l'IdP indique <code>email_verified=true</code> et que l'e-mail correspond à un utilisateur CookTrace existant, on les lie silencieusement à la première connexion SSO. Recommandé activé pour tout IdP auquel tu fais confiance pour vérifier les e-mails.",
+    "provider_active":               "Fournisseur actif",
+    "admin_group_value_ph":          "CookTraceAdmins",
+    "cancel":                        "Annuler",
+    "allow_password_login":          "Autoriser la connexion par mot de passe",
+    "env_locked_html":               "<br /><em>Verrouillé par la variable d'environnement <code>OIDC_ENABLE_EMAIL_PASSWORD_LOGIN</code>.</em>"
+  },
+  "settings_api_tokens_ct": {
+    "intro_before":    "Jetons d'accès personnels pour les agents externes (Claude Desktop, Cursor, Codex",
+    "intro_dev":       "et autres clients du Model Context Protocol",
+    "intro_middle":    ") qui se connectent à",
+    "intro_see":       "Voir",
+    "just_created": {
+      "title":   "Jeton créé :",
+      "warn":    "Copie-le maintenant. Il ne sera plus affiché.",
+      "copy":    "Copier",
+      "saved":   "Je l'ai enregistré"
+    },
+    "empty": {
+      "title": "Pas encore de jetons",
+      "desc":  "Crée-en un pour permettre à NutriTrace d'extraire tes recettes (read:recipes), ou à un client MCP (Claude Desktop, Cursor, Codex) de lire ou mettre à jour tes recettes, tes provisions, ta liste de courses et ton journal de cuisine."
+    },
+    "row": {
+      "scopes_label":  "Portées :",
+      "scopes_none":   "aucune",
+      "never":         "jamais",
+      "just_now":      "à l'instant",
+      "min_ago":       "il y a {n} min",
+      "hr_ago":        "il y a {n} h",
+      "day_ago":       "il y a {n} j",
+      "last_used":     "dernier usage {when}",
+      "expires":       "expire {when}",
+      "revoke_title":  "Révoquer le jeton"
+    },
+    "form": {
+      "new_token":     "Nouveau jeton",
+      "name":          "Nom",
+      "name_ph":       "ex. claude-desktop",
+      "scopes":        "Portées",
+      "expires_label": "Expire après (jours)",
+      "expires_ph":    "jamais",
+      "cancel":        "Annuler",
+      "create":        "Créer",
+      "creating":      "Création…"
+    },
+    "confirm": {
+      "revoke_title":   "Révoquer « {name} » ?",
+      "revoke_msg":     "Tout client utilisant ce jeton perdra immédiatement l'accès.",
+      "revoke_confirm": "Révoquer"
+    },
+    "toast": {
+      "load_failed":     "Impossible de charger les jetons",
+      "scope_required":  "Choisis au moins une portée",
+      "name_required":   "Le nom est requis",
+      "create_failed":   "Impossible de créer le jeton",
+      "revoke_failed":   "Impossible de révoquer le jeton",
+      "revoked":         "Jeton révoqué",
+      "copied":          "Copié dans le presse-papiers",
+      "copy_failed":     "Impossible de copier"
+    }
+  },
+  "settings_webhooks": {
+    "intro": "Les webhooks sortants notifient un autre service dès qu'il se passe quelque chose dans CookTrace : une recette est cuisinée, la liste de courses est entièrement cochée, ou un produit des provisions s'épuise. Chaque webhook déclenche un POST HTTP signé vers une URL que tu fournis.",
+    "disabled_notice": "Les webhooks ne sont pas activés sur ce serveur. On peut quand même créer un webhook, mais il ne se déclenchera pas tant que WEBHOOKS_ENABLED=1 n'est pas défini.",
+    "just_created": {
+      "title": "Webhook créé :",
+      "warn": "Copie ce secret maintenant. Il ne sera plus affiché, et tu en auras besoin pour vérifier la signature des livraisons.",
+      "copy": "Copier",
+      "saved": "Je l'ai enregistré"
+    },
+    "empty": {
+      "title": "Pas encore de webhooks",
+      "desc": "Crée-en un pour notifier un autre service quand quelque chose se passe."
+    },
+    "row": {
+      "last_delivery": "dernière livraison {when}",
+      "never": "jamais",
+      "just_now": "à l'instant",
+      "min_ago": "il y a {n} min",
+      "hr_ago": "il y a {n} h",
+      "day_ago": "il y a {n} j",
+      "status_success": "livré",
+      "status_failed": "échec",
+      "test_title": "Envoyer un événement de test",
+      "enabled_title": "Activé",
+      "delete_title": "Supprimer le webhook"
+    },
+    "form": {
+      "new_webhook": "Nouveau webhook",
+      "url": "URL cible *",
+      "url_ph": "https://example.com/webhook",
+      "events": "Événements *",
+      "secret_label": "Secret (facultatif)",
+      "secret_ph": "Laisser vide pour en générer un",
+      "cancel": "Annuler",
+      "create": "Créer le webhook",
+      "creating": "Création…"
+    },
+    "confirm": {
+      "delete_title": "Supprimer ce webhook ?",
+      "delete_msg": "Cette action est irréversible. La cible cessera immédiatement de recevoir des événements.",
+      "delete_confirm": "Supprimer"
+    },
+    "toast": {
+      "load_failed": "Impossible de charger les webhooks",
+      "url_required": "Saisis une URL cible",
+      "event_required": "Sélectionne au moins un événement",
+      "create_failed": "Impossible de créer le webhook",
+      "update_failed": "Impossible de mettre à jour le webhook",
+      "delete_failed": "Impossible de supprimer le webhook",
+      "deleted": "Webhook supprimé",
+      "test_failed": "Échec de la livraison de test",
+      "test_delivered": "Événement de test livré",
+      "copied": "Copié dans le presse-papiers",
+      "copy_failed": "Impossible de copier, sélectionne le texte manuellement"
+    }
+  },
+  "settings_server_conn": {
+    "toast": {
+      "enter_url":               "Saisis l'URL de ton serveur",
+      "enter_credentials":       "Saisis tes identifiants",
+      "sync_failed":             "Échec de la synchronisation : {reason}",
+      "sync_unknown":            "Erreur inconnue",
+      "connected_reloading":     "Connecté, rechargement",
+      "synced":                  "Synchronisé",
+      "pushed_all":              "Toutes les données envoyées",
+      "logged_out_reloading":    "Déconnecté, rechargement",
+      "disconnected_reloading":  "Déconnecté, rechargement"
+    },
+    "state_connected":           "Connecté",
+    "last_synced":               "Dernière synchronisation",
+    "state_local":               "Mode local",
+    "server_url":                "URL du serveur",
+    "username":                  "Nom d'utilisateur",
+    "username_ph":               "Ton nom d'utilisateur",
+    "password":                  "Mot de passe",
+    "password_ph":               "Ton mot de passe",
+    "sync_options":              "Options de synchronisation",
+    "upload_phone_to_server":    "Envoyer le téléphone vers le serveur",
+    "download_server_to_phone":  "Télécharger le serveur sur le téléphone",
+    "merge_both":                "Fusionner les deux",
+    "cancel":                    "Annuler",
+    "continue":                  "Continuer"
+  },
+  "settings_notifications": {
+    "toast": {
+      "test_sent":                 "Test envoyé, vérifie ton service de push.",
+      "not_supported":             "Ce navigateur ne prend pas en charge les notifications.",
+      "permission_granted":        "Permission de notification accordée.",
+      "permission_denied":         "Permission refusée. Active-la dans les réglages du navigateur."
+    },
+    "device_notifications":        "Notifications de l'appareil",
+    "enable_on_device":            "Activer sur cet appareil",
+    "browser_permission":          "Permission du navigateur",
+    "push_service":                "Service de push",
+    "service":                     "Service",
+    "svc_none":                    "Aucun",
+    "svc_apprise":                 "Apprise",
+    "svc_gotify":                  "Gotify",
+    "apprise_url":                 "URL Apprise",
+    "gotify_url":                  "URL Gotify",
+    "app_token":                   "Jeton de l'app",
+    "topic":                       "Sujet",
+    "send_test":                   "Envoyer un test",
+    "reminders":                   "Rappels",
+    "thaw_alert":                  "Alerte de décongélation",
+    "shopping_nudge":              "Rappel de courses",
+    "comment_replies":             "Réponses aux commentaires",
+    "expiration_digest":           "Résumé des expirations",
+    "warn_days_ahead":             "Me prévenir",
+    "delivery_time":               "Heure d'envoi",
+    "weekly_summary_email":        "E-mail de résumé hebdomadaire",
+    "note":                        "Note"
+  },
+  "import_url_dialog": {
+    "toast": {
+      "recipe_imported":         "Recette importée",
+      "url_batch_limit":         "100 URLs maximum par lot. Divise en lots plus petits.",
+      "pick_one_url":            "Choisis au moins une URL à enregistrer."
+    },
+    "title":                     "Importer depuis une URL",
+    "link_to_pantry":            "Lier les ingrédients aux provisions",
+    "apply_tags":                "Appliquer les tags de la source",
+    "import_source_category":    "Importer la catégorie de la source",
+    "cancel":                    "Annuler",
+    "select_all":                "Tout sélectionner",
+    "clear":                     "Effacer",
+    "failed":                    "Échec",
+    "try_again":                 "Réessayer"
+  },
+  "bulk_import_dialog": {
+    "toast": {
+      "no_ai_saved":             "L'IA n'a pas enregistré de recette pour cette ligne.",
+      "pick_one_recipe":         "Choisis au moins une recette à enregistrer."
+    },
+    "title":                     "Import en masse",
+    "dz_title":                  "Dépose des fichiers ici ou clique pour en choisir",
+    "cancel":                    "Annuler",
+    "select_all":                "Tout sélectionner",
+    "select_clean":              "Sélectionner les valides uniquement",
+    "clear":                     "Effacer",
+    "saved_via_ai":              "Enregistré via IA",
+    "skipped":                   "Ignoré",
+    "no_text":                   "Pas de texte",
+    "try_again":                 "Réessayer"
+  },
+  "file_import_dialog": {
+    "toast": {
+      "unsupported_file":        "Choisis une image, un PDF, un RTF, un TXT ou un MD."
+    },
+    "title":                     "Importer depuis un fichier",
+    "pick_a_file":               "Choisir un fichier",
+    "use_camera":                "Utiliser la caméra",
+    "camera_sub":                "Photographie une page de livre de recettes",
+    "cancel":                    "Annuler",
+    "done":                      "Terminé",
+    "try_again":                 "Réessayer"
+  },
+  "cookbook_import_dialog": {
+    "toast": {
+      "pick_pdf":                "Choisis un fichier PDF."
+    },
+    "title":                     "Importer un livre de recettes",
+    "close":                     "Fermer",
+    "pick_cookbook_pdf":         "Choisir un PDF de livre de recettes",
+    "cancel":                    "Annuler",
+    "try_again":                 "Réessayer"
+  },
+  "recipe_comments": {
+    "toast": {
+      "comment_updated":         "Commentaire mis à jour"
+    },
+    "title":                     "Commentaires",
+    "cancel":                    "Annuler",
+    "save":                      "Enregistrer"
+  },
+  "cook_log_dialog": {
+    "date":                      "Date",
+    "meal":                      "Repas",
+    "optional":                  "(facultatif)",
+    "notes":                     "Notes",
+    "notes_hint":                "(qu'est-ce que ça a donné ?)",
+    "cancel":                    "Annuler"
+  },
+  "import_from_file": {
+    "toast": {
+      "unsupported":             "Choisis une image, un PDF, un RTF, un TXT, un MD ou un ZIP."
+    },
+    "title":                     "Importer depuis un fichier",
+    "dz_title":                  "Dépose des fichiers ici ou clique pour en choisir",
+    "cancel":                    "Annuler"
+  },
+  "nutrition_facts": {
+    "title":                     "Valeurs nutritionnelles",
+    "serving_size":              "Taille de portion",
+    "amount_per_serving":        "Quantité par portion"
+  },
+  "recipes_page": {
+    "toast": {
+      "paste_or_pick":           "Colle d'abord une recette ou choisis un fichier",
+      "recipe_imported":         "Recette importée",
+      "new_link_generated":      "Nouveau lien généré",
+      "link_revoked":            "Lien révoqué",
+      "copied":                  "Copié dans le presse-papiers",
+      "copy_failed":             "Échec de la copie",
+      "clipboard_unavailable":   "Presse-papiers indisponible",
+      "recipe_duplicated":       "Recette dupliquée",
+      "preparing_share":         "Préparation du partage…",
+      "deleted":                 "Supprimé"
+    },
+    "share_recipe":              "Partager la recette",
+    "share_cookbook":            "Partager le livre de recettes",
+    "share":                     "Partager",
+    "add_to_cookbook":           "Ajouter à un livre de recettes",
+    "cancel":                    "Annuler",
+    "save":                      "Enregistrer",
+    "opt_link_pantry":           "Lier les ingrédients à mes provisions",
+    "opt_apply_tags":            "Appliquer les tags de la source",
+    "sort_recent":               "Cuisinés récemment",
+    "sort_most":                 "Les plus cuisinés",
+    "sort_newest":               "Plus récents",
+    "retry":                     "Réessayer",
+    "nothing_shared_yet":        "Rien de partagé avec toi pour l'instant",
+    "no_cookbooks_yet":          "Pas encore de livres de recettes",
+    "create_cookbook":           "Créer un livre de recettes"
+  },
+  "recipe_editor_ct": {
+    "toast": {
+      "pick_video":              "Choisis un fichier vidéo.",
+      "video_uploaded":          "Vidéo envoyée",
+      "draft_restored":          "Brouillon restauré",
+      "cant_restore_draft":      "Impossible de restaurer le brouillon",
+      "name_required":           "Le nom est requis"
+    },
+    "discard":                   "Abandonner",
+    "restore":                   "Restaurer",
+    "name_ph":                   "Pain aux bananes",
+    "yield":                     "Rendement",
+    "yield_hint":                "(ex. « 12 cookies », « 1 pain »)",
+    "ingredients":               "Ingrédients",
+    "steps":                     "Étapes",
+    "category_hint_html":        "Une catégorie par recette. Gère la liste complète dans <a href=\"#/manage\">Gérer</a>.",
+    "nutrition":                 "Nutrition",
+    "nutrition_hint":            "(par portion, facultatif)",
+    "video_instructions":        "Instructions vidéo",
+    "optional_hint":             "(facultatif)",
+    "record":                    "Filmer",
+    "upload":                    "Envoyer",
+    "local_upload":              "Envoi local",
+    "external_url":              "URL externe",
+    "cancel":                    "Annuler",
+    "cat_modal_title":           "Créer une nouvelle catégorie",
+    "name":                      "Nom",
+    "color":                     "Couleur",
+    "create":                    "Créer",
+    "add_step_photo_ph":         "Ajouter une photo d'étape",
+    "done":                      "Terminé"
+  },
+  "recipe_view_ct": {
+    "last_edited_by":            "Dernière modification par {name}",
+    "toast": {
+      "recipe_deleted":          "Recette supprimée",
+      "preparing_share":         "Préparation du partage…",
+      "link_copied":             "Lien copié",
+      "share_unsupported":       "Partage non pris en charge sur ce navigateur",
+      "diary_updated":           "Entrée de journal mise à jour",
+      "logged_cooked":           "Noté, cuisiné !"
+    },
+    "shared_chip":               "Partagé",
+    "retry":                     "Réessayer",
+    "serves":                    "Pour",
+    "yield":                     "Rendement",
+    "tags":                      "Tags",
+    "step":                      "Étape",
+    "notes":                     "Notes",
+    "cancel":                    "Annuler"
+  },
+  "cookbook_view_ct": {
+    "toast": {
+      "cookbook_deleted":        "Livre de recettes supprimé"
+    },
+    "shared_chip":               "Partagé",
+    "retry":                     "Réessayer",
+    "smart_badge":               "Intelligent",
+    "favorites_filter":          "Favoris",
+    "add_recipes":               "Ajouter des recettes",
+    "move_or_copy":              "Déplacer ou copier",
+    "copy_label_html":           "Copier",
+    "move_label_html":           "Déplacer",
+    "cancel":                    "Annuler"
+  },
+  "public_recipe_ct": {
+    "shared_by_prefix":          "Partagé par ",
+    "from_prefix":               "Depuis ",
+    "prep":                      "Préparation",
+    "cook":                      "Cuisson",
+    "rest":                      "Repos",
+    "total":                     "Total",
+    "servings":                  "Portions",
+    "ingredients":               "Ingrédients",
+    "scale":                     "Ajuster",
+    "no_ingredients":            "Aucun ingrédient listé.",
+    "steps":                     "Étapes",
+    "no_steps":                  "Pas encore d'étapes.",
+    "notes":                     "Notes",
+    "powered_by_html":           "Propulsé par <strong>CookTrace</strong>."
+  },
+  "barcode_scanner": {
+    "toast": {
+      "camera_denied":           "Permission caméra refusée",
+      "scan_failed":             "Échec du scan du code-barres : {reason}",
+      "scan_unknown":            "Erreur inconnue"
+    },
+    "title":                     "Scanner un code-barres",
+    "library":                   "Bibliothèque",
+    "camera":                    "Caméra",
+    "look_up":                   "Rechercher"
+  },
+  "time_picker_ct": {
+    "hour":                      "Heure",
+    "minute":                    "Minute",
+    "cancel":                    "Annuler",
+    "set_time":                  "Définir l'heure"
+  },
+  "cook_heatmap": {
+    "title":                     "Activité de cuisine",
+    "less":                      "Moins",
+    "more":                      "Plus"
+  },
+  "image_picker_ct": {
+    "toast": {
+      "camera_denied":           "Accès caméra refusé ou indisponible."
+    },
+    "title":                     "Prendre une photo"
+  },
+  "icon_picker_ct": {
+    "summary":                   "Utiliser un autre symbole Material",
+    "clear":                     "Effacer"
+  },
+  "top_timer_pill": {
+    "done":                      "Terminé"
+  },
+  "cook_timer_rail": {
+    "snooze":                    "Répéter"
+  },
+  "sidebar_ct": {
+    "brand":                     "CookTrace"
+  },
+  "trace_ai_ct": {
+    "toast": {
+      "voice_unsupported":       "La saisie vocale n'est pas prise en charge sur ce navigateur",
+      "configure_ai":            "Configure Trace AI dans les Réglages pour utiliser la voix en maintien",
+      "enable_smart_log":        "Active Smart Log dans Réglages, Trace, pour utiliser la voix en maintien",
+      "voice_needs_https":       "La voix nécessite HTTPS. HTTP brut bloque le micro ; configure TLS ou utilise le domaine public.",
+      "voice_cancelled":         "Voix annulée",
+      "trace_disabled":          "Trace est désactivé. Active-le dans Réglages, Trace.",
+      "voice_unsupported_full":  "La saisie vocale n'est pas prise en charge sur ce navigateur. Essaie Chrome sur ordinateur ou Safari/Chrome mobile.",
+      "voice_needs_https_smart": "La voix nécessite HTTPS. Smart Log ne fonctionnera pas sur HTTP brut ; configure TLS ou utilise le domaine public.",
+      "mic_denied":              "Permission micro refusée",
+      "pick_image":              "Choisis un fichier image."
+    }
+  },
+  "manage_cookbooks": {
+    "toast": {
+      "cookbook_created":        "Livre de recettes créé",
+      "saved":                   "Enregistré",
+      "cover_updated":           "Couverture mise à jour"
+    },
+    "title":                     "Livres de recettes",
+    "name_ph":                   "Nom",
+    "cancel":                    "Annuler",
+    "smart_badge":               "Intelligent",
+    "smart":                     "Intelligent",
+    "category":                  "Catégorie",
+    "favorites_only":            "Favoris uniquement"
+  },
+  "manage_units": {
+    "toast": {
+      "unit_added":              "Unité personnalisée ajoutée",
+      "saved":                   "Enregistré",
+      "builtins_restored":       "Tous les intégrés ont été restaurés"
+    },
+    "title":                     "Unités",
+    "restore_all":               "Tout restaurer",
+    "custom_group":              "Personnalisé",
+    "cancel":                    "Annuler",
+    "save":                      "Enregistrer",
+    "custom_badge":              "Personnalisée"
+  },
+  "manage_pantry_cats": {
+    "toast": {
+      "saved":                   "Enregistré",
+      "category_added":          "Catégorie ajoutée"
+    },
+    "title":                     "Catégories de provisions",
+    "name_ph":                   "Nom",
+    "icon_ph":                   "Icône",
+    "cancel":                    "Annuler",
+    "save":                      "Enregistrer"
+  },
+  "manage_recipe_cats": {
+    "toast": {
+      "saved":                   "Enregistré",
+      "category_added":          "Catégorie ajoutée"
+    },
+    "title":                     "Catégories de recettes",
+    "name_ph":                   "Nom",
+    "cancel":                    "Annuler",
+    "save":                      "Enregistrer"
+  },
+  "manage_taxonomy": {
+    "cancel":                    "Annuler",
+    "save":                      "Enregistrer"
+  },
+  "profile_ct": {
+    "toast": {
+      "biometric_cancelled":     "La vérification biométrique a été annulée ou a échoué."
+    },
+    "biometric_signin":          "Se connecter par biométrie"
+  },
+  "manage_ct": {
+    "title":                     "Gérer"
+  },
+  "cookdiary_page": {
+    "toast": {
+      "pick_recipe":             "Choisis une recette",
+      "planned":                 "Prévu",
+      "marked_cooked":           "Marqué comme cuisiné",
+      "removed":                 "Supprimé"
+    },
+    "this_week":                 "Cette semaine",
+    "current_streak":            "Série actuelle",
+    "longest_streak":            "Plus longue série",
+    "this_month":                "Ce mois-ci",
+    "view_list":                 "Liste",
+    "view_month":                "Mois",
+    "view_photos":               "Photos",
+    "retry":                     "Réessayer",
+    "planned_tag":               "Prévu",
+    "no_photos":                 "Pas encore de photos",
+    "plan_a_cook":               "Prévoir une cuisson",
+    "date":                      "Date",
+    "meal":                      "Repas",
+    "optional":                  "(facultatif)",
+    "recipe":                    "Recette",
+    "cancel":                    "Annuler",
+    "filter_by_recipe":          "Filtrer par recette",
+    "clear":                     "Effacer",
+    "done":                      "Terminé"
+  },
+  "wizard_ct": {
+    "updates": {
+      "title": "Vérifier les mises à jour",
+      "desc": "Ton serveur peut t'indiquer quand une nouvelle version de CookTrace sort.",
+      "toggle": "Vérifier les mises à jour automatiquement",
+      "toggle_sub": "C'est ainsi que tu seras informé(e) des nouveautés, des corrections et des mises à jour de sécurité",
+      "note": "Ton serveur demande à GitHub toutes les quelques heures si une version plus récente de CookTrace est sortie. Rien qui te concerne ou concerne tes données n'est envoyé. Tu pourras changer cela à tout moment dans Réglages, Mises à jour."
+    },
+    "welcome":                   "Bienvenue sur CookTrace",
+    "get_started":               "Commencer",
+    "name_ph":                   "Ton nom",
+    "back":                      "Retour",
+    "next":                      "Suivant",
+    "create_admin":              "Crée ton compte administrateur",
+    "enable_user_accounts":      "Activer les comptes utilisateurs",
+    "admin_account":             "Compte administrateur",
+    "nickname":                  "Surnom",
+    "optional_ph":               "Facultatif",
+    "full_name":                 "Nom complet",
+    "email":                     "E-mail",
+    "continue":                  "Continuer",
+    "cooking_preferences":       "Préférences de cuisine",
+    "measurement_system":        "Système de mesure",
+    "default_servings":          "Portions par défaut",
+    "dietary_preferences":       "Préférences alimentaires",
+    "open_cooktrace":            "Ouvrir CookTrace"
+  },
+  "shopping_page": {
+    "toast": {
+      "cleared":                 "Effacé",
+      "add_items":               "Ajoute d'abord quelques produits",
+      "preparing_share":         "Préparation du partage…",
+      "saved_image":             "Image enregistrée",
+      "copied":                  "Copié dans le presse-papiers",
+      "nothing_planned":         "Rien de prévu sur cette période",
+      "already_in_pantry":       "Tout est déjà dans tes provisions",
+      "cleared_restocked":       "Liste effacée. {n} marqué(s) en stock",
+      "restock_failed":          "Certains produits n'ont pas pu être réapprovisionnés ({n})",
+      "restock_undone":          "Modifications des provisions annulées"
+    },
+    "undo":                      "Annuler",
+    "clear":                     "Effacer",
+    "clearing":                  "Effacement…",
+    "clear_title":               "Effacer les produits cochés ({n})",
+    "clear_desc":                "Les produits cochés seront retirés de ta liste.",
+    "restock_label":             "Marquer en stock",
+    "restock_hint":              "Décoche tout ce que tu n'as pas vraiment acheté.",
+    "restock_variant":           "Variante pour {name}",
+    "retry":                     "Réessayer",
+    "edit_item":                 "Modifier le produit",
+    "name":                      "Nom",
+    "quantity":                  "Quantité",
+    "unit":                      "Unité",
+    "cancel":                    "Annuler",
+    "save":                      "Enregistrer",
+    "add_from_recipe":           "Ajouter depuis une recette",
+    "add_from_planned":          "Ajouter depuis les cuissons prévues",
+    "from":                      "Depuis"
+  },
+  "native_setup_ct": {
+    "toast": {
+      "enter_url":               "Saisis l'URL de ton serveur",
+      "enter_credentials":       "Saisis tes identifiants",
+      "connected_to_server":     "Connecté au serveur",
+      "cant_open_signin":        "Impossible d'ouvrir le navigateur de connexion"
+    },
+    "app_name":                  "CookTrace",
+    "tagline":                   "Trace chaque bouchée",
+    "use_locally":               "Utiliser en local",
+    "connect_to_server":         "Se connecter au serveur",
+    "server_url":                "URL du serveur",
+    "username":                  "Nom d'utilisateur",
+    "username_ph":               "Ton nom d'utilisateur",
+    "password":                  "Mot de passe",
+    "password_ph":               "Ton mot de passe"
+  },
+  "login_ct": {
+    "toast": {
+      "no_saved":                "Aucune connexion enregistrée. Utilise d'abord ton mot de passe une fois.",
+      "saved_expired":           "Ta connexion enregistrée a expiré. Utilise ton mot de passe pour te connecter.",
+      "biometric_failed":        "La connexion biométrique a échoué. Utilise ton mot de passe à la place."
+    },
+    "app_name":                  "CookTrace",
+    "biometric_signin":          "Se connecter par biométrie"
+  },
+  "pantry_editor_ct": {
+    "toast": {
+      "enter_barcode":           "Saisis d'abord un code-barres",
+      "not_found_off":           "Introuvable sur Open Food Facts",
+      "add_barcode":             "Ajoute d'abord un code-barres",
+      "add_name":                "Ajoute d'abord un nom",
+      "name_required":           "Le nom est requis",
+      "saved":                   "Enregistré",
+      "added_to_pantry":         "Ajouté aux provisions",
+      "removed":                 "Retiré"
+    },
+    "photo":                     "Photo",
+    "basic_info":                "Informations de base",
+    "brand":                     "Marque",
+    "serving_size":              "Taille de portion",
+    "unit":                      "Unité",
+    "barcode":                   "Code-barres",
+    "optional_ph":               "Facultatif",
+    "inventory":                 "Inventaire",
+    "on_hand":                   "Quantité",
+    "category":                  "Catégorie",
+    "notes":                     "Notes",
+    "nutrition":                 "Nutrition",
+    "danger_zone":               "Zone de danger",
+    "cat_modal_title":           "Créer une nouvelle catégorie de provisions",
+    "name":                      "Nom",
+    "icon_name":                 "Nom de l'icône",
+    "icon_hint":                 "(Material Symbols)",
+    "cancel":                    "Annuler",
+    "create":                    "Créer"
+  },
+  "pantry_page": {
+    "toast": {
+      "removed":                 "Retiré"
+    },
+    "variant_banner_title":      "Les provisions prennent maintenant en charge les variantes de produit",
+    "sort_updated":              "Dernière mise à jour",
+    "sort_usage":                "Les plus utilisés",
+    "retry":                     "Réessayer",
+    "no_results_all":            "Aucun résultat, quelle que soit la source",
+    "reset_filter":              "Réinitialiser le filtre",
+    "off_quality":               "Qualité OFF",
+    "usda_data_type":            "Type de données USDA",
+    "reset":                     "Réinitialiser"
+  },
+  "pantry_view_ct": {
+    "toast": {
+      "removed":                 "Retiré"
+    },
+    "retry":                     "Réessayer",
+    "in_stock":                  "En stock",
+    "serving_size":              "Taille de portion",
+    "not_set":                   "Non défini",
+    "on_hand":                   "Quantité",
+    "notes":                     "Notes"
+  },
+  "pantry_sheet_extra": {
+    "toast": {
+      "cant_read_label":         "Impossible de lire l'étiquette. Essaie une photo plus nette.",
+      "nutrition_extracted":     "Nutrition extraite de l'étiquette",
+      "scan_failed":             "Échec du scan : {reason}",
+      "scan_unknown":            "erreur inconnue",
+      "brand_or_name_required":  "Ajoute une marque ou un nom pour distinguer cette variante.",
+      "added_variant":           "Variante {name} ajoutée",
+      "linked_as_variant":       "Lié comme variante",
+      "enter_barcode":           "Saisis d'abord un code-barres",
+      "not_found_off":           "Introuvable sur Open Food Facts",
+      "add_barcode":             "Ajoute d'abord un code-barres",
+      "add_name":                "Ajoute d'abord un nom",
+      "name_required":           "Le nom est requis",
+      "added_to_pantry":         "Ajouté aux provisions",
+      "saved":                   "Enregistré"
+    },
+    "retry":                     "Réessayer",
+    "add_a_photo":               "Ajouter une photo",
+    "name_ph":                   "Sel iodé",
+    "brand_ph":                  "Morton",
+    "serving_size":              "Taille de portion",
+    "not_set":                   "Non défini",
+    "nutrition":                 "Nutrition",
+    "per_serving":               "par portion",
+    "recipe_nutrition_source":   "Source de la nutrition de la recette",
+    "add_a_variant":             "Ajouter une variante",
+    "attach_as_variant":         "Attacher comme variante",
+    "cancel":                    "Annuler",
+    "done":                      "Terminé",
+    "name":                      "Nom",
+    "cat_new_name_ph":           "Pâtisserie",
+    "cat_field_hint_html":       "Parcours les noms sur <a href=\"https://fonts.google.com/icons\" target=\"_blank\" rel=\"noopener\">Material Symbols</a>. La page du sélecteur (Gérer → Catégories de provisions) a une recherche d'icônes.",
+    "create":                    "Créer",
+    "keep_standalone":           "Garder comme produits séparés",
+    "remove_variants_too":       "Supprimer aussi les variantes"
+  },
+  "updates": {
+    "current_version":       "Version actuelle",
+    "channel": {
+      "label":  "Canal de mises à jour",
+      "stable": "Stable",
+      "dev":    "Dev",
+      "help":   "Stable suit les releases taguées. Dev est la build de développement continue ; attends-toi à des bugs."
+    },
+    "auto_check":            "Vérifier les mises à jour automatiquement",
+    "auto_check_desc":       "Vérifie les nouvelles releases en arrière-plan.",
+    "off_resting": "Désactivé. Ton serveur ne contactera pas GitHub. Active-le pour être informé(e) des nouveautés, des corrections et des mises à jour de sécurité.",
+    "off_notice_title": "Les vérifications de mises à jour sont désactivées",
+    "off_notice": "Rien ne t'informera des nouveautés, des corrections ou des mises à jour de sécurité. Activer les vérifications demande à GitHub la dernière release toutes les quelques heures, sans rien envoyer qui te concerne.",
+    "turn_on": "Activer",
+    "not_now": "Pas maintenant",
+    "interval": {
+      "label":       "Fréquence de vérification",
+      "desc":        "À quelle fréquence l'app vérifie une nouvelle release quand elle est ouverte. Manuel désactive toutes les vérifications automatiques.",
+      "hourly":      "Toutes les heures",
+      "every_4h":    "Toutes les 4 heures",
+      "every_12h":   "Toutes les 12 heures",
+      "daily":       "Une fois par jour",
+      "manual":      "Manuel uniquement"
+    },
+    "available_generic": "Une nouvelle version est disponible",
+    "ready_headline": "Mise à jour prête",
+    "ready_cta": "Recharge pour obtenir la dernière version.",
+    "banner_reload":     "Recharger",
+    "last_checked":          "Dernière vérification",
+    "last_checked_never":    "Jamais",
+    "check_now":             "Vérifier maintenant",
+    "checking":              "Vérification…",
+    "check_failed":          "Échec de la vérification. Réessaie dans un instant.",
+    "up_to_date":            "Tu es à la dernière version",
+    "available_headline":    "{version} est disponible",
+    "released":              "Sortie le {when}",
+    "release_notes_heading": "Nouveautés",
+    "no_release_notes":      "Aucune note de version n'a été publiée pour cette build.",
+    "view_on_github":        "Voir sur GitHub",
+    "download_install":      "Télécharger et installer",
+    "install_downloaded":    "Installer",
+    "downloading":           "Téléchargement… {percent}%",
+    "install_starting":      "Ouverture de l'installeur…",
+    "install_failed":        "Échec de l'installation. Réessaie.",
+    "skip_this_version":     "Ignorer cette version",
+    "no_apk_asset":          "Cette release n'a pas de fichier APK attaché.",
+    "banner_cta":            "Tape pour voir les nouveautés et installer.",
+    "banner_view":           "Voir",
+    "storage": {
+      "heading":     "APK de mise à jour en cache",
+      "empty":       "Pas d'APK en cache. Les nettoyages automatiques ont réussi.",
+      "clear_now":   "Effacer maintenant",
+      "clearing":    "Effacement…",
+      "cleared":     "Cache effacé."
+    },
+    "server": {
+      "heading":          "Serveur",
+      "headline":         "Mise à jour du serveur {latest} disponible",
+      "behind_desc":      "Mise à jour disponible : {latest}",
+      "current_desc":     "Tu es sur la dernière release",
+      "versions":         "Le serveur est en {current}. Dernière release : {latest}.",
+      "available_chip":   "Mise à jour disponible",
+      "instructions":     "Pour mettre à jour le serveur, exécute sur la machine hôte :",
+      "copy_command":     "Copier la commande",
+      "copied":           "Copié dans le presse-papiers.",
+      "copy_failed":      "Échec de la copie. Copie la commande manuellement.",
+      "view_notes":       "Voir les notes de version",
+      "channel_note":     "Pour changer de canal serveur, modifie le tag de l'image docker-compose.yml (:latest, :1.0, :1, :dev) et relance docker-compose pull && docker-compose up -d."
+    }
+  }
+}
