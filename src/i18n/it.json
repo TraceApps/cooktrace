@@ -1,1 +1,33 @@
-{}
+{
+  "nav": {
+    "recipes": "Ricette",
+    "pantry": "Dispensa",
+    "shopping": "Spesa",
+    "settings": "Impostazioni"
+  },
+  "sync": {
+    "synced": "Sincronizzato",
+    "not_synced": "Non ancora sincronizzato",
+    "retry": "Riprova",
+    "retrying": "Riprovando…",
+    "error_title": "Sincronizzazione fallita",
+    "connection": {
+      "no_network_title": "Nessuna connessione alla rete"
+    }
+  },
+  "routes": {
+    "pantry": {
+      "empty_title": "La dispensa è vuota"
+    },
+    "diary": {
+      "no_matches_title": "Nessuna corrispondenza"
+    },
+    "shopping": {
+      "title": "Spesa",
+      "empty_title": "La lista è vuota",
+      "group_by_recipe": "Per ricetta",
+      "uncategorized": "Non categorizzato",
+      "other": "Altro"
+    }
+  }
+}
