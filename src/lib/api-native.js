@@ -294,7 +294,8 @@ export const CtApiNative = {
     const existing = (await _query(`SELECT * FROM recipes WHERE id = ?`, [id]))[0];
     if (!existing) throw new Error('Recipe not found');
     const d = { ...existing, ...data };
-    const img = d.img_url ?? d.imgUrl ?? existing.img_url ?? null;
+    // No picture is null, as the server keeps it: '' would read as a change.
+    const img = (d.img_url ?? d.imgUrl ?? existing.img_url) || null;
     await _run(
       `UPDATE recipes SET
          name = ?, description = ?, img_url = ?, servings = ?,
@@ -308,7 +309,9 @@ export const CtApiNative = {
         d.name,
         d.description ?? null,
         img,
-        d.servings ?? 2,
+        // Not given (a rating, a favorite): left as it was, so no servings
+        // stays none rather than becoming 2.
+        d.servings ?? null,
         d.prep_minutes  ?? null,
         d.cook_minutes  ?? null,
         d.total_minutes ?? null,
@@ -1571,6 +1574,11 @@ export const CtApiNative = {
   async mintRecipeShareToken()     { throw new Error('Public share links require a server connection.'); },
   async revokeRecipeShareToken()   { return { ok: true }; },
   async getRecipesSharedWithMe()   { return []; },
+  // Earlier versions come from syncing with a server; a phone on its own
+  // has none.
+  async getRecipeVersions()        { return []; },
+  async markRecipeVersionsSeen()   { return { ok: true }; },
+  async restoreRecipeVersion()     { throw new Error('Earlier versions require a server connection.'); },
 
   // Kitchens (household / group sharing) — single-user local mode has
   // no concept of kitchens. Returns empty / no-op shapes that match

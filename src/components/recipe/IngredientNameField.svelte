@@ -73,7 +73,7 @@
       if (highlight >= 0 && filtered[highlight]) { pick(filtered[highlight]); e.preventDefault(); }
       else { open = false; }
     }
-    else if (e.key === 'Escape') { open = false; highlight = -1; }
+    else if (e.key === 'Escape') { if (open) e.preventDefault(); open = false; highlight = -1; }
   }
 
   function onBlur() {

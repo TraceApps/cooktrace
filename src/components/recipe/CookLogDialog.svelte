@@ -115,7 +115,7 @@
   function lightboxNext() { if (lightboxIndex < photos.length - 1) lightboxIndex += 1; }
   function onLightboxKey(e) {
     if (lightboxIndex < 0) return;
-    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'Escape') { closeLightbox(); e.preventDefault(); }
     else if (e.key === 'ArrowLeft') lightboxPrev();
     else if (e.key === 'ArrowRight') lightboxNext();
   }

@@ -38,7 +38,8 @@ test('the status survives the error, so a hiccup is told from a refusal', () => 
 });
 
 test('the queue is replayed as the requests the app made', () => {
-  assert.match(offline, /await _http\._fetch\(op\.method, path, body\)/);
+  // Same route and body; a recipe save also says which copy it was made on.
+  assert.match(offline, /await _http\._fetch\(op\.method, path, withSaveBase\(body, op\.sync\)\)/);
   assert.ok(!/sync\/push/.test(offline), 'no second merge path');
 });
 

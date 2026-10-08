@@ -27,6 +27,8 @@ export const CLAIM_NULL = [
   'disabled_units', 'cookbooks', 'ai_chat_history', 'notification_log',
   // Deletes waiting for devices to pull: they follow the rows they removed.
   'sync_deletions',
+  // Earlier versions of recipes, kept with the recipes they belong to.
+  'recipe_versions',
 ];
 
 const ORPHAN_EXTRA_COUNTS = [];

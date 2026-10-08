@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
         // bridge picks them up when it builds its plugin handle map.
         registerPlugin(WearPairingPlugin.class);
         registerPlugin(FoldPlugin.class);
+        registerPlugin(InstallMarkerPlugin.class);
         super.onCreate(savedInstanceState);
     }
 

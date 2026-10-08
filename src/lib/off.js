@@ -17,6 +17,7 @@
  */
 import { apiUrl, isNative, getServerUrl } from './platform.js';
 import { deriveSodiumSalt } from './nutriments.js';
+import { settingPrefix } from './setting-key.js';
 
 const OFF_BASE = 'https://world.openfoodfacts.org';
 
@@ -26,8 +27,7 @@ const OFF_BASE = 'https://world.openfoodfacts.org';
 function _getOffSearchCountry() {
   try {
     if (typeof localStorage === 'undefined') return null;
-    const userId = localStorage.getItem('wl:userId');
-    const setKey = userId ? `wl_u${userId}_offSearchCountry` : 'wl_offSearchCountry';
+    const setKey = settingPrefix() + 'offSearchCountry';
     const raw = localStorage.getItem(setKey);
     if (!raw) return null;
     const country = JSON.parse(raw);
@@ -43,8 +43,7 @@ function _getOffSearchCountry() {
 function _getOffSearchLanguage() {
   try {
     if (typeof localStorage === 'undefined') return 'en';
-    const userId = localStorage.getItem('wl:userId');
-    const setKey = userId ? `wl_u${userId}_offSearchLanguage` : 'wl_offSearchLanguage';
+    const setKey = settingPrefix() + 'offSearchLanguage';
     const raw = localStorage.getItem(setKey);
     if (!raw) return 'en';
     const lang = JSON.parse(raw);

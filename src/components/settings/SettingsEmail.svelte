@@ -278,7 +278,7 @@
 
 {#if showTestDialog}
   <div class="test-dialog-overlay" on:click={closeTestDialog} use:closeOnBack={closeTestDialog}
-    on:keydown={(e) => e.key === 'Escape' && closeTestDialog()}>
+    on:keydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeTestDialog(); } }}>
     <div class="test-dialog" role="dialog" aria-labelledby="test-dialog-title"
       on:click|stopPropagation>
       <h3 id="test-dialog-title">{$_('settings_email_ct.send_test_email')}</h3>

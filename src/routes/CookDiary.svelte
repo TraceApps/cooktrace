@@ -1,5 +1,6 @@
 <script>
   import { closeOnBack } from '../lib/back-stack.js';
+  import { onSyncChanges } from '../lib/sync-refresh.js';
   import { onMount } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { fade, slide } from 'svelte/transition';
@@ -198,24 +199,35 @@
     return `${y}-${m}-${dd}`;
   }
 
-  async function load() {
-    loading = true;
-    loadError = null;
+  // Two reads at once (the page opening while a sync lands): the later
+  // one's answer stands, never an older one finishing last.
+  let _loadSeq = 0;
+  // quiet: read again after a sync, without the loading state.
+  async function load({ quiet = false } = {}) {
+    const seq = ++_loadSeq;
+    if (!quiet) { loading = true; loadError = null; }
     try {
       // Pull a wide window so both list + month view share data.
       const monthFrom = _isoDate(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() - 1, 1));
       const monthTo   = _isoDate(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 2, 0));
       const from = view === 'month' ? monthFrom : rangeFrom;
       const to   = view === 'month' ? monthTo   : rangeTo;
-      entries = await NtApi.getCookDiary({ from, to });
+      const got = await NtApi.getCookDiary({ from, to });
+      if (seq === _loadSeq) { entries = got; loadError = null; }
     } catch (e) {
-      loadError = e.message || 'Could not load diary';
-      showError(loadError);
+      // Only the newest read speaks; a quiet one after a sync that fails
+      // keeps what's shown, unsaid.
+      if (seq === _loadSeq && !quiet) {
+        loadError = e.message || 'Could not load diary';
+        showError(loadError);
+      }
     } finally {
-      loading = false;
+      if (seq === _loadSeq) loading = false;
     }
   }
   onMount(() => { load(); loadStats(); loadHeatmap(); });
+  // A sync that brought changes down shows them here at once.
+  onMount(() => onSyncChanges(() => { load({ quiet: true }); loadStats(); loadHeatmap(); }));
   $: if (monthAnchor || view) { /* trigger reload on view change */ load(); }
 
   // Group list-view entries by date (descending — future first, then past).

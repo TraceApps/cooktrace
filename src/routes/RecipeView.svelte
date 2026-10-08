@@ -14,9 +14,10 @@
     push('/recipes');
   }
   import { fade } from 'svelte/transition';
-  import { _ } from 'svelte-i18n';
+  import { _, locale } from 'svelte-i18n';
   import { formatDuration } from '../lib/duration.js';
   import { NtApi } from '../lib/api.js';
+  import { recipeBaseOf } from '../lib/offline-edits.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { confirmDialog } from '../stores/confirmDialog.js';
   import StarRating from '../components/ui/StarRating.svelte';
@@ -25,7 +26,7 @@
   import CookLogDialog from '../components/recipe/CookLogDialog.svelte';
   import { relativeTime, shortDate } from '../lib/relative-time.js';
   import { formatDate, formatUpdated, domainFromUrl } from '../lib/format.js';
-  import { dateFormat } from '../stores/settings.js';
+  import { dateFormat, timeFormat } from '../stores/settings.js';
   import { scaleQty, displayQty, displayQtyParts, parseQty } from '../lib/qty.js';
   import { convertWithinFamily, convertQty, unitFamily } from '../lib/recipe-nutrition.js';
   import { resolveAssetUrl, isNative, getServerUrl, publicRecipeUrl } from '../lib/platform.js';
@@ -44,6 +45,7 @@
   import { activeCooks, startCook, endCook, isCooking, describeCook, cookList } from '../stores/cooks.js';
   import { computeRecipeNutrition, computeRecipeMass, lookupCommonDensity } from '../lib/recipe-nutrition.js';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
+  import Sheet from '../components/ui/Sheet.svelte';
   import { buildRecipeCardPages, buildRecipeShareText } from '../lib/recipe-card.js';
   import { svgToPngBlob, shareBlobs } from '../lib/shopping-card.js';
 
@@ -232,7 +234,7 @@
   function lightboxNext() { if (lightboxIndex < lightboxPhotos.length - 1) lightboxIndex += 1; }
   function onLightboxKey(e) {
     if (lightboxIndex < 0) return;
-    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'Escape') { closeLightbox(); e.preventDefault(); }
     else if (e.key === 'ArrowLeft') lightboxPrev();
     else if (e.key === 'ArrowRight') lightboxNext();
   }
@@ -555,6 +557,7 @@
     // of knowing unless it is told. Pressing Cook is not the only moment that
     // matters, since cook mode survives closing the app.
     if (recipe) { describeCook(id, { name: recipe.name, img: recipe.imgUrl || '', serverId: _watchRecipeId() }); _tellWatch({ now: true }); }
+    loadVersions();
     // And the watch may have ticked something off while the phone was shut.
     _hearWatch();
     // Kick off the pantry load so the FDA box can render "~Xg per
@@ -669,6 +672,161 @@
     }
   }
 
+  // ── Earlier versions ─────────────────────────────────────
+  // Copies of this recipe a sync didn't keep (an edit from another device
+  // that was older, or the copy a newer edit replaced), and the copy each
+  // restore replaced. The server holds them, so the Android app asks it
+  // with the recipe's server id; a phone on its own has none. The owner
+  // sees them all; someone who may edit a recipe shared with them sees
+  // their own edits. Anything else answers with an error: none here.
+  let versions = [];
+  let versionsOpen = false;
+  let previewVersionId = null;
+  let restoringVersion = false;
+  function _versionsRecipeId() {
+    if (!recipe || Number(recipe.id) !== id) return 0;
+    // (Asked of the recipe itself: canEdit only catches up after a tick.)
+    const editable = recipe.can_edit === true || recipe.user_id == null
+      || recipe.user_id === $currentUser?.id || $currentUser?.role === 'admin';
+    if (!isNative) return editable ? id : 0;
+    return getServerUrl() ? Number(recipe.server_id) || 0 : 0;
+  }
+  async function loadVersions() {
+    const rid = _versionsRecipeId();
+    if (!rid) { versions = []; return; }
+    try {
+      const rows = await NtApi.getRecipeVersions(rid);
+      if (_versionsRecipeId() === rid) versions = Array.isArray(rows) ? rows : [];
+    } catch { versions = []; }
+  }
+  $: unseenVersions = versions.filter(v => v.reason === 'conflict' && !v.seen).length;
+  // Saves made here with no connection went up just now: the recipe on
+  // the server may be another device's newer edit, with this one kept as
+  // an earlier version. Show what the server has.
+  const _onOfflineSynced = async () => {
+    if (!recipe || isNative) return;
+    try { const fresh = await NtApi.getRecipe(id); if (fresh && Number(fresh.id) === id) recipe = fresh; } catch { /* shown on the next visit */ }
+    loadVersions();
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('ct:offline-synced', _onOfflineSynced);
+    onDestroy(() => window.removeEventListener('ct:offline-synced', _onOfflineSynced));
+  }
+  async function _markVersionsSeen() {
+    if (!unseenVersions) return;
+    versions = versions.map(v => ({ ...v, seen: true }));
+    try { await NtApi.markRecipeVersionsSeen(_versionsRecipeId()); } catch { /* shown again next time */ }
+  }
+  function openVersions() {
+    previewVersionId = null;
+    _loadVersionCategory();
+    versionsOpen = true;
+    _markVersionsSeen();
+  }
+  function _versionTime(v) {
+    const raw = String(v.created_at || '');
+    const d = new Date(raw.replace(' ', 'T') + (/[zZ]$|[+-]\d\d:?\d\d$/.test(raw) ? '' : 'Z'));
+    if (Number.isNaN(d.getTime())) return '';
+    const time = d.toLocaleTimeString($locale || undefined, { hour: 'numeric', minute: '2-digit', hour12: $timeFormat !== '24h' });
+    return `${formatDate(d, $dateFormat)}, ${time}`;
+  }
+  const _stepText = st => (typeof st === 'string' ? st : `${st?.title || ''}\n${st?.text || ''}`).trim();
+  const _ingText = groups => JSON.stringify((Array.isArray(groups) ? groups : []).map(g => [
+    g?.name || '', (g?.items || []).map(i => [String(i?.qty ?? ''), i?.unit || '', (i?.name || '').trim()]),
+  ]));
+  const _same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  // A picture's address, the same however it's written: on its own, with
+  // the server in front, under a subpath, or with a query.
+  const _imgKey = u => {
+    if (!u) return '';
+    const s = String(u);
+    const at = s.indexOf('/uploads/');
+    if (at >= 0) return s.slice(at).split(/[?#]/)[0];
+    try { return new URL(s, 'http://local').pathname; } catch { return s; }
+  };
+  const _sortKeys = o => Object.fromEntries(Object.entries(o || {})
+    .filter(([k, val]) => k !== '_derived' && val != null && val !== '').sort(([a], [b]) => a.localeCompare(b)));
+  // The server's id of this recipe's category, which is what a version
+  // holds. On the phone the recipe has its own id for it.
+  let versionCategoryId = null;
+  async function _loadVersionCategory() {
+    versionCategoryId = null;
+    if (!isNative || recipe?.category_id == null) { versionCategoryId = recipe?.category_id ?? null; return; }
+    try {
+      const cats = await NtApi.getRecipeCategories();
+      versionCategoryId = Number(cats.find(c => c.id === recipe.category_id)?.server_id) || null;
+    } catch { versionCategoryId = null; }
+  }
+  const VERSION_REASONS = {
+    conflict: 'recipe_view_ct.versions.reason_conflict',
+    restore: 'recipe_view_ct.versions.reason_restore',
+    replaced: 'recipe_view_ct.versions.reason_replaced',
+  };
+  // Someone else's edit: whose, in a whole sentence each.
+  const VERSION_REASONS_BY = {
+    conflict: 'recipe_view_ct.versions.reason_conflict_by',
+    restore: 'recipe_view_ct.versions.reason_restore_by',
+    replaced: 'recipe_view_ct.versions.reason_replaced_by',
+  };
+  const VERSION_PARTS = {
+    title: 'recipe_view_ct.versions.part_title',
+    ingredients: 'recipe_view_ct.versions.part_ingredients',
+    steps: 'recipe_view_ct.versions.part_steps',
+    notes: 'recipe_view_ct.versions.part_notes',
+    category: 'recipe_view_ct.versions.part_category',
+    photo: 'recipe_view_ct.versions.part_photo',
+    nutrition: 'recipe_view_ct.versions.part_nutrition',
+    details: 'recipe_view_ct.versions.part_details',
+  };
+  // What a version has that the recipe doesn't, as the parts of the page.
+  // Every field a restore writes is under one of them.
+  function versionDiffers(v, catId = versionCategoryId) {
+    const d = v.data || {};
+    const out = [];
+    if ((d.name || '').trim() !== (recipe?.name || '').trim()) out.push('title');
+    if (_ingText(d.ingredients) !== _ingText(recipe?.ingredients)) out.push('ingredients');
+    if (!_same((d.steps || []).map(_stepText), (recipe?.steps || []).map(_stepText))) out.push('steps');
+    if ((d.notes || '') !== (recipe?.notes || '')) out.push('notes');
+    if ((d.category_id ?? null) !== (catId ?? null)) out.push('category');
+    if (_imgKey(d.img_url) !== _imgKey(recipe?.img_url ?? recipe?.imgUrl)) out.push('photo');
+    if (!_same(_sortKeys(d.nutrition), _sortKeys(recipe?.nutrition))) out.push('nutrition');
+    const details = ['description', 'servings', 'prep_minutes', 'cook_minutes', 'rest_minutes', 'total_minutes',
+      'yield_text', 'source_url', 'video_url'];
+    if (details.some(k => (d[k] ?? '') !== (recipe?.[k] ?? '')) || !_same(d.tags || [], recipe?.tags || [])
+        || !_same(d.tools || [], recipe?.tools || [])) out.push('details');
+    return out;
+  }
+  async function restoreVersion(v) {
+    const ok = await confirmDialog({
+      title: $_('recipe_view_ct.versions.confirm_title'),
+      message: $_('recipe_view_ct.versions.confirm_message'),
+      confirmText: $_('recipe_view_ct.versions.restore'),
+    });
+    if (!ok) return;
+    restoringVersion = true;
+    try {
+      const restored = await NtApi.restoreRecipeVersion(_versionsRecipeId(), v.id);
+      if (isNative && getServerUrl()) {
+        // The phone's own copy comes from the server with a pull. A round
+        // already under way pulled before the restore, so wait for it and
+        // pull again.
+        const { fullSync } = await import('../lib/sync.js');
+        await fullSync({ silent: true });
+        await fullSync({ silent: true });
+        recipe = await NtApi.getRecipe(id);
+      } else {
+        recipe = await NtApi.getRecipe(id).catch(() => restored);
+      }
+      versionsOpen = false;
+      showSuccess($_('recipe_view_ct.versions.restored'));
+      await loadVersions();
+    } catch (e) {
+      showError(e.message || $_('recipe_view_ct.versions.restore_failed'));
+    } finally {
+      restoringVersion = false;
+    }
+  }
+
   function openCookLog(cook = null) {
     editingCook = cook;
     cookDialogOpen = true;
@@ -678,7 +836,7 @@
     cookBusy = true;
     try {
       if (editingCook) {
-        await NtApi.updateCook(recipe.id, editingCook.id, e.detail);
+        await NtApi.updateCook(recipe.id, editingCook.id, { ...e.detail, _base: editingCook });
         showSuccess($_('recipe_view_ct.toast.diary_updated'));
       } else {
         recipe = await NtApi.markCooked(recipe.id, e.detail);
@@ -718,7 +876,7 @@
   async function setRating(e) {
     const next = e.detail;
     try {
-      const updated = await NtApi.updateRecipe(recipe.id, { ...recipe, rating: next });
+      const updated = await NtApi.updateRecipe(recipe.id, { ...recipe, rating: next, _base: recipeBaseOf(recipe), _changed: ['rating'] });
       recipe = updated;
     } catch (err) {
       showError(err.message || 'Could not save rating');
@@ -732,7 +890,7 @@
     const next = !recipe.favorite;
     favPopping = true;
     try {
-      const updated = await NtApi.updateRecipe(recipe.id, { ...recipe, favorite: next });
+      const updated = await NtApi.updateRecipe(recipe.id, { ...recipe, favorite: next, _base: recipeBaseOf(recipe), _changed: ['favorite'] });
       recipe = updated;
     } catch (err) {
       showError(err.message || 'Could not update favorite');
@@ -818,7 +976,7 @@
       for (const [k, v] of Object.entries(recomputeResult.nutrition)) {
         perServing[k] = Math.round((v / div) * 100) / 100;
       }
-      const updated = await NtApi.updateRecipe(recipe.id, { ...recipe, nutrition: perServing });
+      const updated = await NtApi.updateRecipe(recipe.id, { ...recipe, nutrition: perServing, _base: recipeBaseOf(recipe), _changed: ['nutrition'] });
       recipe = updated;
       recomputeResult = null;
       showSuccess(`Saved auto-calc — ${recomputeResult?.used ?? '?'} of ${recomputeResult?.total ?? '?'} ingredients`);
@@ -937,6 +1095,17 @@
       </div>
     {:else if recipe}
       <div class="body">
+        {#if unseenVersions && !cookMode}
+          <div class="versions-notice" role="status">
+            <span class="material-symbols-rounded versions-notice-icon" aria-hidden="true">history</span>
+            <p class="versions-notice-text">{$_('recipe_view_ct.versions.notice')}</p>
+            <button class="btn btn-ghost versions-notice-view" on:click={openVersions}>{$_('recipe_view_ct.versions.view')}</button>
+            <button class="btn-icon versions-notice-close" on:click={_markVersionsSeen}
+              aria-label={$_('recipe_view_ct.versions.dismiss')} title={$_('recipe_view_ct.versions.dismiss')}>
+              <span class="material-symbols-rounded">close</span>
+            </button>
+          </div>
+        {/if}
         <!-- Recipe header — side-by-side on desktop. Hero on the left,
              title / description / byline / rating + actions / meta /
              tags on the right so the screen real estate stays used and
@@ -966,7 +1135,7 @@
              cook history all on one row. Replaces the dedicated Source
              section + the standalone "Last Cooked" line below the meta
              strip — same data, less vertical real estate. -->
-        {#if recipe.created_by_full_name || recipe.created_by_username || recipe.created_at || recipe.source_url || recipe.last_cooked_at || recipe.cook_count > 0}
+        {#if recipe.created_by_full_name || recipe.created_by_username || recipe.created_at || recipe.source_url || recipe.last_cooked_at || recipe.cook_count > 0 || versions.length}
           <p class="byline">
             {#if recipe.created_by_full_name || recipe.created_by_username}
               {@const creatorDisplay = recipe.created_by_full_name || recipe.created_by_username}
@@ -1008,6 +1177,15 @@
             {#if recipe.cook_count > 0}
               <span class="dot">·</span>
               <span>Cooked {recipe.cook_count} {recipe.cook_count === 1 ? 'Time' : 'Times'}</span>
+            {/if}
+            <!-- With the rest of the recipe's history rather than a fifth
+                 header icon: they're rare, and the header has no room. -->
+            {#if versions.length}
+              <span class="byline-versions-wrap">
+                <button type="button" class="byline-versions" on:click={openVersions}>
+                  <span class="material-symbols-rounded" aria-hidden="true">history</span>{$_('recipe_view_ct.versions.title')}
+                </button>
+              </span>
             {/if}
           </p>
         {/if}
@@ -1519,6 +1697,79 @@
 />
 
 <!-- Share menu — Share Card (PNG) or Share Link (public URL). -->
+<!-- Earlier versions: when each was kept, what differs, a look, Restore. -->
+<Sheet bind:open={versionsOpen} title={$_('recipe_view_ct.versions.title')}>
+  <p class="versions-intro">{$_('recipe_view_ct.versions.intro')}</p>
+  <ul class="versions-list">
+    {#each versions as v (v.id)}
+      {@const parts = recipe ? versionDiffers(v, versionCategoryId) : []}
+      <li class="version">
+        <div class="version-head">
+          <span class="version-time">{_versionTime(v)}</span>
+          <span class="version-reason">
+            {#if v.edited_by != null && v.edited_by !== $currentUser?.id && v.edited_by_name}
+              {$_(VERSION_REASONS_BY[v.reason] || VERSION_REASONS_BY.conflict, { values: { name: v.edited_by_name } })}
+            {:else}
+              {$_(VERSION_REASONS[v.reason] || VERSION_REASONS.conflict)}
+            {/if}
+          </span>
+        </div>
+        <p class="version-name">{v.data?.name || ''}</p>
+        {#if parts.length}
+          <div class="version-parts">
+            <span class="version-parts-label">{$_('recipe_view_ct.versions.differs')}</span>
+            {#each parts as part}
+              <span class="version-chip">{$_(VERSION_PARTS[part])}</span>
+            {/each}
+          </div>
+        {/if}
+        <div class="version-actions">
+          <button class="btn btn-secondary version-btn" on:click={() => previewVersionId = previewVersionId === v.id ? null : v.id}
+            aria-expanded={previewVersionId === v.id}>
+            <span class="material-symbols-rounded">{previewVersionId === v.id ? 'visibility_off' : 'visibility'}</span>
+            {$_(previewVersionId === v.id ? 'recipe_view_ct.versions.hide_preview' : 'recipe_view_ct.versions.preview')}
+          </button>
+          <button class="btn btn-primary version-btn" on:click={() => restoreVersion(v)} disabled={restoringVersion}>
+            <span class="material-symbols-rounded">restore</span>
+            {$_('recipe_view_ct.versions.restore')}
+          </button>
+        </div>
+        {#if previewVersionId === v.id}
+          <div class="version-preview">
+            <h4>{v.data?.name || ''}</h4>
+            {#if v.data?.description}<p class="version-desc">{v.data.description}</p>{/if}
+            <h5>{$_('recipe_view_ct.versions.ingredients')}</h5>
+            {#if (v.data?.ingredients || []).some(g => g.items?.length)}
+              {#each v.data.ingredients as g}
+                {#if g.name}<p class="version-group">{g.name}</p>{/if}
+                <ul class="version-ings">
+                  {#each g.items || [] as it}
+                    <li>{[displayQty(it.qty, it.unit), it.unit, it.name].filter(Boolean).join(' ')}</li>
+                  {/each}
+                </ul>
+              {/each}
+            {:else}
+              <p class="version-empty">{$_('recipe_view_ct.versions.no_ingredients')}</p>
+            {/if}
+            <h5>{$_('recipe_view_ct.versions.steps')}</h5>
+            {#if v.data?.steps?.length}
+              <ol class="version-steps">
+                {#each v.data.steps as st}<li>{_stepText(st)}</li>{/each}
+              </ol>
+            {:else}
+              <p class="version-empty">{$_('recipe_view_ct.versions.no_steps')}</p>
+            {/if}
+            {#if v.data?.notes}
+              <h5>{$_('recipe_view_ct.notes')}</h5>
+              <div class="version-notes">{@html sanitizeRichText(v.data.notes)}</div>
+            {/if}
+          </div>
+        {/if}
+      </li>
+    {/each}
+  </ul>
+</Sheet>
+
 <ActionSheet
   bind:open={shareSheetOpen}
   title="Share Recipe"
@@ -1569,6 +1820,54 @@
     background: color-mix(in srgb, var(--danger) 18%, transparent);
     color: var(--danger);
   }
+  /* Earlier versions: the notice above the recipe, and the sheet. */
+  .versions-notice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 8px 8px 8px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in srgb, var(--info) 35%, transparent);
+    background: color-mix(in srgb, var(--info) 10%, var(--surface-1));
+    color: var(--text-1);
+  }
+  .versions-notice-icon { color: var(--info); font-size: 20px; flex-shrink: 0; }
+  .versions-notice-text { flex: 1; min-width: 0; margin: 0; font-size: 14px; line-height: 1.4; }
+  .versions-notice-view { height: 36px; padding: 0 12px; flex-shrink: 0; }
+  .versions-notice-close { width: 36px; height: 36px; flex-shrink: 0; background: transparent; border-color: transparent; color: var(--text-2); }
+  .versions-intro { margin: 0 0 12px; color: var(--text-2); font-size: 14px; line-height: 1.45; }
+  .versions-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .version {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    padding: 12px 14px;
+  }
+  .version-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; }
+  .version-time { font-weight: 600; font-size: 14px; color: var(--text-1); }
+  .version-reason { font-size: 13px; color: var(--text-2); }
+  .version-name { margin: 6px 0 0; font-size: 15px; color: var(--text-1); overflow-wrap: anywhere; }
+  .version-parts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+  .version-parts-label { font-size: 13px; color: var(--text-2); }
+  .version-chip {
+    font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+    background: var(--accent-dim); color: var(--text-1);
+  }
+  .version-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .version-btn { height: 38px; padding: 0 14px; font-size: 14px; }
+  .version-btn .material-symbols-rounded { font-size: 18px; }
+  .version-preview {
+    margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
+    font-size: 14px; line-height: 1.5; color: var(--text-1); overflow-wrap: anywhere;
+  }
+  .version-preview h4 { margin: 0 0 4px; font-size: 16px; }
+  .version-preview h5 { margin: 12px 0 4px; font-size: 13px; color: var(--text-2); }
+  .version-desc { margin: 0; color: var(--text-2); }
+  .version-group { margin: 6px 0 2px; font-weight: 600; }
+  .version-ings, .version-steps { margin: 0; padding-left: 20px; }
+  .version-empty { margin: 0; color: var(--text-3); }
+  .version-notes :global(p) { margin: 0 0 6px; }
   .btn-icon.close-btn:hover {
     background: color-mix(in srgb, var(--danger) 18%, transparent);
     color: var(--danger);
@@ -1841,6 +2140,14 @@
     line-height: 1.4;
   }
   .byline strong { color: var(--text-2); font-weight: 700; }
+  .byline-versions-wrap { display: inline-flex; align-items: center; white-space: nowrap; margin-left: 4px; }
+  .byline-versions {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 0; background: none; border: 0; cursor: pointer;
+    color: var(--accent); font: inherit; font-weight: 600;
+  }
+  .byline-versions .material-symbols-rounded { font-size: 16px; }
+  .byline-versions:hover { text-decoration: underline; }
   .byline .dot { opacity: 0.6; }
   .byline-author {
     display: inline-flex;

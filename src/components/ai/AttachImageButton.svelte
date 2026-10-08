@@ -83,7 +83,7 @@
     if (menuOpen && wrap && !wrap.contains(e.target)) menuOpen = false;
   }
   function onWindowKey(e) {
-    if (menuOpen && e.key === 'Escape') menuOpen = false;
+    if (menuOpen && e.key === 'Escape') { menuOpen = false; e.preventDefault(); }
   }
 </script>
 

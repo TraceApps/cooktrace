@@ -17,6 +17,8 @@
  * built for: ticking things off a list has to work.
  */
 
+import { SYNC_FIELDS } from './sync-fields.js';
+
 /** Was this the server being unreachable, rather than a real answer? */
 export function isOfflineError(err) {
   if (!err) return false;
@@ -39,7 +41,7 @@ export const mirrorKey = (url) => String(url).replace(/^https?:\/\/[^/]+/, '');
 export const MIRRORED_GETS = [
   /^\/api\/recipes$/,
   /^\/api\/recipes\/\d+$/,
-  /^\/api\/recipes\/\d+\/(comments|cooks|tools|tags)$/,
+  /^\/api\/recipes\/\d+\/(comments|cooks|tools|tags|versions)$/,
   /^\/api\/recipes\/categories$/,
   /^\/api\/cookbooks$/,
   /^\/api\/cookbooks\/\d+$/,
@@ -124,6 +126,168 @@ export function writeOp(method, url, body) {
   return null;
 }
 
+// The fields of a recipe a save may change, as the server compares two
+// copies (server/lib/recipe-versions.js VERSION_FIELDS and META_FIELDS).
+const RECIPE_FIELDS = [
+  'name', 'description', 'ingredients', 'steps', 'tags', 'tools', 'notes',
+  'servings', 'prep_minutes', 'cook_minutes', 'total_minutes', 'rest_minutes',
+  'nutrition', 'category_id', 'img_url', 'source_url', 'video_url', 'yield_text',
+  'rating', 'favorite', 'visibility',
+];
+const FIELDS = { ...SYNC_FIELDS, recipes: RECIPE_FIELDS };
+
+/**
+ * The copy of a recipe a page shows, as a save made on it describes it:
+ * the server's stamp of that copy and its fields, the picture as a save
+ * sends it. Pages pass it with a save as `_base`.
+ */
+export function recipeBaseOf(recipe) {
+  if (!recipe || typeof recipe !== 'object') return null;
+  const out = { synced_at: typeof recipe.synced_at === 'string' ? recipe.synced_at : null };
+  for (const f of RECIPE_FIELDS) out[f] = recipe[f] ?? null;
+  out.img_url = recipe.imgUrl || recipe.img_url || null;
+  return out;
+}
+
+// A field's value as two copies on a page compare: the same value written
+// another way is the same.
+function _norm(v) {
+  if (v === undefined || v === '' || v === false) v = v === false ? 0 : null;
+  if (v === true) v = 1;
+  if (Array.isArray(v) && v.length === 0) v = null;
+  if (v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0) v = null;
+  if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim())) v = Number(v);
+  return v;
+}
+function _stable(v) {
+  v = _norm(v);
+  if (Array.isArray(v)) return `[${v.map(_stable).join(',')}]`;
+  if (v && typeof v === 'object') return `{${Object.keys(v).sort().map(k => `${JSON.stringify(k)}:${_stable(v[k])}`).join(',')}}`;
+  return JSON.stringify(v ?? null);
+}
+// Ingredients grouped or as the older flat list: the same ingredients.
+function _groups(v) {
+  if (!Array.isArray(v) || !v.length) return v;
+  if (v.every(g => g && typeof g === 'object' && !Array.isArray(g.items))) return [{ name: '', items: v }];
+  return v.map(g => ({ name: g?.name || '', items: Array.isArray(g?.items) ? g.items : [] }));
+}
+const _val = (o, f) => {
+  const v = f === 'img_url' ? (o?.imgUrl ?? o?.img_url) : o?.[f];
+  return f === 'ingredients' ? _groups(v) : v;
+};
+
+/** The fields a save changes on its page's copy (only those it sends). */
+export function changedFields(table, body, base) {
+  return (FIELDS[table] || []).filter(f => f !== 'deleted_at' && _val(body, f) !== undefined && _stable(_val(body, f)) !== _stable(_val(base, f)));
+}
+export const recipeChangedFields = (body, base) => changedFields('recipes', body, base);
+
+/**
+ * Which row a save is to, by its address: { table, id }, or null for a
+ * request that isn't one.
+ */
+export function saveTarget(method, url) {
+  const m = (method || '').toUpperCase();
+  const path = pathOf(url);
+  const rules = [
+    ['PUT', /^\/api\/recipes\/categories\/(\d+)$/, 'recipe_categories'],
+    ['PUT', /^\/api\/recipes\/\d+\/cooks\/(\d+)$/, 'cook_diary'],
+    ['PUT', /^\/api\/recipes\/\d+\/comments\/(\d+)$/, 'recipe_comments'],
+    ['PUT', /^\/api\/recipes\/(\d+)$/, 'recipes'],
+    ['PUT', /^\/api\/pantry\/categories\/(\d+)$/, 'pantry_categories'],
+    ['PUT', /^\/api\/pantry\/(\d+)$/, 'pantry_items'],
+    ['PATCH', /^\/api\/pantry\/(\d+)\/stock$/, 'pantry_items'],
+    ['PUT', /^\/api\/shopping\/(\d+)$/, 'shopping_list'],
+    ['PATCH', /^\/api\/shopping\/(\d+)\/check$/, 'shopping_list'],
+    ['PUT', /^\/api\/cook-diary\/(\d+)$/, 'cook_diary'],
+    ['PUT', /^\/api\/cookbooks\/(\d+)$/, 'cookbooks'],
+    ['PUT', /^\/api\/units\/(\d+)$/, 'custom_units'],
+  ];
+  for (const [rm, re, table] of rules) {
+    const hit = m === rm && path.match(re);
+    if (hit) return { table, id: Number(hit[1]), toggle: rm === 'PATCH' };
+  }
+  return null;
+}
+
+/** Which table the rows of a read belong to, by its address. */
+export function readTable(url) {
+  const path = pathOf(url);
+  if (/^\/api\/recipes\/categories$/.test(path)) return 'recipe_categories';
+  if (/^\/api\/recipes\/\d+\/cooks$/.test(path)) return 'cook_diary';
+  if (/^\/api\/recipes\/\d+\/comments$/.test(path)) return 'recipe_comments';
+  if (/^\/api\/recipes(\/\d+)?$/.test(path)) return 'recipes';
+  if (/^\/api\/pantry\/categories$/.test(path)) return 'pantry_categories';
+  if (/^\/api\/pantry(\/\d+)?$/.test(path)) return 'pantry_items';
+  if (/^\/api\/shopping$/.test(path)) return 'shopping_list';
+  if (/^\/api\/cook-diary(\/|$)/.test(path)) return 'cook_diary';
+  if (/^\/api\/cookbooks(\/\d+)?$/.test(path)) return 'cookbooks';
+  if (/^\/api\/units$/.test(path)) return 'custom_units';
+  return null;
+}
+
+/** The rows in an answer that carry the server's stamp: its own, a list, or `items` / `custom`. */
+export function stampedRows(answer) {
+  const out = [];
+  const take = r => { if (r && typeof r === 'object' && r.id != null && typeof r.synced_at === 'string') out.push(r); };
+  if (Array.isArray(answer)) answer.forEach(take);
+  else if (answer && typeof answer === 'object') {
+    take(answer);
+    for (const k of ['items', 'custom', 'entries']) if (Array.isArray(answer[k])) answer[k].forEach(take);
+  }
+  return out;
+}
+
+/**
+ * What a save says about the copy it was made on, for the server to keep
+ * the newer of two edits (and, for a recipe, the other as an earlier
+ * version) and to leave alone what the save didn't change: the server's
+ * stamp of the page's copy, and the fields the save changes. The page's
+ * copy is `_base`, or the row this browser showed with the stamp the body
+ * carries (seen(table, id, stamp)); a toggle (PATCH) changes the fields it
+ * sends. Null when the save can't say (sent as before).
+ */
+export function saveBase(method, url, body, seen, editedAt) {
+  const t = saveTarget(method, url);
+  if (!t || !body || typeof body !== 'object') return null;
+  if (t.toggle) {
+    const changed = Object.keys(body).filter(f => !f.startsWith('_') && (FIELDS[t.table] || []).includes(f));
+    return { base_synced_at: null, changed, edited_at: editedAt };
+  }
+  const fields = FIELDS[t.table] || [];
+  const page = body._base && typeof body._base === 'object' ? body._base : null;
+  const stamp = page?.synced_at ?? body.synced_at;
+  const said = Array.isArray(body._changed) ? body._changed.filter(f => fields.includes(f)) : null;
+  if (typeof stamp !== 'string' || !stamp) {
+    // No copy's stamp: a save of a few fields (not a whole row) changes the
+    // fields it sends, or what it says; one with a page's copy but no stamp
+    // changes what differs from it. Otherwise it can't say.
+    const sent = Object.keys(body).filter(f => !f.startsWith('_') && fields.includes(f));
+    if (said) return { base_synced_at: null, changed: said, edited_at: editedAt };
+    if (page) return { base_synced_at: null, changed: changedFields(t.table, body, page), edited_at: editedAt };
+    if (body.id == null && sent.length) return { base_synced_at: null, changed: sent, edited_at: editedAt };
+    return null;
+  }
+  const copy = page || (typeof seen === 'function' ? seen(t.table, t.id, stamp) : null);
+  let changed = null;
+  if (said) changed = said;
+  else if (copy) changed = changedFields(t.table, body, copy);
+  return { base_synced_at: stamp, changed, edited_at: editedAt };
+}
+
+/** A recipe save's base, the kept copy standing in when it is the same copy. */
+export function recipeSaveBase(body, kept, editedAt) {
+  return saveBase('PUT', `/api/recipes/${body?.id ?? 0}`, body,
+    (table, id, stamp) => (kept && typeof kept === 'object' && kept.synced_at === stamp ? recipeBaseOf(kept) : null), editedAt);
+}
+
+/** A save's body with what it says about its copy, and this device's time. */
+export function withSaveBase(body, sync, now = new Date().toISOString()) {
+  if (!body || typeof body !== 'object') return body;
+  const { _sync, _base, _changed, ...rest } = body;
+  return sync ? { ...rest, _sync: { ...sync, client_now: now } } : rest;
+}
+
 /** Creates that make a row, so they need a temporary id to hold on to. */
 export const MAKES_A_ROW = ['shopping-create', 'pantry-create', 'diary-create', 'recipe-create', 'comment-create'];
 
@@ -147,9 +311,19 @@ export function collapseOps(ops) {
         continue;
       }
     }
-    byKey.set(op.key, op);
+    // Two saves of one recipe go up as one, the latest body: it says the
+    // first one's copy, and every field either changed, or the second
+    // save's copy (which already showed the first) would hide the first.
+    byKey.set(op.key, prev?.sync && op.sync ? { ...op, sync: combineSaveBases(prev.sync, op.sync) } : op);
   }
   return [...byKey.values(), ...out].sort((a, b) => (a.seq || 0) - (b.seq || 0));
+}
+
+/** Two saves of one recipe as one: the first copy, every field changed. */
+export function combineSaveBases(first, second) {
+  const changed = Array.isArray(first.changed) && Array.isArray(second.changed)
+    ? [...new Set([...first.changed, ...second.changed])] : null;
+  return { ...second, base_synced_at: first.base_synced_at ?? second.base_synced_at, changed };
 }
 
 /**

@@ -147,12 +147,15 @@ async function _saveImageMap(map) {
  * (not the local cache) so we have the complete set before going
  * offline. onProgress(downloaded, total) fires for UI updates.
  */
-export async function cacheAllImages(onProgress) {
+// `token`: the sync's session. `signal` / `live()`: a change of account
+// stops it between requests (sync.js stopSync), rather than the next
+// account waiting for every picture of the last one.
+export async function cacheAllImages(onProgress, { token = getAuthToken(), signal = null, live = () => true } = {}) {
   const serverUrl = getServerUrl();
   if (!serverUrl) return { total: 0, downloaded: 0, failed: 0 };
+  const stopped = () => !live() || !!signal?.aborted;
 
   const imageMap = await _loadImageMap();
-  const token = getAuthToken();
   const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
   const urlPairs = []; // [{ relative, full }]
@@ -183,7 +186,7 @@ export async function cacheAllImages(onProgress) {
   // photos also show up in the diary list below). Server returns
   // hydrated recipes from /api/recipes.
   try {
-    const recipes = await fetch(`${serverUrl}/api/recipes`, { headers }).then(r => r.json());
+    const recipes = await (stopped() ? Promise.reject(new Error('stopped')) : fetch(`${serverUrl}/api/recipes`, { headers, signal })).then(r => r.json());
     if (Array.isArray(recipes)) {
       for (const r of recipes) {
         addUrl(r.img_url);
@@ -194,13 +197,13 @@ export async function cacheAllImages(onProgress) {
 
   // Pantry items — img_url on each row.
   try {
-    const items = await fetch(`${serverUrl}/api/pantry`, { headers }).then(r => r.json());
+    const items = await (stopped() ? Promise.reject(new Error('stopped')) : fetch(`${serverUrl}/api/pantry`, { headers, signal })).then(r => r.json());
     if (Array.isArray(items)) for (const p of items) addUrl(p.img_url);
   } catch {}
 
   // Cook diary entries — photo_url + photos[] JSON array on each row.
   try {
-    const diary = await fetch(`${serverUrl}/api/cook-diary`, { headers }).then(r => r.json());
+    const diary = await (stopped() ? Promise.reject(new Error('stopped')) : fetch(`${serverUrl}/api/cook-diary`, { headers, signal })).then(r => r.json());
     if (Array.isArray(diary)) {
       for (const d of diary) {
         addUrl(d.photo_url);
@@ -213,7 +216,7 @@ export async function cacheAllImages(onProgress) {
 
   // Cookbooks — cover images.
   try {
-    const cookbooks = await fetch(`${serverUrl}/api/cookbooks`, { headers }).then(r => r.json());
+    const cookbooks = await (stopped() ? Promise.reject(new Error('stopped')) : fetch(`${serverUrl}/api/cookbooks`, { headers, signal })).then(r => r.json());
     if (Array.isArray(cookbooks)) for (const c of cookbooks) addUrl(c.cover_image_url);
   } catch {}
 
@@ -231,6 +234,7 @@ export async function cacheAllImages(onProgress) {
   if (onProgress) onProgress(0, total);
 
   for (const pair of toDownload) {
+    if (stopped()) return { total, downloaded, failed, stopped: true };
     const localUri = await _downloadImage(pair.full);
     if (localUri) {
       // Store both relative and full URL as keys so lookup works no

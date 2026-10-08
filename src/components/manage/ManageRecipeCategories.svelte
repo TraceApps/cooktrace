@@ -51,7 +51,7 @@
     const name = editName.trim();
     if (!name) return;
     try {
-      const updated = await NtApi.updateRecipeCategory(c.id, { name, color: editColor });
+      const updated = await NtApi.updateRecipeCategory(c.id, { name, color: editColor, _base: c });
       categories = categories.map(x => x.id === c.id ? updated : x);
       cancelEdit();
       showSuccess($_('manage_recipe_cats.toast.saved'));

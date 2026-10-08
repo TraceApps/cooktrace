@@ -6,6 +6,7 @@
   import { fade } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
   import { NtApi } from '../lib/api.js';
+  import { recipeBaseOf } from '../lib/offline-edits.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { resolveAssetUrl } from '../lib/platform.js';
   import { defaultServings } from '../stores/settings.js';
@@ -328,10 +329,15 @@
     return { id: _newIngId(), qty: '', unit: '', name: '', note: '' };
   }
 
+  // The copy this editor opened, sent with the save: the server keeps the
+  // newer of this edit and one made elsewhere since, and the other as an
+  // earlier version, and leaves alone what this save didn't change.
+  let loadedBase = null;
   async function load() {
     if (!isEdit) return;
     try {
       const r = await NtApi.getRecipe(id);
+      loadedBase = recipeBaseOf(r);
       name        = r.name || '';
       description = r.description || '';
       imgUrl      = r.imgUrl || '';
@@ -935,6 +941,7 @@
         source_url: sourceUrl.trim() || null,
         video_url:  videoUrl.trim()  || null,
         notes: notes.trim() || null,
+        ...(isEdit && loadedBase ? { _base: loadedBase } : {}),
       };
 
       const saved = isEdit

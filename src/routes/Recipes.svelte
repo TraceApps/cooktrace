@@ -1,5 +1,6 @@
 <script>
   import { closeOnBack } from '../lib/back-stack.js';
+  import { onSyncChanges } from '../lib/sync-refresh.js';
   import { onMount, tick } from 'svelte';
   import { fold } from '../lib/fold.js';
   import { columnsAcrossFold, gridTemplateAcrossFold, columnForIndex } from '../lib/fold-core.js';
@@ -8,6 +9,7 @@
   import { _ } from 'svelte-i18n';
   import { formatDuration } from '../lib/duration.js';
   import { NtApi } from '../lib/api.js';
+  import { recipeBaseOf } from '../lib/offline-edits.js';
   import { showError, showSuccess, showInfo } from '../stores/toast.js';
   import { pageBanners, bannerStyle, aiEnabled, aiKeyVerified, recipesSort, mixSharedIntoRecipes } from '../stores/settings.js';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
@@ -518,7 +520,9 @@
     }
     else if (v === 'favorite') {
       try {
-        const updated = await NtApi.updateRecipe(r.id, { ...r, favorite: !r.favorite });
+        // Says it changes the favorite only: the list's copy may be older
+        // than an edit made elsewhere since, which the save mustn't undo.
+        const updated = await NtApi.updateRecipe(r.id, { ...r, favorite: !r.favorite, _base: recipeBaseOf(r), _changed: ['favorite'] });
         recipes = recipes.map(x => x.id === r.id ? updated : x);
       } catch (err) { showError(err.message || 'Update failed'); }
     }
@@ -793,9 +797,13 @@
     return arr;
   }
 
-  async function load() {
-    loading = true;
-    loadError = null;
+  // Two reads at once (the page opening while a sync lands): the later
+  // one's answer stands, never an older one finishing last.
+  let _loadSeq = 0;
+  // quiet: read again after a sync, without the loading state.
+  async function load({ quiet = false } = {}) {
+    const seq = ++_loadSeq;
+    if (!quiet) { loading = true; loadError = null; }
     try {
       const [recipesRes, catsRes, cookbooksRes, sharedRes, sharedCbRes] = await Promise.all([
         NtApi.getRecipes(),
@@ -810,6 +818,8 @@
           return [];
         }),
       ]);
+      if (seq !== _loadSeq) return;
+      loadError = null;
       recipes = recipesRes;
       categories = catsRes || [];
       cookbooks = cookbooksRes || [];
@@ -825,13 +835,20 @@
       // active button on cold start.
       tick().then(() => requestAnimationFrame(_measureVtPill));
     } catch (e) {
-      loadError = e.message || 'Could not load recipes';
-      showError(loadError);
+      // Only the newest read speaks; a quiet one after a sync that fails
+      // keeps what's shown, unsaid.
+      if (seq === _loadSeq && !quiet) {
+        loadError = e.message || 'Could not load recipes';
+        showError(loadError);
+      }
     } finally {
-      loading = false;
+      if (seq === _loadSeq) loading = false;
     }
   }
-  onMount(load);
+  onMount(() => { load(); });
+  // A sync that brought changes down (the first one after signing in
+  // included) shows them here at once.
+  onMount(() => onSyncChanges(() => load({ quiet: true })));
 
   function totalMinutes(r) {
     if (r?.total_minutes != null) return r.total_minutes;

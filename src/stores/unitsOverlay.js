@@ -20,18 +20,32 @@ export const unitsOverlay = writable(EMPTY, () => {
   if (!_loaded && !_inflight) refreshUnitsOverlay();
 });
 
+// Moves when the account changes: a read started before doesn't land.
+let _gen = 0;
 async function _fetch() {
+  const gen = _gen;
   try {
     const res = await NtApi.getUnits();
-    unitsOverlay.set({ disabled: res?.disabled || [], custom: res?.custom || [] });
+    if (gen === _gen) unitsOverlay.set({ disabled: res?.disabled || [], custom: res?.custom || [] });
   } catch {
-    unitsOverlay.set(EMPTY);
+    if (gen === _gen) unitsOverlay.set(EMPTY);
   }
 }
 
 /** Trigger a fetch. Returns a Promise so callers (e.g. Manage edits)
  *  can await consistency before the next render. */
 export function refreshUnitsOverlay() {
-  _inflight = _fetch().finally(() => { _loaded = true; _inflight = null; });
-  return _inflight;
+  const gen = _gen;
+  const p = _fetch().finally(() => { if (gen === _gen) { _loaded = true; _inflight = null; } });
+  _inflight = p;
+  return p;
+}
+
+/** Another account (or none): forget this one's units; the next picker on
+ *  screen reads them again (lib/user-state.js). */
+export function resetUnitsOverlay() {
+  _gen++;
+  _loaded = false;
+  _inflight = null;
+  unitsOverlay.set(EMPTY);
 }

@@ -9,14 +9,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Earlier versions of a recipe.** When edits from two devices change the same part of a recipe, the newer one stays, and the recipe page says so and lists the other, with what differs and a preview. Restore puts it back, and a restore can be undone the same way. A kitchen member sees the versions that were their own edits.
 - **Shared recipe links show a preview in chat apps**: the recipe's name, a line about it, and its photo. Links are now a plain address (`/r/...`) instead of a `#/` one, which a server never sees. Links copied before this still open.
 
 ### Changed
 
+- **A sync keeps the newer edit, field by field.** An edit made offline in the Android app or in the browser no longer overwrites a newer change made on another device to a recipe, a pantry item, the shopping list, a category, a custom unit, a cookbook or the diary, even when a phone's clock is off. Changes to different fields are both kept: an item checked off on the phone and renamed on the web keeps both. Fields that belong together, such as an amount and its unit, stay together. An item deleted on one device stays deleted when another only edited it earlier or reordered the list. Cook counts follow the cook diary. Older versions of the app sync as before, and a recipe copy they replace is kept as an earlier version.
+- **Sheets work from the keyboard.** Focus moves into a sheet when it opens and stays there, Escape closes it (or only the picker open inside it), and focus goes back where it was, except into a text field on a touch screen.
 - **Trace's attach button offers Camera or Gallery on phones and in the Android app**, the same as the other Trace apps. Each choice goes straight to the camera or the photo picker; on a computer the button opens the file picker.
 
 ### Fixed
 
+- **A recipe made on the phone is made once.** Two syncs could start at once (opening the app, the connection coming back, the timer) and send the same new recipe twice, making two on the server and three on the phone, and keeping the same earlier version twice. Syncs now run one at a time, a new row carries a key so the server makes it once even when it's sent again, and the same earlier version is kept once. An edit made while a sync is running goes up right after it.
+- **The recipe list fills in after the first sync** instead of saying "No Recipes Yet" until you leave the page. The pantry, shopping list and cook diary refresh the same way.
+- **Upload from the phone to a server matches categories the account already has** instead of making a second copy of each, and a second upload makes nothing twice.
+- **Disconnect keeps your settings on the phone** and no longer shows the welcome screen.
+- **Reordering recipe or pantry categories on the web keeps the new order.** The request reached the wrong route and was refused.
 - **A Tandoor export imports** ([#72](https://github.com/TraceApps/cooktrace/issues/72), thanks @joeShuff). Tandoor packs each recipe in its own zip inside the export, which the importer never opened, so every Tandoor export failed with "No JSON files found". Each recipe now comes in with its own picture.
 - **Imports say what they skipped** ([#72](https://github.com/TraceApps/cooktrace/issues/72), thanks @joeShuff). After a bulk import, the summary reads "Imported 119 of 121 Recipes" and lists each recipe skipped as a duplicate, linked to the one you already have, apart from any that failed.
 - **Importing a recipe you already have opens it.** Importing it again from a link, pasted text or a file showed a "no cooking steps" warning and opened an empty page. It now says the recipe already exists and opens yours.
@@ -46,6 +54,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Security
 
+- **Another account signing in on the same phone never sees or sends the last one's data.** The Android app keeps a copy of your account on the phone, and signing in as someone else showed that copy, and sent changes still waiting under the new account's sign-in. The app now checks whose copy it holds before showing anything: signing back in to the same account keeps everything, another account starts from its own data, and if the last account left changes that never reached the server, you're asked before they're discarded. The same server at another address (its LAN address and its domain) is still the same account; where the app can't tell, it asks. Settings and units on show follow the account too.
+- **The server takes the session the app sends over an older sign-in cookie.** On Android a sign-in cookie from an earlier account could ride along with the next account's requests and be answered as the earlier account. CookTrace's own session now wins, and an expired one never falls back to the cookie. A token from a proxy or sign-in gate in front of the server is left alone: the web app signs in with its cookie as before, and still needs its CSRF token. The app removes only CookTrace's cookie when the phone changes hands, so a sign-in gate's cookie stays.
+- **A link can only point at your own pantry items, recipes and categories.** A shopping item, pantry variant, cook or recipe could be saved pointing at another account's row, which also showed that account's pantry item name and aisle. Such links are dropped now, and the list never shows another account's item through one.
 - **The Android app can no longer link your data to another account's.** A synced recipe, pantry item, shopping item or cookbook link could point at a category, item, recipe or cookbook belonging to someone else on the server, including adding your recipes to their cookbooks. The server now accepts a link only to something the account owns or was shared.
 - **The image proxy passes images only.** For its image hosts it passed through whatever came back from the app's own address, a web page included, before sign-in. Anything that isn't an image is refused now, and images can't act as a page.
 - **The recipe share card can't run script or leak a private recipe.** A quote in a recipe's image link ran script as the app when the card was opened, a private recipe's card could be kept by a shared cache, a recipe with no owner gave its card to anyone signed in, and its picture took its address from the request. The card now escapes what it shows, isn't cached, blocks script, and follows the recipe's own sharing: a recipe shared with you shows its card too.
