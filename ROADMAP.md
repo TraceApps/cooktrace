@@ -424,8 +424,15 @@ Full-backup dump + schema-driven restore extended to cover `cookbook_shares`, `k
 
 ### ~~Preliminary foldable support~~ *(done, 1.4.0)*
 
-### Sync: an older change must not win
+### ~~Sync: an older change must not win~~ *(done on dev, 3af0dfa: newer edit wins with a clock correction, the losing recipe kept as a version)*
 Found 2026-10-04 while answering a Reddit question. The phone's sync push applies whatever a device sends, with no timestamp check, so an offline edit brings back an item someone else cleared, and an offline clear removes an item someone unticked since (both reproduced against a real server). The web app's offline queue is safe: an edit to a removed item is refused and named. Keep a deletion unless the edit is newer, skip a stale delete, and add offline-sync tests for both directions. Check NutriTrace, LiftTrace and NoteTrace, which share the pattern.
+
+### Sync: open edge cases (found 2026-10-08)
+Left open after the Android sync rework (3af0dfa, 49090fa):
+- **"No Recipes Yet" right after a fresh sign-in**: the recipe list sometimes still shows empty about 10 s after signing in (3 of 20 tries on the emulator). Probably the first sync still running; not checked. Confirm the cause, then make the list fill in (or show that it's loading) as soon as the first sync lands.
+- **Shared kitchen recipes keep the owner's pantry links**: opened on the phone, a shared recipe's ingredient links still hold the owner's pantry ids, which can point at the wrong item (or none) on this phone. Predates the rework. Decide what a shared recipe's pantry link should mean for someone else, then map or drop it.
+- **Ingredient pantry link fix not run on the emulator**: 49090fa is proven by tests only; the emulator script is `emu/ing-links.sh` in the sync harness.
+- **Blank screen after setup sign-in**: fixed in 49090fa (a harmless native call primes Capacitor's bridge before the database's first call). Proven 0 blanks in 63 vs 3 in 110 before, not by a test that fails on demand. Watch for reports.
 
 ---
 
