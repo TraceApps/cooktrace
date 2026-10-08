@@ -72,6 +72,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **A removed share link stays removed.** A phone still holding the old link could bring it back with its next edit to the recipe, and a device could set a link of its own choosing. The link is now only set by creating or removing it.
 - **Shared recipe pages are kept out of search engines** and don't pass their address on to sites the recipe links to.
 - **Uploaded files get unguessable names.** The random part of the name was made with `Math.random()`, which can be predicted from its own output.
+- **@capacitor/android** bumped 8.3.0 to 8.5.3, and @capacitor/core 8.4.0 to 8.5.3, closes [GHSA-rvm3-566m-v7fv](https://github.com/advisories/GHSA-rvm3-566m-v7fv) (critical: tapping a crafted link to the app's own address could load any web page as the app, with its stored sign-in and its access to the phone). CookTrace was exposed: the Android app shows a recipe's source and video links, and a recipe shared with you by someone else could carry a crafted one. No longer possible.
+- **source-map-js** bumped 1.2.1 to 1.2.2, closes [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) (high: a crafted source map could stall the process). Build tooling only; neither the app nor the server uses it.
+- **@modelcontextprotocol/sdk** bumped 1.30.0 to 1.32.1 on the server, closes [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h) (high: its OAuth client could send credentials to a server another MCP server named). CookTrace only uses the SDK to run its own MCP server, never its OAuth client.
+- **proxy-addr** bumped 2.0.7 to 2.0.8 on the server, closes [GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h) (critical: a trusted-proxy range written in IPv4-mapped IPv6 form trusted every client's forwarded address). CookTrace never sets a trusted proxy, so it wasn't exposed.
+- `npm audit` reports 0 vulnerabilities for the app and the server.
 
 ---
 
