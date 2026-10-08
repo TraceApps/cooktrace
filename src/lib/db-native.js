@@ -380,6 +380,58 @@ export async function dbInit() {
   await _migrateServerCopy();
   await _migrateShoppingAisle();
   await _backfillShoppingNames();
+  await _migrateIngredientLinks();
+}
+
+/**
+ * A recipe's ingredients (JSON text) with each pantry link (pantry_item_id)
+ * put through `map(id)`: the id it should hold, or null to take the link
+ * out, or undefined when it can't be told yet. The phone keeps its own ids
+ * in these links, as everywhere else; the server keeps its ids. Returns
+ * { json, unknown }: unknown counts links `map` couldn't tell.
+ */
+export function mapIngredientLinks(json, map) {
+  let groups;
+  try { groups = typeof json === 'string' ? JSON.parse(json) : json; } catch { return { json, unknown: 0 }; }
+  if (!Array.isArray(groups)) return { json, unknown: 0 };
+  let changed = false, unknown = 0;
+  const fix = it => {
+    if (!it || typeof it !== 'object' || it.pantry_item_id == null) return it;
+    const to = map(Number(it.pantry_item_id));
+    if (to === undefined) { unknown++; return it; }
+    if (to === Number(it.pantry_item_id)) return it;
+    changed = true;
+    if (to == null) { const { pantry_item_id, ...rest } = it; return rest; }
+    return { ...it, pantry_item_id: to };
+  };
+  const out = groups.map(g => (g && Array.isArray(g.items) ? { ...g, items: g.items.map(fix) } : fix(g)));
+  return { json: changed ? (typeof json === 'string' ? JSON.stringify(out) : out) : json, unknown };
+}
+
+// One time: ingredient links pulled before the phone translated them held
+// the server's ids. A link that is the server id of a pantry item here
+// becomes that item's own id, except in a recipe edited here that links an
+// item not sent yet; anything else stays as it was.
+async function _migrateIngredientLinks() {
+  try {
+    const db = await getDb();
+    const done = (await db.query(`SELECT value FROM sync_meta WHERE key = 'ingredient_links_local'`, []))?.values?.[0];
+    if (done) return;
+    const pantry = (await db.query(`SELECT id, server_id FROM pantry_items`, []))?.values || [];
+    const byServer = new Map(pantry.filter(p => p.server_id != null).map(p => [Number(p.server_id), p.id]));
+    const unsent = new Set(pantry.filter(p => p.server_id == null).map(p => p.id));
+    if (byServer.size) {
+      const recipes = (await db.query(`SELECT id, ingredients, sync_status FROM recipes`, []))?.values || [];
+      for (const r of recipes) {
+        // A recipe edited here may hold a link picked here (this phone's id,
+        // to an item not sent yet); one that isn't holds the server's copy.
+        const edited = r.sync_status === 'pending';
+        const { json } = mapIngredientLinks(r.ingredients, id => (edited && unsent.has(id) ? id : byServer.has(id) ? byServer.get(id) : id));
+        if (json !== r.ingredients) await db.run(`UPDATE recipes SET ingredients = ? WHERE id = ?`, [json, r.id]);
+      }
+    }
+    await db.run(`INSERT INTO sync_meta (key, value) VALUES ('ingredient_links_local', '1') ON CONFLICT(key) DO NOTHING`, []);
+  } catch (e) { console.warn('[db-native] ingredient links:', e?.message); }
 }
 
 // Shopping-list drag-to-reorder + pantry-category per-category
@@ -861,7 +913,11 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
     return m.has(value) ? m.get(value) : null;
   }
 
-  for (const [table, rows] of Object.entries(payload.tables)) {
+  // Pantry items before recipes, so an ingredient's link to an item in the
+  // same pull finds it.
+  const order = t => (t === 'pantry_items' ? -1 : 0);
+  const tablesInOrder = Object.entries(payload.tables).sort((x, y) => order(x[0]) - order(y[0]));
+  for (const [table, rows] of tablesInOrder) {
     if (!Array.isArray(rows)) continue;
     if (table === 'disabled_units' || table === 'recipe_cookbook_links' || table === 'settings') continue;
 
@@ -917,7 +973,13 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
           translated[fk] = await translateFK(translated[fk], parentTable);
         }
       }
-      // A smart cookbook's category is an id too.
+      // An ingredient's pantry link: the server's id there, this phone's
+      // here. One to an item the phone doesn't have is taken out.
+      if (table === 'recipes' && translated.ingredients != null) {
+        const pantryHere = await mapFor('pantry_items');
+        translated.ingredients = mapIngredientLinks(translated.ingredients, id => (pantryHere.has(id) ? pantryHere.get(id) : null)).json;
+      }
+            // A smart cookbook's category is an id too.
       if (table === 'cookbooks' && translated.smart_filter_json) {
         const cats = await mapFor('recipe_categories');
         translated.smart_filter_json = mapSmartFilterCategory(translated.smart_filter_json, id => cats.get(id));

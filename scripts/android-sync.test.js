@@ -447,3 +447,32 @@ test("the pictures of the account's recipes are found for keeping offline", { sk
   const r = await run('imagesFound');
   assert.ok(r.total >= 1, `found ${r.total}`);
 });
+
+test("an ingredient's pantry link is the server's id on the server and the phone's own on the phone", { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('ingredientLinks');
+  assert.equal(r.idsDiffer, true, "the item's id differs on each side");
+  assert.deepEqual(r.made.server, r.made.want, 'a recipe made on the phone links the right items on the server, a new item included');
+  assert.equal(r.edited.server, r.edited.want, 'an offline edit of the link too');
+  assert.deepEqual(r.phoneAfter.got, r.phoneAfter.want, 'the phone keeps its own ids after the sync');
+  assert.deepEqual(r.fromWeb.got, r.fromWeb.want, "a recipe from the web links the phone's own item");
+});
+
+test("a recipe's ingredient can't link another account's pantry item", { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const srv = await startServer();
+  try {
+    const call = async (tok, method, path, body) => {
+      const r = await fetch(srv.base + path, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: body ? JSON.stringify(body) : undefined });
+      return r.json();
+    };
+    const theirs = await call(srv.token, 'POST', '/api/pantry', { name: 'Alice Saffron' });
+    const mine = await call(srv.tokenB, 'POST', '/api/pantry', { name: 'Bob Rice' });
+    const link = r => r.ingredients[0].items.map(i => i.pantry_item_id ?? null);
+    const made = await call(srv.tokenB, 'POST', '/api/recipes', { name: 'Paella', ingredients: [{ items: [{ name: 'saffron', pantry_item_id: theirs.id }, { name: 'rice', pantry_item_id: mine.id }] }], steps: ['Cook'] });
+    assert.deepEqual(link(made), [null, mine.id], "another account's item is no link; your own stays");
+    const edited = await call(srv.tokenB, 'PUT', `/api/recipes/${made.id}`, { ...made, ingredients: [{ items: [{ name: 'saffron', pantry_item_id: theirs.id }] }] });
+    assert.deepEqual(link(edited), [null]);
+    const pushed = await call(srv.tokenB, 'POST', '/api/sync/push', { fk_ids: 'server', client_now: new Date().toISOString(), tables: { recipes: [{ client_id: 1, server_id: null, name: 'Pushed', ingredients: JSON.stringify([{ items: [{ name: 'saffron', pantry_item_id: theirs.id }] }]), steps: '[]', tags: '[]', tools: '[]', nutrition: '{}', visibility: 'private', cook_count: 0, favorite: 0, servings: 2, updated_at: new Date().toISOString().replace('T', ' ').slice(0, 19), edit_clock: 'server' }] } });
+    const got = await call(srv.tokenB, 'GET', `/api/recipes/${pushed.tables.recipes[0].server_id}`);
+    assert.deepEqual(link(got), [null], 'nor through a sync');
+  } finally { srv.stop(); }
+});

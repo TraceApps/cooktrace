@@ -20,6 +20,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **The Android app no longer opens on a blank screen after signing in on the setup screen.** Now and then it stayed blank until it was closed and opened again.
+- **A recipe's ingredients made or edited in the Android app link the right pantry items on the server.** They sent the phone's own numbers for the items, so a link could point at another item, or at nothing, once synced, and a recipe from the web linked the wrong items on the phone. A link to another account's pantry item is no longer kept.
 - **A recipe made on the phone is made once.** Two syncs could start at once (opening the app, the connection coming back, the timer) and send the same new recipe twice, making two on the server and three on the phone, and keeping the same earlier version twice. Syncs now run one at a time, a new row carries a key so the server makes it once even when it's sent again, and the same earlier version is kept once. An edit made while a sync is running goes up right after it.
 - **The recipe list fills in after the first sync** instead of saying "No Recipes Yet" until you leave the page. The pantry, shopping list and cook diary refresh the same way.
 - **Upload from the phone to a server matches categories the account already has** instead of making a second copy of each, and a second upload makes nothing twice.

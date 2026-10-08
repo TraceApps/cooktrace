@@ -53,6 +53,7 @@ import { stampFields } from '../lib/field-stamps.js';
 import { repairVariantTree } from '../lib/pantry-tree.js';
 import { clockOffset, editTime, latestTime, utcMs } from '../lib/sync-clock.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
+import { ownIngredientLinks } from '../lib/link-checks.js';
 
 // Unique per account (server/db.js), so one made on two devices is one row.
 const NATURAL_KEYS = { recipe_categories: 'slug', pantry_categories: 'slug', cookbooks: 'slug', custom_units: 'abbr' };
@@ -243,6 +244,12 @@ router.post('/push', wrap((req, res) => {
         if (!translated) continue; // its parent didn't go in; the app sends it again next sync
         if (name === 'cookbooks') _translateFilterCategory(translated, idMaps, serverIds);
         let values = spec.cols.map(c => _coerce(translated[c]));
+        // An ingredient links only to the account's own pantry items
+        // (lib/link-checks.js): the app sends the server's ids for them.
+        if (name === 'recipes') {
+          const at = spec.cols.indexOf('ingredients');
+          if (at > -1 && values[at] != null) values[at] = ownIngredientLinks(values[at], u);
+        }
         const val = (col) => values[spec.cols.indexOf(col)];
         const deleted = spec.softDelete && translated.deleted_at != null;
         // A row the app made, sent before (two syncs at once, a retry, an

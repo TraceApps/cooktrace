@@ -19,7 +19,7 @@ import {
   dbGetPendingChanges, dbGetPendingSettingsForPush,
   dbSetServerId, dbApplyPull,
   dbGetMeta, dbSetMeta, dbMarkSettingsSynced, dbMarkTableSynced, dbRememberEcho,
-  SYNC_PARENTS, SYNC_FIELDS, rowBase, rowChanges, dbInstallId, dbCountUnsynced, createKeyOf,
+  SYNC_PARENTS, SYNC_FIELDS, rowBase, rowChanges, dbInstallId, dbCountUnsynced, createKeyOf, mapIngredientLinks,
 } from './db-native.js';
 import { mapSmartFilterCategory } from './smart-cookbook.js';
 import { localDataIsThisAccount, accountGeneration } from './local-account.js';
@@ -510,6 +510,7 @@ async function pushChanges({ token = getAuthToken(), signal = null, gen = accoun
 
   const tablesToSend = {};
   let total = 0;
+  let deferred = 0;
   for (const [table, rows] of Object.entries(pending)) {
     if (!Array.isArray(rows) || rows.length === 0) continue;
     if (table === 'disabled_units' || table === 'recipe_cookbook_links' || table === 'deletes') continue;
@@ -526,6 +527,15 @@ async function pushChanges({ token = getAuthToken(), signal = null, gen = accoun
       if (changed) row.changed = changed;
       delete row.server_base;
       await _toServerIds(db, row, SYNC_PARENTS[table] || {}, ids);
+      // An ingredient's pantry link holds this phone's id; the server's id
+      // goes up. A link to an item that hasn't gone up yet holds the recipe
+      // back to the push right after this one, once the item has its id.
+      if (table === 'recipes' && row.ingredients != null) {
+        const pantryIds = await _serverIdMap(db, 'pantry_items', ids);
+        const { json, unknown } = mapIngredientLinks(row.ingredients, id => (!pantryIds.has(id) ? null : pantryIds.get(id) || undefined));
+        if (unknown) { deferred++; continue; }
+        row.ingredients = json;
+      }
       if (table === 'cookbooks' && row.smart_filter_json) {
         const cats = await _serverIdMap(db, 'recipe_categories', ids);
         let local = false;
@@ -538,7 +548,7 @@ async function pushChanges({ token = getAuthToken(), signal = null, gen = accoun
       out.push(row);
     }
     tablesToSend[table] = out;
-    total += rows.length;
+    total += out.length;
   }
   if (Array.isArray(pending.disabled_units) && pending.disabled_units.length) {
     tablesToSend.disabled_units = pending.disabled_units.map(r => ({ abbr: r.abbr }));
@@ -565,7 +575,7 @@ async function pushChanges({ token = getAuthToken(), signal = null, gen = accoun
 
   if (total === 0 && settings.length === 0 && deleteIds.length === 0
       && !tablesToSend.disabled_units && !tablesToSend.recipe_cookbook_links) {
-    return { pushed: 0 };
+    return { pushed: 0, deferred };
   }
 
   if (!live()) return { pushed: 0, stopped: true };
@@ -677,7 +687,7 @@ async function pushChanges({ token = getAuthToken(), signal = null, gen = accoun
   if (deleteIds.length && body.deleted && live()) {
     await db.run(`DELETE FROM sync_deletes WHERE id IN (${deleteIds.map(() => '?').join(',')})`, deleteIds);
   }
-  return { pushed: total, serverKept };
+  return { pushed: total, serverKept, deferred };
 }
 
 async function pullChanges({ token = getAuthToken(), signal = null, gen = accountGeneration() } = {}) {
@@ -819,6 +829,13 @@ async function _fullSync({ silent, forceCheck, showFailureBanner, token, signal,
     syncState.update(s => ({ ...s, phase: 'push' }));
     const push = await pushChanges({ token, signal, gen });
     if (push.stopped) throw stopped();
+    // Recipes held back for a pantry item that went up in this push: now.
+    if (push.deferred && push.pushed) {
+      const more = await pushChanges({ token, signal, gen });
+      if (more.stopped) throw stopped();
+      push.pushed += more.pushed || 0;
+      push.serverKept = (push.serverKept || 0) + (more.serverKept || 0);
+    }
     // The server kept something other than what went up: bring it down
     // now rather than on the next round.
     if (push.serverKept) {
