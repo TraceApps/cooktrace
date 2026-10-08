@@ -1,5 +1,6 @@
 <script>
   import { closeOnBack } from '../lib/back-stack.js';
+  import { onSyncChanges } from '../lib/sync-refresh.js';
   import { onMount } from 'svelte';
   import { fade, slide } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
@@ -194,12 +195,19 @@
     return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
   }
 
-  async function load() {
-    loading = true;
-    loadError = null;
-    try { items = await NtApi.getShoppingList(); }
-    catch (e) { loadError = e.message || 'Could not load list'; showError(loadError); }
-    finally { loading = false; }
+  // Two reads at once (the page opening while a sync lands): the later
+  // one's answer stands, never an older one finishing last.
+  let _loadSeq = 0;
+  // quiet: read again after a sync, without the loading state.
+  async function load({ quiet = false } = {}) {
+    const seq = ++_loadSeq;
+    if (!quiet) { loading = true; loadError = null; }
+    try { const list = await NtApi.getShoppingList(); if (seq === _loadSeq) { items = list; loadError = null; } }
+    catch (e) {
+      // A quiet read after a sync that fails keeps what's shown, unsaid.
+      if (seq === _loadSeq && !quiet) { loadError = e.message || 'Could not load list'; showError(loadError); }
+    }
+    finally { if (seq === _loadSeq) loading = false; }
   }
   async function loadPantry() {
     try {
@@ -214,6 +222,8 @@
     catch { categories = []; }
   }
   onMount(() => { load(); loadPantry(); loadCategories(); });
+  // A sync that brought changes down shows them here at once.
+  onMount(() => onSyncChanges(() => { load({ quiet: true }); loadPantry(); loadCategories(); }));
 
   // Known-aisle list = defaults from categories (default_aisle if set,
   // else the category name) + whatever aisles are currently in the
@@ -511,14 +521,14 @@
     try {
       if (members.length === 1) {
         items = items.map(i => i.id === it.id ? { ...i, ...payload } : i);
-        await NtApi.updateShoppingItem(it.id, payload);
+        await NtApi.updateShoppingItem(it.id, { ...payload, _base: it });
       } else if (fold) {
         const [keep, ...rest] = members;
         const restIds = new Set(rest.map(m => m.id));
         items = items
           .filter(i => !restIds.has(i.id))
           .map(i => i.id === keep.id ? { ...i, ...payload } : i);
-        await NtApi.updateShoppingItem(keep.id, payload);
+        await NtApi.updateShoppingItem(keep.id, { ...payload, _base: keep });
         for (const id of restIds) await NtApi.deleteShoppingItem(id);
       } else {
         const nameUnit = { name: payload.name, unit: payload.unit };

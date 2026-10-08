@@ -8,6 +8,8 @@
 import { Router } from 'express';
 import { localizeDataUrl } from '../lib/image-localizer.js';
 import db from '../db.js';
+import { stampFields } from '../lib/field-stamps.js';
+import { saveRow } from '../lib/rest-merge.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 // Same recipe-card hydration the Recipes tab uses (category, tags,
@@ -50,6 +52,8 @@ function _hydrate(row, recipeCount = null) {
     slug: row.slug,
     description: row.description,
     cover_image_url: row.cover_image_url,
+    // The server's stamp of this copy: a save made on it says so.
+    synced_at: row.synced_at,
     is_smart: !!row.is_smart,
     smart_filter,
     sort_order: row.sort_order,
@@ -133,11 +137,13 @@ router.put('/order', wrap((req, res) => {
     : [];
   if (ids.length === 0) return res.status(400).json({ error: 'cookbook_ids required' });
   const own = db.prepare(`SELECT id FROM cookbooks WHERE id = ? AND ${userClause(u)} AND deleted_at IS NULL`);
-  const upd = db.prepare(`UPDATE cookbooks SET sort_order = ?, updated_at = datetime('now') WHERE id = ?`);
+  // A new order isn't an edit of the cookbooks: only sort_order is stamped
+  // as changed now, and updated_at stays (lib/field-merge.js).
+  const upd = db.prepare(`UPDATE cookbooks SET sort_order = ? WHERE id = ? AND sort_order IS NOT ?`);
   const tx = db.transaction(() => {
     ids.forEach((cid, i) => {
       const r = own.get(cid, ...userArgs(u));
-      if (r) upd.run(i, cid);
+      if (r && upd.run(i, cid, i).changes) stampFields('cookbooks', cid, ['sort_order']);
     });
   });
   tx();
@@ -378,13 +384,7 @@ router.put('/:id', wrap((req, res) => {
   }
   if (!nextIsSmart) nextFilterJson = null;
 
-  db.prepare(
-    `UPDATE cookbooks
-        SET name = ?, description = ?, cover_image_url = ?, sort_order = ?,
-            is_smart = ?, smart_filter_json = ?,
-            updated_at = datetime('now')
-      WHERE id = ?`
-  ).run(name, description, cover_image_url, sort_order, nextIsSmart, nextFilterJson, id);
+  saveRow('cookbooks', id, existing, { name, description, cover_image_url, sort_order, is_smart: nextIsSmart, smart_filter_json: nextFilterJson }, req.body?._sync);
   const row = db.prepare(`SELECT * FROM cookbooks WHERE id = ?`).get(id);
   res.json(_hydrate(row, _recipeCount(row)));
 }));

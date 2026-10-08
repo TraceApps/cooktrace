@@ -11,12 +11,20 @@
  * ports without surgery):
  *
  *   POST /api/sync/push
- *     body: { tables: { [name]: [row, ...] }, settings: [{ key, value, updated_at }] }
- *     row shape: { client_id, server_id?, ...table-columns, updated_at, deleted_at }
- *     response: { tables: { [name]: [{ client_id, server_id }] } }
+ *     body: { tables: { [name]: [row, ...] }, settings: [{ key, value, updated_at }],
+ *             client_now?: ISO }
+ *     row shape: { client_id, server_id?, ...table-columns, updated_at, deleted_at,
+ *                  recipes also: server_synced_at?, changed?: [field], base_meta? }
+ *     response: { tables: { [name]: [{ client_id, server_id, synced_at?, updated_at?, kept? }] },
+ *                 clock_offset_ms }
  *
- *   GET /api/sync/pull?since=<ISO>
+ *   GET /api/sync/pull?since=<ISO>[&synced_at=1]
  *     response: { now: 'ISO', tables: { [name]: [{ id, ...cols, updated_at, deleted_at }] } }
+ *
+ * Two edits of one row: apps that send client_now are judged, and the newer
+ * edit stays (lib/sync-clock.js; recipes field by field, with the other
+ * copy kept as an earlier version: lib/recipe-versions.js). Older apps'
+ * edits go in as they always have.
  *
  * Tables handled: recipes, pantry_items, cook_diary, shopping_list,
  * recipe_categories, pantry_categories, custom_units, cookbooks,
@@ -38,6 +46,16 @@ import { isEmptyForGuard } from '../lib/recipe-guards.js';
 import { autoShareNewRecipe } from '../lib/auto-share.js';
 import { dispatchWebhookEvent } from '../lib/webhooks.js';
 import { mapSmartFilterCategory } from '../lib/smart-cookbook.js';
+import { saveRecipeVersion, mergeRecipe, sameContent, VERSION_FIELDS } from '../lib/recipe-versions.js';
+import { mergeFields } from '../lib/field-merge.js';
+import { SYNC_FIELDS, SYNC_GROUPS } from '../lib/sync-fields.js';
+import { stampFields } from '../lib/field-stamps.js';
+import { repairVariantTree } from '../lib/pantry-tree.js';
+import { clockOffset, editTime, latestTime, utcMs } from '../lib/sync-clock.js';
+import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
+
+// Unique per account (server/db.js), so one made on two devices is one row.
+const NATURAL_KEYS = { recipe_categories: 'slug', pantry_categories: 'slug', cookbooks: 'slug', custom_units: 'abbr' };
 
 // Option E guard (2026-08-11): the recipe UPDATE path replaces nested
 // JSON fields (ingredients/steps/tags/tools/nutrition) wholesale. A
@@ -158,6 +176,14 @@ const TABLES = {
   },
 };
 
+// The fields lib/field-merge.js merges are exactly the columns a device
+// writes (plus deleted_at): a column added to one and not the other fails
+// here, at start, rather than merging the wrong fields.
+for (const [t, spec] of Object.entries(TABLES)) {
+  const want = [...spec.cols, ...(spec.softDelete ? ['deleted_at'] : [])].join(',');
+  if ((SYNC_FIELDS[t] || []).join(',') !== want) throw new Error(`lib/sync-fields.js is out of step with routes/sync.js for ${t}`);
+}
+
 // Tables a device deletes rows from outright (no deleted_at column).
 const DELETABLE = ['recipe_categories', 'pantry_categories', 'custom_units', 'ai_chat_history'];
 
@@ -178,6 +204,16 @@ router.post('/push', wrap((req, res) => {
   // columns, apart from those listed in a row's _local_fks. Older apps
   // send the phone's ids.
   const serverIds = req.body?.fk_ids === 'server';
+  // How far the device's clock is behind the server's, so its edit times
+  // compare with the server's. Apps that say what time it is on them can be
+  // judged: the newer edit stays. Older apps' edits go in as before.
+  const offsetMs = clockOffset(req.body?.client_now, req.receivedAt);
+  const modern = typeof req.body?.client_now === 'string' && Number.isFinite(utcMs(req.body.client_now));
+  // Recipes whose cooks changed in this push: their cook counts are
+  // counted again from the diary afterwards, as the REST routes do.
+  const cooksChanged = new Set();
+  // Pantry items written in this push: their variant tree is checked after.
+  const pantryTouched = new Set();
 
   const idMaps = {};       // tableName → { client_id: server_id }
   const results = {};
@@ -209,6 +245,22 @@ router.post('/push', wrap((req, res) => {
         let values = spec.cols.map(c => _coerce(translated[c]));
         const val = (col) => values[spec.cols.indexOf(col)];
         const deleted = spec.softDelete && translated.deleted_at != null;
+        // A row the app made, sent before (two syncs at once, a retry, an
+        // answer lost on the way back): the one made then, as an edit of it.
+        const createKey = row.server_id ? null : cleanCreateKey(row.client_key);
+        if (createKey) {
+          const made = findByCreateKey(name, u, createKey);
+          if (made) row.server_id = made.id;
+        }
+        // A name the account already has (a category, cookbook or unit made
+        // on two devices, or kept on the phone through a reconnect): that
+        // one, as an edit of it. A second would break the unique name and
+        // stop every push of the table.
+        const natural = NATURAL_KEYS[name];
+        if (!row.server_id && natural && translated[natural] != null) {
+          const same = db.prepare(`SELECT id FROM ${name} WHERE ${userClause(u)} AND ${natural} = ?`).get(...userArgs(u), translated[natural]);
+          if (same) row.server_id = same.id;
+        }
 
         if (row.server_id) {
           // Fetch enough of the existing row to (a) authorize the write
@@ -221,15 +273,88 @@ router.post('/push', wrap((req, res) => {
           if (name === 'recipes') {
             values = _guardRecipeValuesForUpdate(values, spec, existing);
           }
+          // The edit's time on the server's clock. Apps that stamp edits with
+          // the server's clock as they're made say so (edit_clock); older
+          // rows are moved by the offset measured on this push. A delete on
+          // an older phone doesn't move updated_at: the delete is the edit.
+          const corrected = row.edit_clock === 'server';
+          const editedAt = editTime(
+            !corrected && translated.deleted_at != null && existing.deleted_at == null
+              ? latestTime(translated.updated_at, translated.deleted_at) : translated.updated_at,
+            corrected ? 0 : offsetMs);
+          if (modern) {
+            // Field by field (lib/field-merge.js): what the app says it
+            // changed on the copy it had (changed, server_synced_at).
+            const incoming = Object.fromEntries(spec.cols.map((c, i) => [c, values[i]]));
+            if (spec.softDelete) incoming.deleted_at = translated.deleted_at ?? null;
+            const opts = {
+              base: row.server_synced_at,
+              changed: Array.isArray(row.changed) ? new Set(row.changed) : null,
+              editedAt,
+            };
+            const m = name === 'recipes'
+              ? mergeRecipe(existing, incoming, opts)
+              : mergeFields(existing, incoming, { ...opts, fields: SYNC_FIELDS[name], groups: SYNC_GROUPS[name] });
+            for (const k of m.keep || []) {
+              saveRecipeVersion(row.server_id, existing.user_id, k.row, {
+                reason: k.reason,
+                editedBy: k.side === 'incoming' ? (u ?? existing.user_id) : (existing.last_edited_by ?? existing.user_id),
+              });
+            }
+            if (m.write) {
+              const cols = m.applied;
+              // The owner's own edit: content that goes in is theirs.
+              const byOwner = name === 'recipes' && cols.some(c => VERSION_FIELDS.includes(c));
+              db.prepare(
+                `UPDATE ${name} SET ${cols.map(c => `${c} = ?`).join(', ')}, updated_at = ?${byOwner ? ', last_edited_by = NULL' : ''} WHERE id = ?`
+              ).run(...cols.map(c => m.row[c] ?? null), m.updatedAt, row.server_id);
+              stampFields(name, row.server_id, cols, m.fieldAt);
+            } else if (m.devicePulls) {
+              // Nothing of the edit stays: the copy here is stamped again so
+              // the device's next pull brings it down. Its edit times stay.
+              db.prepare(`UPDATE ${name} SET synced_at = strftime('%Y-%m-%d %H:%M:%f', 'now') WHERE id = ?`).run(row.server_id);
+            }
+            results[name].push({
+              client_id: row.client_id, server_id: row.server_id,
+              ...(m.write ? { ..._syncedAt(name, row.server_id), updated_at: m.updatedAt } : {}),
+              // What the device has isn't what stays here: it pulls it down.
+              ...(m.devicePulls ? { kept: 'server' } : {}),
+            });
+            idMaps[name][row.client_id] = row.server_id;
+            if (m.write && !deleted) {
+              if (name === 'cook_diary' && existing.kind !== 'cooked' && m.row.kind === 'cooked') {
+                tableEvents.push(_mealCookedEvent(c => (c in m.row ? m.row[c] : existing[c])));
+              } else if (name === 'pantry_items' && _on(existing.in_stock) && !_on(m.row.in_stock)) {
+                tableEvents.push(['pantry.out_of_stock', { pantry_item_id: row.server_id, name: m.row.name ?? existing.name }]);
+              } else if (name === 'shopping_list' && !_on(existing.checked) && _on(m.row.checked)) {
+                tableNewlyChecked = true;
+              }
+            }
+            if (name === 'cook_diary' && m.write) { cooksChanged.add(existing.recipe_id); cooksChanged.add(m.row.recipe_id); }
+            if (name === 'pantry_items' && m.write) pantryTouched.add(row.server_id);
+            continue;
+          }
+          // Older apps can't say what their copy was or when, by the
+          // server's clock: their edit goes in, as before. For a recipe,
+          // the copy it replaces is kept, without pointing at it, in case
+          // it was someone else's newer edit.
+          if (name === 'recipes' && existing.deleted_at == null && translated.deleted_at == null) {
+            const incoming = Object.fromEntries(spec.cols.map((c, i) => [c, values[i]]));
+            incoming.category_id ??= existing.category_id; // as the UPDATE's COALESCE
+            if (!sameContent(incoming, existing)) {
+              saveRecipeVersion(row.server_id, existing.user_id, existing, { reason: 'replaced', editedBy: existing.last_edited_by ?? existing.user_id });
+            }
+          }
           // deleted_at only on tables that have one (categories and
           // units don't), or the statement has one value too many.
           db.prepare(updateSql).run(
             ...values,
-            translated.updated_at || _now(),
+            editedAt,
             ...(spec.softDelete ? [translated.deleted_at ?? null] : []),
             row.server_id
           );
-          results[name].push({ client_id: row.client_id, server_id: row.server_id });
+          // The edit time stored, for the device to know this row's echo.
+          results[name].push({ client_id: row.client_id, server_id: row.server_id, ..._syncedAt(name, row.server_id), updated_at: editedAt });
           idMaps[name][row.client_id] = row.server_id;
           // Same transitions the REST routes fire on. The Android app
           // saves through this push, so without these its changes never
@@ -243,15 +368,20 @@ router.post('/push', wrap((req, res) => {
               tableNewlyChecked = true;
             }
           }
+          if (name === 'cook_diary') { cooksChanged.add(existing.recipe_id); cooksChanged.add(val('recipe_id')); }
         } else {
+          const insertedAt = editTime(translated.updated_at, row.edit_clock === 'server' ? 0 : offsetMs);
           const info = db.prepare(insertSql).run(
             u,
             ...values,
-            translated.updated_at || _now(),
+            insertedAt,
             ...(spec.softDelete ? [translated.deleted_at ?? null] : [])
           );
           const serverId = info.lastInsertRowid;
-          results[name].push({ client_id: row.client_id, server_id: serverId });
+          setCreateKey(name, serverId, createKey);
+          results[name].push({ client_id: row.client_id, server_id: serverId, ..._syncedAt(name, serverId), updated_at: insertedAt });
+          if (name === 'cook_diary') cooksChanged.add(val('recipe_id'));
+          if (name === 'pantry_items' && modern) pantryTouched.add(serverId);
           idMaps[name][row.client_id] = serverId;
           // Auto-share fan-out for native-created recipes. The REST
           // POST /api/recipes route calls this same helper; without
@@ -275,6 +405,25 @@ router.post('/push', wrap((req, res) => {
     }
     catch (e) { results[name] = { error: e.message || 'push failed' }; idMaps[name] = idsBefore; }
   }
+
+  // Two devices' variant links, each fine alone, can break the tree's rules
+  // together: the newer stays (lib/pantry-tree.js).
+  if (pantryTouched.size) {
+    try { db.transaction(() => repairVariantTree([...pantryTouched]))(); } catch (e) { console.warn('[sync] variant tree:', e?.message); }
+  }
+
+  // Cook counts follow the diary, as when cooks are logged on the web: a
+  // count sent by a device could be older than cooks logged since.
+  try {
+    const own = db.prepare(`SELECT 1 FROM recipes WHERE id = ? AND ${userClause(u)}`);
+    const stats = db.prepare(`SELECT COUNT(*) AS n, MAX(date) AS last FROM cook_diary WHERE recipe_id = ? AND deleted_at IS NULL AND kind = 'cooked'`);
+    const set = db.prepare(`UPDATE recipes SET cook_count = ?, last_cooked_at = ? WHERE id = ? AND (cook_count IS NOT ? OR last_cooked_at IS NOT ?)`);
+    for (const id of cooksChanged) {
+      if (id == null || !own.get(id, ...userArgs(u))) continue;
+      const st = stats.get(id);
+      set.run(st.n || 0, st.last || null, id, st.n || 0, st.last || null);
+    }
+  } catch (e) { console.warn('[sync] cook counts:', e?.message); }
 
   // ── disabled_units: replace-by-set ────────────────────────────────
   //
@@ -371,7 +520,7 @@ router.post('/push', wrap((req, res) => {
     try { txn(); } catch {}
   }
 
-  res.json({ tables: results, deleted });
+  res.json({ tables: results, deleted, clock_offset_ms: offsetMs });
 
   try {
     for (const [event, data] of webhookEvents) dispatchWebhookEvent(u, event, data);
@@ -409,6 +558,10 @@ function _mealCookedEvent(val) {
 router.get('/pull', wrap((req, res) => {
   const u = uid(req);
   const since = (typeof req.query.since === 'string' && req.query.since) || '1970-01-01T00:00:00';
+  // Apps that keep which copy of each row they have ask for its stamp.
+  // Older apps write every key of a row into their own table, so it's
+  // only sent when asked for.
+  const withSyncedAt = req.query.synced_at === '1';
   // Server time, taken before the queries, so a write racing this pull
   // is picked up by the next one (>= below makes an overlap harmless:
   // pulls are upserts). Rows are picked by synced_at, the server's
@@ -424,6 +577,9 @@ router.get('/pull', wrap((req, res) => {
     // up looking like it was created on first-connect day.
     const cols = ['id', ...spec.cols, ...(spec.pullCols || []), 'created_at', 'updated_at'];
     if (spec.softDelete) cols.push('deleted_at');
+    // And the key the app made a row with (lib/create-keys.js), so a row
+    // whose push answer was lost is known as its own when it comes down.
+    if (withSyncedAt) cols.push('synced_at', 'client_key');
     // Sort self-referencing tables so parents come before children in
     // the pull payload. The client's dbApplyPull scans server_id →
     // local_id fresh for each row, so a parent that arrives before its
@@ -477,6 +633,14 @@ router.get('/pull', wrap((req, res) => {
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function _now() { return new Date().toISOString().replace('T', ' ').slice(0, 19); }
+
+// The server's stamp of a row just written, for the device to keep as the
+// copy it has.
+function _syncedAt(name, id) {
+  const r = db.prepare(`SELECT synced_at FROM ${name} WHERE id = ?`).get(id);
+  return r?.synced_at ? { synced_at: r.synced_at } : {};
+}
+
 
 function _coerce(v) {
   if (v === undefined) return null;

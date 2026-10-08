@@ -98,8 +98,8 @@ test('deletes and removed links go up from the phone', () => {
   }
   assert.match(apiNative.slice(apiNative.indexOf('async clearAiChat(')).split('\n  },')[0], /INSERT INTO sync_deletes/);
   assert.match(apiNative.slice(apiNative.indexOf('async removeRecipeFromCookbook(')).split('\n  },')[0], /'recipe_cookbook_links'/);
-  assert.match(clientSync, /JSON\.stringify\(\{ tables: tablesToSend, settings, deletes, fk_ids: 'server' \}\)/);
-  assert.match(clientSync, /if \(deleteIds\.length && body\.deleted\)/, 'kept until a server that knows deletes takes them');
+  assert.match(clientSync, /JSON\.stringify\(\{ tables: tablesToSend, settings, deletes, fk_ids: 'server', client_now: new Date\(\)\.toISOString\(\) \}\)/);
+  assert.match(clientSync, /if \(deleteIds\.length && body\.deleted( && live\(\))?\)/, 'kept until a server that knows deletes takes them');
 });
 
 test("a pull keeps the phone's unsent links and drops what the server deleted", () => {

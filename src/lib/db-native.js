@@ -68,7 +68,9 @@ const SCHEMA = `
     created_at           TEXT DEFAULT (datetime('now')),
     updated_at           TEXT DEFAULT (datetime('now')),
     deleted_at           TEXT DEFAULT NULL,
-    sync_status          TEXT DEFAULT 'synced'
+    sync_status          TEXT DEFAULT 'synced',
+    server_synced_at     TEXT,
+    server_base          TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_recipes_user    ON recipes(user_id);
   CREATE INDEX IF NOT EXISTS idx_recipes_updated ON recipes(updated_at);
@@ -303,6 +305,15 @@ const SCHEMA = `
     recipe_server_id INTEGER
   );
 
+  -- The edit time the server stored for this phone's own last push of a
+  -- row, so the copy of it that comes back in a pull is known as its own.
+  CREATE TABLE IF NOT EXISTS sync_echoes (
+    table_name TEXT NOT NULL,
+    row_id     INTEGER NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (table_name, row_id)
+  );
+
   CREATE TABLE IF NOT EXISTS sync_meta (
     key   TEXT PRIMARY KEY,
     value TEXT
@@ -366,6 +377,7 @@ export async function dbInit() {
   await _migrateAiChatUpdatedAt();
   await _migratePantryVariantColumns();
   await _migrateRecipeTotalMinutes();
+  await _migrateServerCopy();
   await _migrateShoppingAisle();
   await _backfillShoppingNames();
 }
@@ -404,6 +416,55 @@ async function _migrateRecipeTotalMinutes() {
       await db.run(`ALTER TABLE recipes ADD COLUMN rest_minutes INTEGER`);
     }
   } catch { /* best-effort */ }
+}
+
+// Per synced row: server_synced_at, the server's stamp of the copy this
+// phone has, sent back with an edit so the server can tell what changed
+// there since; server_base, that copy field by field, in short, so a push
+// can say which fields this phone changed (rowBase / rowChanges); and
+// edit_clock, 'server' when the edit time was stamped on the server's clock
+// as the edit was made (the triggers below), so a clock fixed or broken
+// before the push doesn't move it. Rows pulled before the columns existed
+// have no stamp, so the next pull starts over once and brings them down.
+async function _migrateServerCopy() {
+  try {
+    const db = await getDb();
+    let reset = false;
+    for (const table of SYNC_TABLES) {
+      const info = await db.query(`PRAGMA table_info(${table})`);
+      const cols = new Set((info?.values || []).map(c => c.name));
+      for (const col of ['server_base', 'edit_clock']) {
+        if (!cols.has(col)) await db.run(`ALTER TABLE ${table} ADD COLUMN ${col} TEXT`);
+      }
+      if (!cols.has('server_synced_at')) {
+        await db.run(`ALTER TABLE ${table} ADD COLUMN server_synced_at TEXT`);
+        reset = true;
+      }
+      // An edit made here (the row goes pending with a new time, or is
+      // deleted) is stamped with the server's clock, by the offset the
+      // server last measured, when there is one.
+      const soft = (SYNC_FIELDS[table] || []).includes('deleted_at');
+      const at = soft ? `CASE WHEN NEW.deleted_at IS NOT OLD.deleted_at AND NEW.deleted_at IS NOT NULL THEN NEW.deleted_at ELSE NEW.updated_at END` : 'NEW.updated_at';
+      const shift = `printf('%+.3f seconds', CAST((SELECT value FROM sync_meta WHERE key = 'clock_offset_ms') AS REAL) / 1000.0)`;
+      const has = `EXISTS (SELECT 1 FROM sync_meta WHERE key = 'clock_offset_ms')`;
+      await db.execute(`
+        DROP TRIGGER IF EXISTS trg_${table}_edit_clock_upd;
+        CREATE TRIGGER trg_${table}_edit_clock_upd AFTER UPDATE ON ${table}
+        FOR EACH ROW WHEN NEW.sync_status = 'pending' AND ${has}
+          AND (NEW.updated_at IS NOT OLD.updated_at${soft ? ' OR NEW.deleted_at IS NOT OLD.deleted_at' : ''})
+        BEGIN
+          UPDATE ${table} SET updated_at = strftime('%Y-%m-%d %H:%M:%S', ${at}, ${shift}), edit_clock = 'server' WHERE id = NEW.id;
+        END;
+        DROP TRIGGER IF EXISTS trg_${table}_edit_clock_ins;
+        CREATE TRIGGER trg_${table}_edit_clock_ins AFTER INSERT ON ${table}
+        FOR EACH ROW WHEN NEW.sync_status = 'pending' AND ${has}
+        BEGIN
+          UPDATE ${table} SET updated_at = strftime('%Y-%m-%d %H:%M:%S', COALESCE(NEW.updated_at, datetime('now')), ${shift}), edit_clock = 'server' WHERE id = NEW.id;
+        END;
+      `);
+    }
+    if (reset) await db.run(`DELETE FROM sync_meta WHERE key = 'last_pull_at'`);
+  } catch (e) { console.warn('[db-native] server copy columns:', e?.message); }
 }
 
 // Mirror of the server migration: pantry_items gains generic_parent_id
@@ -618,10 +679,64 @@ const SYNC_TABLES = [
  *  pull (server id to local id) and on push (local id to server id). */
 // Unique per account, so one made on two devices is one row.
 const NATURAL_KEYS = { recipe_categories: 'slug', pantry_categories: 'slug', cookbooks: 'slug', custom_units: 'abbr' };
+// The fields that go with each one (server/lib/sync-fields.js SYNC_GROUPS).
+const NAME_GROUPS = { recipe_categories: ['name', 'slug'], pantry_categories: ['name', 'slug'], cookbooks: ['name', 'slug'], custom_units: ['abbr', 'full_name', 'category'] };
 // Timestamps from either side, comparable as text.
 const _ts = v => String(v || '').replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
+// The same, as a time: SQLite's datetime('now') is UTC with no zone.
+const _utcMs = v => Date.parse(_ts(v).replace(' ', 'T') + 'Z');
+// Whether the server's copy is newer than an edit made here. The server
+// keeps edit times on its own clock and says how far this phone's is
+// behind (clockOffsetMs); a server that doesn't say keeps this phone's
+// times as sent, so they compare as they are.
+function _serverNewer(serverAt, localAt, clockOffsetMs = 0) {
+  const a = _utcMs(serverAt), b = _utcMs(localAt);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return _ts(serverAt) > _ts(localAt);
+  return a > b + clockOffsetMs;
+}
 
 export const SYNC_DELETABLE = ['recipe_categories', 'pantry_categories', 'custom_units', 'ai_chat_history'];
+
+// The fields of each synced table (sync-fields.js). A push says which of
+// them this phone changed on the copy it had.
+export { SYNC_FIELDS } from './sync-fields.js';
+import { SYNC_FIELDS } from './sync-fields.js';
+const _BOOLEAN_FIELDS = new Set(['favorite', 'in_stock', 'checked', 'is_smart']);
+function _stableJson(v) {
+  if (Array.isArray(v)) return `[${v.map(_stableJson).join(',')}]`;
+  if (v && typeof v === 'object') return `{${Object.keys(v).sort().map(k => `${JSON.stringify(k)}:${_stableJson(v[k])}`).join(',')}}`;
+  return JSON.stringify(v ?? null);
+}
+// One field as a short key. The same value written another way (null or
+// '', a number as text, JSON re-serialized, true or 1) gives the same key,
+// so saving a rating, which writes every field back, changes nothing else.
+function _fieldKey(f, v) {
+  if (v === undefined || v === '') v = null;
+  if (f === 'deleted_at') v = v == null ? 0 : 1;
+  else if (_BOOLEAN_FIELDS.has(f)) v = v === true || v === 1 || v === '1' || v === 'true' ? 1 : 0;
+  else if (f === 'visibility') v = v || 'private';
+  else {
+    if (typeof v === 'string' && /^\s*[[{]/.test(v)) { try { v = JSON.parse(v); } catch { /* text */ } }
+    if (Array.isArray(v) && v.length === 0) v = null;
+    else if (v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0) v = null;
+    else if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim())) v = Number(v);
+  }
+  const s = _stableJson(v);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return `${s.length}:${(h >>> 0).toString(36)}`;
+}
+/** A row's fields, as keys: kept for the copy the server has. */
+export function rowBase(table, row) {
+  return JSON.stringify(Object.fromEntries((SYNC_FIELDS[table] || []).map(f => [f, _fieldKey(f, row?.[f])])));
+}
+/** The fields a row changed since the copy the server has; null if unknown. */
+export function rowChanges(table, row) {
+  let base = null;
+  try { base = row?.server_base ? JSON.parse(row.server_base) : null; } catch { base = null; }
+  if (!base) return null;
+  return (SYNC_FIELDS[table] || []).filter(f => base[f] !== _fieldKey(f, row[f]));
+}
 
 export const SYNC_PARENTS = {
   recipes: { category_id: 'recipe_categories' },
@@ -712,9 +827,23 @@ export async function dbSetServerId(table, clientId, serverId, snapshotUpdatedAt
  *  are translated from server ids to local ids via the per-table
  *  server_id index.
  */
-export async function dbApplyPull(payload) {
-  if (!isNative || !payload?.tables) return;
+/** The edit time the server stored for a row this phone pushed. */
+export async function dbRememberEcho(table, rowId, updatedAt) {
+  if (!isNative) return;
   const db = await getDb();
+  await db.run(
+    `INSERT INTO sync_echoes (table_name, row_id, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(table_name, row_id) DO UPDATE SET updated_at = excluded.updated_at`,
+    [table, rowId, updatedAt]
+  );
+}
+
+export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => true } = {}) {
+  // live(): false once the copy is changing hands (another account signing
+  // in, lib/local-account.js): nothing more of this pull is written.
+  if (!isNative || !payload?.tables) return true;
+  const db = await getDb();
+  const install = await dbInstallId();
 
   // Build a per-table { server_id → local_id } map by scanning the
   // local server_id column once. Re-scanned per pull so it picks up
@@ -737,6 +866,7 @@ export async function dbApplyPull(payload) {
     if (table === 'disabled_units' || table === 'recipe_cookbook_links' || table === 'settings') continue;
 
     for (const row of rows) {
+      if (!live()) return false;
       let existing = (await db.query(
         `SELECT * FROM ${table} WHERE server_id = ? LIMIT 1`,
         [row.id]
@@ -753,6 +883,22 @@ export async function dbApplyPull(payload) {
         if (existing) await db.run(`UPDATE ${table} SET server_id = ? WHERE id = ?`, [row.id, existing.id]);
       }
 
+      // One this phone made, whose push went in but whose answer was lost
+      // on the way back (it carries this install's key for that row): the
+      // same row, not a second one.
+      const made = typeof row.client_key === 'string' ? row.client_key : null;
+      if (!existing && made && install && made.startsWith(`${install}:${table}:`)) {
+        const localId = Number(made.slice(`${install}:${table}:`.length).split('@')[0]);
+        const mine = Number.isFinite(localId) ? (await db.query(
+          `SELECT * FROM ${table} WHERE id = ? AND server_id IS NULL LIMIT 1`, [localId]
+        ))?.values?.[0] : undefined;
+        // The same row only if the key is the one it would be sent with now.
+        if (mine && createKeyOf(install, table, mine) === made) {
+          existing = mine;
+          await db.run(`UPDATE ${table} SET server_id = ? WHERE id = ?`, [row.id, existing.id]);
+        }
+      }
+
       // Translate FK columns from server ids to local ids, each through
       // its own parent table (a pantry item's category_id is a pantry
       // category, never a recipe category). Parents in the same pull
@@ -760,6 +906,12 @@ export async function dbApplyPull(payload) {
       // (variants, replies) arrive parent first.
       const parents = SYNC_PARENTS[table] || {};
       const translated = { ...row };
+      delete translated.client_key;
+      // The server's stamp of this copy.
+      if ('synced_at' in translated) {
+        translated.server_synced_at = translated.synced_at;
+        delete translated.synced_at;
+      }
       for (const [fk, parentTable] of Object.entries(parents)) {
         if (fk in translated && translated[fk] != null) {
           translated[fk] = await translateFK(translated[fk], parentTable);
@@ -782,9 +934,15 @@ export async function dbApplyPull(payload) {
       // pending flag AND another server-side change bumped updated_at.
       // Only where the server's copy is newer than the edit waiting here,
       // or this side has none: every push comes back in the next pull, and
-      // that echo of an earlier push must not undo a newer edit.
+      // that echo of an earlier push must not undo a newer edit. The
+      // stamp and fields of the copy this phone has stay too: the edit
+      // waiting here was made on it.
       if (existing && existing.sync_status === 'pending') {
-        const serverNewer = _ts(translated.updated_at) > _ts(existing.updated_at);
+        // This phone's own earlier push coming back is never newer than an
+        // edit made here since. Anything else compares by time, on one clock.
+        const echo = (await db.query(`SELECT updated_at FROM sync_echoes WHERE table_name = ? AND row_id = ?`, [table, existing.id]))?.values?.[0];
+        const serverNewer = echo?.updated_at !== translated.updated_at
+          && _serverNewer(translated.updated_at, existing.updated_at, existing.edit_clock === 'server' ? 0 : clockOffsetMs);
         const fkKeys = Object.keys(parents).filter(k => k in translated && (serverNewer || existing[k] == null));
         if (fkKeys.length) {
           const setClause = fkKeys.map(k => `${k} = ?`).join(', ');
@@ -793,6 +951,24 @@ export async function dbApplyPull(payload) {
             `UPDATE ${table} SET ${setClause} WHERE id = ?`,
             [...setValues, existing.id]
           );
+        }
+        // Its name (slug) on the server, when the edit waiting here didn't
+        // change it: the copy here keeps up, and frees the old name for a
+        // row that has it now (the server's names are unique). It doesn't
+        // count as changed here, so the edit still sends only its own fields.
+        if (key && translated[key] != null && translated[key] !== existing[key]) {
+          const group = NAME_GROUPS[table] || [key];
+          const changedHere = rowChanges(table, existing) || [];
+          if (!group.some(f => changedHere.includes(f))) {
+            const fields = group.filter(f => f in translated);
+            let base = {};
+            try { base = existing.server_base ? JSON.parse(existing.server_base) : {}; } catch { base = {}; }
+            for (const f of fields) base[f] = _fieldKey(f, translated[f]);
+            await db.run(
+              `UPDATE ${table} SET ${fields.map(f => `${f} = ?`).join(', ')}, server_base = ? WHERE id = ?`,
+              [...fields.map(f => translated[f]), existing.server_base ? JSON.stringify(base) : null, existing.id]
+            );
+          }
         }
         continue;
       }
@@ -806,11 +982,38 @@ export async function dbApplyPull(payload) {
         return v;
       });
 
+      // The name (slug) is unique here as on the server. A row here that
+      // has it but is another server row is a stale copy of that row (its
+      // name changed there; its new copy comes in this pull): it steps
+      // aside rather than stop every pull on the unique name.
+      if (key && translated[key] != null) {
+        await db.run(
+          `UPDATE ${table} SET ${key} = ${key} || '~' || id WHERE user_id = ? AND ${key} = ? AND server_id IS NOT NULL AND server_id != ? AND id != ? AND COALESCE(sync_status, 'synced') != 'pending'`,
+          [LOCAL_USER_ID, translated[key], row.id, existing?.id ?? -1]
+        );
+        // Held by an edit waiting here that gave a row this name: the row
+        // coming down keeps it under a name of its own until that edit has
+        // gone up and the server has settled the two, rather than stop
+        // every pull on the unique name.
+        const held = (await db.query(
+          `SELECT id FROM ${table} WHERE user_id = ? AND ${key} = ? AND id != ? LIMIT 1`,
+          [LOCAL_USER_ID, translated[key], existing?.id ?? -1]
+        ))?.values?.[0];
+        if (held) {
+          const i = cols.indexOf(key);
+          if (i > -1) values[i] = `${translated[key]}~s${row.id}`;
+        }
+      }
       if (existing) {
-        const set = cols.map(c => `${c} = ?`).join(', ');
+        // When a row here was made stays as it is: for a row this phone
+        // made, the server's is when it got there. It's part of the key
+        // the row is sent with (createKeyOf), which must never change, or
+        // the same row sent again (Upload a second time) makes a second.
+        const keep = c => c === 'created_at' && existing.created_at != null;
+        const set = cols.map(c => (keep(c) ? null : `${c} = ?`)).filter(Boolean).join(', ');
         await db.run(
           `UPDATE ${table} SET ${set}, sync_status = 'synced' WHERE id = ?`,
-          [...values, existing.id]
+          [...values.filter((v, i) => !keep(cols[i])), existing.id]
         );
       } else {
         await db.run(
@@ -819,9 +1022,16 @@ export async function dbApplyPull(payload) {
           [row.id, LOCAL_USER_ID, ...values]
         );
       }
+      // The copy this phone now has from the server, as it reads it back.
+      if (SYNC_FIELDS[table]) {
+        const here = (await db.query(`SELECT * FROM ${table} WHERE server_id = ? LIMIT 1`, [row.id]))?.values?.[0];
+        if (here) await db.run(`UPDATE ${table} SET server_base = ?, edit_clock = NULL WHERE id = ?`, [rowBase(table, here), here.id]);
+      }
+      if (existing) await db.run(`DELETE FROM sync_echoes WHERE table_name = ? AND row_id = ?`, [table, existing.id]);
     }
   }
 
+  if (!live()) return false;
   // Rows the server deleted outright: drop them here too, like the REST
   // deletes do (a category's recipes and pantry items stay, without it).
   const gone = payload.tables.deletions;
@@ -838,6 +1048,7 @@ export async function dbApplyPull(payload) {
     }
   }
 
+  if (!live()) return false;
   // disabled_units: replace local set with server set.
   if (Array.isArray(payload.tables.disabled_units)) {
     await db.run(`DELETE FROM disabled_units WHERE user_id = ?`, [LOCAL_USER_ID]);
@@ -854,6 +1065,7 @@ export async function dbApplyPull(payload) {
   // the server's, apart from links added here that haven't gone up yet
   // and links taken out here that the server hasn't heard about yet. A
   // cookbook whose last link went on another device ends up empty.
+  if (!live()) return false;
   if (Array.isArray(payload.tables.recipe_cookbook_links)) {
     const cookbookMap = await mapFor('cookbooks');
     const recipeMap = await mapFor('recipes');
@@ -891,8 +1103,10 @@ export async function dbApplyPull(payload) {
   // back into the next push. Skip keys the user has a local pending
   // edit for — the pull would otherwise clobber the fresh value with
   // the server's pre-edit copy, same shape as the per-table guard above.
+  if (!live()) return false;
   if (Array.isArray(payload.tables.settings)) {
     for (const s of payload.tables.settings) {
+      if (!live()) return false;
       const localRow = (await db.query(
         `SELECT sync_status FROM user_settings WHERE user_id = ? AND key = ? LIMIT 1`,
         [LOCAL_USER_ID, s.key]
@@ -911,6 +1125,7 @@ export async function dbApplyPull(payload) {
       );
     }
   }
+  return true;
 }
 
 /**
@@ -928,4 +1143,118 @@ export async function dbMarkTableSynced(table, rows) {
       [r.id, r.updated_at]
     );
   }
+}
+
+// ── Whose copy (lib/local-account.js) ────────────────────────────────────
+
+/** Changes made here that haven't reached the server: rows waiting to go
+ *  up, cookbook links, deletes, and settings. */
+export async function dbCountUnsynced() {
+  if (!isNative) return 0;
+  const db = await getDb();
+  const n = async sql => Number((await db.query(sql, []))?.values?.[0]?.n || 0);
+  let total = 0;
+  for (const t of SYNC_TABLES) total += await n(`SELECT COUNT(*) AS n FROM ${t} WHERE sync_status = 'pending'`);
+  total += await n(`SELECT COUNT(*) AS n FROM recipe_cookbook_links WHERE sync_status = 'pending'`);
+  total += await n(`SELECT COUNT(*) AS n FROM sync_deletes`);
+  total += await n(`SELECT COUNT(*) AS n FROM user_settings WHERE sync_status = 'pending'`);
+  return total;
+}
+
+// Every account row the phone mirrors, and what the sync knows about the
+// copy (the pull cursor, the echoes of its pushes, deletes waiting): gone,
+// so the next sync fills it from the account now signed in. One-time
+// markers, this install's id and the server's clock in sync_meta stay.
+const _ACCOUNT_TABLES = [...SYNC_TABLES, 'recipe_cookbook_links', 'disabled_units', 'user_settings', 'sync_deletes', 'sync_echoes', 'sync_log'];
+export async function dbClearUserData() {
+  if (!isNative) return;
+  const db = await getDb();
+  // One statement per call: the Android plugin's execute() runs only the
+  // first statement of each line it splits a script into, so a script of
+  // deletes silently left most tables as they were.
+  for (const t of _ACCOUNT_TABLES) await db.run(`DELETE FROM ${t}`, []);
+  await db.run(`DELETE FROM sync_meta WHERE key = 'last_pull_at'`, []);
+  // Read back: a copy that still holds anything is never shown as cleared
+  // (lib/local-account.js shows the error screen instead).
+  for (const t of _ACCOUNT_TABLES) {
+    const left = Number((await db.query(`SELECT COUNT(*) AS n FROM ${t}`, []))?.values?.[0]?.n || 0);
+    if (left) throw new Error(`could not clear ${t}`);
+  }
+  if ((await db.query(`SELECT 1 FROM sync_meta WHERE key = 'last_pull_at'`, []))?.values?.length) throw new Error('could not clear the pull cursor');
+}
+
+/**
+ * Connecting to a server after an upload from Settings (lib/migrate.js):
+ * every row is this account's now, and none has an id on its server yet,
+ * except the rows that went up, which take the ids the server gave them
+ * (`uploaded`: { table: [[localId, serverId], ...] }) and come down from it
+ * on the next pull. The rest goes up with the next sync as new rows, with
+ * what points at the uploaded ones translated to the server's ids. Deletes
+ * meant for another server go, and the pull starts over.
+ */
+export async function dbKeepForNewServer(uploaded = {}) {
+  if (!isNative) return;
+  const db = await getDb();
+  for (const t of SYNC_TABLES) {
+    if (t !== 'ai_chat_history') await db.run(`DELETE FROM ${t} WHERE deleted_at IS NOT NULL`, []);
+    await db.run(`UPDATE ${t} SET server_id = NULL, server_synced_at = NULL, server_base = NULL, sync_status = 'pending'`, []);
+    for (const pair of (Array.isArray(uploaded[t]) ? uploaded[t] : [])) {
+      const [localId, serverId] = (pair || []).map(Number);
+      if (!Number.isFinite(localId) || !Number.isFinite(serverId)) continue;
+      await db.run(`UPDATE ${t} SET server_id = ?, sync_status = 'synced' WHERE id = ?`, [serverId, localId]);
+    }
+  }
+  // One statement per call (see dbClearUserData).
+  await db.run(`UPDATE recipe_cookbook_links SET sync_status = 'pending'`, []);
+  await db.run(`DELETE FROM sync_deletes`, []);
+  await db.run(`DELETE FROM sync_echoes`, []);
+  await db.run(`DELETE FROM sync_meta WHERE key = 'last_pull_at'`, []);
+}
+
+/** This install's id: with a row's own id and when it was made, the key
+ *  the server knows a create by, so one sent twice is made once
+ *  (server/lib/create-keys.js).
+ *
+ *  The id is kept in this database, which Android backs up and puts back
+ *  on a new phone (or a second one), and also outside it, in a marker that
+ *  backups leave out (InstallMarkerPlugin). When the two differ, or the
+ *  marker is missing, this database came from elsewhere (or from before
+ *  the marker existed): this install takes a new id, so two phones never
+ *  send the same key for different rows. A new id is always safe; the cost
+ *  is that a create sent just before, whose answer never came, can be made
+ *  a second time, once. */
+let _installId = null;
+let _installIdPromise = null;
+let _markerPlugin = null;
+async function _installMarker() {
+  try {
+    if (!_markerPlugin) { const { registerPlugin } = await import('@capacitor/core'); _markerPlugin = registerPlugin('InstallMarker'); }
+    const got = await _markerPlugin.get();
+    return { kept: got?.value ?? null, set: value => _markerPlugin.set({ value }) };
+  } catch { return null; } // a shell without the plugin: the database's id stands
+}
+export function dbInstallId() {
+  if (_installId) return Promise.resolve(_installId);
+  if (!isNative) return Promise.resolve(null);
+  _installIdPromise ||= (async () => {
+    const db = await getDb();
+    let id = (await db.query(`SELECT value FROM sync_meta WHERE key = 'install_id'`, []))?.values?.[0]?.value || null;
+    const marker = await _installMarker();
+    if (!id || (marker && marker.kept !== id)) {
+      id = globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+      await db.run(`INSERT INTO sync_meta (key, value) VALUES ('install_id', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, [id]);
+      if (marker) await marker.set(id);
+    }
+    _installId = id;
+    return id;
+  })().finally(() => { _installIdPromise = null; });
+  return _installIdPromise;
+}
+
+/** The key a row this install made is sent with: the install, the table,
+ *  the row's own id, and when it was made (a second guard, should two
+ *  copies of one database ever share an install id). */
+export function createKeyOf(install, table, row) {
+  if (!install || row?.id == null) return undefined;
+  return `${install}:${table}:${row.id}${row.created_at ? `@${row.created_at}` : ''}`;
 }

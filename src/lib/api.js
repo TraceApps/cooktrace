@@ -259,6 +259,12 @@ const _CtApiHttp = {
   mintRecipeShareToken(id)              { return this.post(`/api/recipes/${id}/share`); },
   revokeRecipeShareToken(id)            { return this.del(`/api/recipes/${id}/share`); },
 
+  // Earlier versions: copies of a recipe a sync didn't keep, and the copy
+  // each restore replaced. Held by the server, so the Android app asks it.
+  getRecipeVersions(id)                 { return this.get(`/api/recipes/${id}/versions`); },
+  markRecipeVersionsSeen(id)            { return this.post(`/api/recipes/${id}/versions/seen`); },
+  async restoreRecipeVersion(id, versionId) { return this._imgFromApi(await this.post(`/api/recipes/${id}/versions/${versionId}/restore`)); },
+
   // Recipe sharing — per-user grants
   getSharePeers()                            { return this.get('/api/recipes/peers'); },
   async getRecipesSharedWithMe() {
@@ -455,6 +461,8 @@ const SERVER_ONLY_METHODS = new Set([
   'getSharePeers', 'getRecipeShares', 'shareRecipeWithUsers',
   'unshareRecipeWithUser', 'mintRecipeShareToken',
   'revokeRecipeShareToken', 'getRecipesSharedWithMe',
+  // A recipe's earlier versions live on the server (sync keeps them there).
+  'getRecipeVersions', 'markRecipeVersionsSeen', 'restoreRecipeVersion',
   'getUsersList', 'getAppConfig',
   'scanRecipeZip', 'commitRecipeZip',
   // Low-level HTTP primitives — used by components that don't have a
@@ -483,6 +491,11 @@ async function _uploadImageConnected(file) {
 }
 
 // Dynamic proxy — picks the right impl per call based on platform mode.
+const _withoutSaveHints = fn => (...args) => fn(...args.map(a => (
+  a && typeof a === 'object' && !Array.isArray(a) && ('_base' in a || '_changed' in a)
+    ? (({ _base, _changed, ...rest }) => rest)(a) : a
+)));
+
 export const NtApi = new Proxy({}, {
   get(_, prop) {
     // Special-case uploadImage in native connected mode: server-first
@@ -497,7 +510,12 @@ export const NtApi = new Proxy({}, {
     else if (!getServerUrl())                                  impl = CtApiNative;
     else if (SERVER_ONLY_METHODS.has(prop))                    impl = _CtApiHttp;
     else                                                       impl = CtApiCached;
-    return typeof impl[prop] === 'function' ? impl[prop].bind(impl) : impl[prop];
+    const fn = typeof impl[prop] === 'function' ? impl[prop].bind(impl) : impl[prop];
+    // What a web save says about its copy (_base, _changed) means nothing
+    // to the phone's own database, which tracks its edits itself. A recipe
+    // save keeps it: one shared with the phone goes to the server.
+    if (isNative && impl !== _CtApiHttp && typeof fn === 'function' && prop !== 'updateRecipe') return _withoutSaveHints(fn);
+    return fn;
   },
 });
 

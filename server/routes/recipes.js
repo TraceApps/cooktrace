@@ -22,6 +22,10 @@ import { scrapeWithRecipeScrapers, isRecipeScrapersAvailable } from '../lib/reci
 import { importRecipeFromText, importPaprikaArchive, scanRecipeZip, scanLoadedZip, loadRecipeZip, readImageFromLoadedZip, readZipImageBytes, mealieEventImagePaths } from '../lib/recipe-importers.js';
 import { extractText, detectFileType } from '../lib/text-extractors.js';
 import { guardNestedRecipeFields } from '../lib/recipe-guards.js';
+import { saveRecipeVersion, versionColumns, mergeRecipe, sameContent, VERSION_FIELDS, META_FIELDS, RECIPE_MERGE_FIELDS } from '../lib/recipe-versions.js';
+import { clockOffset, editTime } from '../lib/sync-clock.js';
+import { stampFields } from '../lib/field-stamps.js';
+import { saveRow } from '../lib/rest-merge.js';
 import { parseRecipeText, HIGH_CONFIDENCE_THRESHOLD } from '../lib/heuristic-recipe-parser.js';
 import JSZip from 'jszip';
 import path from 'node:path';
@@ -52,6 +56,8 @@ function _userArgs(u) {
 // helper and silently dropped every mobile-created recipe out of
 // auto-share (root cause of the "member sees nothing" bug).
 import { autoShareNewRecipe as _autoShareNewRecipe } from '../lib/auto-share.js';
+import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
+import { ownId } from '../lib/link-checks.js';
 
 // Recipe row -> API-shape hydration lives in server/lib/recipe-hydrate.js
 // so cookbooks.js can hydrate cookbook recipe cards identically (they
@@ -206,7 +212,7 @@ router.get('/categories', wrap((req, res) => {
   // pill in the Manage hub so users can see at a glance which
   // taxonomies are stale.
   const rows = db.prepare(
-    `SELECT c.id, c.name, c.slug, c.color, c.sort_order,
+    `SELECT c.id, c.name, c.slug, c.color, c.sort_order, c.synced_at,
             (SELECT COUNT(*) FROM recipes r
               WHERE r.category_id = c.id AND r.deleted_at IS NULL
                 AND ${_whereUser(u).replace(/user_id/g, 'r.user_id')}) AS recipe_count
@@ -235,8 +241,29 @@ router.post('/categories', wrap((req, res) => {
   const result = db.prepare(
     `INSERT INTO recipe_categories (user_id, name, slug, color, sort_order) VALUES (?, ?, ?, ?, ?)`
   ).run(u, name, slug, color, maxOrder + 1);
-  const row = db.prepare(`SELECT id, name, slug, color, sort_order FROM recipe_categories WHERE id = ?`).get(result.lastInsertRowid);
+  const row = db.prepare(`SELECT id, name, slug, color, sort_order, synced_at FROM recipe_categories WHERE id = ?`).get(result.lastInsertRowid);
   res.status(201).json(row);
+}));
+
+// Before '/categories/:id', which would otherwise take 'order' for an id
+// (and answer 400): the new order never got saved.
+router.put('/categories/order', wrap((req, res) => {
+  const u = uid(req);
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : null;
+  if (!ids) return res.status(400).json({ error: 'ids array required' });
+  // A new order isn't an edit of the categories: updated_at stays, and
+  // only sort_order is stamped as changed now (two edits of a category
+  // meet field by field, see lib/field-merge.js).
+  const upd = db.prepare(
+    `UPDATE recipe_categories
+        SET sort_order = ?
+      WHERE id = ? AND ${_whereUser(u)} AND sort_order IS NOT ?`
+  );
+  const tx = db.transaction(() => {
+    ids.forEach((id, idx) => { if (upd.run(idx, id, ..._userArgs(u), idx).changes) stampFields('recipe_categories', id, ['sort_order']); });
+  });
+  tx();
+  res.json({ ok: true });
 }));
 
 router.put('/categories/:id', wrap((req, res) => {
@@ -256,12 +283,8 @@ router.put('/categories/:id', wrap((req, res) => {
     ? parseInt(req.body.sort_order, 10)
     : existing.sort_order;
 
-  db.prepare(
-    `UPDATE recipe_categories
-        SET name = ?, color = ?, sort_order = ?, updated_at = datetime('now')
-      WHERE id = ?`
-  ).run(name, color, sort, id);
-  const row = db.prepare(`SELECT id, name, slug, color, sort_order FROM recipe_categories WHERE id = ?`).get(id);
+  saveRow('recipe_categories', id, existing, { name, color, sort_order: sort }, req.body?._sync);
+  const row = db.prepare(`SELECT id, name, slug, color, sort_order, synced_at FROM recipe_categories WHERE id = ?`).get(id);
   res.json(row);
 }));
 
@@ -269,21 +292,6 @@ router.put('/categories/:id', wrap((req, res) => {
 // Body: { ids: [42, 17, 9, ...] } — applies sort_order = index to each
 // id in the given sequence. Used by the drag-and-drop reorder in the
 // Manage hub; mirrors the same pattern as cookbooks order.
-router.put('/categories/order', wrap((req, res) => {
-  const u = uid(req);
-  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : null;
-  if (!ids) return res.status(400).json({ error: 'ids array required' });
-  const upd = db.prepare(
-    `UPDATE recipe_categories
-        SET sort_order = ?, updated_at = datetime('now')
-      WHERE id = ? AND ${_whereUser(u)}`
-  );
-  const tx = db.transaction(() => {
-    ids.forEach((id, idx) => upd.run(idx, id, ..._userArgs(u)));
-  });
-  tx();
-  res.json({ ok: true });
-}));
 
 router.delete('/categories/:id', wrap((req, res) => {
   const u = uid(req);
@@ -528,6 +536,11 @@ router.get('/:id', wrap((req, res) => {
 // ── POST / — create ─────────────────────────────────────────────────────
 router.post('/', wrap((req, res) => {
   const u = uid(req);
+  // Sent before (Connect > Upload again, or an answer lost): the row made
+  // then, not a second one (lib/create-keys.js).
+  const createKey = cleanCreateKey(req.body?.client_key);
+  const made = findByCreateKey('recipes', u, createKey);
+  if (made) return res.json(_withCreatorAvatar(_hydrate(made), made));
   // Resolve / auto-create pantry items BEFORE serializing to JSON,
   // but only when the user opts in via the autoCreatePantryFromRecipes
   // setting. Default off — typing "flour" in a recipe editor doesn't
@@ -538,6 +551,8 @@ router.post('/', wrap((req, res) => {
     body.ingredients = _linkIngredientsToPantry(u, body.ingredients);
   }
   const data = _toStorage(body);
+  // Only the account's own category (lib/link-checks.js).
+  if (data.category_id != null) data.category_id = ownId('recipe_categories', data.category_id, u, { softDelete: false });
   if (!data.name) return res.status(400).json({ error: 'Name is required' });
 
   // Capture creator's username on insert (denormalized for display speed).
@@ -556,6 +571,7 @@ router.post('/', wrap((req, res) => {
     data.ingredients, data.steps, data.tags, data.tools, data.nutrition,
     data.source_url, data.notes, data.visibility, creatorUsername, data.category_id, data.video_url,
   );
+  setCreateKey('recipes', result.lastInsertRowid, createKey);
   _autoShareNewRecipe(u, result.lastInsertRowid);
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(result.lastInsertRowid);
   res.status(201).json(_withCreatorAvatar(_hydrate(row), row));
@@ -598,6 +614,8 @@ router.put('/:id', wrap((req, res) => {
     data.rating      = existing.rating;
     data.favorite    = existing.favorite;
   }
+  // Only a category of the recipe's owner (lib/link-checks.js).
+  else if (data.category_id != null) data.category_id = ownId('recipe_categories', data.category_id, existing.user_id, { softDelete: false });
 
   // Option E guard (2026-08-11): if any of the nested JSON fields
   // (ingredients / steps / tags / tools / nutrition) is empty on the
@@ -612,6 +630,50 @@ router.put('/:id', wrap((req, res) => {
   // these fields, promote CT to full Option C (per-uuid merge).
   const guarded = guardNestedRecipeFields({ existing, incoming: data });
 
+  // A save that says which copy it was made on (_sync: the web app sends
+  // it, also when it replays saves made with no connection, and so does the
+  // Android app for a recipe shared with it) follows the same rule as a
+  // phone's sync: the newer edit stays, the copy that doesn't is kept as an
+  // earlier version, and what the save didn't change stays as it is here.
+  const sync = body._sync && typeof body._sync === 'object' ? body._sync : null;
+  let editedAt = null;
+  let keptServer = false;
+  let applied = null;
+  if (sync) {
+    // What this save changed: what it says (`changed`, from the copy the
+    // page had), else every field it sends. A Sous Chef doesn't change the
+    // owner's category, rating, favorite or visibility.
+    const sent = new Set(RECIPE_MERGE_FIELDS.filter(f => f !== 'deleted_at'
+      && (f === 'img_url' ? ('img_url' in body || 'imgUrl' in body) : f in body)));
+    const said = Array.isArray(sync.changed) ? sync.changed.filter(f => sent.has(f)) : [...sent];
+    const changed = new Set(said.filter(f => !(isKitchenEditor && ['category_id', 'rating', 'favorite', 'visibility'].includes(f))));
+    const incoming = {};
+    for (const f of RECIPE_MERGE_FIELDS) if (f !== 'deleted_at' && sent.has(f)) incoming[f] = guarded[f];
+    const m = mergeRecipe(existing, incoming, {
+      base: typeof sync.base_synced_at === 'string' ? sync.base_synced_at : null,
+      changed,
+      editedAt: editTime(typeof sync.edited_at === 'string' ? sync.edited_at : null, clockOffset(sync.client_now)),
+    });
+    for (const k of m.keep) {
+      saveRecipeVersion(id, existing.user_id, k.row, {
+        reason: k.reason,
+        editedBy: k.side === 'incoming' ? (u ?? existing.user_id) : (existing.last_edited_by ?? existing.user_id),
+      });
+    }
+    if (!m.write) {
+      return res.json({ ..._withCreatorAvatar(_hydrate(existing), existing), ...(m.devicePulls ? { kept: 'server' } : {}) });
+    }
+    for (const f of [...VERSION_FIELDS, ...META_FIELDS]) { data[f] = m.row[f]; guarded[f] = m.row[f]; }
+    editedAt = m.updatedAt;
+    keptServer = m.devicePulls;
+    applied = { fields: m.applied, at: m.fieldAt };
+  } else if (!sameContent(guarded, existing)) {
+    // A save that can't say which copy it was made on (an older page, an
+    // API client): it goes in as before, and the copy it replaces is kept,
+    // without pointing at it, in case it was someone else's newer edit.
+    saveRecipeVersion(id, existing.user_id, existing, { reason: 'replaced', editedBy: existing.last_edited_by ?? existing.user_id });
+  }
+
   db.prepare(
     `UPDATE recipes SET
        name = ?, description = ?, img_url = ?, servings = ?, yield_text = ?,
@@ -619,18 +681,104 @@ router.put('/:id', wrap((req, res) => {
        ingredients = ?, steps = ?, tags = ?, tools = ?, nutrition = ?,
        source_url = ?, notes = ?, visibility = ?, category_id = ?, video_url = ?,
        last_edited_by = ?,
-       updated_at = datetime('now')
+       updated_at = COALESCE(?, datetime('now'))
      WHERE id = ?`
   ).run(
     data.name, data.description, data.img_url, data.servings, data.yield_text,
     data.prep_minutes, data.cook_minutes, data.total_minutes, data.rest_minutes, data.rating, data.favorite,
     guarded.ingredients, guarded.steps, guarded.tags, guarded.tools, guarded.nutrition,
     data.source_url, data.notes, data.visibility, data.category_id, data.video_url,
-    // Only worth recording when someone other than the owner saved.
-    isOwner ? null : u,
+    // Only worth recording when someone other than the owner saved, and
+    // only for content of theirs that went in: otherwise it stays whose it was.
+    applied && !applied.fields.some(f => VERSION_FIELDS.includes(f)) ? existing.last_edited_by : (isOwner ? null : u),
+    editedAt,
     id,
   );
+  if (applied) stampFields('recipes', id, applied.fields, applied.at);
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(id);
+  res.json({ ..._withCreatorAvatar(_hydrate(row), row), ...(keptServer ? { kept: 'server' } : {}) });
+}));
+
+
+// ── Earlier versions ──────────────────────────────────────────────────
+// Copies of the recipe a sync didn't keep (an edit from another device
+// that was older, or the copy a newer one replaced), and the copy each
+// restore or older save replaced. The owner sees them all; someone else
+// who may edit it (an admin, a kitchen Sous Chef) sees their own edits.
+function _versionAccess(req, res) {
+  const u = uid(req);
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: 'Invalid id' }); return null; }
+  const recipe = db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(id);
+  if (!recipe) { res.status(404).json({ error: 'Not found' }); return null; }
+  const isOwner = (u == null && recipe.user_id == null) || recipe.user_id === u;
+  const isAdmin = req.user?.role === 'admin';
+  if (!isOwner && !isAdmin && !_canEditViaKitchen(id, u)) { res.status(403).json({ error: 'Forbidden' }); return null; }
+  return {
+    recipe, isOwner, u, isKitchenEditor: !isOwner && !isAdmin,
+    // Which versions: all of them, or this person's own edits.
+    mine: isOwner ? '' : ' AND v.edited_by = ?', mineArgs: isOwner ? [] : [u],
+  };
+}
+
+// GET /:id/versions: newest first, each with the content it holds and whose
+// edit it was.
+router.get('/:id/versions', wrap((req, res) => {
+  const a = _versionAccess(req, res);
+  if (!a) return;
+  const rows = db.prepare(
+    `SELECT v.id, v.reason, v.created_at, v.seen, v.data, v.edited_by,
+            COALESCE(us.full_name, us.username) AS edited_by_name
+       FROM recipe_versions v LEFT JOIN users us ON us.id = v.edited_by
+      WHERE v.recipe_id = ?${a.mine} ORDER BY v.id DESC`
+  ).all(a.recipe.id, ...a.mineArgs);
+  res.json(rows.map(r => {
+    const data = _safeJson(r.data, {});
+    data.ingredients = _normaliseIngredientGroups(data.ingredients);
+    return { ...r, seen: !!r.seen, data };
+  }));
+}));
+
+// POST /:id/versions/seen: they've looked, so the recipe page stops
+// pointing at them.
+router.post('/:id/versions/seen', wrap((req, res) => {
+  const a = _versionAccess(req, res);
+  if (!a) return;
+  db.prepare(`UPDATE recipe_versions AS v SET seen = 1 WHERE v.recipe_id = ? AND v.seen = 0${a.mine}`).run(a.recipe.id, ...a.mineArgs);
+  res.json({ ok: true });
+}));
+
+// POST /:id/versions/:vid/restore: the version becomes the recipe. The
+// copy it replaces is kept as a version first, so a restore can be undone.
+// A new edit time, so every device picks it up.
+router.post('/:id/versions/:vid/restore', wrap((req, res) => {
+  const a = _versionAccess(req, res);
+  if (!a) return;
+  const { recipe } = a;
+  const vid = parseInt(req.params.vid, 10);
+  const version = Number.isFinite(vid)
+    ? db.prepare(`SELECT v.* FROM recipe_versions v WHERE v.id = ? AND v.recipe_id = ?${a.mine}`).get(vid, recipe.id, ...a.mineArgs)
+    : null;
+  if (!version) return res.status(404).json({ error: 'Not found' });
+  const data = _safeJson(version.data, {});
+  // A version's name and category may no longer fit: a recipe needs a
+  // name, and a category deleted since stays the current one. A Sous Chef
+  // doesn't move the owner's recipe between categories.
+  if (!String(data.name ?? '').trim()) data.name = recipe.name;
+  if (a.isKitchenEditor) data.category_id = recipe.category_id;
+  else if (data.category_id != null) {
+    const cat = db.prepare(`SELECT user_id FROM recipe_categories WHERE id = ?`).get(data.category_id);
+    const ownCat = cat && ((recipe.user_id == null && cat.user_id == null) || cat.user_id === recipe.user_id);
+    if (!ownCat) data.category_id = recipe.category_id;
+  }
+  const { cols, vals } = versionColumns(data);
+  db.transaction(() => {
+    saveRecipeVersion(recipe.id, recipe.user_id, recipe, { reason: 'restore', editedBy: recipe.last_edited_by ?? recipe.user_id });
+    db.prepare(
+      `UPDATE recipes SET ${cols.map(c => `${c} = ?`).join(', ')}, last_edited_by = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(...vals, a.isOwner ? null : a.u, recipe.id);
+  })();
+  const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(recipe.id);
   res.json(_withCreatorAvatar(_hydrate(row), row));
 }));
 
@@ -811,11 +959,7 @@ router.put('/:id/cooks/:cookId', wrap((req, res) => {
   const photoUrl = nextPhotos[0] || null;
   const photosJson = nextPhotos.length ? JSON.stringify(nextPhotos) : null;
 
-  db.prepare(
-    `UPDATE cook_diary
-       SET date = ?, notes = ?, photo_url = ?, photos = ?, updated_at = datetime('now')
-     WHERE id = ?`
-  ).run(date, notes, photoUrl, photosJson, cookId);
+  saveRow('cook_diary', cookId, existing, { date, notes, photo_url: photoUrl, photos: photosJson }, req.body?._sync);
 
   _recomputeCookAggregates(id);
   res.json({ ok: true });
@@ -2435,9 +2579,7 @@ router.put('/:id/comments/:commentId', wrap((req, res) => {
   if (!body) return res.status(400).json({ error: 'body required' });
   if (body.length > 4000) return res.status(400).json({ error: 'comment too long (4000 char max)' });
 
-  db.prepare(
-    `UPDATE recipe_comments SET body = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(body, cid);
+  saveRow('recipe_comments', cid, c, { body }, req.body?._sync);
   const row = _selectCommentJoined(cid);
   res.json(_commentRow(row));
 }));

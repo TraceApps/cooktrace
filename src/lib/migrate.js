@@ -97,7 +97,19 @@ export async function uploadLocalToServer({ serverUrl, authToken, onProgress } =
     errors: [],
     total: 0,
     totalSuccess: 0,
+    // The rows that went up, by table: [local id, server id]. They take
+    // the server's ids when the phone connects (lib/local-account.js
+    // claimForServer), so the next sync doesn't send them again.
+    uploaded: {},
   };
+  const went = (table, localId, created) => {
+    if (localId != null && created?.id != null) (summary.uploaded[table] ||= []).push([localId, created.id]);
+  };
+  // A key per row (this install and the row's own id): an upload sent
+  // twice, or one whose answer was lost, makes each row once on the server.
+  let install = null, createKeyOf = () => undefined;
+  try { ({ createKeyOf } = await import('./db-native.js')); install = await (await import('./db-native.js')).dbInstallId(); } catch { install = null; }
+  const key = (table, row) => createKeyOf(install, table, row);
   const headers = {
     'Content-Type':  'application/json',
     'Authorization': `Bearer ${authToken}`,
@@ -106,6 +118,18 @@ export async function uploadLocalToServer({ serverUrl, authToken, onProgress } =
   // ── Categories first so recipes/pantry items can reference them ─────────
   // Map local category_id → newly-created server category_id so the
   // recipes + pantry uploads that follow can rewrite their FK fields.
+  // The account's categories on the server, by slug or name: a category
+  // the phone has that the account has too is matched, never made twice.
+  const _byKey = async path => {
+    const list = await _request('GET', `${serverUrl}${path}`, headers).catch(() => []);
+    const m = new Map();
+    for (const x of Array.isArray(list) ? list : []) {
+      if (x?.slug) m.set(`s:${x.slug}`, x);
+      if (x?.name) m.set(`n:${String(x.name).trim().toLowerCase()}`, x);
+    }
+    return c => m.get(`s:${c.slug}`) || m.get(`n:${String(c.name || '').trim().toLowerCase()}`) || null;
+  };
+  const theirs = { recipe: await _byKey('/api/recipes/categories'), pantry: await _byKey('/api/pantry/categories') };
   const recipeCatIdMap = new Map();
   try {
     const localCats = NtApi.getRecipeCategories ? await NtApi.getRecipeCategories().catch(() => []) : [];
@@ -113,10 +137,13 @@ export async function uploadLocalToServer({ serverUrl, authToken, onProgress } =
       onProgress?.('categories', i, localCats.length);
       const c = localCats[i];
       try {
-        const created = await _post(`${serverUrl}/api/recipes/categories`, headers, {
+        // One the account has already (the default ones every account
+        // starts with, or an upload sent before): that one, not a second.
+        const created = theirs.recipe(c) || await _post(`${serverUrl}/api/recipes/categories`, headers, {
           name: c.name, slug: c.slug || null, color: c.color || null,
         });
         if (created?.id) recipeCatIdMap.set(c.id, created.id);
+        went('recipe_categories', c.id, created);
         summary.success.categories++;
       } catch (e) {
         summary.errors.push({ stage: 'categories', name: c.name || `cat #${c.id}`, message: e.message });
@@ -134,10 +161,11 @@ export async function uploadLocalToServer({ serverUrl, authToken, onProgress } =
         onProgress?.('categories', i, localPCats.length);
         const c = localPCats[i];
         try {
-          const created = await _post(`${serverUrl}/api/pantry/categories`, headers, {
+          const created = theirs.pantry(c) || await _post(`${serverUrl}/api/pantry/categories`, headers, {
             name: c.name, slug: c.slug || null, color: c.color || null,
           });
           if (created?.id) pantryCatIdMap.set(c.id, created.id);
+          went('pantry_categories', c.id, created);
           summary.success.categories++;
         } catch (e) {
           summary.errors.push({ stage: 'categories', name: c.name || `pcat #${c.id}`, message: e.message });
@@ -146,7 +174,57 @@ export async function uploadLocalToServer({ serverUrl, authToken, onProgress } =
     }
   } catch { /* non-fatal */ }
 
-  // ── Recipes ─────────────────────────────────────────────────────────────
+  // ── Pantry items ────────────────────────────────────────────────────────
+  // Items first (recipes, the shopping list and other items point at them),
+  // and every link sent as the server's id: an id from this phone's own
+  // numbering would point at whatever has that id on the server. Items
+  // that aren't variants go first, then their variants, then each item's
+  // nutrition source, once the variant it points at is there.
+  const localPantry = await NtApi.getPantry().catch(() => []);
+  const pantryIdMap = new Map(); // local id -> server id
+  // A link may hold this phone's id, or (pulled from a server before a
+  // Disconnect) that server's id: either finds the row it means.
+  const byOldServerId = new Map(localPantry.filter(p => p.server_id != null).map(p => [p.server_id, p.id]));
+  const pantryLink = raw => {
+    if (raw == null || raw === '') return null;
+    const n = Number(raw);
+    const localId = byOldServerId.has(n) ? byOldServerId.get(n)
+      : localPantry.some(p => p.id === n && p.server_id == null) ? n : null;
+    return localId != null ? (pantryIdMap.get(localId) ?? null) : null;
+  };
+  const pantryOrder = [
+    ...localPantry.filter(p => p.generic_parent_id == null),
+    ...localPantry.filter(p => p.generic_parent_id != null),
+  ];
+  for (let i = 0; i < pantryOrder.length; i++) {
+    onProgress?.('pantry', i, pantryOrder.length);
+    const p = pantryOrder[i];
+    try {
+      const { id, user_id, sync_status, server_id, created_at, updated_at, deleted_at,
+              category_id, generic_parent_id, nutrition_source_variant_id,
+              server_synced_at, server_base, edit_clock, ...rest } = p;
+      const created = await _post(`${serverUrl}/api/pantry`, headers, {
+        ...rest,
+        client_key: key('pantry_items', p),
+        category_id: category_id != null ? (pantryCatIdMap.get(category_id) ?? null) : null,
+        generic_parent_id: generic_parent_id != null ? (pantryIdMap.get(generic_parent_id) ?? null) : null,
+      });
+      if (created?.id) pantryIdMap.set(id, created.id);
+      went('pantry_items', id, created);
+      summary.success.pantry++;
+    } catch (e) {
+      summary.errors.push({ stage: 'pantry', name: p.name || `pantry #${p.id}`, message: e.message });
+    }
+  }
+  for (const p of localPantry) {
+    const own = pantryIdMap.get(p.id);
+    const source = p.nutrition_source_variant_id != null ? pantryIdMap.get(p.nutrition_source_variant_id) : null;
+    if (!own || !source) continue;
+    try { await _request('PUT', `${serverUrl}/api/pantry/${own}`, headers, { nutrition_source_variant_id: source }); }
+    catch (e) { summary.errors.push({ stage: 'pantry', name: p.name || `pantry #${p.id}`, message: e.message }); }
+  }
+
+  // ── Recipes ───────────────────────────────────────────────────────────────
   const localRecipes = await NtApi.getRecipes().catch(() => []);
   const recipeIdMap = new Map(); // local id → server id, for diary + shopping rewire
   for (let i = 0; i < localRecipes.length; i++) {
@@ -156,32 +234,23 @@ export async function uploadLocalToServer({ serverUrl, authToken, onProgress } =
       const { id, user_id, sync_status, server_id, created_at, updated_at, deleted_at,
               cook_count, last_cooked_at, share_token,
               category_id, ...rest } = r;
+      // Ingredients linked to pantry items: the server's ids for them.
+      const ingredients = Array.isArray(rest.ingredients)
+        ? rest.ingredients.map(g => (g && Array.isArray(g.items)
+          ? { ...g, items: g.items.map(it => (it && it.pantry_item_id != null ? { ...it, pantry_item_id: pantryLink(it.pantry_item_id) } : it)) }
+          : g))
+        : rest.ingredients;
       const created = await _post(`${serverUrl}/api/recipes`, headers, {
         ...rest,
+        ingredients,
+        client_key: key('recipes', r),
         category_id: category_id != null ? (recipeCatIdMap.get(category_id) ?? null) : null,
       });
       if (created?.id) recipeIdMap.set(id, created.id);
+      went('recipes', id, created);
       summary.success.recipes++;
     } catch (e) {
       summary.errors.push({ stage: 'recipes', name: r.name || `recipe #${r.id}`, message: e.message });
-    }
-  }
-
-  // ── Pantry items ────────────────────────────────────────────────────────
-  const localPantry = await NtApi.getPantry().catch(() => []);
-  for (let i = 0; i < localPantry.length; i++) {
-    onProgress?.('pantry', i, localPantry.length);
-    const p = localPantry[i];
-    try {
-      const { id, user_id, sync_status, server_id, created_at, updated_at, deleted_at,
-              category_id, ...rest } = p;
-      await _post(`${serverUrl}/api/pantry`, headers, {
-        ...rest,
-        category_id: category_id != null ? (pantryCatIdMap.get(category_id) ?? null) : null,
-      });
-      summary.success.pantry++;
-    } catch (e) {
-      summary.errors.push({ stage: 'pantry', name: p.name || `pantry #${p.id}`, message: e.message });
     }
   }
 
@@ -197,10 +266,12 @@ export async function uploadLocalToServer({ serverUrl, authToken, onProgress } =
         summary.errors.push({ stage: 'diary', name: d.date || `diary #${d.id}`, message: 'recipe not uploaded — skipping' });
         continue;
       }
-      await _post(`${serverUrl}/api/cook-diary`, headers, {
+      const created = await _post(`${serverUrl}/api/cook-diary`, headers, {
         ...rest,
+        client_key: key('cook_diary', d),
         recipe_id: remappedRecipeId,
       });
+      went('cook_diary', id, created);
       summary.success.diary++;
     } catch (e) {
       summary.errors.push({ stage: 'diary', name: d.date || `diary #${d.id}`, message: e.message });
@@ -215,10 +286,13 @@ export async function uploadLocalToServer({ serverUrl, authToken, onProgress } =
     try {
       const { id, user_id, sync_status, server_id, created_at, updated_at, deleted_at, ...rest } = s;
       const remappedRecipeId = s.recipe_id != null ? (recipeIdMap.get(s.recipe_id) ?? null) : null;
-      await _post(`${serverUrl}/api/shopping`, headers, {
+      const created = await _post(`${serverUrl}/api/shopping`, headers, {
         ...rest,
+        client_key: key('shopping_list', s),
         recipe_id: remappedRecipeId,
+        pantry_id: s.pantry_id != null ? (pantryIdMap.get(s.pantry_id) ?? null) : null,
       });
+      went('shopping_list', id, created);
       summary.success.shopping++;
     } catch (e) {
       summary.errors.push({ stage: 'shopping', name: s.name || `shop #${s.id}`, message: e.message });

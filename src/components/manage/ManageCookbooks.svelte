@@ -114,6 +114,7 @@
         name,
         description: editDesc.trim() || null,
         cover_image_url: editCover || null,
+        _base: cb,
       });
       cookbooks = cookbooks.map(x => x.id === cb.id ? { ...x, ...updated } : x);
       cancelEdit();

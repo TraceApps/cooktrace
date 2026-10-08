@@ -199,7 +199,7 @@
       e.preventDefault();
       return;
     }
-    if (e.key === 'Escape')          { closePopover(); return; }
+    if (e.key === 'Escape')          { if (open) e.preventDefault(); closePopover(); return; }
     if (e.key === 'ArrowDown')       { e.preventDefault(); highlightIndex = Math.min(rowCount - 1, highlightIndex + 1); return; }
     if (e.key === 'ArrowUp')         { e.preventDefault(); highlightIndex = Math.max(0, highlightIndex - 1); return; }
     if (e.key === 'Enter') {

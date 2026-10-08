@@ -83,6 +83,9 @@ const router = express.Router();
 // global parser so they win — by the time the global parser runs, req.body
 // is already populated and it short-circuits.
 router.use('/api/data/import', express.json({ limit: '25mb' }));
+// The push's clock correction is measured from when the request arrived,
+// before its body uploads, so a slow upload doesn't read as a slow clock.
+router.use('/api/sync/push',   (req, res, next) => { req.receivedAt = Date.now(); next(); });
 router.use('/api/sync/push',   express.json({ limit: '25mb' }));
 // Global cap: 1 MB. Prevents a single authed user from filling memory with
 // repeated large requests. Anything above belongs on a per-route opt-in.

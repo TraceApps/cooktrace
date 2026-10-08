@@ -139,7 +139,7 @@
     if (!abbr) return;
     try {
       const updated = await NtApi.updateCustomUnit(u.id, {
-        abbr, full_name: full, category: editCategory,
+        abbr, full_name: full, category: editCategory, _base: u,
       });
       custom = custom.map(x => x.id === u.id ? updated : x);
       cancelEdit();

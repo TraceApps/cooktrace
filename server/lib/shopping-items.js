@@ -44,14 +44,16 @@ export function titleCaseName(raw) {
 // falling back to the category name, then null. Used by every insert path
 // (single-item POST, /from-recipe, /from-plan, the sister-app API) so the
 // shopping list groups itself without the user having to tag each row.
-export function aisleForPantry(pantryId) {
+// Only the account's own pantry item says where it is (`userId`): an id
+// from anywhere else never reads another account's aisle.
+export function aisleForPantry(pantryId, userId) {
   if (!pantryId) return null;
   const cat = db.prepare(
     `SELECT c.default_aisle, c.name
        FROM pantry_items p
-       LEFT JOIN pantry_categories c ON c.id = p.category_id
-      WHERE p.id = ?`
-  ).get(pantryId);
+       LEFT JOIN pantry_categories c ON c.id = p.category_id AND c.user_id IS p.user_id
+      WHERE p.id = ? AND p.user_id IS ?`
+  ).get(pantryId, userId ?? null);
   if (!cat) return null;
   return (cat.default_aisle && cat.default_aisle.trim()) || cat.name || null;
 }
@@ -76,6 +78,7 @@ export function listShoppingItems(userId, { includeChecked = true } = {}) {
             r.name AS recipe_name, s.sort_order, s.updated_at
        FROM shopping_list s
        LEFT JOIN recipes r ON r.id = s.recipe_id AND r.deleted_at IS NULL
+                         AND (r.user_id IS s.user_id OR EXISTS (SELECT 1 FROM recipe_shares rs WHERE rs.recipe_id = r.id AND rs.grantee_id = s.user_id))
       WHERE ${userClause(userId, 's.user_id')} AND s.deleted_at IS NULL${includeChecked ? '' : ' AND s.checked = 0'}
       ORDER BY s.checked ASC,
                COALESCE(s.aisle, 'zzz') ASC,
@@ -108,7 +111,7 @@ export const addShoppingItems = db.transaction((userId, items) => {
     const open = findOpen.get(...userArgs(userId), name);
     if (open) { skipped.push({ name, existing_id: open.id }); continue; }
     const pantryId = pantryIdForName(userId, name);
-    const aisle = raw.aisle || aisleForPantry(pantryId);
+    const aisle = raw.aisle || aisleForPantry(pantryId, userId);
     const info = insert.run(userId, name, raw.quantity ?? null, raw.unit || null, aisle || null, pantryId);
     added.push({ id: Number(info.lastInsertRowid), name, quantity: raw.quantity ?? null, unit: raw.unit || null, aisle: aisle || null, pantry_id: pantryId });
   }
