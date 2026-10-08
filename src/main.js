@@ -45,6 +45,18 @@ if (publicToken) {
   boot();
 }
 
+// A harmless native call, given up on after a moment: its answer may go
+// to the page before a reload, and every call after it is answered here.
+async function primeNativeBridge() {
+  try {
+    const { CapacitorSQLite } = await import('@capacitor-community/sqlite');
+    await Promise.race([
+      CapacitorSQLite.echo({ value: 'ready' }).catch(() => {}),
+      new Promise(resolve => setTimeout(resolve, 1000)),
+    ]);
+  } catch { /* nothing to prime */ }
+}
+
 function boot() {
   DB.init()
     .then(async () => {
@@ -53,6 +65,13 @@ function boot() {
       // No-op on web. Lazy on subsequent calls because getDb() memoises.
       const { isNative } = await import('./lib/platform.js');
       if (isNative) {
+        // The first native call a page makes after the app reloads itself
+        // (setup's sign-in, Connect, Disconnect, sign-out) can lose its
+        // answer: Capacitor's Android bridge runs the call before it starts
+        // answering this page, and a quick call answers the page that's
+        // gone. The database's first call then never returned and the app
+        // stayed blank. A first call whose answer can be lost goes first.
+        await primeNativeBridge();
         const { dbInit } = await import('./lib/db-native.js');
         await dbInit();
         const { loadImageMap } = await import('./lib/platform.js');

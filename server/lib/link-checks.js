@@ -31,3 +31,28 @@ export function linkableRecipeId(raw, u) {
   if (u == null || !Number.isInteger(id)) return null;
   return db.prepare(`SELECT 1 FROM recipe_shares WHERE recipe_id = ? AND grantee_id = ?`).get(id, u) ? id : null;
 }
+
+/**
+ * A recipe's ingredients (JSON text or a list of groups) with every pantry
+ * link that isn't one of `ownerId`'s own pantry items taken out: a link
+ * holds the server's id of the recipe owner's item, never another
+ * account's (or an id from a phone's own numbering). Same type back.
+ */
+export function ownIngredientLinks(ingredients, ownerId) {
+  const asText = typeof ingredients === 'string';
+  let groups = ingredients;
+  if (asText) { try { groups = JSON.parse(ingredients); } catch { return ingredients; } }
+  if (!Array.isArray(groups)) return ingredients;
+  let changed = false;
+  const items = g => (g && Array.isArray(g.items) ? g.items : null);
+  const fix = it => {
+    if (!it || typeof it !== 'object' || it.pantry_item_id == null) return it;
+    if (ownId('pantry_items', it.pantry_item_id, ownerId) != null) return it;
+    changed = true;
+    const { pantry_item_id, ...rest } = it;
+    return rest;
+  };
+  const out = groups.map(g => (items(g) ? { ...g, items: g.items.map(fix) } : fix(g)));
+  if (!changed) return ingredients;
+  return asText ? JSON.stringify(out) : out;
+}

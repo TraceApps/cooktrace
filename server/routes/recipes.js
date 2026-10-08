@@ -57,7 +57,7 @@ function _userArgs(u) {
 // auto-share (root cause of the "member sees nothing" bug).
 import { autoShareNewRecipe as _autoShareNewRecipe } from '../lib/auto-share.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
-import { ownId } from '../lib/link-checks.js';
+import { ownId, ownIngredientLinks } from '../lib/link-checks.js';
 
 // Recipe row -> API-shape hydration lives in server/lib/recipe-hydrate.js
 // so cookbooks.js can hydrate cookbook recipe cards identically (they
@@ -551,8 +551,9 @@ router.post('/', wrap((req, res) => {
     body.ingredients = _linkIngredientsToPantry(u, body.ingredients);
   }
   const data = _toStorage(body);
-  // Only the account's own category (lib/link-checks.js).
+  // Only the account's own category and pantry items (lib/link-checks.js).
   if (data.category_id != null) data.category_id = ownId('recipe_categories', data.category_id, u, { softDelete: false });
+  data.ingredients = ownIngredientLinks(data.ingredients, u);
   if (!data.name) return res.status(400).json({ error: 'Name is required' });
 
   // Capture creator's username on insert (denormalized for display speed).
@@ -616,6 +617,8 @@ router.put('/:id', wrap((req, res) => {
   }
   // Only a category of the recipe's owner (lib/link-checks.js).
   else if (data.category_id != null) data.category_id = ownId('recipe_categories', data.category_id, existing.user_id, { softDelete: false });
+  // Ingredients link only to the recipe owner's pantry items.
+  data.ingredients = ownIngredientLinks(data.ingredients, existing.user_id);
 
   // Option E guard (2026-08-11): if any of the nested JSON fields
   // (ingredients / steps / tags / tools / nutrition) is empty on the
@@ -1521,6 +1524,7 @@ function _saveImportedRecipe(u, parsed, opts = {}) {
     }
   }
   const data = _toStorage(body);
+  data.ingredients = ownIngredientLinks(data.ingredients, u);
   if (!data.name) throw Object.assign(new Error('No recipe name found'), { status: 400 });
 
   const result = db.prepare(

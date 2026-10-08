@@ -182,16 +182,9 @@ export async function uploadLocalToServer({ serverUrl, authToken, onProgress } =
   // nutrition source, once the variant it points at is there.
   const localPantry = await NtApi.getPantry().catch(() => []);
   const pantryIdMap = new Map(); // local id -> server id
-  // A link may hold this phone's id, or (pulled from a server before a
-  // Disconnect) that server's id: either finds the row it means.
-  const byOldServerId = new Map(localPantry.filter(p => p.server_id != null).map(p => [p.server_id, p.id]));
-  const pantryLink = raw => {
-    if (raw == null || raw === '') return null;
-    const n = Number(raw);
-    const localId = byOldServerId.has(n) ? byOldServerId.get(n)
-      : localPantry.some(p => p.id === n && p.server_id == null) ? n : null;
-    return localId != null ? (pantryIdMap.get(localId) ?? null) : null;
-  };
+  // An ingredient's link holds this phone's id for the item (db-native.js
+  // keeps them so); the server gets the id it gave that item.
+  const pantryLink = raw => (raw == null || raw === '' ? null : (pantryIdMap.get(Number(raw)) ?? null));
   const pantryOrder = [
     ...localPantry.filter(p => p.generic_parent_id == null),
     ...localPantry.filter(p => p.generic_parent_id != null),

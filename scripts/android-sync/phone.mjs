@@ -682,6 +682,42 @@ const scenarios = {
     out.userMgmt = get(userMgmtActive);
     process.env.CT_SERVER = server;
   },
+
+  // An ingredient linked to a pantry item, on the phone in server mode,
+  // where the item's id here differs from its id on the server: the link is
+  // the right one on both sides, made new, edited offline, and from the web.
+  async ingredientLinks() {
+    for (const n of ['Salt', 'Pepper', 'Oil', 'Vinegar']) await web('POST', '/api/pantry', { name: n });
+    // The phone makes its own items first, so its ids run ahead of the server's.
+    await api.createPantryItem({ name: 'Flour' });
+    await api.createPantryItem({ name: 'Sugar' });
+    await sync();
+    const here = async n => (await db.query(`SELECT id, server_id FROM pantry_items WHERE name = ?`, [n])).values[0];
+    const flour = await here('Flour'), sugar = await here('Sugar'), oil = await here('Oil');
+    out.idsDiffer = flour.id !== flour.server_id && sugar.id !== sugar.server_id;
+    // A new item and a recipe that links it, both made before a sync.
+    const butter = await api.createPantryItem({ name: 'Butter' });
+    const r = await api.createRecipe({ name: 'Cake', ingredients: [{ items: [{ name: 'flour', pantry_item_id: flour.id }, { name: 'butter', pantry_item_id: butter.id }] }], steps: ['Bake'] });
+    await sync();
+    const linkOnServer = async (rid, i) => (await web('GET', `/api/recipes/${rid}`)).ingredients[0].items[i]?.pantry_item_id ?? null;
+    const sid = (await db.query(`SELECT server_id FROM recipes WHERE id = ?`, [r.id])).values[0].server_id;
+    const butterHere = await here('Butter');
+    out.made = { server: [await linkOnServer(sid, 0), await linkOnServer(sid, 1)], want: [flour.server_id, butterHere.server_id] };
+    // Edited offline: the butter link swapped for sugar.
+    const x = await api.getRecipe(r.id);
+    const g = x.ingredients;
+    g[0].items[1] = { name: 'sugar', pantry_item_id: sugar.id };
+    await api.updateRecipe(r.id, { ...x, ingredients: g });
+    await sync();
+    out.edited = { server: await linkOnServer(sid, 1), want: sugar.server_id };
+    const phoneLinks = async rid => JSON.parse((await db.query(`SELECT ingredients FROM recipes WHERE id = ?`, [rid])).values[0].ingredients)[0].items.map(i => i.pantry_item_id ?? null);
+    out.phoneAfter = { got: await phoneLinks(r.id), want: [flour.id, sugar.id] };
+    // A recipe made on the web, linked to an item by its server id.
+    const w = await web('POST', '/api/recipes', { name: 'Dressing', ingredients: [{ items: [{ name: 'oil', pantry_item_id: oil.server_id }] }], steps: ['Shake'] });
+    await sync();
+    const wl = (await db.query(`SELECT id FROM recipes WHERE server_id = ?`, [w.id])).values[0].id;
+    out.fromWeb = { got: await phoneLinks(wl), want: [oil.id] };
+  },
 };
 
 const name = process.argv[2];
