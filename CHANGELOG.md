@@ -20,6 +20,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Photos synced from the Android app are stored as files on the server.** A photo that reached the sync embedded in its recipe, pantry item, cookbook or cook diary entry was kept inline, so every list carried it and share cards and link previews couldn't show it. Photos already stored that way are turned into files when the server starts.
 - **The Android app no longer opens on a blank screen after signing in on the setup screen.** Now and then it stayed blank until it was closed and opened again.
 - **A recipe's ingredients made or edited in the Android app link the right pantry items on the server.** They sent the phone's own numbers for the items, so a link could point at another item, or at nothing, once synced, and a recipe from the web linked the wrong items on the phone. A link to another account's pantry item is no longer kept.
 - **A recipe made on the phone is made once.** Two syncs could start at once (opening the app, the connection coming back, the timer) and send the same new recipe twice, making two on the server and three on the phone, and keeping the same earlier version twice. Syncs now run one at a time, a new row carries a key so the server makes it once even when it's sent again, and the same earlier version is kept once. An edit made while a sync is running goes up right after it.

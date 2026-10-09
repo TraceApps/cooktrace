@@ -676,6 +676,78 @@ for (const [label, base] of [['noStamp', null], ['forgedStamp', '9999-01-01 00:0
     .map(v => `${JSON.parse(v.data).name}:${v.reason}`);
 }
 
+// 30. A photo taken with no connection comes embedded in its row (a data:
+// URL): the push stores it as a file, and the startup repair does the same
+// for photos stored embedded before.
+{
+  const fs = await import('node:fs');
+  const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  const files = () => { try { return fs.readdirSync(process.env.UPLOADS_PATH).length; } catch { return 0; } };
+  out.photos = {};
+  const base = { ingredients: '[]', steps: '[]', tags: '[]', tools: '[]', nutrition: '{}', visibility: 'private', cook_count: 0, favorite: 0, servings: 2, edit_clock: 'server' };
+  // A new recipe with its photo.
+  const made = await j('POST', '/api/sync/push', { fk_ids: 'server', ...now(), tables: { recipes: [{ ...base, client_id: 31, server_id: null, name: 'Photo Soup', img_url: PNG, updated_at: fmt(Date.now()) }] } });
+  const rid = made.body.tables.recipes[0].server_id;
+  out.photos.made = sql('SELECT img_url FROM recipes WHERE id = ?', rid).img_url;
+  backdate('recipes', rid);
+  // The photo changed on the phone, on the copy the server has: one file, no version, nothing to pull back.
+  const copy = await pulled(rid);
+  await sleep(1100);
+  const before = files();
+  const edit = await push([phoneRow(copy, { img_url: PNG, updated_at: fmt(Date.now()), changed: ['img_url'], edit_clock: 'server' })], now());
+  out.photos.edited = sql('SELECT img_url FROM recipes WHERE id = ?', rid).img_url;
+  out.photos.editResult = edit.body.tables.recipes[0].kept ?? null;
+  out.photos.filesAdded = files() - before;
+  out.photos.versions = (await versions(rid)).length;
+  // Another field changed, with the photo still embedded on the phone: no file, the photo stays.
+  const copy2 = await pulled(rid);
+  await sleep(1100);
+  const before2 = files();
+  await push([phoneRow(copy2, { name: 'Photo Soup (renamed)', img_url: PNG, updated_at: fmt(Date.now()), changed: ['name'], edit_clock: 'server' })], now());
+  out.photos.otherField = { files: files() - before2, img: sql('SELECT img_url, name FROM recipes WHERE id = ?', rid) };
+  // A diary entry's photos list, and a cookbook cover.
+  const cook = await j('POST', '/api/sync/push', { fk_ids: 'server', ...now(), tables: { cook_diary: [{ client_id: 32, server_id: null, recipe_id: rid, date: '2026-10-09', kind: 'cooked', photo_url: PNG, photos: JSON.stringify([PNG, '/uploads/kept.jpg']), updated_at: fmt(Date.now()), edit_clock: 'server' }] } });
+  out.photos.cook = sql('SELECT photo_url, photos FROM cook_diary WHERE id = ?', cook.body.tables.cook_diary[0].server_id);
+  const cb = await j('POST', '/api/sync/push', { fk_ids: 'server', ...now(), tables: { cookbooks: [{ client_id: 33, server_id: null, name: 'Covers', slug: 'covers', cover_image_url: PNG, is_smart: 0, sort_order: 0, updated_at: fmt(Date.now()), edit_clock: 'server' }] } });
+  out.photos.cover = sql('SELECT cover_image_url FROM cookbooks WHERE id = ?', cb.body.tables.cookbooks[0].server_id).cover_image_url;
+  const pi = await j('POST', '/api/sync/push', { fk_ids: 'server', ...now(), tables: { pantry_items: [{ client_id: 34, server_id: null, name: 'Photo Flour', in_stock: 1, img_url: PNG, updated_at: fmt(Date.now()), edit_clock: 'server' }] } });
+  out.photos.pantry = sql('SELECT img_url FROM pantry_items WHERE id = ?', pi.body.tables.pantry_items[0].server_id).img_url;
+
+  // The startup repair.
+  const { repairInlinePhotos } = await import('../server/lib/inline-photos.js');
+  const ins = (name, img, extra = '') => db.prepare(`INSERT INTO recipes (user_id, name, img_url, ingredients, steps, tags, tools, nutrition${extra ? ', deleted_at' : ''}) VALUES (?, ?, ?, '[]', '[]', '[]', '[]', '{}'${extra ? ', ?' : ''})`).run(...[null, name, img, ...(extra ? [extra] : [])]).lastInsertRowid;
+  const owner = sql('SELECT user_id FROM recipes WHERE id = ?', rid).user_id;
+  const insOwned = (name, img, deleted = null) => { const id = ins(name, img, deleted || ''); db.prepare('UPDATE recipes SET user_id = ? WHERE id = ?').run(owner, id); return id; };
+  const stored = insOwned('Stored Inline', PNG);
+  db.prepare(`UPDATE recipes SET updated_at = '2026-01-02 03:04:05' WHERE id = ?`).run(stored);
+  const gone = insOwned('Deleted Inline', PNG, '2026-01-01 00:00:00');
+  const editedMeanwhile = insOwned('Edited Meanwhile', PNG);
+  const broken = insOwned('Broken Inline', 'data:image/png;base64,bm90IGFuIGltYWdl');
+  const external = insOwned('External', 'https://example.com/a.jpg');
+  const stamps = id => sql('SELECT updated_at, field_stamps, synced_at FROM recipes WHERE id = ?', id);
+  const s0 = stamps(stored);
+  const vBefore = db.prepare('SELECT COUNT(*) AS n FROM recipe_versions').get().n;
+  await sleep(20);
+  // An edit of one row lands while the repair is running.
+  const run1 = repairInlinePhotos();
+  db.prepare('UPDATE recipes SET img_url = ? WHERE id = ?').run('/uploads/edited-meanwhile.jpg', editedMeanwhile);
+  const r1 = await run1;
+  const s1 = stamps(stored);
+  out.photos.repair = {
+    result: r1,
+    stored: sql('SELECT img_url FROM recipes WHERE id = ?', stored).img_url,
+    updatedKept: s1.updated_at === s0.updated_at,
+    stampsKept: s1.field_stamps === s0.field_stamps,
+    syncMoved: s1.synced_at > s0.synced_at,
+    deleted: sql('SELECT img_url FROM recipes WHERE id = ?', gone).img_url.slice(0, 5),
+    meanwhile: sql('SELECT img_url FROM recipes WHERE id = ?', editedMeanwhile).img_url,
+    broken: sql('SELECT img_url FROM recipes WHERE id = ?', broken).img_url.slice(0, 5),
+    external: sql('SELECT img_url FROM recipes WHERE id = ?', external).img_url,
+    versions: db.prepare('SELECT COUNT(*) AS n FROM recipe_versions').get().n - vBefore,
+  };
+  out.photos.retry = await repairInlinePhotos();
+}
+
 server.close();
 process.stdout.write('\n@@' + JSON.stringify(out));
 process.exit(0);

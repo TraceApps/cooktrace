@@ -342,6 +342,13 @@ app.listen(PORT, async () => {
     logger.warn(`[claim] orphan repair skipped: ${e.message}`);
   }
 
+  // Photos stored embedded in their rows (pushed by the Android app before
+  // the push turned them into files) become files. After listening, so it
+  // never holds up startup; it tries again on every start until all are done.
+  import('./lib/inline-photos.js').then(({ repairInlinePhotos }) => repairInlinePhotos()).catch(e => {
+    logger.warn(`[inline-photos] repair skipped: ${e.message}`);
+  });
+
   // Start the notification + sync scheduler
   import('./lib/scheduler.js').then(({ startScheduler }) => startScheduler()).catch(e => {
     logger.warn(`[scheduler] failed to start: ${e.message}`);
