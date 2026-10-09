@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.4.1-dev03] - 2026-10-09 (pre-release)
+
+Security fixes (two rated critical), Android sync that no longer loses edits, and smart cookbooks that show their recipes.
+
 ### Added
 
 - **Earlier versions of a recipe.** When edits from two devices change the same part of a recipe, the newer one stays, and the recipe page says so and lists the other, with what differs and a preview. Restore puts it back, and a restore can be undone. A kitchen member sees the versions that were their own edits.
