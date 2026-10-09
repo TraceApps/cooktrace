@@ -338,6 +338,35 @@ test('server: newer edit wins, versions kept, restore and undo (real schema)', (
     assert.deepEqual(out.once.versions, ['Twice Soup (phone)'], 'the same lost copy kept once');
     assert.deepEqual(out.once.uploads, [1, 1, 1], 'an upload sent twice makes each row once');
 
+    // Photos taken with no connection are stored as files, from the push and by the startup repair.
+    const file = /^\/uploads\/[\w-]+\.png$/;
+    assert.match(out.photos.made, file, 'a new recipe pushed with an embedded photo stores a file');
+    assert.match(out.photos.edited, file, 'a photo changed on the phone too');
+    assert.equal(out.photos.editResult, null, "the phone's edit stands: nothing to pull back");
+    assert.equal(out.photos.filesAdded, 1);
+    assert.equal(out.photos.versions, 0, 'storing a photo as a file makes no version');
+    assert.equal(out.photos.otherField.files, 0, "a photo the push didn't change isn't stored again");
+    assert.equal(out.photos.otherField.img.img_url, out.photos.edited, 'and stays as it was');
+    assert.equal(out.photos.otherField.img.name, 'Photo Soup (renamed)');
+    assert.match(out.photos.cook.photo_url, file);
+    const list = JSON.parse(out.photos.cook.photos);
+    assert.equal(list.length, 2); assert.match(list[0], file); assert.equal(list[1], '/uploads/kept.jpg');
+    assert.match(out.photos.cover, file);
+    assert.match(out.photos.pantry, file);
+    const r = out.photos.repair;
+    assert.match(r.stored, file, 'a photo stored embedded becomes a file at startup');
+    assert.equal(r.updatedKept, true, 'its edit time stays');
+    assert.equal(r.stampsKept, true, 'and its field stamps');
+    assert.equal(r.syncMoved, true, 'the sync stamp moves, so phones pull the path');
+    assert.equal(r.deleted, 'data:', 'deleted rows are left alone');
+    assert.equal(r.meanwhile, '/uploads/edited-meanwhile.jpg', 'an edit made meanwhile stays');
+    assert.equal(r.broken, 'data:', "what can't be stored is left for the next startup");
+    assert.equal(r.external, 'https://example.com/a.jpg', 'other addresses are never touched');
+    assert.equal(r.versions, 0);
+    assert.ok(r.result.failed >= 1);
+    assert.equal(out.photos.retry.failed, r.result.failed, 'and tried again');
+    assert.equal(out.photos.retry.repaired, 0);
+
     assert.deepEqual(out.keptAgain, ['Copy V:restore', 'Other 2:conflict', 'Other 1:conflict', 'Other 0:conflict'], 'kept once, as the newest, for the new reason');
 
     // The managers' saves say their copy, as every other save does.

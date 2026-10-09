@@ -54,6 +54,7 @@ import { repairVariantTree } from '../lib/pantry-tree.js';
 import { clockOffset, editTime, latestTime, utcMs } from '../lib/sync-clock.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
 import { ownIngredientLinks } from '../lib/link-checks.js';
+import { localizeRowPhotos } from '../lib/inline-photos.js';
 
 // Unique per account (server/db.js), so one made on two devices is one row.
 const NATURAL_KEYS = { recipe_categories: 'slug', pantry_categories: 'slug', cookbooks: 'slug', custom_units: 'abbr' };
@@ -227,7 +228,10 @@ router.post('/push', wrap((req, res) => {
   for (const name of PUSH_ORDER) {
     if (!Array.isArray(tables[name])) { results[name] = []; continue; }
     const spec = TABLES[name];
-    const rows = tables[name];
+    // A photo taken with no connection comes embedded in its row: it
+    // becomes a file first, as the REST routes do (lib/inline-photos.js),
+    // so what's stored and merged is its path.
+    const rows = tables[name].map(r => localizeRowPhotos(name, r));
     idMaps[name] = idMaps[name] || {};
     // A table that fails rolls back, and so do the ids it handed out.
     const idsBefore = { ...idMaps[name] };
