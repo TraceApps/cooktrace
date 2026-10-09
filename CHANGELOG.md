@@ -7,6 +7,56 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Earlier versions of a recipe.** When edits from two devices change the same part of a recipe, the newer one stays, and the recipe page says so and lists the other, with what differs and a preview. Restore puts it back, and a restore can be undone. A kitchen member sees the versions that were their own edits.
+
+### Changed
+
+- **A sync keeps the newer edit, field by field.** An edit made offline in the Android app or in the browser no longer overwrites a newer change made on another device, even when a phone's clock is off. Changes to different fields are both kept (an item checked off on the phone and renamed on the web keeps both), an amount and its unit stay together, and an item deleted on one device stays deleted. Older versions of the app sync as before.
+- **Sheets work from the keyboard.** Focus moves into a sheet when it opens and stays there, Escape closes it, and focus goes back where it was.
+- **Trace's attach button offers Camera or Gallery on phones and in the Android app**, the same as the other Trace apps. On a computer it opens the file picker.
+
+### Fixed
+
+- **Smart cookbooks show how many recipes they hold** ([#76](https://github.com/TraceApps/cooktrace/issues/76), thanks @herver1971). Every smart cookbook said "0 recipes", and a plain cookbook still counted recipes you had deleted.
+- **Smart cookbooks open with their recipes in the Android app** ([#76](https://github.com/TraceApps/cooktrace/issues/76)). They opened empty, and renaming one there turned it into an empty plain cookbook.
+- **Smart cookbooks filtered by category show the right recipes on the phone and the server**, whichever one they were made on.
+- **The Android app syncs what it creates, edits and deletes.** A recipe or pantry item could land in the wrong category on the server, and categories, custom units and Trace chat made on the phone never reached it.
+- **Deletes sync both ways in the Android app**: categories, custom units, Trace chat, and recipes taken out of a cookbook. A recipe added to a cookbook on the phone no longer drops off at the next sync.
+- **An edit made offline reaches your other devices.** One that synced after another device's last sync was skipped there; after this update every device catches up once.
+- **A recipe made on the phone is made once.** Two syncs starting at once could make it twice on the server and three times on the phone.
+- **A recipe's ingredients made or edited in the Android app link the right pantry items on the server**, and a recipe from the web links the right ones on the phone.
+- **Photos synced from the Android app are stored as files on the server.** They were kept inside the recipe, pantry item, cookbook or diary entry, so every list carried them and share cards couldn't show them. Photos already stored that way become files when the server starts.
+- **The recipe list fills in after the first sync** instead of saying "No Recipes Yet" until you leave the page. The pantry, shopping list and cook diary refresh the same way.
+- **Upload from the phone to a server matches categories the account already has** instead of making a second copy of each.
+- **The Android app no longer opens on a blank screen after signing in on the setup screen.**
+- **Disconnect keeps your settings on the phone** and no longer shows the welcome screen.
+- **Changing a cookbook's cover in the Android app works**, and covers are kept for offline use.
+- **Reordering recipe or pantry categories on the web keeps the new order.**
+- **The Recipes, Shared and Cookbooks switch highlights the tab you're on.**
+- **The installed app works when CookTrace is served from a subpath** (`BASE_URL`). Every visit after the first sent the app's requests to the site root. Thanks @kgenerozov for the fix in LiftTrace and NutriTrace.
+- **Trace works with OpenAI-compatible endpoints that stream unless told not to** ([nutritrace#258](https://github.com/TraceApps/nutritrace/issues/258), reported by @jsapede). Chat and smart recipe import failed with "Unexpected non-whitespace character after JSON".
+- **Smart recipe import works with an OpenAI-compatible endpoint set on the server, or one without an API key** (such as Ollama). It failed with "Unknown AI provider" or counted as not set up.
+- **Trace shows your newest messages when you open it.** It loaded the oldest 100, so a longer chat never showed its latest messages.
+
+### Security
+
+- **Another account signing in on the same phone never sees or sends the last one's data.** Signing back in to the same account keeps everything, another account starts from its own data, and you're asked before unsent changes from the last account are discarded.
+- **The server takes the session the app sends over an older sign-in cookie.** On Android, a cookie from an earlier account could be answered as that account.
+- **A link can only point at your own pantry items, recipes, categories and cookbooks**, from the web or the Android app. One could point at another account's row, showing its name and aisle or adding your recipes to their cookbook.
+- **The recipe share card can't run script or leak a private recipe.** It escapes what it shows, isn't cached, blocks script, and follows the recipe's own sharing.
+- **A password reset link can no longer be pointed at someone else's site.** It took its address from the request, so a forged host could receive another person's reset token. Reset, invite and sharing emails now use `PUBLIC_URL`, or an address an admin uses, and keep the `BASE_URL` subpath.
+- **Names in emails can no longer carry markup.** Everything an email shows is escaped.
+- **Accounts can't use recipe import to read services on your own network.** Only an admin can import from your network; `ALLOW_PRIVATE_RECIPE_URLS=1` opens it to every account.
+- **An AI address an account sets is checked before smart import uses it.** Other accounts can't point it inside your network unless `ALLOW_PRIVATE_AI_URLS=1`.
+- **Push notifications and the NutriTrace link never reach cloud-metadata addresses** and follow a redirect only on the same server; the open `/api/proxy` checks every redirect.
+- **The image proxy passes images only**, and images can't act as a page.
+- **@capacitor/android** and **@capacitor/core** bumped to 8.5.3, closes [GHSA-rvm3-566m-v7fv](https://github.com/advisories/GHSA-rvm3-566m-v7fv) (critical: a crafted link to the app's own address could load any page as the app, with its sign-in and access to the phone). CookTrace was exposed through recipe source and video links; no longer possible.
+- **proxy-addr** bumped 2.0.7 to 2.0.8, closes [GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h) (critical). CookTrace never sets a trusted proxy, so it wasn't exposed.
+- **@modelcontextprotocol/sdk** bumped 1.30.0 to 1.32.1, closes [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h) (high). CookTrace doesn't use the affected OAuth client.
+- **source-map-js** bumped 1.2.1 to 1.2.2, closes [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) (high). Build tooling only.
+
 ---
 
 ## [1.4.1-dev02] - 2026-10-04 (pre-release)
@@ -25,10 +75,6 @@ Imports now say what they skipped, and importing a recipe you already have opens
 
 A hotfix: Tandoor exports import again, single sign-on fixes, and share links that open for everyone.
 
-### Changed
-
-- **Trace's attach button offers Camera or Gallery on phones and in the Android app**, the same as the other Trace apps. Each choice goes straight to the camera or the photo picker; on a computer the button opens the file picker.
-
 ### Fixed
 
 - **A Tandoor export imports** ([#72](https://github.com/TraceApps/cooktrace/issues/72), thanks @joeShuff). Tandoor packs each recipe in its own zip inside the export, which the importer never opened, so every Tandoor export failed with "No JSON files found". Each recipe now comes in with its own picture.
@@ -42,30 +88,9 @@ A hotfix: Tandoor exports import again, single sign-on fixes, and share links th
 - **The app no longer loads behind the sign-in screen.** Opened signed out, it asked the server for your data and was refused before the sign-in screen replaced it. It now waits to learn who is signed in.
 - **Trace set up through the server's environment variables shows as set up in the Android app.** The app asked without its sign-in, so the server refused and Trace looked unconfigured.
 - **Your custom and hidden units load after signing in on the web** without a reload. Opened signed out, the app tried to load them before you signed in and then gave up.
-- **The installed app works when CookTrace is served from a subpath.** With `BASE_URL` set (say `/cooktrace`), every visit after the first sent the app's requests to the site root instead, online and offline. Thanks @kgenerozov for the fix in LiftTrace and NutriTrace.
-- **Trace works with OpenAI-compatible endpoints that stream unless told not to** ([nutritrace#258](https://github.com/TraceApps/nutritrace/issues/258), reported by @jsapede). Chat answers and smart recipe import failed with "Unexpected non-whitespace character after JSON"; every request now asks for a single answer.
-- **Smart recipe import works with an OpenAI-compatible endpoint set on the server, or one without an API key.** With `AI_PROVIDER=oai-compat` it failed with "Unknown AI provider", and a keyless endpoint such as Ollama counted as not set up.
-- **Smart cookbooks show how many recipes they hold** ([#76](https://github.com/TraceApps/cooktrace/issues/76), thanks @herver1971). The cookbooks list, shared cookbooks and the Android app said "0 recipes" for every smart cookbook, and a plain cookbook still counted recipes you had deleted.
-- **Smart cookbooks open with their recipes in the Android app** ([#76](https://github.com/TraceApps/cooktrace/issues/76)). They opened empty, and renaming one there turned it into an empty plain cookbook.
-- **Changing a cookbook's cover in the Android app works.** It failed with an error.
-- **The Android app syncs what it creates, edits and deletes.** A recipe or pantry item could land in the wrong category on the server, and recipe categories, pantry categories, custom units and Trace chat made on the phone never reached it.
-- **An edit made offline reaches your other devices.** One that synced after another device's last sync was skipped there; after this update every device catches up once.
-- **Deletes sync both ways in the Android app**: categories, custom units and Trace chat, and recipes taken out of a cookbook. A recipe added to an existing cookbook on the phone no longer drops off at the next sync.
-- **Smart cookbooks filtered by category show the right recipes on the phone and the server**, whichever one they were made on.
-- **Cookbook covers are kept for offline use in the Android app.**
-- **The Recipes, Shared and Cookbooks switch highlights the tab you're on.** It could sit off to one side until the page was resized.
-- **Trace shows your newest messages when you open it.** It loaded the oldest 100, so once a chat passed 100 messages the latest ones never appeared.
 
 ### Security
 
-- **The Android app can no longer link your data to another account's.** A synced recipe, pantry item, shopping item or cookbook link could point at a category, item, recipe or cookbook belonging to someone else on the server, including adding your recipes to their cookbooks. The server now accepts a link only to something the account owns or was shared.
-- **The image proxy passes images only.** For its image hosts it passed through whatever came back from the app's own address, a web page included, before sign-in. Anything that isn't an image is refused now, and images can't act as a page.
-- **The recipe share card can't run script or leak a private recipe.** A quote in a recipe's image link ran script as the app when the card was opened, a private recipe's card could be kept by a shared cache, a recipe with no owner gave its card to anyone signed in, and its picture took its address from the request. The card now escapes what it shows, isn't cached, blocks script, and follows the recipe's own sharing: a recipe shared with you shows its card too.
-- **A password reset link can no longer be pointed at someone else's site.** The link took its address from the request, so anyone could ask for another person's reset with a forged host and have the real email, token included, send them to it. Reset, invite and recipe sharing emails now link to `PUBLIC_URL` when it's set, or to an address an admin uses. Links also keep the `BASE_URL` subpath now.
-- **Names in emails can no longer carry markup.** A name, or a title someone shared, went into the email as-is, so HTML or a link typed into it became real markup in the recipient's inbox. Affected the SMTP test and invite emails, the recipe shared with you email, and recipe names in the weekly summary. Everything an email shows is escaped now.
-- **Accounts can't use recipe import to read services on your own network.** An address inside it (directly, through a name, or through a redirect) could be imported and the page sent to an AI address the account chose. Only an admin can now import from your network; `ALLOW_PRIVATE_RECIPE_URLS=1` opens it to every account, and to a single-user install, which has no sign-in.
-- **An AI address an account sets is checked before smart import uses it.** Other accounts can't point it inside your network unless `ALLOW_PRIVATE_AI_URLS=1`, and a failed request shows its status and the provider's own message, not the raw reply.
-- **Push notifications and the NutriTrace link never reach cloud-metadata addresses** and follow a redirect only on the same server. NutriTrace food search passes back only food fields, a failed push test no longer shows the raw reply, and the open `/api/proxy` checks every redirect.
 - **The Android app's SSO sign-in no longer passes the session token through the `cooktrace://` link**, which another app could intercept. The link carries a single-use code that only the app that started the sign-in can redeem.
 - **Share link tokens come from a secure random source.** They were made with `Math.random()`, which can be predicted from its own output.
 - **A removed share link stays removed.** A phone still holding the old link could bring it back with its next edit to the recipe, and a device could set a link of its own choosing. The link is now only set by creating or removing it.
