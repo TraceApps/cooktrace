@@ -53,6 +53,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Smart cookbooks filtered by category show the right recipes on the phone and the server**, whichever one they were made on.
 - **Cookbook covers are kept for offline use in the Android app.**
 - **The Recipes, Shared and Cookbooks switch highlights the tab you're on.** It could sit off to one side until the page was resized.
+- **Trace shows your newest messages when you open it.** It loaded the oldest 100, so once a chat passed 100 messages the latest ones never appeared.
 
 ### Security
 
