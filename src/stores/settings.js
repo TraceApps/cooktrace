@@ -25,6 +25,10 @@ export const USER_PREFS = new Set([
   'defaultServings',           // number
   'dietaryPrefs',              // string[] (e.g. ['vegetarian','gluten-free'])
   'allergens',                 // string[]
+  // Who you cook for (lib/allergens.js cleanHousehold): names, allergies,
+  // diets, dislikes and the days each is home. Allergy warnings and planned
+  // servings follow it.
+  'household',
   'visibleNutriments',         // string[] of nutriment ids shown in the FDA box
   'customUnits',               // string[] of user-defined unit abbreviations
   // NutriTrace federation (Phase 2)
@@ -435,6 +439,7 @@ export const autoCreatePantryFromRecipes = createSettingStore('autoCreatePantryF
 export const energyUnit = createSettingStore('energyUnit', 'kcal');
 export const dietaryPrefs      = createSettingStore('dietaryPrefs',      []);
 export const allergens         = createSettingStore('allergens',         []);
+export const household         = createSettingStore('household',         []);
 // Nutrition + units customization. visibleNutriments default = `null` so
 // consumers fall back to DEFAULT_VISIBLE_NUTRIMENT_IDS — that lets us add
 // new defaults later without users who never customized losing them.

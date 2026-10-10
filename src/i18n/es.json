@@ -199,6 +199,9 @@
     "cooking": {
       "section": "Cocina"
     },
+    "household": {
+      "section": "Hogar"
+    },
     "nutrition": {
       "section": "Nutrición"
     },
@@ -1731,6 +1734,11 @@
     "done": "Listo"
   },
   "wizard_ct": {
+    "household": {
+      "title": "¿Para quién cocinas?",
+      "desc": "Añade a las personas para las que cocinas, con sus alergias o dietas. Las raciones planificadas y los avisos de alergia lo usan. Puedes cambiarlo después en Ajustes.",
+      "skip": "Omitir"
+    },
     "updates": {
       "title": "Buscar actualizaciones",
       "desc": "Tu servidor puede avisarte cuando sale una nueva versión de CookTrace.",
@@ -1754,7 +1762,6 @@
     "cooking_preferences": "Preferencias de cocina",
     "measurement_system": "Sistema de medidas",
     "default_servings": "Porciones predeterminadas",
-    "dietary_preferences": "Preferencias alimentarias",
     "open_cooktrace": "Abrir CookTrace"
   },
   "shopping_item": {
@@ -2001,5 +2008,85 @@
       "view_notes": "Ver notas de la versión",
       "channel_note": "Para cambiar de canal en el servidor, cambia la etiqueta de la imagen en tu docker-compose.yml (:latest, :dev) y vuelve a ejecutar docker-compose pull && docker-compose up -d."
     }
+  },
+  "allergens": {
+    "gluten": "Gluten",
+    "crustaceans": "Crustáceos",
+    "eggs": "Huevos",
+    "fish": "Pescado",
+    "peanuts": "Cacahuetes",
+    "soybeans": "Soja",
+    "milk": "Leche",
+    "nuts": "Frutos de cáscara",
+    "celery": "Apio",
+    "mustard": "Mostaza",
+    "sesame_seeds": "Sésamo",
+    "sulphur_dioxide_and_sulphites": "Sulfitos",
+    "lupin": "Altramuces",
+    "molluscs": "Moluscos",
+    "meat": "Carne",
+    "honey": "Miel"
+  },
+  "diets": {
+    "vegetarian": "Vegetariana",
+    "vegan": "Vegana",
+    "pescatarian": "Pescetariana",
+    "gluten_free": "Sin gluten",
+    "dairy_free": "Sin lácteos"
+  },
+  "allergen_info": {
+    "section": "Alérgenos",
+    "contains": "Contiene",
+    "may_contain": "Puede contener",
+    "none_found": "No se encontró ninguno",
+    "conflict": "{what} · {who}",
+    "source_label": "De la etiqueta",
+    "source_you": "Lo indicaste tú",
+    "source_name": "De los nombres",
+    "not_known": "Aún no se sabe",
+    "nothing_on_label": "Nada en la etiqueta",
+    "note": "Calculado a partir de los nombres de los ingredientes y las etiquetas de la despensa. Revisa el envase.",
+    "correct": "Corregir",
+    "correct_title": "Corregir alérgenos",
+    "correct_desc": "Toca lo que contiene esta receta. Lo que indiques aquí prevalece sobre los nombres de los ingredientes y las etiquetas.",
+    "reset": "Restablecer",
+    "saved": "Alérgenos actualizados",
+    "edit": "Editar",
+    "done": "Listo",
+    "pantry_hint": "Se leen de Open Food Facts al escanear o buscar un producto. Las recetas que usan este artículo los tienen en cuenta.",
+    "pantry_tap": "Toca lo que contiene este producto.",
+    "pantry_tap_traces": "Toca lo que puede contener.",
+    "all": "Todas",
+    "safe_for_everyone": "Aptas para todos",
+    "left_out": "{count, plural, one {# receta descartada por alergias o dietas} other {# recetas descartadas por alergias o dietas}}",
+    "include_anyway": "Incluirlas",
+    "leave_out": "Descartarlas",
+    "dislikes": "A {who} no le gusta {item}",
+    "dislikes_many": "A {who} no les gusta {item}"
+  },
+  "household": {
+    "title": "Hogar",
+    "intro": "Las raciones planificadas siguen a quién está en casa ese día. Los avisos de alergia nombran a la persona afectada.",
+    "allergies": "Alergias",
+    "diet": "Dieta",
+    "dislikes": "No le gusta",
+    "home": "En casa",
+    "none": "Ninguna",
+    "add": "Añadir miembro",
+    "edit": "Editar a {name}",
+    "days_home": "Días que {name} está en casa",
+    "home_hint": "Los días que come en casa. Si no eliges ninguno, son todos los días.",
+    "disclaimer": "Los avisos de alergia son una ayuda, no una garantía. Salen de los nombres de los ingredientes y las etiquetas de los productos, así que revisa siempre el envase.",
+    "name": "Nombre",
+    "name_placeholder": "¿Quién es?",
+    "new_title": "Nuevo miembro",
+    "dislikes_placeholder": "Añade un alimento y pulsa Intro",
+    "remove_dislike": "Quitar {item}",
+    "remove": "Quitar",
+    "remove_confirm": "¿Quitar a {name} del hogar?",
+    "removed": "{name} ya no está en el hogar",
+    "save": "Guardar",
+    "name_required": "Escribe un nombre",
+    "you": "Tú"
   }
 }

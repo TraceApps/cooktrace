@@ -204,6 +204,7 @@
       "language": "Language"
     },
     "cooking":            { "section": "Cooking" },
+    "household":            { "section": "Household" },
     "nutrition":          { "section": "Nutrition" },
     "server_connection":  { "section": "Server Connection" },
     "email":              { "section": "Email (SMTP)" },
@@ -1732,6 +1733,11 @@
     "done":                      "Done"
   },
   "wizard_ct": {
+    "household": {
+      "title": "Who Do You Cook For?",
+      "desc": "Add the people you cook for, with any allergies or diets. Planned servings and allergy warnings use this. You can change it later in Settings.",
+      "skip": "Skip"
+    },
     "updates": {
       "title": "Check For Updates",
       "desc": "Your server can tell you when a new CookTrace is out.",
@@ -1755,7 +1761,6 @@
     "cooking_preferences":       "Cooking Preferences",
     "measurement_system":        "Measurement System",
     "default_servings":          "Default Servings",
-    "dietary_preferences":       "Dietary Preferences",
     "open_cooktrace":            "Open CookTrace"
   },
   "shopping_item": {
@@ -2002,5 +2007,85 @@
       "view_notes":       "View Release Notes",
       "channel_note":     "To switch server channels, change your docker-compose.yml image tag (:latest, :dev) and re-run docker-compose pull && docker-compose up -d."
     }
+  },
+  "allergens": {
+    "gluten": "Gluten",
+    "crustaceans": "Crustaceans",
+    "eggs": "Eggs",
+    "fish": "Fish",
+    "peanuts": "Peanuts",
+    "soybeans": "Soy",
+    "milk": "Milk",
+    "nuts": "Tree Nuts",
+    "celery": "Celery",
+    "mustard": "Mustard",
+    "sesame_seeds": "Sesame",
+    "sulphur_dioxide_and_sulphites": "Sulfites",
+    "lupin": "Lupin",
+    "molluscs": "Mollusks",
+    "meat": "Meat",
+    "honey": "Honey"
+  },
+  "diets": {
+    "vegetarian": "Vegetarian",
+    "vegan": "Vegan",
+    "pescatarian": "Pescatarian",
+    "gluten_free": "Gluten Free",
+    "dairy_free": "Dairy Free"
+  },
+  "allergen_info": {
+    "section": "Allergens",
+    "contains": "Contains",
+    "may_contain": "May Contain",
+    "none_found": "None found",
+    "conflict": "{what} · {who}",
+    "source_label": "From the label",
+    "source_you": "You set this",
+    "source_name": "From the names",
+    "not_known": "Not known yet",
+    "nothing_on_label": "Nothing on the label",
+    "note": "Worked out from ingredient names and pantry labels. Check the packaging.",
+    "correct": "Correct",
+    "correct_title": "Correct Allergens",
+    "correct_desc": "Tap what this recipe contains. What you set here wins over the ingredient names and labels.",
+    "reset": "Reset",
+    "saved": "Allergens updated",
+    "edit": "Edit",
+    "done": "Done",
+    "pantry_hint": "Read from Open Food Facts when you scan or look up a product. Recipes that use this item pick these up.",
+    "pantry_tap": "Tap what this product contains.",
+    "pantry_tap_traces": "Tap what it may contain.",
+    "all": "All",
+    "safe_for_everyone": "Safe for Everyone",
+    "left_out": "{count, plural, one {# recipe left out for allergies or diets} other {# recipes left out for allergies or diets}}",
+    "include_anyway": "Include Them",
+    "leave_out": "Leave Them Out",
+    "dislikes": "{who} doesn't like {item}",
+    "dislikes_many": "{who} don't like {item}"
+  },
+  "household": {
+    "title": "Household",
+    "intro": "Planned servings follow who's home that day. Allergy warnings name the person they're for.",
+    "allergies": "Allergies",
+    "diet": "Diet",
+    "dislikes": "Dislikes",
+    "home": "Home",
+    "none": "None",
+    "add": "Add Member",
+    "edit": "Edit {name}",
+    "days_home": "Days {name} is home",
+    "home_hint": "The days they eat at home. None picked means every day.",
+    "disclaimer": "Allergy warnings are a help, not a guarantee. They come from ingredient names and product labels, so always check the packaging.",
+    "name": "Name",
+    "name_placeholder": "Who is it?",
+    "new_title": "New Member",
+    "dislikes_placeholder": "Add a food, then press Enter",
+    "remove_dislike": "Remove {item}",
+    "remove": "Remove",
+    "remove_confirm": "Remove {name} from the household?",
+    "removed": "{name} removed from the household",
+    "save": "Save",
+    "name_required": "Enter a name",
+    "you": "You"
   }
 }

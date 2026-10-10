@@ -13,6 +13,7 @@
   import { showError } from '../stores/toast.js';
   import { isNative, getServerUrl, apiUrl } from '../lib/platform.js';
   import Toggle from '../components/settings/Toggle.svelte';
+  import HouseholdEditor from '../components/household/HouseholdEditor.svelte';
 
   // Wizard variants:
   //   1. Native local mode: skip user-management step, just collect display name + cooking prefs
@@ -50,8 +51,8 @@
   $: pwScore = passwordStrength(umPassword);
 
   $: STEPS = _isNativeLocal
-    ? ['welcome','name','prefs','updates','done']
-    : ['welcome','account','prefs','updates','done'];
+    ? ['welcome','name','prefs','household','updates','done']
+    : ['welcome','account','prefs','household','updates','done'];
   $: progress = ((step + 1) / STEPS.length) * 100;
 
   // ── Cooking prefs state ──────────────────────────────────────────────────
@@ -72,7 +73,8 @@
   let measurementSystem = _ld.metric ? 'metric' : 'imperial';
   let energyUnitVal = _ld.kj ? 'kJ' : 'kcal';
   let defaultServings = 2;
-  let dietary = { vegetarian: false, vegan: false, glutenFree: false, dairyFree: false };
+  // Who you cook for starts as you, by the name given a step earlier.
+  $: youName = displayName.trim() || umNickname.trim() || umFullName.trim() || umUsername.trim() || $_('household.you');
 
   function next() {
     dir = 1;
@@ -158,7 +160,6 @@
       measurementSystem,
       energyUnit: energyUnitVal,
       defaultServings,
-      dietaryPrefs: Object.entries(dietary).filter(([_, v]) => v).map(([k]) => k),
       // New users finishing onboarding get gradient banners as their
       // default first impression. Existing users (who never re-run the
       // wizard) keep whatever bannerStyle / legacy pageBanners they had
@@ -346,18 +347,18 @@
           />
         </label>
 
-        <label class="field">
-          <span>{$_('wizard_ct.dietary_preferences')}</span>
-          <div class="checks">
-            {#each [['vegetarian','Vegetarian'], ['vegan','Vegan'], ['glutenFree','Gluten-free'], ['dairyFree','Dairy-free']] as [key, label]}
-              <label class="check">
-                <input type="checkbox" bind:checked={dietary[key]} />
-                <span>{label}</span>
-              </label>
-            {/each}
-          </div>
-        </label>
+        <div class="step-actions">
+          <button class="btn-secondary" on:click={back}>{$_('wizard_ct.back')}</button>
+          <button class="btn-primary" on:click={next}>{$_('wizard_ct.next')}</button>
+        </div>
 
+      <!-- Household: who you cook for, their allergies and diets -->
+      {:else if STEPS[step] === 'household'}
+        <h1 class="step-title">{$_('wizard_ct.household.title')}</h1>
+        <p class="step-desc">{$_('wizard_ct.household.desc')}</p>
+        <div class="household-step">
+          <HouseholdEditor suggestName={youName} />
+        </div>
         <div class="step-actions">
           <button class="btn-secondary" on:click={back}>{$_('wizard_ct.back')}</button>
           <button class="btn-primary" on:click={next}>{$_('wizard_ct.next')}</button>
@@ -623,12 +624,7 @@
     border-color: color-mix(in srgb, var(--accent) 30%, transparent);
   }
 
-  .checks { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
-  .check {
-    display: flex; align-items: center; gap: 10px;
-    cursor: pointer; font-size: 14px; color: var(--text-1);
-  }
-  .check input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .household-step { text-align: left; margin-bottom: 8px; }
 
   .error {
     color: var(--danger);

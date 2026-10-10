@@ -40,6 +40,7 @@
   import SettingsAppearance      from '../components/settings/SettingsAppearance.svelte';
   import SettingsRegional        from '../components/settings/SettingsRegional.svelte';
   import SettingsCooking         from '../components/settings/SettingsCooking.svelte';
+  import SettingsHousehold       from '../components/settings/SettingsHousehold.svelte';
   import SettingsNutrition       from '../components/settings/SettingsNutrition.svelte';
   import SettingsTrace           from '../components/settings/SettingsTrace.svelte';
   import SettingsFoodSources     from '../components/settings/SettingsFoodSources.svelte';
@@ -175,6 +176,7 @@
     appearance:    { titleKey: 'settings.appearance.section',        icon: 'contrast' },
     regional:      { titleKey: 'settings.regional.section',          icon: 'public' },
     cooking:       { titleKey: 'settings.cooking.section',           icon: 'restaurant' },
+    household:     { titleKey: 'settings.household.section',         icon: 'family_restroom' },
     nutrition:     { titleKey: 'settings.nutrition.section',         icon: 'science' },
     ai:            { titleKey: 'settings.ai.section',                icon: 'smart_toy' },
     foodsources:   { titleKey: 'settings.connected_services.section',icon: 'restaurant_menu' },
@@ -203,6 +205,7 @@
     appearance:    SettingsAppearance,
     regional:      SettingsRegional,
     cooking:       SettingsCooking,
+    household:     SettingsHousehold,
     nutrition:     SettingsNutrition,
     ai:            SettingsTrace,
     // foodsources is a three-component render (food sources + the
@@ -236,6 +239,7 @@
     appearance:    ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','reduce motion','banner','page banner','force mobile','mobile layout','mobile view','phone layout','narrow layout'],
     regional:      ['regional','language','translation','locale','date','time','12h','24h','units','energy','kcal','kj','calories','kilojoules','imperial','metric','measurement system'],
     cooking:       ['cooking','servings','default servings','yield','recipe','recipes','url import','url import engine','scraper','recipe scrapers','recipe-scrapers','enhanced','smart','json-ld','schema.org','parser','auto add ingredients','auto-create pantry','pantry catalog','shopping','shopping list','aisle','aisles','group by','grouping','checked','hide checked','sort','reorder','shared recipes','main list','kitchen recipes','mixed view'],
+    household:     ['household','household members','family','people','members','who i cook for','cook for','allergies','allergy','allergens','allergen','diet','diets','vegetarian','vegan','pescatarian','gluten','gluten free','dairy free','dislikes','picky','home','days home','who is home','servings'],
     nutrition:     ['nutrition','nutrients','nutriments','vitamins','minerals','visible nutriments','fda'],
     foodsources:   ['food sources','open food facts','off','usda','fooddata central','api key','barcode','scanner','beep','flashlight','search','language','country','contribute','default source','default search','my pantry','pantry search','federation','nutritrace','nt','linked','share','token','instance','pull foods','import foods','sync foods'],
     ai:            ['ai','trace','assistant','provider','model','custom model','model id','api key','chat','claude','openai','gemini','sonnet','opus','haiku','gpt','gemini 3','base url','artificial intelligence','smart log','smartlog','quick log','voice','dictate','hold to record','mic','voice language','voice input','language'],
@@ -243,7 +247,7 @@
     email:         ['email','smtp','mail','password reset','invite','from address','tls','outgoing','send test','test email','recipient','test recipient','connection status','change password','change smtp'],
     backup:        ['backup','export','import','restore','json','full backup','reset','danger zone'],
     import:        ['import','mealie','tandoor','paprika','recipe import','migration','migrate','transfer','bulk','zip','from another app'],
-    kitchens:      ['kitchens','kitchen','household','household members','share','sharing','family','roommates','crew','group','members','auto-share','auto share','auto sharing','share recipes','share cookbook','cookbook sharing','via kitchen'],
+    kitchens:      ['kitchens','kitchen','share','sharing','family','roommates','crew','group','members','auto-share','auto share','auto sharing','share recipes','share cookbook','cookbook sharing','via kitchen'],
     users:         ['users','user management','accounts','login','admin','register','invite'],
     auth:          ['authentication','auth','sso','single sign-on','single sign on','oidc','openid','authentik','keycloak','authelia','password login'],
     apitokens:     ['api tokens','api token','personal access token','pat','mcp','model context protocol','claude desktop','cursor','codex','agent','ai agent','bearer token','scopes','revoke token'],
@@ -477,6 +481,11 @@
   <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'cooking')} class:active={currentSection === 'cooking'} aria-current={currentSection === 'cooking' ? 'page' : undefined} on:click={() => toggleSection('cooking')}>
     <span class="material-symbols-rounded si">soup_kitchen</span>
     <span>{$_('settings.cooking.section')}</span>
+    <span class="material-symbols-rounded chevron">expand_more</span>
+  </button>
+  <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'household')} class:active={currentSection === 'household'} aria-current={currentSection === 'household' ? 'page' : undefined} on:click={() => toggleSection('household')}>
+    <span class="material-symbols-rounded si">family_restroom</span>
+    <span>{$_('settings.household.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
 
