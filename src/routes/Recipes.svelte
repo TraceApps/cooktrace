@@ -530,7 +530,7 @@
     else if (v === 'shop') {
       try {
         const result = await NtApi.shopFromRecipe(r.id, { only_missing: true });
-        showSuccess(`Added ${result.added} item${result.added === 1 ? '' : 's'} to shopping list`);
+        showSuccess($_('shopping_page.toast.recipe_added', { values: { count: result.added, name: r.name } }));
       } catch (err) { showError(err.message || 'Could not add'); }
     }
     else if (v === 'duplicate') {

@@ -718,6 +718,50 @@ const scenarios = {
     const wl = (await db.query(`SELECT id FROM recipes WHERE server_id = ?`, [w.id])).values[0].id;
     out.fromWeb = { got: await phoneLinks(wl), want: [oil.id] };
   },
+  // A week's plan onto the list, on the phone and on the web: the amounts
+  // scale to the planned servings and add up, the list rows keep their
+  // recipes and cooks as each side's ids, building again replaces a
+  // cook's share, and a cancelled cook takes its share out.
+  async planList() {
+    const day1 = '2030-01-07', day2 = '2030-01-08';
+    const shak = await api.createRecipe({
+      name: 'Shakshuka', servings: 2, steps: [{ text: 'Cook' }],
+      ingredients: [{ items: [{ id: 'a', name: 'Tomatoes', qty: '3' }, { id: 'b', name: 'olive oil', qty: '1/2', unit: 'tbsp' }] }],
+    });
+    const cook1 = await api.createDiaryEntry({ recipe_id: shak.id, date: day1, kind: 'planned', servings: 4 });
+    out.phoneBuild = await api.shopFromPlan({ from: day1, to: day2 });
+    await sync();
+    const list = async () => (await web('GET', '/api/shopping')).filter(x => !x.checked);
+    const row = (l, n) => l.find(x => x.name.toLowerCase().startsWith(n));
+    const shakServer = (await db.query(`SELECT server_id FROM recipes WHERE id = ?`, [shak.id])).values[0].server_id;
+    const cook1Server = (await db.query(`SELECT server_id FROM cook_diary WHERE id = ?`, [cook1.id ?? cook1])).values[0].server_id;
+    const s1 = row(await list(), 'tomato');
+    out.afterPhone = {
+      qty: s1.quantity, oil: row(await list(), 'olive').quantity,
+      ids: s1.sources.map(x => [x.recipe_id, x.diary_id]), want: [[shakServer, cook1Server]],
+    };
+    // The web plans tacos on day 2 and builds the same week again.
+    const tacos = await web('POST', '/api/recipes', { name: 'Tacos', servings: 4, steps: ['Fold'], ingredients: [{ items: [{ name: 'tomato', qty: '2' }] }] });
+    const cook2 = await web('POST', '/api/cook-diary', { recipe_id: tacos.id, date: day2, kind: 'planned', servings: 4 });
+    out.webBuild = await web('POST', `/api/shopping/from-plan?from=${day1}&to=${day2}`, {});
+    const l2 = await list();
+    out.afterWeb = { rows: l2.filter(x => x.name.toLowerCase().startsWith('tomato')).length, qty: row(l2, 'tomato').quantity };
+    await sync();
+    const local = (await db.query(`SELECT * FROM shopping_list WHERE deleted_at IS NULL AND lower(name) LIKE 'tomato%'`)).values;
+    const tacosLocal = (await db.query(`SELECT id FROM recipes WHERE server_id = ?`, [tacos.id])).values[0].id;
+    const cook2Local = (await db.query(`SELECT id FROM cook_diary WHERE server_id = ?`, [cook2.id])).values[0].id;
+    out.phoneAfterPull = {
+      rows: local.length, qty: local[0].quantity,
+      ids: JSON.parse(local[0].sources).map(x => [x.recipe_id, x.diary_id]).sort(),
+      want: [[shak.id, cook1.id ?? cook1], [tacosLocal, cook2Local]].sort(),
+    };
+    // The phone cancels the Shakshuka cook and builds the week again.
+    await api.deleteDiaryEntry(cook1.id ?? cook1);
+    out.phoneRebuild = await api.shopFromPlan({ from: day1, to: day2 });
+    await sync();
+    const l3 = await list();
+    out.afterCancel = { tomato: row(l3, 'tomato')?.quantity ?? null, oil: row(l3, 'olive')?.quantity ?? 'gone' };
+  },
 };
 
 const name = process.argv[2];

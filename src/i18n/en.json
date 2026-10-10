@@ -1695,7 +1695,10 @@
       "already_in_pantry":       "Everything's already in your pantry",
       "cleared_restocked":       "List cleared. {n} marked in stock",
       "restock_failed":          "Some pantry items couldn't be restocked ({n})",
-      "restock_undone":          "Pantry changes undone"
+      "restock_undone":          "Pantry changes undone",
+      "plan_added":              "{count, plural, one {# item} other {# items}} for {cooks, plural, one {# planned cook} other {# planned cooks}}",
+      "plan_removed":            "{count, plural, one {# item is} other {# items are}} no longer needed and left the list",
+      "recipe_added":            "{count, plural, one {# item} other {# items}} from {name}"
     },
     "undo":                      "Undo",
     "clear":                     "Clear",

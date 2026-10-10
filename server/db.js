@@ -548,6 +548,11 @@ if (!columnExists('shopping_list', 'recipe_id')) {
 if (!columnExists('shopping_list', 'sort_order')) {
   db.exec(`ALTER TABLE shopping_list ADD COLUMN sort_order INTEGER`);
 }
+// Where a row's amount came from: the recipes and planned cooks that added
+// it, as JSON (lib/shopping-plan.js). NULL for a row typed by hand.
+if (!columnExists('shopping_list', 'sources')) {
+  db.exec(`ALTER TABLE shopping_list ADD COLUMN sources TEXT`);
+}
 // Optional per-category default aisle. When set, new shopping items
 // linked to this category inherit this string as their aisle; the
 // user still overrides per item after auto-assignment. Free text

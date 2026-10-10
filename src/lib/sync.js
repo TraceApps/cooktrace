@@ -22,6 +22,7 @@ import {
   SYNC_PARENTS, SYNC_FIELDS, rowBase, rowChanges, dbInstallId, dbCountUnsynced, createKeyOf, mapIngredientLinks,
 } from './db-native.js';
 import { mapSmartFilterCategory } from './smart-cookbook.js';
+import { mapSourceIds } from './shopping-plan.js';
 import { localDataIsThisAccount, accountGeneration } from './local-account.js';
 
 let _syncInFlight = null;
@@ -535,6 +536,16 @@ async function pushChanges({ token = getAuthToken(), signal = null, gen = accoun
         const { json, unknown } = mapIngredientLinks(row.ingredients, id => (!pantryIds.has(id) ? null : pantryIds.get(id) || undefined));
         if (unknown) { deferred++; continue; }
         row.ingredients = json;
+      }
+      // A list row's sources name recipes and planned cooks by id: the
+      // server's go up. One not up yet holds the row back a push.
+      if (table === 'shopping_list' && row.sources) {
+        const recipeIds = await _serverIdMap(db, 'recipes', ids);
+        const diaryIds = await _serverIdMap(db, 'cook_diary', ids);
+        const toServer = m => id => (!m.has(id) ? null : m.get(id) || undefined);
+        const { json, unknown } = mapSourceIds(row.sources, toServer(recipeIds), toServer(diaryIds));
+        if (unknown) { deferred++; continue; }
+        row.sources = json;
       }
       if (table === 'cookbooks' && row.smart_filter_json) {
         const cats = await _serverIdMap(db, 'recipe_categories', ids);

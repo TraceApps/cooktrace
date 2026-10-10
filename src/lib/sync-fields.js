@@ -21,7 +21,7 @@ export const SYNC_FIELDS = {
     'generic_parent_id', 'nutrition_source_variant_id', 'deleted_at',
   ],
   cook_diary: ['recipe_id', 'date', 'kind', 'servings', 'notes', 'photo_url', 'photos', 'meal_type', 'rating', 'deleted_at'],
-  shopping_list: ['name', 'quantity', 'unit', 'aisle', 'checked', 'pantry_id', 'recipe_id', 'sort_order', 'deleted_at'],
+  shopping_list: ['name', 'quantity', 'unit', 'aisle', 'checked', 'pantry_id', 'recipe_id', 'sort_order', 'sources', 'deleted_at'],
   recipe_comments: ['recipe_id', 'parent_id', 'body', 'deleted_at'],
   ai_chat_history: ['role', 'content'],
 };

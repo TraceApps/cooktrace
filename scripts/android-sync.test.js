@@ -476,3 +476,15 @@ test("a recipe's ingredient can't link another account's pantry item", { skip, t
     assert.deepEqual(link(got), [null], 'nor through a sync');
   } finally { srv.stop(); }
 });
+
+test("a week's plan on the list: scaled, added up, kept with each side's ids, rebuilt without doubling", { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('planList');
+  assert.equal(r.afterPhone.qty, 6, 'Shakshuka for 4 instead of 2: 3 tomatoes twice');
+  assert.equal(r.afterPhone.oil, 1, '1/2 tbsp twice');
+  assert.deepEqual(r.afterPhone.ids, r.afterPhone.want, "the server has its own ids for the recipe and the cook");
+  assert.deepEqual(r.afterWeb, { rows: 1, qty: 8 }, 'the tacos add 2 to the same row; the week is not counted twice');
+  assert.equal(r.phoneAfterPull.rows, 1);
+  assert.equal(r.phoneAfterPull.qty, 8);
+  assert.deepEqual(r.phoneAfterPull.ids, r.phoneAfterPull.want, "the phone has its own ids for both");
+  assert.deepEqual(r.afterCancel, { tomato: 2, oil: 'gone' }, "the cancelled cook's share leaves the list");
+});

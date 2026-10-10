@@ -1697,7 +1697,10 @@
       "already_in_pantry": "Ya tienes todo en tu despensa",
       "cleared_restocked": "Lista vaciada. {n} marcados en stock",
       "restock_failed": "Algunos ítems de la despensa no se pudieron reponer ({n})",
-      "restock_undone": "Se deshicieron los cambios en la despensa"
+      "restock_undone": "Se deshicieron los cambios en la despensa",
+      "plan_added": "{count, plural, one {# ítem} other {# ítems}} para {cooks, plural, one {# comida planificada} other {# comidas planificadas}}",
+      "plan_removed": "{count, plural, one {# ítem ya no hace falta y salió de la lista} other {# ítems ya no hacen falta y salieron de la lista}}",
+      "recipe_added": "{count, plural, one {# ítem} other {# ítems}} de {name}"
     },
     "undo": "Deshacer",
     "clear": "Quitar",

@@ -16,7 +16,7 @@ import { dispatchWebhookEvent } from '../lib/webhooks.js';
 import { titleCaseName as _titleCaseName, aisleForPantry as _aisleForPantry } from '../lib/shopping-items.js';
 import { ownId, linkableRecipeId } from '../lib/link-checks.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
-import { qtyToBuy } from '../lib/quantity.js';
+import { recipeContributions, mergeIntoList, parseSources } from '../lib/shopping-plan.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -27,7 +27,7 @@ const userArgs   = (u) => u == null ? [] : [u];
 
 function _hydrate(row) {
   if (!row) return null;
-  return { ...row, checked: !!row.checked };
+  return { ...row, checked: !!row.checked, sources: parseSources(row.sources) };
 }
 
 // ── GET / — list shopping items ────────────────────────────────────────
@@ -235,16 +235,57 @@ router.patch('/:id/check', wrap((req, res) => {
   res.json({ ok: true, checked: !!next });
 }));
 
-// ── POST /from-plan — bulk-add ingredients across a window of planned cooks ──
-// Sweeps every cook_diary row with kind='planned' in the given date
-// range (defaults: today → +7d), pulls each recipe's ingredient list,
-// dedupes by name + unit (summing numeric qty when both sides have
-// one), and inserts one shopping row per unique ingredient. Mirrors
-// the optional `only_missing` filter on /from-recipe — skip any
-// ingredient whose linked pantry_item is currently in stock.
+// Folds what a plan or a recipe adds into the account's list: amounts of the
+// same ingredient add up across recipes and units of one kind (1 cup + 120
+// ml), and each row keeps where its amount came from (lib/shopping-plan.js).
+function _applyToList(u, contributions, opts) {
+  const rows = db.prepare(
+    `SELECT id, name, quantity, unit, checked, pantry_id, recipe_id, sources
+       FROM shopping_list WHERE ${userClause(u)} AND deleted_at IS NULL`
+  ).all(...userArgs(u));
+  const plan = mergeIntoList(rows, contributions, opts);
+  const insert = db.prepare(
+    `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, pantry_id, recipe_id, sources, checked)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
+  );
+  const update = db.prepare(
+    `UPDATE shopping_list SET quantity = ?, unit = ?, sources = ?, pantry_id = COALESCE(?, pantry_id),
+            updated_at = datetime('now') WHERE id = ?`
+  );
+  const remove = db.prepare(
+    `UPDATE shopping_list SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
+  );
+  db.transaction(() => {
+    for (const r of plan.inserts) {
+      // A shared recipe's ingredients point at its owner's pantry: no link.
+      const pantryId = ownId('pantry_items', r.pantry_id, u);
+      insert.run(u, _titleCaseName(r.name), r.quantity, r.unit, _aisleForPantry(pantryId, u),
+        pantryId, linkableRecipeId(r.recipe_id, u), r.sources);
+    }
+    for (const r of plan.updates) {
+      update.run(r.quantity, r.unit, r.sources, ownId('pantry_items', r.pantry_id, u), r.id);
+    }
+    for (const id of plan.deletes) remove.run(id);
+  })();
+  return { added: plan.inserts.length, updated: plan.updates.length, removed: plan.deletes.length };
+}
+
+function _inStockSet(u) {
+  return new Set(
+    db.prepare(
+      `SELECT id FROM pantry_items WHERE ${userClause(u)} AND in_stock = 1 AND deleted_at IS NULL`
+    ).all(...userArgs(u)).map(r => r.id)
+  );
+}
+
+// ── POST /from-plan: the planned cooks of a date range onto the list ────
+// Every cook_diary row with kind='planned' in the range (defaults: today
+// to +7 days), each recipe scaled to the cook's servings. Building the
+// same range again replaces its cooks' share instead of adding it twice;
+// a cook no longer planned takes its share out. `only_missing` (default
+// on) leaves out ingredients whose pantry item is in stock.
 router.post('/from-plan', wrap((req, res) => {
   const u = uid(req);
-  // Date window — query params for parity with /from-recipe.
   const todayIso = new Date().toISOString().slice(0, 10);
   const from = /^\d{4}-\d{2}-\d{2}$/.test(req.query.from) ? req.query.from : todayIso;
   let to = /^\d{4}-\d{2}-\d{2}$/.test(req.query.to) ? req.query.to : null;
@@ -254,137 +295,46 @@ router.post('/from-plan', wrap((req, res) => {
   }
   const onlyMissing = req.query.only_missing !== '0';
 
-  // All planned cook_diary entries in the window — with their recipes.
-  const userClauseDiary = userClause(u).replace(/user_id/g, 'cd.user_id');
   const planned = db.prepare(
-    `SELECT cd.id AS diary_id, cd.recipe_id, r.name AS recipe_name, r.ingredients
-     FROM cook_diary cd
-     JOIN recipes r ON r.id = cd.recipe_id AND r.deleted_at IS NULL
-     WHERE ${userClauseDiary} AND cd.deleted_at IS NULL
-       AND cd.kind = 'planned'
-       AND cd.date >= ? AND cd.date <= ?`
+    `SELECT cd.id AS diary_id, cd.date, cd.servings AS planned_servings,
+            r.id, r.servings, r.ingredients
+       FROM cook_diary cd
+       JOIN recipes r ON r.id = cd.recipe_id AND r.deleted_at IS NULL
+      WHERE ${userClause(u).replace(/user_id/g, 'cd.user_id')} AND cd.deleted_at IS NULL
+        AND cd.kind = 'planned'
+        AND cd.date >= ? AND cd.date <= ?`
   ).all(...userArgs(u), from, to);
 
-  if (planned.length === 0) {
-    return res.json({ added: 0, planned_cooks: 0, from, to });
-  }
-
-  // Pantry in-stock set — same gate as /from-recipe.
-  const stockSet = new Set(
-    db.prepare(
-      `SELECT id FROM pantry_items WHERE ${userClause(u)} AND in_stock = 1 AND deleted_at IS NULL`
-    ).all(...userArgs(u)).map(r => r.id)
-  );
-
-  // Dedupe map. Key = lowercased name + '|' + (unit ?? '').
-  // Value carries the running sum (or null if any contributor was
-  // qty-less — can't meaningfully sum) and the first recipe_id we saw
-  // so the grouped UI still slots the row under a recognisable recipe.
-  const merged = new Map();
-  for (const row of planned) {
-    let groups = [];
-    try { groups = JSON.parse(row.ingredients || '[]'); } catch {}
-    for (const g of groups) {
-      for (const it of (g.items || [])) {
-        if (!it.name) continue;
-        if (onlyMissing && it.pantry_item_id && stockSet.has(it.pantry_item_id)) continue;
-        const name = String(it.name).trim();
-        const unit = it.unit ? String(it.unit).trim() : '';
-        const key = `${name.toLowerCase()}|${unit.toLowerCase()}`;
-        // "1/2", "1 1/2", "½" and ranges ("4-5", the more) read as numbers.
-        const qtyN = qtyToBuy(it.qty);
-        const hasQty = qtyN != null;
-
-        const prev = merged.get(key);
-        if (!prev) {
-          merged.set(key, {
-            name,
-            unit: unit || null,
-            qty: hasQty ? qtyN : null,
-            qtyHadNull: !hasQty,
-            pantry_id: it.pantry_item_id || null,
-            recipe_id: row.recipe_id,
-          });
-        } else {
-          // Sum quantities only when every contributor has one. Once
-          // any contributor lacks a qty the merged row becomes qty-less
-          // ("flour" without a number is more honest than a wrong sum).
-          if (prev.qtyHadNull || !hasQty) {
-            prev.qty = null;
-            prev.qtyHadNull = true;
-          } else {
-            prev.qty = (prev.qty || 0) + qtyN;
-          }
-          if (!prev.pantry_id && it.pantry_item_id) prev.pantry_id = it.pantry_item_id;
-        }
-      }
-    }
-  }
-
-  if (merged.size === 0) {
-    return res.json({ added: 0, planned_cooks: planned.length, from, to });
-  }
-
-  const insert = db.prepare(
-    `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, pantry_id, recipe_id, checked)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0)`
-  );
-  let added = 0;
-  const tx = db.transaction(() => {
-    for (const row of merged.values()) {
-      // A shared recipe's ingredients point at its owner's pantry: no link.
-      const pantryId = ownId('pantry_items', row.pantry_id, u);
-      const aisle = _aisleForPantry(pantryId, u);
-      insert.run(u, _titleCaseName(row.name), row.qty, row.unit, aisle, pantryId, row.recipe_id);
-      added++;
-    }
-  });
-  tx();
-  res.json({ added, planned_cooks: planned.length, from, to });
+  const stock = _inStockSet(u);
+  const skip = it => onlyMissing && it.pantry_item_id && stock.has(it.pantry_item_id);
+  const contributions = planned.flatMap(p => recipeContributions(p, {
+    diaryId: p.diary_id, date: p.date, servings: p.planned_servings, skip,
+  }));
+  // Run even with nothing planned: cooks taken off the plan leave the list.
+  const result = _applyToList(u, contributions, { window: { from, to } });
+  res.json({ ...result, planned_cooks: planned.length, from, to });
 }));
 
-// ── POST /from-recipe/:id — add this recipe's "out of stock" ingredients ──
+// ── POST /from-recipe/:id: a recipe's ingredients onto the list ─────────
+// Scaled to ?servings= when given. `only_missing` (default on) leaves out
+// ingredients whose pantry item is in stock.
 router.post('/from-recipe/:id', wrap((req, res) => {
   const u = uid(req);
   const recipeId = parseInt(req.params.id, 10);
   if (!Number.isFinite(recipeId)) return res.status(400).json({ error: 'Invalid id' });
-
+  if (linkableRecipeId(recipeId, u) == null) return res.status(404).json({ error: 'Recipe not found' });
   const recipe = db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(recipeId);
   if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
 
-  let ingredients = [];
-  try { ingredients = JSON.parse(recipe.ingredients || '[]'); } catch {}
-  // Flatten grouped ingredient JSON down to one list.
-  const flat = [];
-  for (const g of ingredients) for (const it of (g.items || [])) flat.push(it);
-
   const onlyMissing = req.query.only_missing !== '0';
-  const stockSet = new Set(
-    db.prepare(
-      `SELECT id FROM pantry_items WHERE ${userClause(u)} AND in_stock = 1 AND deleted_at IS NULL`
-    ).all(...userArgs(u)).map(r => r.id)
-  );
-
-  let added = 0;
-  // Stamp recipe_id on every row so the client can render a small
-  // recipe chip next to it and offer "remove all from this recipe".
-  const insert = db.prepare(
-    `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, pantry_id, recipe_id, checked)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0)`
-  );
-  const tx = db.transaction(() => {
-    for (const it of flat) {
-      if (!it.name) continue;
-      if (onlyMissing && it.pantry_item_id && stockSet.has(it.pantry_item_id)) continue;
-      // A shared recipe's ingredients point at its owner's pantry: no link.
-      const pantryId = ownId('pantry_items', it.pantry_item_id, u);
-      const aisle = _aisleForPantry(pantryId, u);
-      insert.run(u, _titleCaseName(it.name), qtyToBuy(it.qty), it.unit || null, aisle, pantryId, recipeId);
-      added++;
-    }
+  const stock = _inStockSet(u);
+  const servings = Number(req.query.servings);
+  const contributions = recipeContributions(recipe, {
+    servings: Number.isFinite(servings) && servings > 0 ? servings : null,
+    skip: it => onlyMissing && it.pantry_item_id && stock.has(it.pantry_item_id),
   });
-  tx();
-  res.json({ added });
+  const result = _applyToList(u, contributions, {});
+  res.json({ ...result, added: result.added + result.updated });
 }));
 
 export default router;

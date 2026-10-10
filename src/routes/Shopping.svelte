@@ -750,14 +750,17 @@
         to: planTo,
         only_missing: planOnlyMissing,
       });
-      if (result.added === 0) {
-        if (result.planned_cooks === 0) {
-          showSuccess($_('shopping_page.toast.nothing_planned'));
-        } else {
-          showSuccess($_('shopping_page.toast.already_in_pantry'));
-        }
+      // A build adds rows, adds to rows already there, and takes out what
+      // cooks no longer planned had added.
+      const touched = (result.added || 0) + (result.updated || 0);
+      if (touched > 0) {
+        showSuccess($_('shopping_page.toast.plan_added', { values: { count: touched, cooks: result.planned_cooks } }));
+      } else if (result.removed > 0) {
+        showSuccess($_('shopping_page.toast.plan_removed', { values: { count: result.removed } }));
+      } else if (result.planned_cooks === 0) {
+        showSuccess($_('shopping_page.toast.nothing_planned'));
       } else {
-        showSuccess(`Added ${result.added} ${result.added === 1 ? 'item' : 'items'} from ${result.planned_cooks} planned ${result.planned_cooks === 1 ? 'cook' : 'cooks'}`);
+        showSuccess($_('shopping_page.toast.already_in_pantry'));
       }
       planImportOpen = false;
       await load();
@@ -775,7 +778,7 @@
     pickerBusy = true;
     try {
       const result = await NtApi.shopFromRecipe(r.id, { only_missing: pickerOnlyMissing });
-      showSuccess(`Added ${result.added} ${result.added === 1 ? 'item' : 'items'} from "${r.name}"`);
+      showSuccess($_('shopping_page.toast.recipe_added', { values: { count: result.added, name: r.name } }));
       pickerOpen = false;
       await load();
     } catch (e) {

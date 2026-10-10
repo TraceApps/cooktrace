@@ -20,6 +20,7 @@
 import { CapacitorSQLite, SQLiteConnection } from '@capacitor-community/sqlite';
 import { isNative } from './platform.js';
 import { mapSmartFilterCategory } from './smart-cookbook.js';
+import { mapSourceIds } from './shopping-plan.js';
 
 export const LOCAL_USER_ID = 1;
 const DB_NAME = 'cooktrace_local';
@@ -157,6 +158,7 @@ const SCHEMA = `
     pantry_id    INTEGER,
     recipe_id    INTEGER,
     sort_order   INTEGER,
+    sources      TEXT,
     created_at   TEXT DEFAULT (datetime('now')),
     updated_at   TEXT DEFAULT (datetime('now')),
     deleted_at   TEXT DEFAULT NULL,
@@ -444,6 +446,10 @@ async function _migrateShoppingAisle() {
     const shopCols = new Set((shopInfo?.values || []).map(c => c.name));
     if (!shopCols.has('sort_order')) {
       await db.run(`ALTER TABLE shopping_list ADD COLUMN sort_order INTEGER`);
+    }
+    // Where a row's amount came from (shopping-plan.js).
+    if (!shopCols.has('sources')) {
+      await db.run(`ALTER TABLE shopping_list ADD COLUMN sources TEXT`);
     }
     const catInfo = await db.query(`PRAGMA table_info(pantry_categories)`);
     const catCols = new Set((catInfo?.values || []).map(c => c.name));
@@ -983,6 +989,14 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
       if (table === 'cookbooks' && translated.smart_filter_json) {
         const cats = await mapFor('recipe_categories');
         translated.smart_filter_json = mapSmartFilterCategory(translated.smart_filter_json, id => cats.get(id));
+      }
+      // So are the recipes and planned cooks a list row's amount came from.
+      if (table === 'shopping_list' && translated.sources) {
+        const recipesHere = await mapFor('recipes');
+        const diaryHere = await mapFor('cook_diary');
+        translated.sources = mapSourceIds(translated.sources,
+          id => (recipesHere.has(id) ? recipesHere.get(id) : null),
+          id => (diaryHere.has(id) ? diaryHere.get(id) : null)).json;
       }
 
       // Local pending edits shouldn't be overwritten by the server's

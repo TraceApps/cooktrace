@@ -17,7 +17,7 @@
 import { getDb, LOCAL_USER_ID } from './db-native.js';
 import { resolveAssetUrl } from './platform.js';
 import { cleanSmartFilter, matchesSmartFilter } from './smart-cookbook.js';
-import { qtyToBuy } from './quantity.js';
+import { recipeContributions, mergeIntoList, parseSources } from './shopping-plan.js';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
 // ── Small utilities ──────────────────────────────────────────────────
@@ -151,11 +151,49 @@ function _shoppingFromRow(row) {
   if (!row) return null;
   const out = { ...row };
   out.checked = !!out.checked;
+  out.sources = parseSources(out.sources);
   return out;
 }
 
 // Aisle auto-lookup mirror of server/routes/shopping.js's helper: linked
 // pantry item → its category default_aisle → the category name → null.
+// The account's in-stock pantry items, by id.
+async function _inStockIds() {
+  return new Set(
+    (await _query(`SELECT id FROM pantry_items WHERE user_id = ? AND in_stock = 1 AND deleted_at IS NULL`, [LOCAL_USER_ID]))
+      .map(r => r.id)
+  );
+}
+
+// What a plan or a recipe adds, folded into the list as the server does
+// (shopping-plan.js). Every row written goes up with the next sync.
+async function _applyToList(contributions, opts) {
+  const rows = await _query(
+    `SELECT id, name, quantity, unit, checked, pantry_id, recipe_id, sources
+       FROM shopping_list WHERE user_id = ? AND deleted_at IS NULL`,
+    [LOCAL_USER_ID]
+  );
+  const plan = mergeIntoList(rows, contributions, opts);
+  for (const r of plan.inserts) {
+    await _runInsert(
+      `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, pantry_id, recipe_id, sources, checked, sync_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'pending')`,
+      [LOCAL_USER_ID, _titleCaseName(r.name), r.quantity, r.unit, await _aisleForPantry(r.pantry_id), r.pantry_id, r.recipe_id, r.sources]
+    );
+  }
+  for (const r of plan.updates) {
+    await _run(
+      `UPDATE shopping_list SET quantity = ?, unit = ?, sources = ?, pantry_id = COALESCE(?, pantry_id),
+              updated_at = datetime('now'), sync_status = 'pending' WHERE id = ?`,
+      [r.quantity, r.unit, r.sources, r.pantry_id ?? null, r.id]
+    );
+  }
+  for (const id of plan.deletes) {
+    await _run(`UPDATE shopping_list SET deleted_at = datetime('now'), sync_status = 'pending' WHERE id = ?`, [id]);
+  }
+  return { added: plan.inserts.length, updated: plan.updates.length, removed: plan.deletes.length };
+}
+
 async function _aisleForPantry(pantryId) {
   if (!pantryId) return null;
   const rows = await _query(
@@ -1093,31 +1131,22 @@ export const CtApiNative = {
 
   async shopFromRecipe(recipeId, opts = {}) {
     const recipe = (await _query(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`, [recipeId]))[0];
-    if (!recipe) return { added: 0 };
-    const groups = _parseJson(recipe.ingredients, []);
-    const flat = []; for (const g of groups) for (const it of (g.items || [])) flat.push(it);
-
+    if (!recipe) return { added: 0, updated: 0, removed: 0 };
     const onlyMissing = opts.only_missing !== false;
-    const stockIds = new Set(
-      (await _query(`SELECT id FROM pantry_items WHERE user_id = ? AND in_stock = 1 AND deleted_at IS NULL`, [LOCAL_USER_ID]))
-        .map(r => r.id)
-    );
-
-    let added = 0;
-    for (const it of flat) {
-      if (!it?.name) continue;
-      if (onlyMissing && it.pantry_item_id && stockIds.has(it.pantry_item_id)) continue;
-      const aisle = await _aisleForPantry(it.pantry_item_id);
-      await _runInsert(
-        `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, pantry_id, recipe_id, checked, sync_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'pending')`,
-        [LOCAL_USER_ID, _titleCaseName(it.name), qtyToBuy(it.qty), it.unit || null, aisle, it.pantry_item_id || null, recipeId]
-      );
-      added++;
-    }
-    return { added };
+    const stock = await _inStockIds();
+    const servings = Number(opts.servings);
+    const contributions = recipeContributions(recipe, {
+      servings: Number.isFinite(servings) && servings > 0 ? servings : null,
+      skip: it => onlyMissing && it.pantry_item_id && stock.has(it.pantry_item_id),
+    });
+    const result = await _applyToList(contributions, {});
+    return { ...result, added: result.added + result.updated };
   },
 
+  // The planned cooks of a date range onto the list, scaled to their
+  // servings, the same way as the server (shopping-plan.js): building the
+  // same range again replaces its cooks' share, and a cook no longer
+  // planned takes its share out.
   async shopFromPlan(opts = {}) {
     const today = new Date().toISOString().slice(0, 10);
     const from = /^\d{4}-\d{2}-\d{2}$/.test(opts.from) ? opts.from : today;
@@ -1126,58 +1155,20 @@ export const CtApiNative = {
     const onlyMissing = opts.only_missing !== false;
 
     const planned = await _query(
-      `SELECT cd.id AS diary_id, cd.recipe_id, r.name AS recipe_name, r.ingredients
+      `SELECT cd.id AS diary_id, cd.date, cd.servings AS planned_servings,
+              r.id, r.servings, r.ingredients
          FROM cook_diary cd JOIN recipes r ON r.id = cd.recipe_id AND r.deleted_at IS NULL
         WHERE cd.user_id = ? AND cd.deleted_at IS NULL AND cd.kind = 'planned'
           AND cd.date >= ? AND cd.date <= ?`,
       [LOCAL_USER_ID, from, to]
     );
-    if (!planned.length) return { added: 0, planned_cooks: 0, from, to };
-
-    const stockIds = new Set(
-      (await _query(`SELECT id FROM pantry_items WHERE user_id = ? AND in_stock = 1 AND deleted_at IS NULL`, [LOCAL_USER_ID]))
-        .map(r => r.id)
-    );
-
-    const merged = new Map();
-    for (const row of planned) {
-      const groups = _parseJson(row.ingredients, []);
-      for (const g of groups) for (const it of (g.items || [])) {
-        if (!it?.name) continue;
-        if (onlyMissing && it.pantry_item_id && stockIds.has(it.pantry_item_id)) continue;
-        const name = String(it.name).trim();
-        const unit = it.unit ? String(it.unit).trim() : '';
-        const key = `${name.toLowerCase()}|${unit.toLowerCase()}`;
-        const qtyN = qtyToBuy(it.qty);
-        const hasQty = qtyN != null;
-        const prev = merged.get(key);
-        if (!prev) {
-          merged.set(key, {
-            name, unit: unit || null,
-            qty: hasQty ? qtyN : null,
-            qtyHadNull: !hasQty,
-            pantry_id: it.pantry_item_id || null,
-            recipe_id: row.recipe_id,
-          });
-        } else {
-          if (prev.qtyHadNull || !hasQty) { prev.qty = null; prev.qtyHadNull = true; }
-          else prev.qty = (prev.qty || 0) + qtyN;
-          if (!prev.pantry_id && it.pantry_item_id) prev.pantry_id = it.pantry_item_id;
-        }
-      }
-    }
-
-    let added = 0;
-    for (const row of merged.values()) {
-      const aisle = await _aisleForPantry(row.pantry_id);
-      await _runInsert(
-        `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, pantry_id, recipe_id, checked, sync_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'pending')`,
-        [LOCAL_USER_ID, _titleCaseName(row.name), row.qty, row.unit, aisle, row.pantry_id, row.recipe_id]
-      );
-      added++;
-    }
-    return { added, planned_cooks: planned.length, from, to };
+    const stock = await _inStockIds();
+    const skip = it => onlyMissing && it.pantry_item_id && stock.has(it.pantry_item_id);
+    const contributions = planned.flatMap(p => recipeContributions(p, {
+      diaryId: p.diary_id, date: p.date, servings: p.planned_servings, skip,
+    }));
+    const result = await _applyToList(contributions, { window: { from, to } });
+    return { ...result, planned_cooks: planned.length, from, to };
   },
 
   // ── Recipe categories ──────────────────────────────────────────────

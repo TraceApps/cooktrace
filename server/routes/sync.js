@@ -53,7 +53,8 @@ import { stampFields } from '../lib/field-stamps.js';
 import { repairVariantTree } from '../lib/pantry-tree.js';
 import { clockOffset, editTime, latestTime, utcMs } from '../lib/sync-clock.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
-import { ownIngredientLinks } from '../lib/link-checks.js';
+import { ownIngredientLinks, ownId, linkableRecipeId } from '../lib/link-checks.js';
+import { cleanSourceIds } from '../lib/shopping-plan.js';
 import { localizeRowPhotos } from '../lib/inline-photos.js';
 
 // Unique per account (server/db.js), so one made on two devices is one row.
@@ -162,7 +163,7 @@ const TABLES = {
     softDelete: true,
   },
   shopping_list: {
-    cols: ['name', 'quantity', 'unit', 'aisle', 'checked', 'pantry_id', 'recipe_id', 'sort_order'],
+    cols: ['name', 'quantity', 'unit', 'aisle', 'checked', 'pantry_id', 'recipe_id', 'sort_order', 'sources'],
     parents: { pantry_id: 'pantry_items', recipe_id: 'recipes' },
     softDelete: true,
   },
@@ -254,6 +255,16 @@ router.post('/push', wrap((req, res) => {
           const at = spec.cols.indexOf('ingredients');
           if (at > -1 && values[at] != null) values[at] = ownIngredientLinks(values[at], u);
         }
+        // Where a list row's amount came from: recipes and planned cooks of
+        // this account (lib/shopping-plan.js), sent with the server's ids.
+        // An app from before sends none, which leaves what's here.
+        const sourcesAt = name === 'shopping_list' ? spec.cols.indexOf('sources') : -1;
+        if (sourcesAt > -1 && values[sourcesAt] != null) {
+          values[sourcesAt] = cleanSourceIds(values[sourcesAt],
+            id => linkableRecipeId(id, u) != null,
+            // A cook since deleted is still the account's: a rebuild takes its share out.
+            id => ownId('cook_diary', id, u, { softDelete: false }) != null);
+        }
         const val = (col) => values[spec.cols.indexOf(col)];
         const deleted = spec.softDelete && translated.deleted_at != null;
         // A row the app made, sent before (two syncs at once, a retry, an
@@ -281,6 +292,7 @@ router.post('/push', wrap((req, res) => {
           ).get(row.server_id);
           if (!existing) continue;
           if ((u == null && existing.user_id != null) || (u != null && existing.user_id !== u)) continue;
+          if (sourcesAt > -1 && !('sources' in row)) values[sourcesAt] = existing.sources ?? null;
           if (name === 'recipes') {
             values = _guardRecipeValuesForUpdate(values, spec, existing);
           }
