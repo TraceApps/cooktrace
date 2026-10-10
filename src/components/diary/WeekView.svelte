@@ -12,12 +12,13 @@
     anyDay: planned cooks for any day of the week
     needs: weekNeeds() for the week's plan, or null for a week gone by
     building: the list is being built
+    usesUp: usesUp() for the week ({ items, ideas }), or null
   Events: open (entry), actions (entry), cooked (entry), servings ({ entry, value }),
-    plan ({ date }), planAnyDay, build
+    plan ({ date }), planAnyDay, build, buildWeek, planRecipe (recipe)
 -->
 <script>
   import { createEventDispatcher } from 'svelte';
-  import { _ } from 'svelte-i18n';
+  import { _, locale } from 'svelte-i18n';
   import ServingsStepper from '../ui/ServingsStepper.svelte';
   import { resolveAssetUrl } from '../../lib/platform.js';
   import { longpress } from '../../lib/long-press.js';
@@ -26,6 +27,9 @@
   export let anyDay = [];
   export let needs = null;
   export let building = false;
+  export let usesUp = null;
+  let usesUpEl;
+  $: list = new Intl.ListFormat($locale || undefined, { style: 'long', type: 'conjunction' });
 
   const dispatch = createEventDispatcher();
 
@@ -52,18 +56,31 @@
         <span class="tile-value">{needs.inPantry}</span>
         <span class="tile-label">{$_('cookdiary_page.week.in_pantry')}</span>
       </div>
-      <div class="tile" class:good={needs.expiring > 0}>
-        <span class="tile-value">
-          {needs.expiring}
-          {#if needs.expiring > 0}<span class="material-symbols-rounded" aria-hidden="true">eco</span>{/if}
-        </span>
-        <span class="tile-label">{$_('cookdiary_page.week.uses_up')}</span>
-      </div>
+      {#if usesUp?.items?.length}
+        <button class="tile good" on:click={() => usesUpEl?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          aria-label={$_('cookdiary_page.week.go_uses_up')}>
+          <span class="tile-value">{needs.expiring}<span class="material-symbols-rounded" aria-hidden="true">eco</span></span>
+          <span class="tile-label">{$_('cookdiary_page.week.uses_up')}</span>
+        </button>
+      {:else}
+        <div class="tile" class:good={needs.expiring > 0}>
+          <span class="tile-value">
+            {needs.expiring}
+            {#if needs.expiring > 0}<span class="material-symbols-rounded" aria-hidden="true">eco</span>{/if}
+          </span>
+          <span class="tile-label">{$_('cookdiary_page.week.uses_up')}</span>
+        </div>
+      {/if}
     </div>
-    <button class="btn btn-primary build" on:click={() => dispatch('build')} disabled={building || needs.meals === 0}>
-      <span class="material-symbols-rounded" class:spin={building} aria-hidden="true">{building ? 'progress_activity' : 'add_shopping_cart'}</span>
-      {needs.built ? $_('cookdiary_page.week.update_list') : $_('cookdiary_page.week.build_list')}
-    </button>
+    <div class="summary-actions">
+      <button class="btn btn-secondary plan-week" on:click={() => dispatch('buildWeek')}>
+        <span class="material-symbols-rounded" aria-hidden="true">auto_awesome</span>{$_('cookdiary_page.week.build_my_week')}
+      </button>
+      <button class="btn btn-primary build" on:click={() => dispatch('build')} disabled={building || needs.meals === 0}>
+        <span class="material-symbols-rounded" class:spin={building} aria-hidden="true">{building ? 'progress_activity' : 'add_shopping_cart'}</span>
+        {needs.built ? $_('cookdiary_page.week.update_list') : $_('cookdiary_page.week.build_list')}
+      </button>
+    </div>
   </section>
 {/if}
 
@@ -157,6 +174,40 @@
   {/each}
 </ol>
 
+{#if usesUp?.items?.length}
+  <section class="uses-up" bind:this={usesUpEl} aria-label={$_('cookdiary_page.week.uses_up_title')}>
+    <header class="uses-head">
+      <span class="material-symbols-rounded" aria-hidden="true">eco</span>
+      <h3>{$_('cookdiary_page.week.uses_up_title')}</h3>
+      <span class="uses-sub">{$_('cookdiary_page.week.uses_up_sub')}</span>
+    </header>
+    <ul class="soon">
+      {#each usesUp.items as x (x.family)}
+        <li class="soon-item">
+          <span class="soon-name">{x.name}</span>
+          <span class="soon-days" class:urgent={x.daysLeft != null && x.daysLeft <= 2}>{$_('cookdiary_page.week.days_left', { values: { n: Math.max(0, x.daysLeft ?? 0) } })}</span>
+          {#if x.plannedBy.length}<span class="soon-in">{$_('cookdiary_page.week.in_plan', { values: { names: list.format(x.plannedBy) } })}</span>{/if}
+        </li>
+      {/each}
+    </ul>
+    {#each usesUp.ideas as idea (idea.recipe.id)}
+      <div class="idea">
+        {#if idea.recipe.imgUrl || idea.recipe.img_url}
+          <img src={idea.recipe.imgUrl || resolveAssetUrl(idea.recipe.img_url)} alt="" loading="lazy" />
+        {:else}<span class="ph material-symbols-rounded" aria-hidden="true">restaurant</span>{/if}
+        <span class="idea-text">
+          <span class="name">{idea.recipe.name}</span>
+          <span class="sub">{$_('cookdiary_page.week.idea_uses', { values: { items: list.format(idea.uses) } })}</span>
+        </span>
+        <button class="btn btn-primary idea-plan" on:click={() => dispatch('planRecipe', idea.recipe)}
+          aria-label={$_('cookdiary_page.week.plan_recipe', { values: { name: idea.recipe.name } })}>
+          <span class="material-symbols-rounded" aria-hidden="true">add</span>{$_('cookdiary_page.week.plan')}
+        </button>
+      </div>
+    {/each}
+  </section>
+{/if}
+
 <style>
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
@@ -181,7 +232,29 @@
   .tile-label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
   .tile.good { background: var(--accent-dim); }
   .tile.good .tile-value, .tile.good .tile-label { color: var(--accent); }
-  .build { width: 100%; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .summary-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .summary-actions .btn { flex: 1 1 160px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  button.tile { border: none; font: inherit; text-align: left; cursor: pointer; }
+
+  /* Uses up: what's about to expire, and what would use it. */
+  .uses-up {
+    margin-top: 16px; background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 12px; display: flex; flex-direction: column; gap: 10px; scroll-margin-top: 140px;
+  }
+  .uses-head { display: flex; align-items: center; gap: 6px; }
+  .uses-head .material-symbols-rounded { font-size: 18px; color: var(--accent); }
+  .uses-head h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-1); }
+  .uses-sub { margin-left: auto; font-size: 12px; color: var(--text-2); }
+  .soon { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+  .soon-item { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; background: var(--surface-2); border-radius: var(--radius-md); min-width: 0; }
+  .soon-name { font-size: 13px; font-weight: 600; color: var(--text-1); }
+  .soon-days { font-size: 12px; color: var(--text-2); }
+  .soon-days.urgent { color: var(--warning); font-weight: 600; }
+  .soon-in { font-size: 11px; color: var(--accent); }
+  .idea { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); border-radius: var(--radius-md); }
+  .idea img, .idea .ph { width: 48px; height: 48px; border-radius: var(--radius-sm); object-fit: cover; flex: none; }
+  .idea-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .idea-plan { min-height: 40px; display: inline-flex; align-items: center; gap: 4px; padding: 0 12px; flex: none; }
   .spin { animation: spin 0.9s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 

@@ -15,7 +15,9 @@
   import DateInput from '../components/ui/DateInput.svelte';
   import ServingsStepper from '../components/ui/ServingsStepper.svelte';
   import WeekView from '../components/diary/WeekView.svelte';
-  import { firstDayOfWeek, weekStartOf, weekDays, weekdayNames, weekRangeLabel, weekNeeds, isoDay, fromIso } from '../lib/week.js';
+  import BuildWeekSheet from '../components/diary/BuildWeekSheet.svelte';
+  import { usesUp, freeDays } from '../lib/plan-ideas.js';
+  import { firstDayOfWeek, weekStartOf, weekDays, weekdayNames, weekRangeLabel, weekNeeds, planHorizon, isoDay, fromIso } from '../lib/week.js';
   import CookHeatmap from '../components/diary/CookHeatmap.svelte';
   import { longpress } from '../lib/long-press.js';
   import { resolveAssetUrl } from '../lib/platform.js';
@@ -349,6 +351,22 @@
         recipes: weekRecipes, pantry: weekPantry, list: weekList, weekEnd: weekToIso, today: todayIso,
       })
     : null;
+
+  // Uses up: what's about to expire by the week's end, and what would use it.
+  $: weekPlanned = view === 'week' ? displayEntries.filter(e => e.kind === 'planned') : [];
+  $: weekUsesUp = weekPlanNeeds
+    ? usesUp({ recipes: [...weekRecipes.values()], pantry: weekPantry, planned: weekPlanned, today: todayIso, horizon: planHorizon(weekToIso, todayIso) })
+    : null;
+  // A suggestion goes on the week's first free day from today.
+  function planSuggested(ev) {
+    const free = freeDays(weekFromIso, weekPlanned.filter(e => !e.any_day).map(e => e.date), todayIso);
+    openPlan(ev.detail.id, free[0] || (weekFromIso > todayIso ? weekFromIso : todayIso));
+  }
+  let buildWeekOpen = false;
+  async function onWeekBuilt() {
+    await load({ quiet: true });
+    await loadWeekExtras();
+  }
 
   // Servings change at once; the save waits for the taps to settle.
   const _servingsTimers = new Map();
@@ -713,12 +731,15 @@
         anyDay={weekAnyDay}
         needs={weekPlanNeeds}
         building={weekBuilding}
+        usesUp={weekUsesUp}
         on:open={(ev) => ev.detail.recipe_id && push(`/recipes/${ev.detail.recipe_id}`)}
         on:actions={(ev) => onEntryLongPress(ev.detail)}
         on:cooked={(ev) => markPlannedAsCooked(ev.detail)}
         on:servings={onWeekServings}
         on:plan={(ev) => openPlan(null, ev.detail.date)}
         on:build={buildWeekList}
+        on:buildWeek={() => (buildWeekOpen = true)}
+        on:planRecipe={planSuggested}
       />
     {:else if entries.length === 0}
       <div class="state empty" in:fade={{ duration: 120 }}>
@@ -886,6 +907,16 @@
   title={actionSheetEntry?.recipe_name || 'Diary entry'}
   actions={entryActions}
   on:select={onEntryAction}
+/>
+
+<BuildWeekSheet
+  bind:open={buildWeekOpen}
+  weekStart={weekFromIso}
+  planned={weekPlanned}
+  recipes={[...weekRecipes.values()]}
+  pantry={weekPantry}
+  today={todayIso}
+  on:added={onWeekBuilt}
 />
 
 <!-- Giving a plan for any day of its week a day. -->

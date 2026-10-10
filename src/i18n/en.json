@@ -1636,7 +1636,30 @@
   "servings_stepper": {
     "servings":                  "Servings",
     "fewer":                     "Fewer Servings",
-    "more":                      "More Servings"
+    "more":                      "More Servings",
+    "less":                      "Fewer {what}",
+    "add":                       "More {what}"
+  },
+  "build_week": {
+    "title":                     "Build My Week",
+    "options":                   "Options",
+    "dinners":                   "Dinners",
+    "servings":                  "Servings",
+    "use_expiring":              "Use Expiring",
+    "not_recent":                "Not Cooked Lately",
+    "quick":                     "Under 30 Min",
+    "any_day":                   "Any Day",
+    "reason_uses":               "Uses {items}",
+    "reason_shares":             "Shares {item} with {with}",
+    "reason_have":               "{have} of {need} on hand",
+    "reason_not_cooked":         "{weeks, plural, one {Not cooked in # week} other {Not cooked in # weeks}}",
+    "reason_new":                "Not cooked yet",
+    "swap":                      "Swap {name}",
+    "summary":                   "{count, plural, one {# dinner} other {# dinners}} · {toBuy} to buy",
+    "uses_n":                    "{n, plural, one {Uses # expiring item} other {Uses # expiring items}}",
+    "add":                       "Add to Week",
+    "added":                     "{count, plural, one {# dinner added to the week} other {# dinners added to the week}}",
+    "none":                      "No recipes to pick from. Add a few recipes first."
   },
   "cookdiary_page": {
     "view_week":                 "Week",
@@ -1667,7 +1690,16 @@
       "last_week":               "Last Week",
       "previous":                "Previous Week",
       "next":                    "Next Week",
-      "go_this_week":            "Go to This Week"
+      "go_this_week":            "Go to This Week",
+      "go_uses_up":              "Go to Uses Up",
+      "uses_up_title":           "Uses Up",
+      "uses_up_sub":             "About to expire",
+      "days_left":               "{n, plural, =0 {Today} one {# day left} other {# days left}}",
+      "in_plan":                 "In {names}",
+      "idea_uses":               "Uses {items}",
+      "plan":                    "Plan",
+      "plan_recipe":             "Plan {name}",
+      "build_my_week":           "Build My Week"
     },
     "servings":                  "Servings",
     "servings_count":            "{count, plural, one {# serving} other {# servings}}",

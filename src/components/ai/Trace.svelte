@@ -44,6 +44,7 @@
   import { callAI, callAIProxy, TOOLS, setToolHandler, AI_DEFAULT_MODELS } from '../../lib/aiChat.js';
 
   import { foldText } from '../../lib/search-text.js';
+  import { isoDay, weekStartOf, fromIso } from '../../lib/week.js';
 
   let panelOpen = false;
   let messages = [];      // { role, content, time? }
@@ -519,10 +520,15 @@
             const id = parseInt(args?.recipe_id, 10);
             const date = args?.date;
             if (!Number.isFinite(id) || !date) return { error: 'recipe_id and date required' };
+            const servings = parseInt(args?.servings, 10);
             const r = await NtApi.createDiaryEntry({
-              recipe_id: id, date, kind: 'planned',
+              recipe_id: id, kind: 'planned',
+              // Any day of a week is dated the week's first day.
+              date: args?.any_day ? isoDay(weekStartOf(fromIso(date))) : date,
               notes: args?.notes || null,
               meal_type: args?.meal_type || null,
+              servings: Number.isFinite(servings) && servings > 0 ? servings : null,
+              any_day: !!args?.any_day,
             });
             return { ok: true, entry: r };
           } catch (e) { return { error: e.message || 'Failed' }; }

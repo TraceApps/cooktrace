@@ -1635,7 +1635,30 @@
   "servings_stepper": {
     "servings": "Porciones",
     "fewer": "Menos porciones",
-    "more": "Más porciones"
+    "more": "Más porciones",
+    "less": "Menos {what}",
+    "add": "Más {what}"
+  },
+  "build_week": {
+    "title": "Arma mi semana",
+    "options": "Opciones",
+    "dinners": "Cenas",
+    "servings": "Porciones",
+    "use_expiring": "Usar lo que caduca",
+    "not_recent": "No cocinadas hace poco",
+    "quick": "Menos de 30 min",
+    "any_day": "Cualquier día",
+    "reason_uses": "Usa {items}",
+    "reason_shares": "Comparte {item} con {with}",
+    "reason_have": "Tienes {have} de {need}",
+    "reason_not_cooked": "{weeks, plural, one {Sin cocinar hace # semana} other {Sin cocinar hace # semanas}}",
+    "reason_new": "Aún sin cocinar",
+    "swap": "Cambiar {name}",
+    "summary": "{count, plural, one {# cena} other {# cenas}} · {toBuy} por comprar",
+    "uses_n": "{n, plural, one {Usa # producto que caduca} other {Usa # productos que caducan}}",
+    "add": "Añadir a la semana",
+    "added": "{count, plural, one {# cena añadida a la semana} other {# cenas añadidas a la semana}}",
+    "none": "No hay recetas para elegir. Agrega algunas primero."
   },
   "cookdiary_page": {
     "view_week": "Semana",
@@ -1666,7 +1689,16 @@
       "last_week": "La semana pasada",
       "previous": "Semana anterior",
       "next": "Semana siguiente",
-      "go_this_week": "Ir a esta semana"
+      "go_this_week": "Ir a esta semana",
+      "go_uses_up": "Ir a Aprovecha",
+      "uses_up_title": "Aprovecha",
+      "uses_up_sub": "A punto de caducar",
+      "days_left": "{n, plural, =0 {Hoy} one {Queda # día} other {Quedan # días}}",
+      "in_plan": "En {names}",
+      "idea_uses": "Usa {items}",
+      "plan": "Planificar",
+      "plan_recipe": "Planificar {name}",
+      "build_my_week": "Arma mi semana"
     },
     "servings": "Porciones",
     "servings_count": "{count, plural, one {# porción} other {# porciones}}",

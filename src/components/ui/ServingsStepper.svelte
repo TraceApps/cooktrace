@@ -5,6 +5,7 @@
     value (bindable): servings, a whole number from min to max
     min, max: limits (1 and 99)
     label: what it counts, for screen readers ("Servings")
+    icon: the symbol beside the number ('person'), or '' for none
   Fires `change` with the new value after a tap.
 -->
 <script>
@@ -15,6 +16,7 @@
   export let min = 1;
   export let max = 99;
   export let label = '';
+  export let icon = 'person';
 
   const dispatch = createEventDispatcher();
 
@@ -29,14 +31,14 @@
 
 <div class="stepper" role="group" aria-label={label || $_('servings_stepper.servings')}>
   <button type="button" class="step" on:click={() => step(-1)} disabled={value <= min}
-    aria-label={$_('servings_stepper.fewer')}>
+    aria-label={icon === 'person' ? $_('servings_stepper.fewer') : $_('servings_stepper.less', { values: { what: label } })}>
     <span class="material-symbols-rounded" aria-hidden="true">remove</span>
   </button>
   <span class="value" aria-live="polite">
-    <span class="material-symbols-rounded person" aria-hidden="true">person</span>{value}
+    {#if icon}<span class="material-symbols-rounded person" aria-hidden="true">{icon}</span>{/if}{value}
   </span>
   <button type="button" class="step" on:click={() => step(1)} disabled={value >= max}
-    aria-label={$_('servings_stepper.more')}>
+    aria-label={icon === 'person' ? $_('servings_stepper.more') : $_('servings_stepper.add', { values: { what: label } })}>
     <span class="material-symbols-rounded" aria-hidden="true">add</span>
   </button>
 </div>

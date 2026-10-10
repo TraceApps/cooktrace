@@ -62,6 +62,16 @@ export function weekRangeLabel(start, locale) {
 }
 
 /**
+ * How far ahead "about to expire" looks for a week's plan: to the week's
+ * end, and at least a week from today (late in a week, its end is close).
+ */
+export function planHorizon(weekEnd, today) {
+  const t = fromIso(today); t.setDate(t.getDate() + 7);
+  const h = isoDay(t);
+  return weekEnd && weekEnd > h ? weekEnd : h;
+}
+
+/**
  * What a week's plan needs. planned: the week's planned cooks; recipes: by
  * id, with ingredients; pantry: the pantry rows; list: the shopping list.
  * Returns { meals, toBuy, inPantry, expiring, built }:
@@ -80,11 +90,7 @@ export function weekNeeds({ planned, recipes, pantry, list, weekEnd, today }) {
     stocked.add(p.id);
     if (p.generic_parent_id != null) stocked.add(p.generic_parent_id);
   }
-  const horizon = (() => {
-    const t = fromIso(today); t.setDate(t.getDate() + 7);
-    const h = isoDay(t);
-    return h > weekEnd ? h : weekEnd;
-  })();
+  const horizon = planHorizon(weekEnd, today);
   const need = new Set(), have = new Set(), expiring = new Set();
   for (const e of planned || []) {
     const r = recipes?.get?.(e.recipe_id);
