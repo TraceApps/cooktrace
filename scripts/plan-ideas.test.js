@@ -76,3 +76,11 @@ test('a recipe can be left out of a day, or ranked lower', () => {
   const disliked = buildWeek({ recipes, pantry, today, horizon, count: 1, options: {}, fit: r => (r.name === 'Guacamole' ? -10 : 0) });
   assert.notEqual(disliked[0].recipe.name, 'Guacamole');
 });
+
+test('Uses Up favors an idea that shares ingredients with what is planned', () => {
+  const salsa = R(6, 'Salsa', [{ name: 'cilantro', pantry_item_id: 2 }, { name: 'tortillas' }]);
+  const soupC = R(7, 'Cilantro Soup', [{ name: 'cilantro', pantry_item_id: 2 }, { name: 'water' }]);
+  const plannedTacos = { recipe_id: 2 };
+  const r = usesUp({ recipes: [tacos, soupC, salsa], pantry, planned: [plannedTacos], today, horizon });
+  assert.deepEqual(r.ideas.map(i => i.recipe.name), ['Salsa', 'Cilantro Soup'], 'Salsa shares tortillas with the tacos');
+});

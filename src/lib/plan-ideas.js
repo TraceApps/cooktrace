@@ -62,7 +62,9 @@ const _dayNumber = iso => Math.round(fromIso(iso).getTime() / 864e5);
 
 /**
  * Uses Up: in-stock items expiring by `horizon`, which of the week's
- * planned cooks use them, and recipes not planned that use the most of them.
+ * planned cooks use them, and recipes not planned that use the most of them,
+ * then share the most with what's planned (one bag of spinach for two
+ * dinners), then have the most on hand.
  * Returns { items: [{ family, name, expires, daysLeft, quantity, unit, plannedBy }], ideas: [{ recipe, uses }] }.
  */
 export function usesUp({ recipes, pantry, planned, today, horizon, limit = 3 }) {
@@ -76,6 +78,16 @@ export function usesUp({ recipes, pantry, planned, today, horizon, limit = 3 }) 
       ...x,
       plannedBy: [...plannedIds].map(id => byId.get(id)).filter(r => r && recipeNeeds(r, idx).families.has(x.family)).map(r => r.name),
     }));
+  // What the planned cooks already need (in the pantry or to buy), for
+  // ideas that share it.
+  const plannedNeeds = new Set();
+  for (const id of plannedIds) {
+    const r = byId.get(id);
+    if (!r) continue;
+    const n = recipeNeeds(r, idx);
+    for (const f of n.families) plannedNeeds.add(`f${f}`);
+    for (const k of n.loose) plannedNeeds.add(`k${k}`);
+  }
   const ideas = [];
   for (const r of recipes || []) {
     if (plannedIds.has(r.id)) continue;
@@ -83,7 +95,9 @@ export function usesUp({ recipes, pantry, planned, today, horizon, limit = 3 }) 
     const uses = items.filter(x => need.families.has(x.family));
     if (!uses.length) continue;
     const have = [...need.families].filter(f => idx.stocked.has(f)).length;
-    ideas.push({ recipe: r, uses: uses.map(x => x.name), soonest: uses[0].expires, score: uses.length * 10 + (need.count ? have / need.count : 0) });
+    const shared = [...need.families].filter(f => plannedNeeds.has(`f${f}`)).length
+      + [...need.loose].filter(k => plannedNeeds.has(`k${k}`)).length;
+    ideas.push({ recipe: r, uses: uses.map(x => x.name), soonest: uses[0].expires, score: uses.length * 10 + Math.min(shared, 3) + (need.count ? have / need.count : 0) });
   }
   ideas.sort((a, b) => b.score - a.score || (a.soonest < b.soonest ? -1 : 1) || String(a.recipe.name).localeCompare(b.recipe.name));
   return { items, ideas: ideas.slice(0, limit).map(({ recipe, uses }) => ({ recipe, uses })) };
