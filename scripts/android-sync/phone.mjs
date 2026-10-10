@@ -823,6 +823,27 @@ const scenarios = {
     out.phone = { notes: (await here('shopping_list', milk.id)).notes, anyDay: (await here('cook_diary', cook.id)).any_day, date: (await here('cook_diary', cook.id)).date };
     out.ids = { cook: sCook, milk: sMilk };
   },
+  // Allergens: a pantry item's from its label and a recipe's correction,
+  // made on the phone, read and changed on the web, both ways.
+  async allergens() {
+    const flour = await api.createPantryItem({ name: 'Gluten-Free Flour', in_stock: true, allergens: [], traces: ['en:nuts'], allergens_source: 'label' });
+    const r = await api.createRecipe({ name: 'Pancakes', steps: [{ text: 'Mix' }], ingredients: [{ items: [{ name: 'flour', pantry_item_id: flour.id }, { name: 'milk' }, { name: 'eggs' }] }] });
+    await api.setRecipeAllergens(r.id, { add: ['en:sesame-seeds'], remove: ['en:eggs'] });
+    out.phoneCard = (await api.getRecipes()).find(x => x.id === r.id).allergens;
+    await sync();
+    const sFlour = (await db.query(`SELECT server_id FROM pantry_items WHERE id = ?`, [flour.id])).values[0].server_id;
+    const sRecipe = (await db.query(`SELECT server_id FROM recipes WHERE id = ?`, [r.id])).values[0].server_id;
+    const card = (await web('GET', '/api/recipes')).find(x => x.id === sRecipe);
+    out.webCard = card.allergens;
+    out.webPantry = (await web('GET', `/api/pantry/${sFlour}`));
+    await web('PUT', `/api/pantry/${sFlour}`, { allergens: ['en:gluten'], allergens_source: 'user' });
+    await web('PUT', `/api/recipes/${sRecipe}/allergens`, { allergen_overrides: { add: [], remove: ['en:milk'] } });
+    await sync();
+    const here = (await db.query(`SELECT allergens, traces, allergens_source FROM pantry_items WHERE id = ?`, [flour.id])).values[0];
+    out.phonePantry = here;
+    out.phoneAfter = (await api.getRecipes()).find(x => x.id === r.id).allergens;
+    out.ids = { flour: sFlour, recipe: sRecipe };
+  },
 };
 
 const name = process.argv[2];

@@ -164,6 +164,8 @@ const _CtApiHttp = {
   async getRecipe(id)            { return this._imgFromApi(await this.get(`/api/recipes/${id}`)); },
   async createRecipe(data)       { return this._imgFromApi(await this.post('/api/recipes', this._imgToApi(data))); },
   async updateRecipe(id, data)   { return this._imgFromApi(await this.put(`/api/recipes/${id}`, this._imgToApi(data))); },
+  // The recipe's own allergen correction: { add: [codes], remove: [codes] }.
+  async setRecipeAllergens(id, fix) { return this._imgFromApi(await this.put(`/api/recipes/${id}/allergens`, { allergen_overrides: fix })); },
   async markCooked(id, payload = {}) { return this._imgFromApi(await this.post(`/api/recipes/${id}/cooked`, payload)); },
   async backdateRecipe(id, createdAt) {
     const r = await this.post(`/api/recipes/${id}/backdate`, { created_at: createdAt });

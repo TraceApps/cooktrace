@@ -66,6 +66,7 @@ const SCHEMA = `
     favorite             INTEGER NOT NULL DEFAULT 0,
     category_id          INTEGER,
     share_token          TEXT,
+    allergen_overrides   TEXT,
     created_at           TEXT DEFAULT (datetime('now')),
     updated_at           TEXT DEFAULT (datetime('now')),
     deleted_at           TEXT DEFAULT NULL,
@@ -103,6 +104,9 @@ const SCHEMA = `
     g_per_cup                   REAL,
     generic_parent_id           INTEGER,
     nutrition_source_variant_id INTEGER,
+    allergens                   TEXT,
+    traces                      TEXT,
+    allergens_source            TEXT,
     created_at                  TEXT DEFAULT (datetime('now')),
     updated_at                  TEXT DEFAULT (datetime('now')),
     deleted_at                  TEXT DEFAULT NULL,
@@ -461,6 +465,16 @@ async function _migrateShoppingAisle() {
     const diaryCols = new Set((diaryInfo?.values || []).map(c => c.name));
     if (!diaryCols.has('any_day')) {
       await db.run(`ALTER TABLE cook_diary ADD COLUMN any_day INTEGER NOT NULL DEFAULT 0`);
+    }
+    // Allergens (allergens.js): a pantry item's, and a recipe's correction.
+    const pantryInfo = await db.query(`PRAGMA table_info(pantry_items)`);
+    const pantryCols = new Set((pantryInfo?.values || []).map(c => c.name));
+    for (const c of ['allergens', 'traces', 'allergens_source']) {
+      if (!pantryCols.has(c)) await db.run(`ALTER TABLE pantry_items ADD COLUMN ${c} TEXT`);
+    }
+    const recipeInfo = await db.query(`PRAGMA table_info(recipes)`);
+    if (!(recipeInfo?.values || []).some(c => c.name === 'allergen_overrides')) {
+      await db.run(`ALTER TABLE recipes ADD COLUMN allergen_overrides TEXT`);
     }
     const catInfo = await db.query(`PRAGMA table_info(pantry_categories)`);
     const catCols = new Set((catInfo?.values || []).map(c => c.name));

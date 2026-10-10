@@ -133,6 +133,15 @@ test('a recipe edited offline reads back edited, and a cook shows in the diary',
   assert.equal(diary[0].id, tempId);
 });
 
+test('a recipe\'s allergens corrected offline show on the recipe and its card', () => {
+  const op = writeOp('PUT', '/api/recipes/4/allergens', { allergen_overrides: { add: [], remove: ['en:milk'] } });
+  assert.deepEqual([op.kind, op.key, op.id], ['recipe-allergens', 'recipe-allergens:4', 4]);
+  const ops = [{ seq: 1, ...op, body: { allergen_overrides: { add: [], remove: ['en:milk'] } } }];
+  assert.deepEqual(answerWithOps('/api/recipes/4', { id: 4, name: 'Pancakes' }, ops).allergen_overrides, { add: [], remove: ['en:milk'] });
+  assert.equal(answerWithOps('/api/recipes', [{ id: 4 }, { id: 5 }], ops)[0].allergen_overrides.remove[0], 'en:milk');
+  assert.match(describeOp(op), /allergens you corrected/);
+});
+
 test('a note left on a recipe offline shows on that recipe, not another', () => {
   const ops = [{ seq: 1, kind: 'comment-create', path: '/api/recipes/4/comments', body: { body: 'more salt' }, tempId: -1 }];
   assert.equal(answerWithOps('/api/recipes/4/comments', [], ops).length, 1);

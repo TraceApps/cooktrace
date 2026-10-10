@@ -562,6 +562,21 @@ if (!columnExists('shopping_list', 'notes')) {
 if (!columnExists('cook_diary', 'any_day')) {
   db.exec(`ALTER TABLE cook_diary ADD COLUMN any_day INTEGER NOT NULL DEFAULT 0`);
 }
+// Allergens (lib/allergens.js): a pantry item's, as JSON lists of Open
+// Food Facts codes (NULL: not known), and where they came from ('label'
+// or 'user'); a recipe's own correction ({ add, remove }).
+if (!columnExists('pantry_items', 'allergens')) {
+  db.exec(`ALTER TABLE pantry_items ADD COLUMN allergens TEXT`);
+}
+if (!columnExists('pantry_items', 'traces')) {
+  db.exec(`ALTER TABLE pantry_items ADD COLUMN traces TEXT`);
+}
+if (!columnExists('pantry_items', 'allergens_source')) {
+  db.exec(`ALTER TABLE pantry_items ADD COLUMN allergens_source TEXT`);
+}
+if (!columnExists('recipes', 'allergen_overrides')) {
+  db.exec(`ALTER TABLE recipes ADD COLUMN allergen_overrides TEXT`);
+}
 // Optional per-category default aisle. When set, new shopping items
 // linked to this category inherit this string as their aisle; the
 // user still overrides per item after auto-assignment. Free text

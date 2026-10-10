@@ -17,13 +17,13 @@ export const SYNC_FIELDS = {
     'name', 'description', 'img_url', 'servings', 'prep_minutes', 'cook_minutes', 'total_minutes', 'rest_minutes',
     'ingredients', 'steps', 'tags', 'tools', 'source_url', 'video_url', 'notes',
     'visibility', 'rating', 'yield_text', 'last_cooked_at', 'cook_count',
-    'nutrition', 'favorite', 'category_id', 'deleted_at',
+    'nutrition', 'favorite', 'category_id', 'allergen_overrides', 'deleted_at',
   ],
   pantry_items: [
     'name', 'brand', 'barcode', 'in_stock', 'quantity', 'unit', 'expires_on',
     'nt_food_id', 'img_url', 'notes', 'category', 'category_id',
     'serving_size', 'serving_unit', 'serving_label', 'nutrition', 'g_per_cup',
-    'generic_parent_id', 'nutrition_source_variant_id', 'deleted_at',
+    'generic_parent_id', 'nutrition_source_variant_id', 'allergens', 'traces', 'allergens_source', 'deleted_at',
   ],
   cook_diary: ['recipe_id', 'date', 'kind', 'servings', 'notes', 'photo_url', 'photos', 'meal_type', 'rating', 'any_day', 'deleted_at'],
   shopping_list: ['name', 'quantity', 'unit', 'aisle', 'checked', 'pantry_id', 'recipe_id', 'sort_order', 'sources', 'notes', 'deleted_at'],
@@ -57,6 +57,8 @@ export const SYNC_GROUPS = {
     // Which item this is a variant of, and which variant its nutrition comes
     // from: the shape of the variant tree.
     ['generic_parent_id', 'nutrition_source_variant_id'],
+    // What a label says, and that it's the label's (or the user's) word.
+    ['allergens', 'traces', 'allergens_source'],
   ],
   cook_diary: [['photos', 'photo_url'], ['date', 'meal_type', 'kind', 'any_day']],
   // An amount and where it came from (lib/shopping-plan.js) go together.

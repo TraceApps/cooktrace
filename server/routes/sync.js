@@ -130,7 +130,7 @@ const TABLES = {
       'name', 'description', 'img_url', 'servings', 'prep_minutes', 'cook_minutes', 'total_minutes', 'rest_minutes',
       'ingredients', 'steps', 'tags', 'tools', 'source_url', 'video_url', 'notes',
       'visibility', 'rating', 'yield_text', 'last_cooked_at', 'cook_count',
-      'nutrition', 'favorite', 'category_id',
+      'nutrition', 'favorite', 'category_id', 'allergen_overrides',
     ],
     // Sent to devices so they know a public link exists, never taken from
     // them: only POST/DELETE /api/recipes/:id/share set it. A device still
@@ -149,6 +149,7 @@ const TABLES = {
       // pull translates the server ids to local ids via the same
       // pantry_items lookup the shopping_list uses for pantry_id.
       'generic_parent_id', 'nutrition_source_variant_id',
+      'allergens', 'traces', 'allergens_source',
     ],
     parents: {
       category_id: 'pantry_categories',
@@ -190,7 +191,10 @@ for (const [t, spec] of Object.entries(TABLES)) {
 // Columns added after apps were already syncing: an app from before sends
 // rows without them, which leaves what the server has (or the default for
 // a new row).
-const LATER_COLS = { shopping_list: ['sources', 'notes'], cook_diary: ['any_day'] };
+const LATER_COLS = {
+  shopping_list: ['sources', 'notes'], cook_diary: ['any_day'],
+  pantry_items: ['allergens', 'traces', 'allergens_source'], recipes: ['allergen_overrides'],
+};
 const LATER_DEFAULTS = { any_day: 0 };
 
 // Tables a device deletes rows from outright (no deleted_at column).

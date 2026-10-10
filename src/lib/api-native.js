@@ -19,6 +19,7 @@ import { resolveAssetUrl } from './platform.js';
 import { cleanSmartFilter, matchesSmartFilter } from './smart-cookbook.js';
 import { recipeContributions, mergeIntoList, parseSources } from './shopping-plan.js';
 import { ingredientKey } from './quantity.js';
+import { allergenSummary, cleanCodes, cleanOverrides, knownCodes } from './allergens.js';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
 // ── Small utilities ──────────────────────────────────────────────────
@@ -129,6 +130,8 @@ function _pantryFromRow(row, catMap = null) {
   out.nutrition = _parseJson(out.nutrition, null);
   out.imgUrl = resolveAssetUrl(out.img_url) || '';
   out.in_stock = !!out.in_stock;
+  out.allergens = knownCodes(out.allergens);
+  out.traces = knownCodes(out.traces);
   // Mirror the server's _hydrate: when the row carries a category_id,
   // attach the joined category object so downstream callers (the
   // sheet's pill, the list view) see the same shape as on PWA. Without
@@ -184,9 +187,24 @@ async function _stockSet() {
   return set;
 }
 
+// Each pantry item's allergens and name, for recipe cards' allergens
+// (server/lib/recipe-hydrate.js buildAllergenPantry).
+async function _allergenPantry() {
+  const rows = await _query(
+    `SELECT id, name, allergens, traces, allergens_source FROM pantry_items WHERE user_id = ? AND deleted_at IS NULL`,
+    [LOCAL_USER_ID]
+  );
+  return new Map(rows.map(p => [p.id, p]));
+}
+
+// Allergens as stored: JSON text of codes, or null for "not known".
+const _codesText = v => (v == null || v === '' ? null : JSON.stringify(cleanCodes(v)));
+const _allergenSource = v => (v === 'label' || v === 'user' ? v : null);
+
 // "You have 9 of 11": the recipe card's pantry match (matchSummary on the
-// server), worked out here from the phone's own pantry.
-function _withPantryMatch(recipe, stock) {
+// server), worked out here from the phone's own pantry, and what the
+// recipe contains (lib/allergens.js), as the server adds to its cards.
+function _withPantryMatch(recipe, stock, pantryById = null) {
   if (!recipe) return recipe;
   let have = 0, need = 0;
   for (const g of Array.isArray(recipe.ingredients) ? recipe.ingredients : []) {
@@ -195,7 +213,7 @@ function _withPantryMatch(recipe, stock) {
       if (it?.pantry_item_id && stock.has(it.pantry_item_id)) have++;
     }
   }
-  return { ...recipe, pantry_match: { have, need } };
+  return { ...recipe, pantry_match: { have, need }, allergens: allergenSummary(recipe, pantryById) };
 }
 
 // The account's in-stock pantry items, by id.
@@ -320,7 +338,8 @@ export const CtApiNative = {
       [LOCAL_USER_ID]
     );
     const stock = await _stockSet();
-    return rows.map(r => _withPantryMatch(_recipeFromRow(r), stock));
+    const pantryById = await _allergenPantry();
+    return rows.map(r => _withPantryMatch(_recipeFromRow(r), stock, pantryById));
   },
 
   async getRecipe(id) {
@@ -412,6 +431,17 @@ export const CtApiNative = {
         d.category_id ?? null,
         id,
       ]
+    );
+    return this.getRecipe(id);
+  },
+
+  // The recipe's own allergen correction (routes/recipes.js PUT /:id/allergens).
+  async setRecipeAllergens(id, fix) {
+    const c = cleanOverrides(fix);
+    const text = c.add.length || c.remove.length ? JSON.stringify(c) : null;
+    await _run(
+      `UPDATE recipes SET allergen_overrides = ?, updated_at = datetime('now'), sync_status = 'pending' WHERE id = ?`,
+      [text, id]
     );
     return this.getRecipe(id);
   },
@@ -821,8 +851,9 @@ export const CtApiNative = {
          (user_id, name, brand, barcode, in_stock, quantity, unit, expires_on,
           img_url, notes, category, category_id, serving_size, serving_unit, serving_label,
           nutrition, g_per_cup, nt_food_id,
-          generic_parent_id, nutrition_source_variant_id, sync_status)
-       VALUES (?,?,?,?,?,?,?,?, ?,?,?,?,?,?,?, ?,?,?, ?,?, 'pending')`,
+          generic_parent_id, nutrition_source_variant_id,
+          allergens, traces, allergens_source, sync_status)
+       VALUES (?,?,?,?,?,?,?,?, ?,?,?,?,?,?,?, ?,?,?, ?,?, ?,?,?, 'pending')`,
       [
         LOCAL_USER_ID,
         d.name,
@@ -844,6 +875,9 @@ export const CtApiNative = {
         d.nt_food_id ?? null,
         d.generic_parent_id ?? null,
         d.nutrition_source_variant_id ?? null,
+        _codesText(d.allergens),
+        _codesText(d.traces),
+        d.allergens != null || d.traces != null ? _allergenSource(d.allergens_source) : null,
       ]
     );
     return this.getPantryItem(id);
@@ -885,6 +919,9 @@ export const CtApiNative = {
     if ('nt_food_id' in d)                  push('nt_food_id', d.nt_food_id ?? null);
     if ('generic_parent_id' in d)           push('generic_parent_id', d.generic_parent_id ?? null);
     if ('nutrition_source_variant_id' in d) push('nutrition_source_variant_id', d.nutrition_source_variant_id ?? null);
+    if ('allergens' in d)                   push('allergens', _codesText(d.allergens));
+    if ('traces' in d)                      push('traces', _codesText(d.traces));
+    if ('allergens_source' in d)            push('allergens_source', _allergenSource(d.allergens_source));
     if (fields.length === 0) return this.getPantryItem(id);
     fields.push(`updated_at = datetime('now')`);
     fields.push(`sync_status = 'pending'`);
@@ -1418,7 +1455,8 @@ export const CtApiNative = {
         [id]
       );
     const stock = await _stockSet();
-    out.recipes = recipes.map(r => _withPantryMatch(_recipeFromRow(r), stock));
+    const pantryById = await _allergenPantry();
+    out.recipes = recipes.map(r => _withPantryMatch(_recipeFromRow(r), stock, pantryById));
     out.recipe_count = out.recipes.length;
     return out;
   },

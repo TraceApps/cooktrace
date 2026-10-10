@@ -536,3 +536,32 @@ test('"any day" plans and list notes sync both ways, and an app from before leav
     assert.equal(fresh.find(x => x.id === id).any_day, 0);
   } finally { srv.stop(); }
 });
+
+test('allergens: a label on the phone and a recipe\'s correction sync both ways, and an app from before leaves them be', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const srv = await startServer();
+  const call = async (tok, method, path, body) => {
+    const r = await fetch(srv.base + path, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: body ? JSON.stringify(body) : undefined });
+    const t = await r.text();
+    if (!r.ok) throw new Error(`${method} ${path} ${r.status} ${t.slice(0, 200)}`);
+    return t ? JSON.parse(t) : null;
+  };
+  try {
+    const r = await phone(srv, 'allergens');
+    const want = { contains: ['en:milk', 'en:sesame-seeds'], traces: ['en:nuts'] };
+    assert.deepEqual(r.phoneCard, want, 'the label says no gluten; eggs taken out, sesame added');
+    assert.deepEqual(r.webCard, want, 'the server works it out the same');
+    assert.deepEqual([r.webPantry.allergens, r.webPantry.traces, r.webPantry.allergens_source], [[], ['en:nuts'], 'label']);
+    assert.deepEqual(r.phonePantry, { allergens: '["en:gluten"]', traces: '["en:nuts"]', allergens_source: 'user' });
+    assert.deepEqual(r.phoneAfter, { contains: ['en:gluten', 'en:eggs'], traces: ['en:nuts'] }, "the web's correction replaces the phone's: milk out, eggs back");
+    // An app from before 1.5 pushes the same rows without the new columns.
+    const at = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    await call(srv.token, 'POST', '/api/sync/push', { fk_ids: 'server', client_now: new Date().toISOString(), tables: {
+      pantry_items: [{ client_id: 99, server_id: r.ids.flour, name: 'GF Flour', in_stock: 1, updated_at: at, edit_clock: 'server' }],
+    } });
+    const item = await call(srv.token, 'GET', `/api/pantry/${r.ids.flour}`);
+    assert.equal(item.name, 'GF Flour', 'the rest of the push goes in');
+    assert.deepEqual([item.allergens, item.traces, item.allergens_source], [['en:gluten'], ['en:nuts'], 'user'], 'the allergens stay');
+    const recipe = await call(srv.token, 'GET', `/api/recipes/${r.ids.recipe}`);
+    assert.deepEqual(JSON.parse(recipe.allergen_overrides), { add: [], remove: ['en:milk'] });
+  } finally { srv.stop(); }
+});

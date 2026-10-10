@@ -31,7 +31,7 @@ function _schedulePush() {
 // or returns a fixed-shape no-op) trigger _schedulePush() after the
 // local write returns. Reads pass through untouched.
 const WRITE_METHODS = new Set([
-  'createRecipe', 'updateRecipe', 'deleteRecipe', 'markCooked',
+  'createRecipe', 'updateRecipe', 'deleteRecipe', 'markCooked', 'setRecipeAllergens',
   'updateCook', 'deleteCook',
   'createPantryItem', 'updatePantryItem', 'toggleStock', 'deletePantryItem',
   'createDiaryEntry', 'updateDiaryEntry', 'deleteDiaryEntry',
@@ -126,6 +126,38 @@ wrapped.updateRecipe = async function (id, data) {
   const body = withSaveBase(data, recipeSaveBase(data, null, now), now);
   const res = await fetch(apiUrl(`/api/recipes/${id}`), {
     method: 'PUT', headers, credentials: 'include', body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
+  const row = await res.json();
+  if (!row) return null;
+  const { img_url, ...rest } = row;
+  return { ...rest, imgUrl: resolveAssetUrl(img_url) || '' };
+};
+
+// A recipe's allergen correction: the same split as updateRecipe. A
+// recipe shared with the user goes to the server, which checks they may.
+wrapped.setRecipeAllergens = async function (id, fix) {
+  let local = null;
+  try { local = await CtApiNative.getRecipe(id); } catch { /* treat as remote */ }
+  if (local) {
+    const r = await CtApiNative.setRecipeAllergens(id, fix);
+    _schedulePush();
+    return r;
+  }
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    throw new Error('Editing a recipe shared with you needs a connection.');
+  }
+  const { getServerUrl, getAuthToken, apiUrl, resolveAssetUrl } = await import('./platform.js');
+  const headers = { 'Content-Type': 'application/json' };
+  if (getServerUrl()) {
+    const token = getAuthToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(apiUrl(`/api/recipes/${id}/allergens`), {
+    method: 'PUT', headers, credentials: 'include', body: JSON.stringify({ allergen_overrides: fix }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

@@ -23,7 +23,9 @@ import {
   matchSummary,
   buildStockSet,
   buildCategoryMap,
+  buildAllergenPantry,
 } from '../lib/recipe-hydrate.js';
+import { allergenSummary } from '../lib/allergens.js';
 import { cleanSmartFilter, matchesSmartFilter, parseSmartFilter } from '../lib/smart-cookbook.js';
 
 const router = Router();
@@ -285,6 +287,9 @@ router.get('/:id', wrap((req, res) => {
   // guess whose stock to check), only compute it when isOwner.
   const catMap = buildCategoryMap(cb.user_id);
   const stockSet = isOwner ? buildStockSet(cb.user_id) : null;
+  // Allergens are about the recipe, so the owner's pantry labels count
+  // whoever reads (lib/allergens.js).
+  const pantryById = buildAllergenPantry(cb.user_id);
 
   const hydratedRecipes = recipes.map(r => {
     if (accessible && !accessible.has(r.id)) {
@@ -299,6 +304,7 @@ router.get('/:id', wrap((req, res) => {
     }
     const hydrated = hydrateRecipe(r, catMap);
     if (stockSet) hydrated.pantry_match = matchSummary(hydrated.ingredients, stockSet);
+    hydrated.allergens = allergenSummary(hydrated, pantryById);
     return hydrated;
   });
 

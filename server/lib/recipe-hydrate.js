@@ -102,6 +102,19 @@ export function buildStockSet(u) {
   return stockSet;
 }
 
+// Per-user pantry id -> { name, allergens, traces, allergens_source }, for
+// working out recipe cards' allergens (lib/allergens.js allergenSummary).
+// Always the recipe owner's pantry: the labels are about the recipe's
+// ingredients, whoever is reading.
+export function buildAllergenPantry(u) {
+  const whereUser = u == null ? 'user_id IS NULL' : 'user_id = ?';
+  const args = u == null ? [] : [u];
+  return new Map(db.prepare(
+    `SELECT id, name, allergens, traces, allergens_source FROM pantry_items
+       WHERE ${whereUser} AND deleted_at IS NULL`
+  ).all(...args).map(p => [p.id, p]));
+}
+
 // Per-user category id -> {id,name,slug,color} map, built once and
 // reused across a batch of recipes to avoid an N+1 SELECT.
 export function buildCategoryMap(u) {

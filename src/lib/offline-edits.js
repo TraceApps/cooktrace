@@ -117,6 +117,9 @@ export function writeOp(method, url, body) {
   }
   match = path.match(/^\/api\/recipes\/(-?\d+)\/comments$/);
   if (match && m === 'POST') return { kind: 'comment-create', key: null };
+  // A recipe's allergen correction ({ allergen_overrides }): the latest wins.
+  match = path.match(/^\/api\/recipes\/(-?\d+)\/allergens$/);
+  if (match && m === 'PUT') return { kind: 'recipe-allergens', key: `recipe-allergens:${match[1]}`, id: Number(match[1]) };
 
   // Your own profile: a name, a nickname, a picture. Nothing here decides
   // what anyone else can see, so it queues like the rest.
@@ -132,7 +135,7 @@ const RECIPE_FIELDS = [
   'name', 'description', 'ingredients', 'steps', 'tags', 'tools', 'notes',
   'servings', 'prep_minutes', 'cook_minutes', 'total_minutes', 'rest_minutes',
   'nutrition', 'category_id', 'img_url', 'source_url', 'video_url', 'yield_text',
-  'rating', 'favorite', 'visibility',
+  'rating', 'favorite', 'visibility', 'allergen_overrides',
 ];
 const FIELDS = { ...SYNC_FIELDS, recipes: RECIPE_FIELDS };
 
@@ -388,13 +391,15 @@ export function answerWithOps(url, mirrored, ops) {
     return _withQueued(mirrored, ops, { create: 'diary-create', update: 'diary-update', remove: 'diary-delete' });
   }
   if (path === '/api/recipes') {
-    return _withQueued(mirrored, ops, { create: 'recipe-create', update: 'recipe-update', remove: 'recipe-delete' });
+    return _withQueued(mirrored, ops, { create: 'recipe-create', update: 'recipe-update', remove: 'recipe-delete', patches: ['recipe-allergens'] });
   }
   const oneRecipe = path.match(/^\/api\/recipes\/(-?\d+)$/);
   if (oneRecipe && mirrored) {
     const id = Number(oneRecipe[1]);
     const edit = [...(ops || [])].reverse().find(op => op.kind === 'recipe-update' && Number(op.id) === id);
-    return edit ? { ...mirrored, ...edit.body, _pending: true } : mirrored;
+    const fix = [...(ops || [])].reverse().find(op => op.kind === 'recipe-allergens' && Number(op.id) === id);
+    if (!edit && !fix) return mirrored;
+    return { ...mirrored, ...(edit?.body || {}), ...(fix?.body || {}), _pending: true };
   }
   const comments = path.match(/^\/api\/recipes\/(-?\d+)\/comments$/);
   if (comments) {
@@ -447,6 +452,7 @@ export function queuedReply(op, body, tempId, { recipe } = {}) {
     case 'pantry-stock':
     case 'diary-update':
     case 'recipe-update':
+    case 'recipe-allergens':
       return { ...(body || {}), id: op.id, updated_at: now, ...queued };
     default:
       return { ok: true, ...(body || {}), ...queued };
@@ -493,6 +499,7 @@ export function describeOp(op) {
     case 'recipe-create':    return `the recipe${named} you wrote`;
     case 'recipe-update':    return 'a recipe you changed';
     case 'recipe-delete':    return 'a recipe you deleted';
+    case 'recipe-allergens': return 'the allergens you corrected on a recipe';
     case 'comment-create':   return 'the note you left on a recipe';
     case 'profile':          return 'your profile';
     case 'setting':          return `the "${op.body?.key || 'setting'}" setting`;

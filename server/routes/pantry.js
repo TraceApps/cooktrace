@@ -24,6 +24,7 @@ import { foldText } from '../lib/search-text.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
 import { ownId } from '../lib/link-checks.js';
 import { ingredientKey } from '../lib/quantity.js';
+import { cleanCodes, knownCodes } from '../lib/allergens.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -31,6 +32,15 @@ router.use(requireAuth);
 const uid = req => userMgmtActive() ? req.user.id : null;
 const userClause = (u) => u == null ? 'user_id IS NULL' : 'user_id = ?';
 const userArgs   = (u) => u == null ? [] : [u];
+
+// Allergens as sent: a list of codes, or null for "not known"
+// (lib/allergens.js). Stored as JSON text.
+function _codesText(value) {
+  if (value == null || value === '') return null;
+  return JSON.stringify(cleanCodes(value));
+}
+// Where they came from: the label (a scan or a lookup) or the user.
+const _source = v => (v === 'label' || v === 'user' ? v : null);
 
 function _hydrate(row, categoryMap = null) {
   if (!row) return null;
@@ -55,6 +65,8 @@ function _hydrate(row, categoryMap = null) {
     ...row,
     in_stock: !!row.in_stock,
     nutrition,
+    allergens: knownCodes(row.allergens),
+    traces: knownCodes(row.traces),
     category,
   };
 }
@@ -371,8 +383,9 @@ router.post('/', wrap((req, res) => {
     `INSERT INTO pantry_items
        (user_id, name, brand, barcode, in_stock, quantity, unit, expires_on, nt_food_id,
         img_url, notes, category, category_id, serving_size, serving_unit, serving_label,
-        nutrition, g_per_cup, generic_parent_id, nutrition_source_variant_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        nutrition, g_per_cup, generic_parent_id, nutrition_source_variant_id,
+        allergens, traces, allergens_source)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     u, name,
     body.brand?.toString().trim() || null,
@@ -394,6 +407,9 @@ router.post('/', wrap((req, res) => {
     body.g_per_cup != null && body.g_per_cup !== '' ? Number(body.g_per_cup) : null,
     Number.isFinite(genericParentId) ? genericParentId : null,
     Number.isFinite(nutritionSourceVariantId) ? nutritionSourceVariantId : null,
+    _codesText(body.allergens),
+    _codesText(body.traces),
+    body.allergens != null || body.traces != null ? _source(body.allergens_source) : null,
   );
   setCreateKey('pantry_items', result.lastInsertRowid, createKey);
   const row = db.prepare(`SELECT * FROM pantry_items WHERE id = ?`).get(result.lastInsertRowid);
@@ -498,6 +514,9 @@ router.put('/:id', wrap((req, res) => {
     g_per_cup: body.g_per_cup !== undefined ? (body.g_per_cup === '' || body.g_per_cup == null ? null : Number(body.g_per_cup)) : existing.g_per_cup,
     generic_parent_id: nextGenericParentId,
     nutrition_source_variant_id: nextNutritionSourceVariantId,
+    allergens: body.allergens !== undefined ? _codesText(body.allergens) : existing.allergens,
+    traces: body.traces !== undefined ? _codesText(body.traces) : existing.traces,
+    allergens_source: body.allergens_source !== undefined ? _source(body.allergens_source) : existing.allergens_source,
   }, body._sync);
   // A merge can't leave the variant tree in a shape the checks above refuse.
   if (body._sync) repairVariantTree([id]);

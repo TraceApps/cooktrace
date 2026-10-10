@@ -21,7 +21,8 @@ export const VERSION_FIELDS = [
 ];
 // About the recipe rather than its content: each is merged like the rest,
 // and never kept as a version.
-export const META_FIELDS = ['rating', 'favorite', 'visibility'];
+// A recipe's allergen correction (lib/allergens.js) is one of them.
+export const META_FIELDS = ['rating', 'favorite', 'visibility', 'allergen_overrides'];
 // The fields an edit of a recipe is merged over.
 export const RECIPE_MERGE_FIELDS = [...VERSION_FIELDS, ...META_FIELDS, 'deleted_at'];
 

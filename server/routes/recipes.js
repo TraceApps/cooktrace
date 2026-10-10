@@ -58,6 +58,7 @@ function _userArgs(u) {
 import { autoShareNewRecipe as _autoShareNewRecipe } from '../lib/auto-share.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
 import { ownId, ownIngredientLinks } from '../lib/link-checks.js';
+import { allergenSummary, cleanOverrides } from '../lib/allergens.js';
 
 // Recipe row -> API-shape hydration lives in server/lib/recipe-hydrate.js
 // so cookbooks.js can hydrate cookbook recipe cards identically (they
@@ -71,6 +72,7 @@ import {
   matchSummary as _matchSummary,
   buildStockSet as _buildStockSet,
   buildCategoryMap as _buildCategoryMap,
+  buildAllergenPantry as _buildAllergenPantry,
 } from '../lib/recipe-hydrate.js';
 
 // Tack the creator's current avatar onto a hydrated recipe so the
@@ -175,7 +177,15 @@ function _toStorage(body) {
     category_id:  body.category_id != null && Number.isFinite(parseInt(body.category_id, 10))
                     ? parseInt(body.category_id, 10) : null,
     video_url:    body.video_url ? String(body.video_url).trim() || null : null,
+    // Only when sent: a save that doesn't mention it keeps what's there.
+    allergen_overrides: 'allergen_overrides' in body ? _overridesText(body.allergen_overrides) : undefined,
   };
+}
+
+// A recipe's allergen correction ({ add, remove }) as stored: NULL for none.
+function _overridesText(value) {
+  const fix = cleanOverrides(value);
+  return fix.add.length || fix.remove.length ? JSON.stringify(fix) : null;
 }
 
 // ── GET / — list recipes (with pantry-match counts on each) ────────────
@@ -191,7 +201,12 @@ router.get('/', wrap((req, res) => {
   const stockSet = _buildStockSet(u);
   const catMap = _buildCategoryMap(u);
 
-  const out = ownRows.map(r => _hydrate(r, catMap)).map(r => ({ ...r, pantry_match: _matchSummary(r.ingredients, stockSet) }));
+  const pantryById = _buildAllergenPantry(u);
+  const out = ownRows.map(r => _hydrate(r, catMap)).map(r => ({
+    ...r,
+    pantry_match: _matchSummary(r.ingredients, stockSet),
+    allergens: allergenSummary(r, pantryById),
+  }));
   res.json(out);
 }));
 
@@ -476,8 +491,15 @@ router.get('/shared-with-me', wrap((req, res) => {
       WHERE s.grantee_id = ? AND r.deleted_at IS NULL
       ORDER BY s.granted_at DESC`
   ).all(u);
+  // Allergens from each owner's pantry labels, read once per owner.
+  const pantries = new Map();
+  const pantryOf = owner => {
+    if (!pantries.has(owner)) pantries.set(owner, _buildAllergenPantry(owner));
+    return pantries.get(owner);
+  };
   res.json(rows.map(r => ({
     ..._hydrate(r, catMap),
+    allergens: allergenSummary(_hydrate(r, catMap), pantryOf(r.user_id)),
     shared_with_me: true,
     shared_by: r.shared_by_username || r.created_by_username || null,
     via_kitchen_id: r.via_kitchen_id ?? null,
@@ -564,13 +586,14 @@ router.post('/', wrap((req, res) => {
        (user_id, name, description, img_url, servings, yield_text,
         prep_minutes, cook_minutes, total_minutes, rest_minutes, rating, favorite,
         ingredients, steps, tags, tools, nutrition,
-        source_url, notes, visibility, created_by_username, category_id, video_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        source_url, notes, visibility, created_by_username, category_id, video_url, allergen_overrides)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     u, data.name, data.description, data.img_url, data.servings, data.yield_text,
     data.prep_minutes, data.cook_minutes, data.total_minutes, data.rest_minutes, data.rating, data.favorite,
     data.ingredients, data.steps, data.tags, data.tools, data.nutrition,
     data.source_url, data.notes, data.visibility, creatorUsername, data.category_id, data.video_url,
+    data.allergen_overrides ?? null,
   );
   setCreateKey('recipes', result.lastInsertRowid, createKey);
   _autoShareNewRecipe(u, result.lastInsertRowid);
@@ -683,6 +706,7 @@ router.put('/:id', wrap((req, res) => {
        prep_minutes = ?, cook_minutes = ?, total_minutes = ?, rest_minutes = ?, rating = ?, favorite = ?,
        ingredients = ?, steps = ?, tags = ?, tools = ?, nutrition = ?,
        source_url = ?, notes = ?, visibility = ?, category_id = ?, video_url = ?,
+       allergen_overrides = ?,
        last_edited_by = ?,
        updated_at = COALESCE(?, datetime('now'))
      WHERE id = ?`
@@ -691,6 +715,7 @@ router.put('/:id', wrap((req, res) => {
     data.prep_minutes, data.cook_minutes, data.total_minutes, data.rest_minutes, data.rating, data.favorite,
     guarded.ingredients, guarded.steps, guarded.tags, guarded.tools, guarded.nutrition,
     data.source_url, data.notes, data.visibility, data.category_id, data.video_url,
+    data.allergen_overrides === undefined ? existing.allergen_overrides : data.allergen_overrides,
     // Only worth recording when someone other than the owner saved, and
     // only for content of theirs that went in: otherwise it stays whose it was.
     applied && !applied.fields.some(f => VERSION_FIELDS.includes(f)) ? existing.last_edited_by : (isOwner ? null : u),
@@ -702,6 +727,27 @@ router.put('/:id', wrap((req, res) => {
   res.json({ ..._withCreatorAvatar(_hydrate(row), row), ...(keptServer ? { kept: 'server' } : {}) });
 }));
 
+
+// ── PUT /:id/allergens: the recipe's own correction ───────────────────
+// { add: [codes], remove: [codes] } (lib/allergens.js): what the
+// ingredient names and labels can't know, like gluten-free flour. Whoever
+// may edit the recipe may correct it.
+router.put('/:id/allergens', wrap((req, res) => {
+  const u = uid(req);
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+  const existing = db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(id);
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  const isOwner = (u == null && existing.user_id == null) || existing.user_id === u;
+  if (!isOwner && req.user?.role !== 'admin' && !_canEditViaKitchen(id, u)) return res.status(403).json({ error: 'Forbidden' });
+  // { allergen_overrides: { add, remove } }, or { add, remove } as is.
+  const next = _overridesText(req.body?.allergen_overrides ?? req.body ?? {});
+  if (next !== existing.allergen_overrides) {
+    db.prepare(`UPDATE recipes SET allergen_overrides = ?, updated_at = datetime('now') WHERE id = ?`).run(next, id);
+  }
+  const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(id);
+  res.json(_withCreatorAvatar(_hydrate(row), row));
+}));
 
 // ── Earlier versions ──────────────────────────────────────────────────
 // Copies of the recipe a sync didn't keep (an edit from another device
@@ -1532,13 +1578,14 @@ function _saveImportedRecipe(u, parsed, opts = {}) {
        (user_id, name, description, img_url, servings, yield_text,
         prep_minutes, cook_minutes, total_minutes, rest_minutes, rating, favorite,
         ingredients, steps, tags, tools, nutrition,
-        source_url, notes, visibility, created_by_username, category_id, video_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        source_url, notes, visibility, created_by_username, category_id, video_url, allergen_overrides)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     u, data.name, data.description, data.img_url, data.servings, data.yield_text,
     data.prep_minutes, data.cook_minutes, data.total_minutes, data.rest_minutes, data.rating, data.favorite,
     data.ingredients, data.steps, data.tags, data.tools, data.nutrition,
     data.source_url, data.notes, data.visibility, creatorUsername, data.category_id, data.video_url,
+    data.allergen_overrides ?? null,
   );
 
   // Backdate to the source app's original creation timestamp if the
