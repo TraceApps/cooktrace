@@ -494,3 +494,11 @@ test('the Android app shows how many of a recipe\'s ingredients are in stock, as
   assert.deepEqual(r.list, { have: 2, need: 4 }, 'flour, and milk through its in-stock variant');
   assert.deepEqual(r.cookbook, { have: 2, need: 4 });
 });
+
+test('an import links ingredients to the pantry by name, plurals included, and makes the rest out of stock', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('importLinksPantry');
+  assert.equal(r.phone.tomatoesLinked, true, '"tomato" links to the Tomatoes already there');
+  assert.deepEqual(r.phone.links, ['Tomatoes', 'Onion', 'Onion', 'Garlic'], 'one Onion for "onion" and "onions"');
+  assert.deepEqual(r.phone.made, [['Garlic', false], ['Onion', false]], 'made out of stock, not marked as owned');
+  assert.deepEqual(r.web, { names: ['Tomatoes', 'Tomatoes'], same: true }, '"tomato" and "Tomatoes" link to one item on the server');
+});

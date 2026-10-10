@@ -778,6 +778,32 @@ const scenarios = {
     await api.addRecipesToCookbook(cb.id, [r.id]);
     out.cookbook = (await api.getCookbook(cb.id)).recipes.find(x => x.id === r.id).pantry_match;
   },
+  // An import links each ingredient to the pantry: "tomato" to the
+  // "Tomatoes" already there, and a new item (out of stock) for the rest,
+  // on the phone as on the server.
+  async importLinksPantry() {
+    const toms = await api.createPantryItem({ name: 'Tomatoes', in_stock: true });
+    const jsonld = JSON.stringify({ '@context': 'https://schema.org', '@type': 'Recipe', name: 'Salsa',
+      recipeIngredient: ['2 tomato, diced', '1 small onion', '1 onions', '2 cloves garlic, minced'],
+      recipeInstructions: [{ '@type': 'HowToStep', text: 'Chop.' }] });
+    const r = await api.importRecipe({ text: jsonld });
+    const pantry = await api.getPantry();
+    const nameOf = id => pantry.find(p => p.id === id)?.name ?? null;
+    const items = (await api.getRecipe(r.id)).ingredients[0].items;
+    out.phone = {
+      links: items.map(i => nameOf(i.pantry_item_id)),
+      tomatoesLinked: items[0].pantry_item_id === toms.id,
+      made: pantry.filter(p => p.id !== toms.id).map(p => [p.name, !!p.in_stock]).sort(),
+    };
+    // The web: an import with "tomato" and "Tomatoes" links both to one item.
+    await sync();
+    const w = await web('POST', '/api/recipes/import', { text: JSON.stringify({ '@context': 'https://schema.org', '@type': 'Recipe',
+      name: 'Web Salsa', recipeIngredient: ['1 tomato', '2 Tomatoes'], recipeInstructions: [{ '@type': 'HowToStep', text: 'Chop.' }] }) });
+    const webPantry = await web('GET', '/api/pantry');
+    const list = Array.isArray(webPantry) ? webPantry : (webPantry.items || []);
+    const ids = w.ingredients[0].items.map(i => i.pantry_item_id);
+    out.web = { names: ids.map(id => list.find(p => p.id === id)?.name ?? null), same: ids[0] != null && ids[0] === ids[1] };
+  },
 };
 
 const name = process.argv[2];

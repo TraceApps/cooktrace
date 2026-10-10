@@ -25,6 +25,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Ingredient lines import cleanly** ([#57](https://github.com/TraceApps/cooktrace/discussions/57), thanks @tmzhuang). A range like "4 - 5 roma tomatoes" is one amount, and sizes, package sizes and prep ("large", "15-ounce can", "garlic, minced") go to the note, so the pantry gets "Tomatoes" and "Garlic" rather than "- 5 roma tomatoes" or "garlic, minced". A comma inside a name stays ("boneless, skinless chicken").
+- **An ingredient links to the pantry item it names, plural or not.** "tomato" finds "Tomatoes", and an import naming both makes one item.
+- **Importing a recipe in the Android app links its ingredients to the pantry** and adds new items out of stock. It marked them all in stock and left the recipe unlinked, so nothing ever showed as missing.
 - **Recipes exported from Mealime import with their photo, notes and original link.** The export names each photo by its path inside the zip, which the import didn't follow, and the notes (`comment`) and link (`isBasedOn`) weren't read. Any schema.org recipe file gains from this: its times, tools and picture come through too.
 - **The Android app shows how many of a recipe's ingredients you have** on recipe cards and in cookbooks. It was always empty there.
 - **Plan a Cook on a recipe card opens the planner with that recipe picked.** It went to the Diary and did nothing more.

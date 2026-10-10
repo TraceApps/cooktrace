@@ -23,6 +23,7 @@ import { dispatchWebhookEvent } from '../lib/webhooks.js';
 import { foldText } from '../lib/search-text.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
 import { ownId } from '../lib/link-checks.js';
+import { ingredientKey } from '../lib/quantity.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -612,14 +613,25 @@ export function ensurePantryItems(userId, names) {
     `SELECT * FROM pantry_items WHERE ${userExpr} AND LOWER(name) = ? AND deleted_at IS NULL AND generic_parent_id IS NULL`
   );
   const findById = db.prepare(`SELECT * FROM pantry_items WHERE id = ?`);
+  // A name that differs only by plural or case ("tomato" and "Tomatoes")
+  // is the same item: the one there, or the one made for an earlier name.
+  const byKey = new Map();
+  for (const r of db.prepare(
+    `SELECT * FROM pantry_items WHERE ${userExpr} AND deleted_at IS NULL AND generic_parent_id IS NULL ORDER BY id`
+  ).all(...userArg)) {
+    const k = ingredientKey(r.name);
+    if (k && !byKey.has(k)) byKey.set(k, r);
+  }
 
   const tx = db.transaction(() => {
     for (const lname of cleaned) {
-      const existing = findByName.get(...userArg, lname);
+      const existing = findByName.get(...userArg, lname) || byKey.get(ingredientKey(lname));
       if (existing) { out.set(lname, existing); continue; }
       const result = insert.run(userId, _properCase(lname));
       const row = findById.get(result.lastInsertRowid);
       out.set(lname, row);
+      const k = ingredientKey(lname);
+      if (k) byKey.set(k, row);
     }
   });
   tx();

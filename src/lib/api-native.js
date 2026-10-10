@@ -18,6 +18,7 @@ import { getDb, LOCAL_USER_ID } from './db-native.js';
 import { resolveAssetUrl } from './platform.js';
 import { cleanSmartFilter, matchesSmartFilter } from './smart-cookbook.js';
 import { recipeContributions, mergeIntoList, parseSources } from './shopping-plan.js';
+import { ingredientKey } from './quantity.js';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
 // ── Small utilities ──────────────────────────────────────────────────
@@ -1732,23 +1733,40 @@ async function _saveImportedRecipeLocal(api, r, opts = {}) {
   if (saved?.id && r.imported_created_at) {
     try { await api.backdateRecipe(saved.id, r.imported_created_at); } catch {}
   }
-  // Pantry auto-create — best-effort, mirrors what server's
-  // ensurePantryItems does. Reads existing pantry rows (case-
-  // insensitive) and only inserts the missing names.
-  if (addToPantry && Array.isArray(saved.ingredients)) {
-    const existing = await api.getPantry();
-    const have = new Set((existing || []).map(p => (p.name || '').toLowerCase().trim()));
+  // Each ingredient links to its pantry item, made (out of stock) when
+  // there isn't one, as the server's ensurePantryItems does: a name that
+  // differs only by plural or case ("tomato", "Tomatoes") is the same item.
+  if (addToPantry && Array.isArray(saved?.ingredients)) {
+    const rows = await _query(
+      `SELECT id, name FROM pantry_items WHERE user_id = ? AND deleted_at IS NULL AND generic_parent_id IS NULL ORDER BY id`,
+      [LOCAL_USER_ID]
+    );
+    const byName = new Map();
+    const byKey = new Map();
+    const remember = (name, id) => {
+      const lower = String(name || '').toLowerCase().trim();
+      if (lower && !byName.has(lower)) byName.set(lower, id);
+      const k = ingredientKey(name);
+      if (k && !byKey.has(k)) byKey.set(k, id);
+    };
+    for (const r of rows) remember(r.name, r.id);
+    let linked = false;
     for (const group of saved.ingredients) {
       for (const it of (group.items || [])) {
-        const name = (it.name || '').trim();
-        if (!name) continue;
-        if (have.has(name.toLowerCase())) continue;
-        try {
-          await api.createPantryItem({ name, in_stock: true });
-          have.add(name.toLowerCase());
-        } catch {}
+        const name = (it?.name || '').trim();
+        if (!name || it.pantry_item_id != null) continue;
+        let id = byName.get(name.toLowerCase()) ?? byKey.get(ingredientKey(name));
+        if (id == null) {
+          try {
+            const made = await api.createPantryItem({ name: name.charAt(0).toUpperCase() + name.slice(1), in_stock: false });
+            id = made?.id;
+          } catch { id = null; }
+          if (id != null) remember(name, id);
+        }
+        if (id != null) { it.pantry_item_id = id; linked = true; }
       }
     }
+    if (linked) return api.updateRecipe(saved.id, { ingredients: saved.ingredients });
   }
   return saved;
 }

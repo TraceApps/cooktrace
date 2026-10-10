@@ -15,6 +15,9 @@
  */
 import * as cheerio from 'cheerio';
 import { fetchChecked } from './ssrf-guard.js';
+import { parseIngredientLine } from './ingredient-line.js';
+// One ingredient line split into amount, unit, name and note (shared with the other side).
+export { parseIngredientLine };
 
 const MAX_BYTES   = 5 * 1024 * 1024;
 const TIMEOUT_MS  = 8000;
@@ -209,7 +212,7 @@ function _normalise(r, sourceUrl) {
   // string into qty / unit / name / note so the pantry doesn't end up with
   // entries like "0.25 cup butter" — it should hold "butter".
   const items = (r.recipeIngredient || [])
-    .map(s => _parseIngredientLine(_str(s)))
+    .map(s => parseIngredientLine(_str(s)))
     .filter(i => i.name);
 
   // Steps — recipeInstructions can be:
@@ -342,123 +345,8 @@ function _setNum(obj, key, val) { if (val != null && Number.isFinite(val)) obj[k
 // Splits "0.25 cup butter" → { qty: '0.25', unit: 'cup', name: 'butter' }.
 // Mirrors the unit catalog in src/lib/units.js but kept self-contained so
 // this module stays a leaf on the server.
-const UNIT_VARIANTS = {
-  // teaspoon / tablespoon
-  'tsp': 'tsp', 'tsps': 'tsp', 't': 'tsp', 'teaspoon': 'tsp', 'teaspoons': 'tsp',
-  'tbsp': 'tbsp', 'tbsps': 'tbsp', 'tbs': 'tbsp', 'tbl': 'tbsp', 'tablespoon': 'tbsp', 'tablespoons': 'tbsp',
-  // cup / pint / quart / gallon
-  'c': 'cup', 'cup': 'cup', 'cups': 'cup',
-  'pt': 'pt', 'pint': 'pt', 'pints': 'pt',
-  'qt': 'qt', 'quart': 'qt', 'quarts': 'qt',
-  'gal': 'gal', 'gallon': 'gal', 'gallons': 'gal',
-  // fluid ounce — handled as two-word match
-  'fl oz': 'fl oz', 'fluid ounce': 'fl oz', 'fluid ounces': 'fl oz',
-  // metric volume
-  'ml': 'ml', 'millilitre': 'ml', 'milliliter': 'ml', 'millilitres': 'ml', 'milliliters': 'ml',
-  'cl': 'cl', 'centilitre': 'cl', 'centiliter': 'cl',
-  'dl': 'dl', 'decilitre': 'dl', 'deciliter': 'dl',
-  'l': 'l', 'litre': 'l', 'liter': 'l', 'litres': 'l', 'liters': 'l',
-  // weight
-  'oz': 'oz', 'ounce': 'oz', 'ounces': 'oz',
-  'lb': 'lb', 'lbs': 'lb', 'pound': 'lb', 'pounds': 'lb',
-  'mg': 'mg', 'milligram': 'mg', 'milligrams': 'mg',
-  'g': 'g', 'gram': 'g', 'grams': 'g',
-  'kg': 'kg', 'kilogram': 'kg', 'kilograms': 'kg',
-  // count / descriptive
-  'pc': 'pc', 'pcs': 'pc', 'piece': 'pc', 'pieces': 'pc',
-  'clove': 'clove', 'cloves': 'clove',
-  'sprig': 'sprig', 'sprigs': 'sprig',
-  'slice': 'slice', 'slices': 'slice',
-  'stick': 'stick', 'sticks': 'stick',
-  'pinch': 'pinch', 'pinches': 'pinch',
-  'dash': 'dash', 'dashes': 'dash',
-  'drop': 'drop', 'drops': 'drop',
-  'splash': 'splash', 'splashes': 'splash',
-  'can': 'can', 'cans': 'can',
-  'jar': 'jar', 'jars': 'jar',
-  'package': 'pkg', 'packages': 'pkg', 'pkg': 'pkg',
-  'bottle': 'bottle', 'bottles': 'bottle',
-};
 
-export function parseIngredientLine(line) { return _parseIngredientLine(line); }
-function _parseIngredientLine(line) {
-  if (!line || typeof line !== 'string') return { qty: '', unit: '', name: '', note: '' };
-  const original = line.trim();
 
-  // Pull anything in parens out as a note ("(divided)", "(or to taste)").
-  let note = '';
-  let working = original.replace(/\s*\(([^)]+)\)/g, (_, n) => {
-    note = note ? note + '; ' + n.trim() : n.trim();
-    return '';
-  }).trim();
-
-  // Quantity: integer | mixed (1 1/2) | fraction (1/2) | decimal (0.25).
-  // Also accept unicode vulgar fractions (½, ¼, ¾, ⅓, ⅔) by mapping them.
-  const VULGAR = { '½':'1/2','⅓':'1/3','⅔':'2/3','¼':'1/4','¾':'3/4','⅕':'1/5','⅖':'2/5','⅗':'3/5','⅘':'4/5','⅙':'1/6','⅚':'5/6','⅛':'1/8','⅜':'3/8','⅝':'5/8','⅞':'7/8' };
-  working = working.replace(/[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]/g, ch => ' ' + VULGAR[ch] + ' ').replace(/\s+/g, ' ').trim();
-
-  // European-style tight metric units ("320g", "1.5kg", "100ml") —
-  // inject a space between a leading numeric quantity and a known
-  // metric/imperial unit so the qty + unit regexes below see them
-  // as separate tokens. Limited to short unambiguous units; longer
-  // English forms like "tsp"/"tbsp"/"cup" stay space-required to
-  // avoid swallowing words that happen to start with the same letters.
-  working = working.replace(/^(\d+(?:\.\d+)?)(kg|mg|ml|dl|cl|oz|lb|g|l)\b/i, '$1 $2');
-
-  // Conjunctive mixed numbers: "1 and 1/2 cups" → "1 1/2 cups". Some
-  // recipe sites (and recipe-scrapers' raw lines) write the integer +
-  // fraction with "and" between them; without this normalize step the
-  // qty regex below only matches the leading integer and the fraction
-  // gets misparsed as the unit.
-  working = working.replace(/^(\d+)\s+and\s+(\d+\s*\/\s*\d+)\b/i, '$1 $2');
-
-  let qty = '';
-  const qtyRx = /^([0-9]+(?:\s+[0-9]+\/[0-9]+)|[0-9]+\/[0-9]+|[0-9]+(?:\.[0-9]+)?)\s+/;
-  const qm = working.match(qtyRx);
-  if (qm) {
-    qty = qm[1].trim();
-    working = working.slice(qm[0].length);
-  }
-
-  // Unit. Try a two-word phrase first (so "fluid ounce" beats "fluid").
-  let unit = '';
-  const twoWord = working.match(/^([A-Za-z]+\s+[A-Za-z]+)\b/);
-  if (twoWord) {
-    const cand = twoWord[1].toLowerCase().replace(/\./g, '');
-    if (UNIT_VARIANTS[cand]) {
-      unit = UNIT_VARIANTS[cand];
-      working = working.slice(twoWord[0].length).trim();
-    }
-  }
-  if (!unit) {
-    const oneWord = working.match(/^([A-Za-z]+)\.?\b/);
-    if (oneWord) {
-      const cand = oneWord[1].toLowerCase();
-      if (UNIT_VARIANTS[cand]) {
-        unit = UNIT_VARIANTS[cand];
-        working = working.slice(oneWord[0].length).replace(/^\.\s*/, '').trim();
-      }
-    }
-  }
-
-  // Strip a leading particle that joins quantity to the name in many
-  // languages: English "of", Italian "di / d'", Spanish "de", French "de
-  // / d'", German "von". Only strip when there's a real name after it
-  // (otherwise "of" might be the whole name, unlikely but cheap to guard).
-  let name = working
-    .replace(/^(?:of|di|de|von|do|da)\s+/i, '')
-    .replace(/^d['’]/i, '')
-    .trim();
-
-  // Trailing "to taste" / "as needed" / "optional" patterns become notes.
-  const tail = name.match(/^(.+?)[,\s]+(to taste|as needed|optional|divided|chopped|sifted)$/i);
-  if (tail && tail[1].trim()) {
-    name = tail[1].trim();
-    note = note ? note + '; ' + tail[2] : tail[2];
-  }
-
-  return { qty, unit, name, note };
-}
 
 function _flattenSteps(instructions) {
   if (!instructions) return [];

@@ -27,6 +27,10 @@
  *     return a 200 instead of a CORS-blocked failure.
  */
 
+import { parseIngredientLine } from './ingredient-line.js';
+// One ingredient line split into amount, unit, name and note (shared with the server).
+export { parseIngredientLine };
+
 const UA = 'CookTrace/0.11.0 (Android local mode; +https://github.com/TraceApps)';
 
 /**
@@ -77,9 +81,6 @@ export function extractRecipeFromHtml(html, sourceUrl = null) {
 }
 export function normaliseSchemaOrgRecipe(node, sourceUrl = null) {
   return _normalise(node, sourceUrl);
-}
-export function parseIngredientLine(line) {
-  return _parseIngredientLine(line);
 }
 
 function _extractRecipe(html, sourceUrl) {
@@ -153,7 +154,7 @@ function _normalise(r, sourceUrl) {
     : null;
 
   const items = (r.recipeIngredient || [])
-    .map(s => _parseIngredientLine(_str(s)))
+    .map(s => parseIngredientLine(_str(s)))
     .filter(i => i.name);
 
   const steps = _flattenSteps(r.recipeInstructions);
@@ -261,93 +262,8 @@ function _parseNum(s) {
 }
 function _setNum(obj, key, val) { if (val != null && Number.isFinite(val)) obj[key] = val; }
 
-const UNIT_VARIANTS = {
-  'tsp': 'tsp', 'tsps': 'tsp', 't': 'tsp', 'teaspoon': 'tsp', 'teaspoons': 'tsp',
-  'tbsp': 'tbsp', 'tbsps': 'tbsp', 'tbs': 'tbsp', 'tbl': 'tbsp', 'tablespoon': 'tbsp', 'tablespoons': 'tbsp',
-  'c': 'cup', 'cup': 'cup', 'cups': 'cup',
-  'pt': 'pt', 'pint': 'pt', 'pints': 'pt',
-  'qt': 'qt', 'quart': 'qt', 'quarts': 'qt',
-  'gal': 'gal', 'gallon': 'gal', 'gallons': 'gal',
-  'fl oz': 'fl oz', 'fluid ounce': 'fl oz', 'fluid ounces': 'fl oz',
-  'ml': 'ml', 'millilitre': 'ml', 'milliliter': 'ml', 'millilitres': 'ml', 'milliliters': 'ml',
-  'cl': 'cl', 'centilitre': 'cl', 'centiliter': 'cl',
-  'dl': 'dl', 'decilitre': 'dl', 'deciliter': 'dl',
-  'l': 'l', 'litre': 'l', 'liter': 'l', 'litres': 'l', 'liters': 'l',
-  'oz': 'oz', 'ounce': 'oz', 'ounces': 'oz',
-  'lb': 'lb', 'lbs': 'lb', 'pound': 'lb', 'pounds': 'lb',
-  'mg': 'mg', 'milligram': 'mg', 'milligrams': 'mg',
-  'g': 'g', 'gram': 'g', 'grams': 'g',
-  'kg': 'kg', 'kilogram': 'kg', 'kilograms': 'kg',
-  'pc': 'pc', 'pcs': 'pc', 'piece': 'pc', 'pieces': 'pc',
-  'clove': 'clove', 'cloves': 'clove',
-  'sprig': 'sprig', 'sprigs': 'sprig',
-  'slice': 'slice', 'slices': 'slice',
-  'stick': 'stick', 'sticks': 'stick',
-  'pinch': 'pinch', 'pinches': 'pinch',
-  'dash': 'dash', 'dashes': 'dash',
-  'drop': 'drop', 'drops': 'drop',
-  'splash': 'splash', 'splashes': 'splash',
-  'can': 'can', 'cans': 'can',
-  'jar': 'jar', 'jars': 'jar',
-  'package': 'pkg', 'packages': 'pkg', 'pkg': 'pkg',
-  'bottle': 'bottle', 'bottles': 'bottle',
-};
 
-function _parseIngredientLine(line) {
-  if (!line || typeof line !== 'string') return { qty: '', unit: '', name: '', note: '' };
-  const original = line.trim();
-  let note = '';
-  let working = original.replace(/\s*\(([^)]+)\)/g, (_, n) => {
-    note = note ? note + '; ' + n.trim() : n.trim();
-    return '';
-  }).trim();
 
-  const VULGAR = { '½':'1/2','⅓':'1/3','⅔':'2/3','¼':'1/4','¾':'3/4','⅕':'1/5','⅖':'2/5','⅗':'3/5','⅘':'4/5','⅙':'1/6','⅚':'5/6','⅛':'1/8','⅜':'3/8','⅝':'5/8','⅞':'7/8' };
-  working = working.replace(/[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]/g, ch => ' ' + VULGAR[ch] + ' ').replace(/\s+/g, ' ').trim();
-  working = working.replace(/^(\d+(?:\.\d+)?)(kg|mg|ml|dl|cl|oz|lb|g|l)\b/i, '$1 $2');
-  working = working.replace(/^(\d+)\s+and\s+(\d+\s*\/\s*\d+)\b/i, '$1 $2');
-
-  let qty = '';
-  const qtyRx = /^([0-9]+(?:\s+[0-9]+\/[0-9]+)|[0-9]+\/[0-9]+|[0-9]+(?:\.[0-9]+)?)\s+/;
-  const qm = working.match(qtyRx);
-  if (qm) {
-    qty = qm[1].trim();
-    working = working.slice(qm[0].length);
-  }
-
-  let unit = '';
-  const twoWord = working.match(/^([A-Za-z]+\s+[A-Za-z]+)\b/);
-  if (twoWord) {
-    const cand = twoWord[1].toLowerCase().replace(/\./g, '');
-    if (UNIT_VARIANTS[cand]) {
-      unit = UNIT_VARIANTS[cand];
-      working = working.slice(twoWord[0].length).trim();
-    }
-  }
-  if (!unit) {
-    const oneWord = working.match(/^([A-Za-z]+)\.?\b/);
-    if (oneWord) {
-      const cand = oneWord[1].toLowerCase();
-      if (UNIT_VARIANTS[cand]) {
-        unit = UNIT_VARIANTS[cand];
-        working = working.slice(oneWord[0].length).replace(/^\.\s*/, '').trim();
-      }
-    }
-  }
-
-  let name = working
-    .replace(/^(?:of|di|de|von|do|da)\s+/i, '')
-    .replace(/^d['’]/i, '')
-    .trim();
-
-  const tail = name.match(/^(.+?)[,\s]+(to taste|as needed|optional|divided|chopped|sifted)$/i);
-  if (tail && tail[1].trim()) {
-    name = tail[1].trim();
-    note = note ? note + '; ' + tail[2] : tail[2];
-  }
-
-  return { qty, unit, name, note };
-}
 
 function _flattenSteps(instructions) {
   if (!instructions) return [];
