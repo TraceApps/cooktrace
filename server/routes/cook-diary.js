@@ -188,11 +188,13 @@ router.post('/', wrap((req, res) => {
   const servings = body.servings != null ? Number(body.servings) || null : null;
   const mealType = _coerceMealType(body.meal_type);
   const rating   = _coerceRating(body.rating);
+  // Planned for some day of the week (its date is the week's Monday).
+  const anyDay   = kind === 'planned' && body.any_day ? 1 : 0;
 
   const result = db.prepare(
-    `INSERT INTO cook_diary (user_id, recipe_id, date, kind, servings, notes, photo_url, meal_type, rating)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(u, recipeId, date, kind, servings, notes, photoUrl, mealType, rating);
+    `INSERT INTO cook_diary (user_id, recipe_id, date, kind, servings, notes, photo_url, meal_type, rating, any_day)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(u, recipeId, date, kind, servings, notes, photoUrl, mealType, rating, anyDay);
 
   setCreateKey('cook_diary', result.lastInsertRowid, createKey);
   if (kind === 'cooked') recomputeRecipeAggregates(recipeId);
@@ -228,10 +230,12 @@ router.put('/:id', wrap((req, res) => {
   const servings = body.servings !== undefined ? (body.servings === '' || body.servings == null ? null : Number(body.servings)) : existing.servings;
   const mealType = body.meal_type !== undefined ? _coerceMealType(body.meal_type) : existing.meal_type;
   const rating   = body.rating    !== undefined ? _coerceRating(body.rating)      : existing.rating;
+  // Cooked, or given a day, it's no longer "any day".
+  const anyDay   = kindIn === 'cooked' ? 0 : body.any_day !== undefined ? (body.any_day ? 1 : 0) : (existing.any_day ? 1 : 0);
 
   // With _sync, merged with changes made elsewhere (lib/rest-merge.js):
   // what stays may not be all of this save.
-  saveRow('cook_diary', id, existing, { date, kind: kindIn, notes, photo_url: photoUrl, servings, meal_type: mealType, rating }, body._sync);
+  saveRow('cook_diary', id, existing, { date, kind: kindIn, notes, photo_url: photoUrl, servings, meal_type: mealType, rating, any_day: anyDay }, body._sync);
   const kind = db.prepare(`SELECT kind FROM cook_diary WHERE id = ?`).get(id).kind;
 
   // Recompute aggregates if cooked-state or recipe changed.

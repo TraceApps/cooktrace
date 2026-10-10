@@ -804,6 +804,25 @@ const scenarios = {
     const ids = w.ingredients[0].items.map(i => i.pantry_item_id);
     out.web = { names: ids.map(id => list.find(p => p.id === id)?.name ?? null), same: ids[0] != null && ids[0] === ids[1] };
   },
+  // A planned cook for "any day" of a week, and a note on a list item,
+  // made on the phone and edited on the web, both ways.
+  async laterFields() {
+    const r = await api.createRecipe({ name: 'Curry', steps: [{ text: 'Cook' }], ingredients: [{ items: [{ name: 'rice' }] }] });
+    const cook = await api.createDiaryEntry({ recipe_id: r.id, date: '2030-01-07', kind: 'planned', any_day: true, servings: 2 });
+    const milk = await api.addShoppingItem({ name: 'Milk', notes: 'oat' });
+    await sync();
+    const sCook = (await db.query(`SELECT server_id FROM cook_diary WHERE id = ?`, [cook.id])).values[0].server_id;
+    const sMilk = (await db.query(`SELECT server_id FROM shopping_list WHERE id = ?`, [milk.id])).values[0].server_id;
+    const diary = await web('GET', '/api/cook-diary?from=2030-01-07&to=2030-01-07');
+    const list = await web('GET', '/api/shopping');
+    out.server = { anyDay: diary.find(x => x.id === sCook)?.any_day, notes: list.find(x => x.id === sMilk)?.notes };
+    await web('PUT', `/api/shopping/${sMilk}`, { notes: 'whole' });
+    await web('PUT', `/api/cook-diary/${sCook}`, { date: '2030-01-09', any_day: false });
+    await sync();
+    const here = async (t, id) => (await db.query(`SELECT * FROM ${t} WHERE id = ?`, [id])).values[0];
+    out.phone = { notes: (await here('shopping_list', milk.id)).notes, anyDay: (await here('cook_diary', cook.id)).any_day, date: (await here('cook_diary', cook.id)).date };
+    out.ids = { cook: sCook, milk: sMilk };
+  },
 };
 
 const name = process.argv[2];

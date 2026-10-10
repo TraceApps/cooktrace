@@ -25,6 +25,12 @@ const uid = req => userMgmtActive() ? req.user.id : null;
 const userClause = (u) => u == null ? 'user_id IS NULL' : 'user_id = ?';
 const userArgs   = (u) => u == null ? [] : [u];
 
+// A note on an item: trimmed text, at most 500 characters, or none.
+function _note(v) {
+  const s = v == null ? '' : String(v).trim();
+  return s ? s.slice(0, 500) : null;
+}
+
 function _hydrate(row) {
   if (!row) return null;
   return { ...row, checked: !!row.checked, sources: parseSources(row.sources) };
@@ -73,8 +79,8 @@ router.post('/', wrap((req, res) => {
   if (aisle == null && pantryId) aisle = _aisleForPantry(pantryId, u);
 
   const result = db.prepare(
-    `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, checked, pantry_id, recipe_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, checked, pantry_id, recipe_id, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     u, _titleCaseName(name),
     body.quantity == null || body.quantity === '' ? null : Number(body.quantity),
@@ -83,6 +89,7 @@ router.post('/', wrap((req, res) => {
     body.checked ? 1 : 0,
     pantryId,
     recipeId,
+    _note(body.notes),
   );
   setCreateKey('shopping_list', result.lastInsertRowid, createKey);
   const row = db.prepare(`SELECT * FROM shopping_list WHERE id = ?`).get(result.lastInsertRowid);
@@ -109,6 +116,7 @@ router.put('/:id', wrap((req, res) => {
     checked: body.checked !== undefined ? (body.checked ? 1 : 0) : existing.checked,
     pantry_id: body.pantry_id !== undefined ? ownId('pantry_items', body.pantry_id, u) : existing.pantry_id,
     sort_order: body.sort_order !== undefined ? (body.sort_order == null ? null : Number(body.sort_order)) : existing.sort_order,
+    notes: body.notes !== undefined ? _note(body.notes) : existing.notes,
   }, body._sync);
   const row = db.prepare(`SELECT * FROM shopping_list WHERE id = ?`).get(id);
   res.json({ ..._hydrate(row), ...(kept ? { kept: 'server' } : {}) });

@@ -553,6 +553,15 @@ if (!columnExists('shopping_list', 'sort_order')) {
 if (!columnExists('shopping_list', 'sources')) {
   db.exec(`ALTER TABLE shopping_list ADD COLUMN sources TEXT`);
 }
+// A note on a list item ("riper ones for Monday").
+if (!columnExists('shopping_list', 'notes')) {
+  db.exec(`ALTER TABLE shopping_list ADD COLUMN notes TEXT`);
+}
+// A planned cook for some day of its week rather than a set day: its date
+// is the week's Monday, so the week's reads and the list still find it.
+if (!columnExists('cook_diary', 'any_day')) {
+  db.exec(`ALTER TABLE cook_diary ADD COLUMN any_day INTEGER NOT NULL DEFAULT 0`);
+}
 // Optional per-category default aisle. When set, new shopping items
 // linked to this category inherit this string as their aisle; the
 // user still overrides per item after auto-assignment. Free text

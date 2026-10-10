@@ -148,6 +148,12 @@ function _diaryFromRow(row) {
   return out;
 }
 
+// A note on a list item, as the server keeps it (routes/shopping.js _note).
+function _note(v) {
+  const s = v == null ? '' : String(v).trim();
+  return s ? s.slice(0, 500) : null;
+}
+
 function _shoppingFromRow(row) {
   if (!row) return null;
   const out = { ...row };
@@ -485,6 +491,9 @@ export const CtApiNative = {
     if (d.meal_type !== undefined){ fields.push('meal_type = ?');params.push(d.meal_type || null); }
     if (d.rating !== undefined){ fields.push('rating = ?');   params.push(d.rating ?? null); }
     if (d.kind != null)      { fields.push('kind = ?');      params.push(d.kind); }
+    // Cooked, or given a day, it's no longer "any day" (as the server does).
+    if (d.kind === 'cooked') fields.push('any_day = 0');
+    else if (d.any_day !== undefined) { fields.push('any_day = ?'); params.push(d.any_day ? 1 : 0); }
     if (d.photos !== undefined) {
       fields.push('photos = ?'); params.push(_stringify(d.photos));
       fields.push('photo_url = ?'); params.push(Array.isArray(d.photos) && d.photos.length ? d.photos[0] : null);
@@ -947,8 +956,8 @@ export const CtApiNative = {
     const d = data || {};
     const id = await _runInsert(
       `INSERT INTO cook_diary
-         (user_id, recipe_id, date, kind, servings, notes, photo_url, photos, meal_type, rating, sync_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+         (user_id, recipe_id, date, kind, servings, notes, photo_url, photos, meal_type, rating, any_day, sync_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
       [
         LOCAL_USER_ID, d.recipe_id ?? null, d.date,
         d.kind === 'cooked' ? 'cooked' : 'planned',
@@ -957,6 +966,7 @@ export const CtApiNative = {
         d.photos != null ? _stringify(d.photos) : null,
         d.meal_type || null,
         d.rating ?? null,
+        d.kind !== 'cooked' && d.any_day ? 1 : 0,
       ]
     );
     if (d.kind === 'cooked' && d.recipe_id) await _recomputeCookAggregates(d.recipe_id);
@@ -1062,11 +1072,11 @@ export const CtApiNative = {
     if (aisle == null && d.pantry_id) aisle = await _aisleForPantry(d.pantry_id);
     const id = await _runInsert(
       `INSERT INTO shopping_list
-         (user_id, name, quantity, unit, aisle, checked, pantry_id, recipe_id, sync_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+         (user_id, name, quantity, unit, aisle, checked, pantry_id, recipe_id, notes, sync_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
       [
         LOCAL_USER_ID, _titleCaseName(d.name), d.quantity ?? null, d.unit || null,
-        aisle, _bool(d.checked), d.pantry_id ?? null, d.recipe_id ?? null,
+        aisle, _bool(d.checked), d.pantry_id ?? null, d.recipe_id ?? null, _note(d.notes),
       ]
     );
     const rows = await _query(`SELECT * FROM shopping_list WHERE id = ?`, [id]);
@@ -1085,7 +1095,7 @@ export const CtApiNative = {
     await _run(
       `UPDATE shopping_list SET
          name = ?, quantity = ?, unit = ?, aisle = ?,
-         checked = ?, pantry_id = ?, sort_order = ?,
+         checked = ?, pantry_id = ?, sort_order = ?, notes = ?,
          updated_at = datetime('now'), sync_status = 'pending'
        WHERE id = ?`,
       [
@@ -1096,6 +1106,7 @@ export const CtApiNative = {
         d.checked !== undefined ? _bool(d.checked) : existing.checked,
         d.pantry_id !== undefined ? (d.pantry_id ?? null) : existing.pantry_id,
         nextSort,
+        d.notes !== undefined ? _note(d.notes) : existing.notes,
         id,
       ]
     );

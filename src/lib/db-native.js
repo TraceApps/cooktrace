@@ -136,6 +136,7 @@ const SCHEMA = `
     photos       TEXT,
     meal_type    TEXT,
     rating       INTEGER,
+    any_day      INTEGER NOT NULL DEFAULT 0,
     created_at   TEXT DEFAULT (datetime('now')),
     updated_at   TEXT DEFAULT (datetime('now')),
     deleted_at   TEXT DEFAULT NULL,
@@ -159,6 +160,7 @@ const SCHEMA = `
     recipe_id    INTEGER,
     sort_order   INTEGER,
     sources      TEXT,
+    notes        TEXT,
     created_at   TEXT DEFAULT (datetime('now')),
     updated_at   TEXT DEFAULT (datetime('now')),
     deleted_at   TEXT DEFAULT NULL,
@@ -450,6 +452,15 @@ async function _migrateShoppingAisle() {
     // Where a row's amount came from (shopping-plan.js).
     if (!shopCols.has('sources')) {
       await db.run(`ALTER TABLE shopping_list ADD COLUMN sources TEXT`);
+    }
+    if (!shopCols.has('notes')) {
+      await db.run(`ALTER TABLE shopping_list ADD COLUMN notes TEXT`);
+    }
+    // A planned cook for some day of its week (date = the week's Monday).
+    const diaryInfo = await db.query(`PRAGMA table_info(cook_diary)`);
+    const diaryCols = new Set((diaryInfo?.values || []).map(c => c.name));
+    if (!diaryCols.has('any_day')) {
+      await db.run(`ALTER TABLE cook_diary ADD COLUMN any_day INTEGER NOT NULL DEFAULT 0`);
     }
     const catInfo = await db.query(`PRAGMA table_info(pantry_categories)`);
     const catCols = new Set((catInfo?.values || []).map(c => c.name));

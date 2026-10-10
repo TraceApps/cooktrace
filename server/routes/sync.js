@@ -158,12 +158,12 @@ const TABLES = {
     softDelete: true,
   },
   cook_diary: {
-    cols: ['recipe_id', 'date', 'kind', 'servings', 'notes', 'photo_url', 'photos', 'meal_type', 'rating'],
+    cols: ['recipe_id', 'date', 'kind', 'servings', 'notes', 'photo_url', 'photos', 'meal_type', 'rating', 'any_day'],
     parents: { recipe_id: 'recipes' },
     softDelete: true,
   },
   shopping_list: {
-    cols: ['name', 'quantity', 'unit', 'aisle', 'checked', 'pantry_id', 'recipe_id', 'sort_order', 'sources'],
+    cols: ['name', 'quantity', 'unit', 'aisle', 'checked', 'pantry_id', 'recipe_id', 'sort_order', 'sources', 'notes'],
     parents: { pantry_id: 'pantry_items', recipe_id: 'recipes' },
     softDelete: true,
   },
@@ -186,6 +186,12 @@ for (const [t, spec] of Object.entries(TABLES)) {
   const want = [...spec.cols, ...(spec.softDelete ? ['deleted_at'] : [])].join(',');
   if ((SYNC_FIELDS[t] || []).join(',') !== want) throw new Error(`lib/sync-fields.js is out of step with routes/sync.js for ${t}`);
 }
+
+// Columns added after apps were already syncing: an app from before sends
+// rows without them, which leaves what the server has (or the default for
+// a new row).
+const LATER_COLS = { shopping_list: ['sources', 'notes'], cook_diary: ['any_day'] };
+const LATER_DEFAULTS = { any_day: 0 };
 
 // Tables a device deletes rows from outright (no deleted_at column).
 const DELETABLE = ['recipe_categories', 'pantry_categories', 'custom_units', 'ai_chat_history'];
@@ -249,6 +255,10 @@ router.post('/push', wrap((req, res) => {
         if (!translated) continue; // its parent didn't go in; the app sends it again next sync
         if (name === 'cookbooks') _translateFilterCategory(translated, idMaps, serverIds);
         let values = spec.cols.map(c => _coerce(translated[c]));
+        for (const c of LATER_COLS[name] || []) {
+          const at = spec.cols.indexOf(c);
+          if (values[at] == null && c in LATER_DEFAULTS) values[at] = LATER_DEFAULTS[c];
+        }
         // An ingredient links only to the account's own pantry items
         // (lib/link-checks.js): the app sends the server's ids for them.
         if (name === 'recipes') {
@@ -292,7 +302,10 @@ router.post('/push', wrap((req, res) => {
           ).get(row.server_id);
           if (!existing) continue;
           if ((u == null && existing.user_id != null) || (u != null && existing.user_id !== u)) continue;
-          if (sourcesAt > -1 && !('sources' in row)) values[sourcesAt] = existing.sources ?? null;
+          // Columns an app from before doesn't send keep what's here.
+          for (const c of LATER_COLS[name] || []) {
+            if (!(c in row)) values[spec.cols.indexOf(c)] = existing[c] ?? null;
+          }
           if (name === 'recipes') {
             values = _guardRecipeValuesForUpdate(values, spec, existing);
           }

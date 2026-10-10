@@ -502,3 +502,37 @@ test('an import links ingredients to the pantry by name, plurals included, and m
   assert.deepEqual(r.phone.made, [['Garlic', false], ['Onion', false]], 'made out of stock, not marked as owned');
   assert.deepEqual(r.web, { names: ['Tomatoes', 'Tomatoes'], same: true }, '"tomato" and "Tomatoes" link to one item on the server');
 });
+
+test('"any day" plans and list notes sync both ways, and an app from before leaves them be', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const srv = await startServer();
+  const call = async (tok, method, path, body) => {
+    const r = await fetch(srv.base + path, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: body ? JSON.stringify(body) : undefined });
+    const t = await r.text();
+    if (!r.ok) throw new Error(`${method} ${path} ${r.status} ${t.slice(0, 200)}`);
+    return t ? JSON.parse(t) : null;
+  };
+  try {
+    const r = await phone(srv, 'laterFields');
+    assert.deepEqual(r.server, { anyDay: 1, notes: 'oat' });
+    assert.deepEqual(r.phone, { notes: 'whole', anyDay: 0, date: '2030-01-09' }, 'given a day on the web, it has one on the phone');
+    // An app from before 1.5 pushes the same rows without the new columns.
+    const at = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    await call(srv.token, 'PUT', `/api/cook-diary/${r.ids.cook}`, { date: '2030-01-07', any_day: true });
+    await call(srv.token, 'POST', '/api/sync/push', { fk_ids: 'server', client_now: new Date().toISOString(), tables: {
+      shopping_list: [{ client_id: 99, server_id: r.ids.milk, name: 'Milk', quantity: 2, unit: null, aisle: null, checked: 1, pantry_id: null, recipe_id: null, sort_order: null, updated_at: at, edit_clock: 'server' }],
+      cook_diary: [{ client_id: 98, server_id: r.ids.cook, recipe_id: null, date: '2030-01-07', kind: 'planned', servings: 3, notes: null, photo_url: null, photos: null, meal_type: null, rating: null, updated_at: at, edit_clock: 'server' }],
+    } });
+    const list = await call(srv.token, 'GET', '/api/shopping');
+    const diary = await call(srv.token, 'GET', '/api/cook-diary?from=2030-01-07&to=2030-01-07');
+    assert.equal(list.find(x => x.id === r.ids.milk).notes, 'whole', 'the note stays');
+    assert.equal(diary.find(x => x.id === r.ids.cook).any_day, 1, '"any day" stays');
+    assert.equal(diary.find(x => x.id === r.ids.cook).servings, 3, 'the rest of the push goes in');
+    // A new row from such an app is a set day.
+    const made = await call(srv.token, 'POST', '/api/sync/push', { fk_ids: 'server', client_now: new Date().toISOString(), tables: {
+      cook_diary: [{ client_id: 97, server_id: null, recipe_id: null, date: '2030-01-10', kind: 'planned', servings: 2, updated_at: at, edit_clock: 'server' }],
+    } });
+    const id = made.tables.cook_diary[0].server_id;
+    const fresh = await call(srv.token, 'GET', '/api/cook-diary?from=2030-01-10&to=2030-01-10');
+    assert.equal(fresh.find(x => x.id === id).any_day, 0);
+  } finally { srv.stop(); }
+});
