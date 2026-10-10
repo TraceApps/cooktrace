@@ -13,53 +13,10 @@
  *   - "Count" units (pc, clove, slice, etc.) only line up when both
  *     recipe and pantry use the same count unit.
  */
-import { parseQty } from './qty.js';
+import { parseQty, unitFamily, convertWithinFamily, convertQty } from './quantity.js';
 
-// ── Unit conversion to base units (ml for volume, g for weight) ──────────
-// Returned as { factor, family }. factor = how many BASE units per 1
-// of the input unit.
-const VOLUME_TO_ML = {
-  ml: 1, cl: 10, dl: 100, l: 1000,
-  tsp: 4.929,        // US teaspoon
-  tbsp: 14.787,      // US tablespoon
-  'fl oz': 29.574,
-  cup: 236.588,
-  pt: 473.176,
-  qt: 946.353,
-  gal: 3785.411,
-};
-const WEIGHT_TO_G = {
-  mg: 0.001, g: 1, kg: 1000,
-  oz: 28.3495,
-  lb: 453.592,
-};
-
-export function unitFamily(unit) {
-  if (!unit) return null;
-  const u = unit.toLowerCase().trim();
-  if (VOLUME_TO_ML[u] != null) return 'volume';
-  if (WEIGHT_TO_G[u] != null) return 'weight';
-  return 'count'; // pc, clove, slice, etc., or anything we don't know
-}
-
-export function convertWithinFamily(qty, fromUnit, toUnit) {
-  if (qty == null || !Number.isFinite(qty)) return null;
-  const fromFam = unitFamily(fromUnit);
-  const toFam = unitFamily(toUnit);
-  if (!fromFam || !toFam || fromFam !== toFam) return null;
-
-  const fu = (fromUnit || '').toLowerCase().trim();
-  const tu = (toUnit || '').toLowerCase().trim();
-
-  if (fromFam === 'volume') {
-    return qty * VOLUME_TO_ML[fu] / VOLUME_TO_ML[tu];
-  }
-  if (fromFam === 'weight') {
-    return qty * WEIGHT_TO_G[fu] / WEIGHT_TO_G[tu];
-  }
-  // count-family: only pass through if the unit is identical
-  return fu === tu ? qty : null;
-}
+// Units and conversions live in quantity.js (shared with the server).
+export { unitFamily, convertWithinFamily, convertQty };
 
 /**
  * Built-in density table — grams per US cup for the most common
@@ -524,42 +481,6 @@ export function lookupCommonDensity(name) {
 }
 
 /**
- * Convert qty + unit, allowing cross-family bridging via per-pantry-row
- * density (`g_per_cup`). Returns null when conversion is impossible.
- *
- *   - Same family: defers to convertWithinFamily.
- *   - volume → weight: ml = qty * VOLUME_TO_ML[fromUnit];
- *                       g  = ml * (g_per_cup / 236.588);
- *                       result = g / WEIGHT_TO_G[toUnit].
- *   - weight → volume: inverse.
- *   - count family: still no-op unless units match (count→volume/weight
- *                   would need per-piece weight, not modelled).
- */
-export function convertQty(qty, fromUnit, toUnit, gPerCup) {
-  if (qty == null || !Number.isFinite(qty)) return null;
-  const same = convertWithinFamily(qty, fromUnit, toUnit);
-  if (same != null) return same;
-  const fromFam = unitFamily(fromUnit);
-  const toFam   = unitFamily(toUnit);
-  if (!gPerCup || !Number.isFinite(gPerCup) || gPerCup <= 0) return null;
-  if (fromFam === 'volume' && toFam === 'weight') {
-    const fu = (fromUnit || '').toLowerCase().trim();
-    const tu = (toUnit || '').toLowerCase().trim();
-    const ml = qty * VOLUME_TO_ML[fu];
-    const grams = ml * (gPerCup / VOLUME_TO_ML.cup);
-    return grams / WEIGHT_TO_G[tu];
-  }
-  if (fromFam === 'weight' && toFam === 'volume') {
-    const fu = (fromUnit || '').toLowerCase().trim();
-    const tu = (toUnit || '').toLowerCase().trim();
-    const grams = qty * WEIGHT_TO_G[fu];
-    const ml = grams / (gPerCup / VOLUME_TO_ML.cup);
-    return ml / VOLUME_TO_ML[tu];
-  }
-  return null;
-}
-
-/**
  * Resolve which pantry row supplies nutrition for a recipe ingredient.
  * Variant feature (Issue #4): when a recipe ingredient links to a
  * generic pantry item AND that generic has nutrition_source_variant_id
@@ -685,9 +606,8 @@ export function computeRecipeMass(recipe, pantryById) {
       const fam = unitFamily(it.unit);
 
       if (fam === 'weight') {
-        const u = (it.unit || '').toLowerCase().trim();
-        const grams = qty * WEIGHT_TO_G[u];
-        if (!Number.isFinite(grams)) { complete = false; continue; }
+        const grams = convertWithinFamily(qty, it.unit, 'g');
+        if (grams == null || !Number.isFinite(grams)) { complete = false; continue; }
         totalG += grams; anyMassUsed = true;
       } else if (fam === 'volume') {
         if (!pantry?.g_per_cup) { complete = false; continue; }
@@ -698,15 +618,10 @@ export function computeRecipeMass(recipe, pantryById) {
         // count unit. Need a per-piece mass.
         if (!pantry?.serving_size || !pantry?.serving_unit) { complete = false; continue; }
         const psSize = Number(pantry.serving_size);
-        const psUnit = (pantry.serving_unit || '').toLowerCase().trim();
         if (!Number.isFinite(psSize) || psSize <= 0) { complete = false; continue; }
-        let perItemG = null;
-        if (WEIGHT_TO_G[psUnit] != null) {
-          perItemG = psSize * WEIGHT_TO_G[psUnit];
-        } else if (VOLUME_TO_ML[psUnit] != null && pantry.g_per_cup) {
-          const ml = psSize * VOLUME_TO_ML[psUnit];
-          perItemG = ml * (pantry.g_per_cup / VOLUME_TO_ML.cup);
-        }
+        // A piece's weight from the serving: grams as given, or a volume
+        // through the item's density.
+        const perItemG = convertQty(psSize, pantry.serving_unit, 'g', pantry.g_per_cup);
         if (perItemG == null || !Number.isFinite(perItemG)) { complete = false; continue; }
         totalG += qty * perItemG; anyMassUsed = true;
       }

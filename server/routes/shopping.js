@@ -16,6 +16,7 @@ import { dispatchWebhookEvent } from '../lib/webhooks.js';
 import { titleCaseName as _titleCaseName, aisleForPantry as _aisleForPantry } from '../lib/shopping-items.js';
 import { ownId, linkableRecipeId } from '../lib/link-checks.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
+import { qtyToBuy } from '../lib/quantity.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -290,8 +291,9 @@ router.post('/from-plan', wrap((req, res) => {
         const name = String(it.name).trim();
         const unit = it.unit ? String(it.unit).trim() : '';
         const key = `${name.toLowerCase()}|${unit.toLowerCase()}`;
-        const qtyN = Number(it.qty);
-        const hasQty = it.qty != null && it.qty !== '' && Number.isFinite(qtyN);
+        // "1/2", "1 1/2", "½" and ranges ("4-5", the more) read as numbers.
+        const qtyN = qtyToBuy(it.qty);
+        const hasQty = qtyN != null;
 
         const prev = merged.get(key);
         if (!prev) {
@@ -377,7 +379,7 @@ router.post('/from-recipe/:id', wrap((req, res) => {
       // A shared recipe's ingredients point at its owner's pantry: no link.
       const pantryId = ownId('pantry_items', it.pantry_item_id, u);
       const aisle = _aisleForPantry(pantryId, u);
-      insert.run(u, _titleCaseName(it.name), it.qty || null, it.unit || null, aisle, pantryId, recipeId);
+      insert.run(u, _titleCaseName(it.name), qtyToBuy(it.qty), it.unit || null, aisle, pantryId, recipeId);
       added++;
     }
   });

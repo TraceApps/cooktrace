@@ -55,6 +55,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Cookbook covers are kept for offline use in the Android app.**
 - **The Recipes, Shared and Cookbooks switch highlights the tab you're on.** It could sit off to one side until the page was resized.
 - **Trace shows your newest messages when you open it.** It loaded the oldest 100, so once a chat passed 100 messages the latest ones never appeared.
+- **Fractional amounts reach the shopping list.** Adding a recipe or a week's plan to the list dropped amounts like "1/2", "1 1/2" or "½" (the item came in with no amount), and a range like "4-5" now counts as the larger number.
 
 ### Security
 

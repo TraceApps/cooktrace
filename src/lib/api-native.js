@@ -17,6 +17,7 @@
 import { getDb, LOCAL_USER_ID } from './db-native.js';
 import { resolveAssetUrl } from './platform.js';
 import { cleanSmartFilter, matchesSmartFilter } from './smart-cookbook.js';
+import { qtyToBuy } from './quantity.js';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
 // ── Small utilities ──────────────────────────────────────────────────
@@ -1110,7 +1111,7 @@ export const CtApiNative = {
       await _runInsert(
         `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, pantry_id, recipe_id, checked, sync_status)
          VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'pending')`,
-        [LOCAL_USER_ID, _titleCaseName(it.name), it.qty || null, it.unit || null, aisle, it.pantry_item_id || null, recipeId]
+        [LOCAL_USER_ID, _titleCaseName(it.name), qtyToBuy(it.qty), it.unit || null, aisle, it.pantry_item_id || null, recipeId]
       );
       added++;
     }
@@ -1147,8 +1148,8 @@ export const CtApiNative = {
         const name = String(it.name).trim();
         const unit = it.unit ? String(it.unit).trim() : '';
         const key = `${name.toLowerCase()}|${unit.toLowerCase()}`;
-        const qtyN = Number(it.qty);
-        const hasQty = it.qty != null && it.qty !== '' && Number.isFinite(qtyN);
+        const qtyN = qtyToBuy(it.qty);
+        const hasQty = qtyN != null;
         const prev = merged.get(key);
         if (!prev) {
           merged.set(key, {
