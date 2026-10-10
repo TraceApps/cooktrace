@@ -25,6 +25,8 @@ import { registerLogCook } from './log-cook.js';
 import { registerAddShoppingItem } from './add-shopping-item.js';
 import { registerCheckShoppingItem } from './check-shopping-item.js';
 import { registerUpdatePantryStock } from './update-pantry-stock.js';
+import { registerUpdateRecipe } from './update-recipe.js';
+import { registerSetRecipeImage } from './set-recipe-image.js';
 import { registerCreateRecipe } from './create-recipe.js';
 import { registerAddPantryItem } from './add-pantry-item.js';
 import { registerDeleteCookDiaryEntry } from './delete-cook-diary-entry.js';
@@ -44,6 +46,8 @@ export function registerWriteTools(server, ctx) {
   registerAddShoppingItem(server, ctx);
   registerCheckShoppingItem(server, ctx);
   registerUpdatePantryStock(server, ctx);
+  registerUpdateRecipe(server, ctx);
+  registerSetRecipeImage(server, ctx);
 }
 
 export function registerDestroyTools(server, ctx) {

@@ -2,7 +2,7 @@
  * MCP tool: get_recipe
  *
  * Full detail of one recipe: ingredients (grouped), steps, nutrition,
- * and metadata. Reuses hydrateRecipe from recipe-hydrate.js so this
+ * image and metadata. Reuses hydrateRecipe from recipe-hydrate.js so this
  * tool's output can never drift from what GET /api/recipes/:id and the
  * Cookbook view already resolve (category, normalised ingredient
  * groups, parsed JSON columns).
@@ -19,7 +19,7 @@ export function registerGetRecipe(server, { userId }) {
       title: 'Get Recipe',
       description:
         'Full detail of one of the user\'s own recipes: ingredients (grouped), steps, ' +
-        'servings, timings, tags, tools, and nutrition. Use search_recipes or ' +
+        'servings, timings, tags, tools, nutrition and image. Use search_recipes or ' +
         'recent_recipes first to find a recipe_id.',
       inputSchema: {
         recipe_id: z.number().int().positive(),
@@ -50,6 +50,7 @@ export function registerGetRecipe(server, { userId }) {
         ingredients: hydrated.ingredients,
         steps: hydrated.steps,
         nutrition: hydrated.nutrition,
+        img_url: hydrated.img_url,
         source_url: hydrated.source_url,
         notes: hydrated.notes,
         cook_count: hydrated.cook_count,

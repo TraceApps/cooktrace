@@ -126,6 +126,8 @@ test('All write tools are registered in registerWriteTools', () => {
     'registerAddShoppingItem',
     'registerCheckShoppingItem',
     'registerUpdatePantryStock',
+    'registerUpdateRecipe',
+    'registerSetRecipeImage',
   ];
   for (const fn of expected) {
     assert.match(mcpTools, new RegExp(`\\b${fn}\\s*\\(`), `expected ${fn}() call in tools/index.js`);
@@ -190,6 +192,8 @@ test('MCP tool DB queries scope on user_id — no cross-user access', () => {
     'add-shopping-item.js',
     'check-shopping-item.js',
     'update-pantry-stock.js',
+    'update-recipe.js',
+    'set-recipe-image.js',
     'create-recipe.js',
     'add-pantry-item.js',
     'delete-cook-diary-entry.js',

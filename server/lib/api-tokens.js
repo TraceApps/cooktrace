@@ -27,7 +27,7 @@ export const SCOPE_DESCRIPTIONS = {
   'shopping':     "View, add to, check off, and clear the token owner's shopping list through /api/v1/shopping, with no server switch needed. Used by NoteTrace's Send to CookTrace and its Shopping view.",
   'read:pantry':  "Read the token owner's pantry catalog. Used by NutriTrace federation to bulk-import CookTrace pantry items (variants and standalone rows) into NT's foods library.",
   'mcp:read':    'MCP: read recipes, pantry, shopping list, and cook diary (6 tools). Also unlocks the equivalent /api/v1 read routes when PUBLIC_API_ENABLED=1.',
-  'mcp:write':   'MCP: log a cook, manage the shopping list, update pantry stock (4 additive tools). Requires MCP_WRITE_ENABLED=1 on the server. Also unlocks the equivalent /api/v1 write routes when PUBLIC_API_WRITE_ENABLED=1.',
+  'mcp:write':   'MCP: log a cook, manage the shopping list, update pantry stock, edit recipes and set their image (6 tools). Requires MCP_WRITE_ENABLED=1 on the server. Also unlocks the equivalent /api/v1 write routes when PUBLIC_API_WRITE_ENABLED=1.',
   'mcp:destroy': 'MCP: create recipes, add pantry items, delete diary entries and shopping items (4 tools). Requires MCP_DESTROY_ENABLED=1 AND every call to include confirm=true.',
 };
 
@@ -54,7 +54,8 @@ export const KNOWN_SCOPES = new Set([
   // shopping list, and cook diary through the MCP standard interface.
   'mcp:read',
   // mcp:write unlocks MCP write tools (log_cook, add_shopping_item,
-  // check_shopping_item, update_pantry_stock). Independent of mcp:read
+  // check_shopping_item, update_pantry_stock, update_recipe,
+  // set_recipe_image). Independent of mcp:read
   // but tokens typically hold both. Requires MCP_WRITE_ENABLED=1 on
   // the server for any effect.
   'mcp:write',
