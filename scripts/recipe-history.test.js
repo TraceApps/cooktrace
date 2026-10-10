@@ -191,3 +191,18 @@ test('an app from before 1.5 is sent nothing it has no place for', { skip, timeo
     assert.equal(now.tables.shopping_list[0].notes, 'oat');
   } finally { await s.stop(); }
 });
+
+test("editing a cook from the recipe saves its rating, meal and version (the rating used to be dropped)", { skip, timeout: 60_000 }, async () => {
+  const s = await start();
+  try {
+    const r = await s.ok('POST', '/api/recipes', scones());
+    const v1 = (await s.ok('GET', `/api/recipes/${r.id}/revisions`)).current;
+    await s.ok('PUT', `/api/recipes/${r.id}`, scones('250'));
+    await s.ok('POST', `/api/recipes/${r.id}/cooked`, { date: '2030-03-01', rating: 4 });
+    const cook = (await s.ok('GET', '/api/cook-diary?from=2030-03-01&to=2030-03-01'))[0];
+    await s.ok('PUT', `/api/recipes/${r.id}/cooks/${cook.id}`, { rating: 2, meal_type: 'lunch', notes: 'edited', recipe_rev: v1 });
+    const after = (await s.ok('GET', '/api/cook-diary?from=2030-03-01&to=2030-03-01'))[0];
+    assert.deepEqual([after.rating, after.meal_type, after.notes, after.recipe_rev], [2, 'lunch', 'edited', v1]);
+    assert.equal((await s.call('PUT', `/api/recipes/${r.id}/cooks/${cook.id}`, { recipe_rev: 'v00000000000000' })).status, 400);
+  } finally { await s.stop(); }
+});

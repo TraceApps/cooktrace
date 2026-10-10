@@ -1383,6 +1383,10 @@
     "save": "Guardar"
   },
   "cook_log_dialog": {
+    "version": "Hecha con",
+    "version_hint": "(qué versión de la receta)",
+    "version_current": "Versión {n} (actual)",
+    "version_option": "Versión {n}, guardada el {date}",
     "date": "Fecha",
     "meal": "Comida",
     "optional": "(opcional)",

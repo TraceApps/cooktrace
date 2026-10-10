@@ -875,7 +875,7 @@
         showSuccess($_('recipe_view_ct.toast.diary_updated'));
       } else {
         // Made from the recipe as this page shows it (#54).
-        recipe = await NtApi.markCooked(recipe.id, { ...e.detail, recipe_rev: revisionOf(recipe).rev });
+        recipe = await NtApi.markCooked(recipe.id, { ...e.detail, recipe_rev: e.detail.recipe_rev || revisionOf(recipe).rev });
         showSuccess($_('recipe_view_ct.toast.logged_cooked'));
         // "I made this" is the natural end of a cook session — clear
         // checks + drop out of cook mode so the next visit is fresh.
@@ -1752,6 +1752,8 @@
   bind:open={cookDialogOpen}
   recipeName={recipe?.name || ''}
   editing={editingCook}
+  versions={history?.revisions || []}
+  currentRev={history?.current || null}
   on:save={onCookLogSave}
 />
 

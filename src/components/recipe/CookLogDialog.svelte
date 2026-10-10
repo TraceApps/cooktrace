@@ -17,6 +17,10 @@
   export let recipeName = '';
   /** Existing cook entry being edited (null when logging a new cook). */
   export let editing = null;
+  /** The recipe's versions (#54, oldest first) and its current one: with
+   *  more than one, the cook says which it was made from. */
+  export let versions = [];
+  export let currentRev = null;
 
   const dispatch = createEventDispatcher();
 
@@ -31,6 +35,8 @@
   let urlEntryOpen = false;
   let urlEntry = '';
   let fileInput;
+  let recipeRev = null;
+  let revPicked = false;  // chosen by hand: a new date leaves it
 
   // Reset / hydrate when the dialog opens.
   $: if (open) {
@@ -51,7 +57,30 @@
     }
     urlEntryOpen = false;
     urlEntry = '';
+    recipeRev = editing ? (editing.recipe_rev || null) : currentRev;
+    revPicked = !!editing;
   }
+
+  // A cook logged for an earlier day: the version the recipe had then
+  // (the last one saved by that day; the first one kept for a day before
+  // any), until another is picked.
+  function _versionOn(day) {
+    if (!versions.length) return currentRev;
+    if (day >= _todayIso()) return currentRev || versions[versions.length - 1].rev;
+    const localDay = at => {
+      const raw = String(at || '');
+      const d = new Date(raw.replace(' ', 'T') + (/[zZ]$|[+-]\d\d:?\d\d$/.test(raw) ? '' : 'Z'));
+      return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const then = versions.filter(v => localDay(v.created_at) <= day);
+    return (then[then.length - 1] || versions[0]).rev;
+  }
+  $: if (open && !revPicked && versions.length) recipeRev = _versionOn(date);
+  $: versionDate = v => {
+    const raw = String(v.created_at || '');
+    const d = new Date(raw.replace(' ', 'T') + (/[zZ]$|[+-]\d\d:?\d\d$/.test(raw) ? '' : 'Z'));
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   // Pre-fill meal type based on the time of day — convenient default
   // for the common "I just ate this" log. User can change it.
@@ -175,6 +204,7 @@
         // 0 stars in the UI means unrated — send null so the column
         // stores NULL instead of forcing a 0 score.
         rating: rating > 0 ? rating : null,
+        ...(versions.length > 1 && recipeRev ? { recipe_rev: recipeRev } : {}),
       };
       dispatch('save', payload);
       open = false;
@@ -253,6 +283,19 @@
             {/if}
           </div>
         </div>
+
+        {#if versions.length > 1}
+          <label class="cl-field">
+            <span class="cl-label">{$_('cook_log_dialog.version')} <span class="cl-hint">{$_('cook_log_dialog.version_hint')}</span></span>
+            <select class="input" bind:value={recipeRev} on:change={() => (revPicked = true)}>
+              {#each [...versions].reverse() as v (v.rev)}
+                <option value={v.rev}>{v.rev === currentRev
+                  ? $_('cook_log_dialog.version_current', { values: { n: v.number } })
+                  : $_('cook_log_dialog.version_option', { values: { n: v.number, date: versionDate(v) } })}</option>
+              {/each}
+            </select>
+          </label>
+        {/if}
 
         <label class="cl-field">
           <span class="cl-label">{$_('cook_log_dialog.notes')} <span class="cl-hint">{$_('cook_log_dialog.notes_hint')}</span></span>

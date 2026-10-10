@@ -1107,7 +1107,23 @@ router.put('/:id/cooks/:cookId', wrap((req, res) => {
   const photoUrl = nextPhotos[0] || null;
   const photosJson = nextPhotos.length ? JSON.stringify(nextPhotos) : null;
 
-  saveRow('cook_diary', cookId, existing, { date, notes, photo_url: photoUrl, photos: photosJson }, req.body?._sync);
+  // The rating and meal slot are edited here too (the cook dialog sends
+  // them); they used to be dropped, so a changed rating never saved.
+  const mealType = req.body?.meal_type !== undefined
+    ? (['breakfast', 'lunch', 'dinner', 'snack'].includes(String(req.body.meal_type || '').toLowerCase()) ? String(req.body.meal_type).toLowerCase() : null)
+    : existing.meal_type;
+  const rating = req.body?.rating !== undefined
+    ? (() => { const n = parseInt(req.body.rating, 10); return Number.isFinite(n) ? (Math.max(0, Math.min(5, n)) || null) : null; })()
+    : existing.rating;
+  // Which version it was made from (#54): one of this recipe's.
+  let recipeRev = existing.recipe_rev;
+  if (req.body?.recipe_rev !== undefined && existing.kind === 'cooked') {
+    const want = _REV_RX.test(String(req.body.recipe_rev || '')) ? req.body.recipe_rev : null;
+    if (want && !getRevision(id, want)) return res.status(400).json({ error: "That version isn't one of this recipe's." });
+    if (want) recipeRev = want;
+  }
+
+  saveRow('cook_diary', cookId, existing, { date, notes, photo_url: photoUrl, photos: photosJson, meal_type: mealType, rating, recipe_rev: recipeRev }, req.body?._sync);
 
   _recomputeCookAggregates(id);
   res.json({ ok: true });
