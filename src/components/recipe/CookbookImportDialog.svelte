@@ -211,12 +211,16 @@ Rules:
       userMsg = _buildCookbookMessage(provider, sys, preview.text);
     }
 
+    let toolsUnsupported = false;
     try {
       await callAI({
         provider, apiKey, model, baseUrl,
         messages: [userMsg],
         systemPrompt: sys,
         tools: cookbookTools,
+        // Saving the recipes is a tool call: no tools, no import (TraceApps/nutritrace#259).
+        toolsRequired: true,
+        onToolsUnsupported: () => { toolsUnsupported = true; },
         onToolCall: (name) => {
           if (name === 'create_recipe') {
             progressLine = `Saving recipe ${createdRecipes.length + 1}…`;
@@ -245,7 +249,7 @@ Rules:
         errorMessage = `Trace stopped after ${createdRecipes.length} recipe${createdRecipes.length === 1 ? '' : 's'}: ${e.message || 'AI error'}`;
       } else {
         phase = 'error';
-        errorMessage = e.message || 'Cookbook extraction failed.';
+        errorMessage = toolsUnsupported ? $_('trace_ai_ct.tools_unsupported_import') : (e.message || 'Cookbook extraction failed.');
       }
     }
   }

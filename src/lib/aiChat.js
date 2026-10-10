@@ -18,6 +18,7 @@
  * loosely coupled so we can iterate on either independently.
  */
 import { getOpenAIChatParams } from './openai-chat-params.js';
+import { createToolSupportMemory, sendWithToolFallback, isToolsUnsupported } from './tool-support.js';
 
 // ── Provider catalog (kept in CookTrace's `id`-keyed shape so the
 //    existing SettingsTrace dropdown keeps working). ───────────────────────
@@ -314,13 +315,17 @@ export const TOOLS = [
 
 // ── Main entry point ────────────────────────────────────────────────────────
 
-export async function callAI({ provider, apiKey, model, messages, systemPrompt, tools, onToolCall, onToolResult, baseUrl }) {
+// onToolsUnsupported runs when the model can't use tools and answered
+// without them (TraceApps/nutritrace#259). With toolsRequired (a recipe
+// import, which only works through a tool), there is no answer without
+// them: onToolsUnsupported runs and the refusal is thrown.
+export async function callAI({ provider, apiKey, model, messages, systemPrompt, tools, onToolCall, onToolResult, onToolsUnsupported, toolsRequired = false, baseUrl }) {
   // 'custom' is the legacy CookTrace name for the same OpenAI-compatible
   // path that NutriTrace calls 'oai-compat'. Both are accepted.
   if (!apiKey && provider !== 'custom' && provider !== 'oai-compat') {
     throw new Error('No API key configured. Add one in Settings → Trace Assistant.');
   }
-  const cb = { onToolCall, onToolResult };
+  const cb = { onToolCall, onToolResult, onToolsUnsupported, toolsRequired };
   switch (provider) {
     case 'claude':     return _callClaudeWithTools(apiKey, model, messages, systemPrompt, tools, cb);
     case 'openai':     return _callOpenAIWithTools(apiKey, model, messages, systemPrompt, tools, cb, 'https://api.openai.com');
@@ -415,8 +420,11 @@ async function _callClaudeWithTools(apiKey, model, messages, systemPrompt, tools
 }
 
 // ── OpenAI / OpenAI-compatible ─────────────────────────────────────────────
+// Models found unable to use tools, by base URL and model (TraceApps/nutritrace#259).
+const toolSupport = createToolSupportMemory();
+
 async function _callOpenAIWithTools(apiKey, model, messages, systemPrompt, tools, cb, baseUrl = 'https://api.openai.com') {
-  const { onToolCall, onToolResult } = cb || {};
+  const { onToolCall, onToolResult, onToolsUnsupported, toolsRequired } = cb || {};
   const openaiTools = (tools || []).map(t => ({
     type: 'function',
     function: { name: t.name, description: t.description, parameters: t.parameters },
@@ -441,13 +449,24 @@ async function _callOpenAIWithTools(apiKey, model, messages, systemPrompt, tools
     if (openaiTools.length) body.tools = openaiTools;
     const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
     if (apiKey && apiKey !== 'no-key') headers['Authorization'] = `Bearer ${apiKey}`;
-    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error?.message || `AI API error ${res.status}`);
+    const send = async (b) => {
+      const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(b),
+      });
+      return { ok: res.ok, status: res.status, data: await res.json() };
+    };
+    // A model that can't use tools gets the request again without them,
+    // unless the caller can't do without them.
+    const { ok, status, data, toolsDropped, toolsRouted } = toolsRequired
+      ? { ...(await send(body)), toolsDropped: false, toolsRouted: false }
+      : await sendWithToolFallback(body, send, { memory: toolSupport, baseUrl, model: selectedModel });
+    if (!ok) {
+      if (toolsRequired && isToolsUnsupported(status, data)) onToolsUnsupported?.();
+      throw new Error(data.error?.message || `AI API error ${status}`);
+    }
+    if (toolsDropped) onToolsUnsupported?.({ routed: toolsRouted });
 
     const choice = data.choices[0];
     const msg = choice.message;

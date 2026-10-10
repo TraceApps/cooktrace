@@ -36,6 +36,7 @@
   // so flipping it in Settings updates every avatar immediately.
   $: Mascot = $traceChefHat ? TraceFaceChef : TraceFace;
   import { showError, showSuccess } from '../../stores/toast.js';
+  import { createToolsNotice, forModel } from '../../lib/tool-support.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
   import { portal } from '../../lib/portal.js';
   import { NtApi } from '../../lib/api.js';
@@ -279,6 +280,8 @@
   let busy = false;
   let messagesEl;
   let toolStatus = '';
+  // Says once per conversation that the model can't use tools (TraceApps/nutritrace#259).
+  const toolsNotice = createToolsNotice();
   let attachedImage = null;        // { base64, mimeType, preview }
   // Derive env-lock state from the global envLocks store (populated by
   // App.svelte at startup with the Bearer token attached). Local fetch
@@ -718,12 +721,19 @@ When you write to the user's data, summarise what you did briefly and concretely
       const apiKey = $aiApiKey;
       const model = $aiModel || AI_DEFAULT_MODELS[provider] || '';
       const baseUrl = $aiBaseUrl;
-      const apiMessages = messages.map(m => ({ role: m.role, content: m.content })).slice(-20);
+      const apiMessages = forModel(messages).map(m => ({ role: m.role, content: m.content })).slice(-20);
       // Inline the image into the last user message in the provider's format.
       if (attachedImage) {
         const lastIdx = apiMessages.length - 1;
         apiMessages[lastIdx] = _buildImageMessage(provider, text || 'Have a look at this.', attachedImage);
       }
+      // The model can't use tools and answered without them: a note in the
+      // conversation says so, once (TraceApps/nutritrace#259). routed: the
+      // gateway picked a model for this request that can't, another may.
+      let toolsNote = null;
+      const onToolsUnsupported = ({ routed } = {}) => {
+        toolsNote = routed ? 'trace_ai_ct.tools_unsupported_routed' : 'trace_ai_ct.tools_unsupported';
+      };
       const reply = aiEnvLocked
         ? await callAIProxy({ messages: apiMessages, systemPrompt: _systemPrompt(smartLog) })
         : await callAI({
@@ -732,9 +742,11 @@ When you write to the user's data, summarise what you did briefly and concretely
             systemPrompt: _systemPrompt(smartLog),
             tools: TOOLS,
             onToolCall: (toolName) => { toolStatus = `Calling ${toolName.replace(/_/g, ' ')}…`; },
+            onToolsUnsupported,
           });
       const reply2 = reply || '(no response)';
       messages = [...messages, { role: 'assistant', content: reply2, time: _fmtTime() }];
+      if (toolsNote) messages = toolsNotice.add(messages, $_(toolsNote));
       NtApi.post('/api/ai/history', { role: 'assistant', content: reply2 })
         .catch(e => console.warn('[Trace] history save (assistant) failed:', e?.message || e));
     } catch (e) {
@@ -977,6 +989,7 @@ When you write to the user's data, summarise what you did briefly and concretely
       dangerous: true,
     })) return;
     messages = [];
+    toolsNotice.reset();
     // Wipe server-side history too so the cleared state survives a
     // reload + travels across other browsers / devices.
     NtApi.del('/api/ai/history').catch(() => {});
@@ -1110,6 +1123,12 @@ When you write to the user's data, summarise what you did briefly and concretely
           </div>
         {/if}
         {#each messages as m}
+          {#if m.role === 'note'}
+            <div class="msg-note" role="status">
+              <span class="material-symbols-rounded">info</span>
+              <span>{m.content}</span>
+            </div>
+          {:else}
           <div class="msg" class:user={m.role === 'user'} class:assistant={m.role === 'assistant'}>
             {#if m.role === 'assistant'}
               <div class="msg-avatar"><svelte:component this={Mascot} size={24} /></div>
@@ -1121,6 +1140,7 @@ When you write to the user's data, summarise what you did briefly and concretely
               {m.content}
             </div>
           </div>
+          {/if}
         {/each}
         {#if busy}
           <div class="msg assistant">
@@ -1556,6 +1576,18 @@ When you write to the user's data, summarise what you did briefly and concretely
     border-radius: 8px;
     margin-bottom: 6px;
   }
+  /* A note from the app in the conversation, such as a model that can't
+     use tools (TraceApps/nutritrace#259). */
+  .msg-note {
+    display: flex; align-items: flex-start; gap: 6px;
+    margin-left: 36px;
+    padding: 9px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: 13px; line-height: 1.4; color: var(--text-2);
+  }
+  .msg-note .material-symbols-rounded { font-size: 18px; color: var(--accent); flex-shrink: 0; }
   .tool-status {
     color: var(--text-3);
     font-size: 12px;

@@ -189,12 +189,16 @@ Rules:
     const apiKey   = $aiApiKey;
     const model    = $aiModel || AI_DEFAULT_MODELS[provider] || '';
     const baseUrl  = $aiBaseUrl;
+    let toolsUnsupported = false;
     try {
       await callAI({
         provider, apiKey, model, baseUrl,
         messages: [userMsg],
         systemPrompt: _systemPrompt,
         tools: createRecipeTool,
+        // Saving the recipe is a tool call: no tools, no import (TraceApps/nutritrace#259).
+        toolsRequired: true,
+        onToolsUnsupported: () => { toolsUnsupported = true; },
         onToolCall:   (name) => { progressLine = `Calling ${name.replace(/_/g, ' ')}…`; },
         onToolResult: (name, result) => {
           if (name === 'create_recipe' && result && result.ok && result.recipe) {
@@ -211,7 +215,7 @@ Rules:
       }
     } catch (e) {
       phase = 'error';
-      errorMessage = e.message || 'AI import failed.';
+      errorMessage = toolsUnsupported ? $_('trace_ai_ct.tools_unsupported_import') : (e.message || 'AI import failed.');
     }
   }
 

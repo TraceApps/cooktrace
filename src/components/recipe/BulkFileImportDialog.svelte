@@ -52,6 +52,10 @@
   let confidenceThreshold = 0.7;
   let selected = new Set();
   let aiBusyId = null;
+  // Why Trace couldn't save a row, shown on the row: a toast would sit
+  // under this dialog (TraceApps/nutritrace#259).
+  let aiErrors = {};
+  function _aiError(id, message) { aiErrors = { ...aiErrors, [id]: message }; }
   let progressLabel = '';
   let errorMessage = '';
   let savedRecipes = [];
@@ -180,6 +184,7 @@
   async function _tryWithAi(item) {
     if (!scanResult?.cacheUuid) return;
     aiBusyId = item.id;
+    _aiError(item.id, '');
     progressLabel = `Trace is re-reading "${_displayName(item)}"…`;
 
     let textPayload;
@@ -192,7 +197,7 @@
       textPayload = data;
     } catch (e) {
       aiBusyId = null;
-      showError(e.message || 'Could not load text for AI fallback.');
+      _aiError(item.id, e.message || 'Could not load text for AI fallback.');
       return;
     }
 
@@ -220,12 +225,16 @@ ${textPayload.text}
     };
 
     let aiSaved = null;
+    let toolsUnsupported = false;
     try {
       await callAI({
         provider, apiKey, model, baseUrl,
         messages: [userMsg],
         systemPrompt: sys,
         tools: photoTools,
+        // Saving the recipe is a tool call: no tools, no import (TraceApps/nutritrace#259).
+        toolsRequired: true,
+        onToolsUnsupported: () => { toolsUnsupported = true; },
         onToolResult: (name, result) => {
           if (name === 'create_recipe' && result && result.ok && result.recipe) {
             aiSaved = result.recipe;
@@ -234,7 +243,7 @@ ${textPayload.text}
       });
     } catch (e) {
       aiBusyId = null;
-      showError(e.message || 'AI re-parse failed.');
+      _aiError(item.id, toolsUnsupported ? $_('trace_ai_ct.tools_unsupported_import') : (e.message || 'AI re-parse failed.'));
       return;
     }
 
@@ -256,7 +265,7 @@ ${textPayload.text}
       selected = next;
       showSuccess(`Saved "${aiSaved.name}" via Trace AI`);
     } else {
-      showError($_('bulk_import_dialog.toast.no_ai_saved'));
+      _aiError(item.id, $_('bulk_import_dialog.toast.no_ai_saved'));
     }
   }
 
@@ -402,6 +411,9 @@ ${textPayload.text}
                 </div>
                 {#if item.filename && item.filename !== _displayName(item)}
                   <div class="row-filename" title={item.filename}>{item.source ? `${item.source} → ` : ''}{item.filename}</div>
+                {/if}
+                {#if aiErrors[item.id] && !item.aiSavedId}
+                  <div class="row-ai-error" role="alert">{aiErrors[item.id]}</div>
                 {/if}
               </div>
               {#if !item.error && !item.empty && !item.aiSavedId && $aiEnabled && !envLocked && item.confidence < confidenceThreshold}
@@ -577,6 +589,7 @@ ${textPayload.text}
     font-size: 12px;
   }
   .row-msg { color: var(--text-3); }
+  .row-ai-error { color: var(--danger); font-size: 12px; margin-top: 4px; }
   .row-filename {
     color: var(--text-3); font-size: 11px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

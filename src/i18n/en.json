@@ -1567,7 +1567,10 @@
       "voice_needs_https_smart": "Voice needs HTTPS. Smart Log won't work over plain HTTP, set up TLS or use the public domain.",
       "mic_denied":              "Microphone permission denied",
       "pick_image":              "Pick an image file."
-    }
+    },
+    "tools_unsupported":         "This model can't use tools: it can answer, but it can't look up or change your recipes and pantry. Pick a model with tool support in Settings.",
+    "tools_unsupported_routed":  "The model that answered can't use tools, so nothing was looked up or changed.",
+    "tools_unsupported_import":  "This model can't use tools, so it can't import recipes. Pick a model with tool support in Settings."
   },
   "manage_cookbooks": {
     "toast": {
