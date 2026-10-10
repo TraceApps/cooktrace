@@ -4,6 +4,7 @@
  * "as you made it". `t` is svelte-i18n's $_.
  */
 import { formatDuration } from './duration.js';
+import { changeSummary } from './recipe-content.js';
 
 const DETAIL_KEYS = {
   servings: 'history.detail_servings',
@@ -55,4 +56,36 @@ export function detailRows(t, data) {
   return Object.keys(DETAIL_KEYS)
     .filter(f => data?.[f] != null && data[f] !== '')
     .map(f => ({ field: f, label: t(DETAIL_KEYS[f]), value: _detailValue(t, f, data[f]) }));
+}
+
+/**
+ * A recipe's history for Trace: each version's changes in words, its cooks
+ * and average rating, the best-rated version and what changed from it to
+ * now, so the model reads the answer rather than working it out.
+ */
+export function historyForTrace(t, recipe, h) {
+  const versions = h?.revisions || [];
+  const avg = v => {
+    const r = (v.cooks || []).map(c => Number(c.rating)).filter(n => n > 0);
+    return r.length ? Math.round((r.reduce((a, b) => a + b, 0) / r.length) * 10) / 10 : null;
+  };
+  const lines = (a, b) => changeSummary(a, b).map(c => changeText(t, c));
+  const rated = versions.filter(v => avg(v) != null);
+  const best = rated.length ? rated.reduce((x, y) => (avg(y) >= avg(x) ? y : x)) : null;
+  const current = versions.find(v => v.current) || versions[versions.length - 1] || null;
+  return {
+    recipe: recipe?.name || '',
+    versions: versions.map((v, i) => ({
+      version: v.number,
+      name: v.label || null,
+      saved: String(v.created_at || '').slice(0, 10),
+      current: !!v.current,
+      changes_from_previous: i > 0 ? lines(versions[i - 1].data, v.data) : [],
+      cooks: (v.cooks || []).map(c => ({ date: c.date, rating: c.rating || null, notes: c.notes || null })),
+      average_rating: avg(v),
+    })),
+    best_rated_version: best ? { version: best.number, name: best.label || null, average_rating: avg(best) } : null,
+    changes_from_best_to_now: best && current && best.rev !== current.rev ? lines(best.data, current.data) : [],
+    cooks_before_history: (h?.unversioned || []).length,
+  };
 }

@@ -78,6 +78,15 @@ export const TOOLS = [
     },
   },
   {
+    name: 'get_recipe_history',
+    description: "A recipe's versions (every change to its ingredients, steps, servings or times is kept), oldest first: each with its number, name if given, date, what changed from the one before, and the cooks made from it with their ratings and notes. Also the best-rated version and what changed from it to the recipe now. Use for 'what did I change since my best batch?', 'which version did I like most?', 'when did I add the sugar?'.",
+    parameters: {
+      type: 'object',
+      properties: { id: { type: 'integer', description: 'Recipe id' } },
+      required: ['id'],
+    },
+  },
+  {
     name: 'get_pantry',
     description: "Get the user's pantry inventory. Each item has id, name, brand, in_stock, quantity, unit, expires_on, category, serving size + nutrition (when set), barcode, and notes. Use this to answer 'do I have X?' or feed into find_recipes_from_pantry.",
     parameters: {

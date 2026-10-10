@@ -47,6 +47,7 @@
 
   import { foldText } from '../../lib/search-text.js';
   import { isoDay, weekStartOf, fromIso } from '../../lib/week.js';
+  import { historyForTrace } from '../../lib/version-text.js';
 
   let panelOpen = false;
   let messages = [];      // { role, content, time? }
@@ -349,6 +350,14 @@
           try {
             const r = await NtApi.getRecipe(parseInt(args?.id, 10));
             return _fullRecipe(r);
+          } catch (e) { return { error: e.message || 'Not found' }; }
+        }
+        case 'get_recipe_history': {
+          try {
+            const rid = parseInt(args?.id, 10);
+            const [r, h] = await Promise.all([NtApi.getRecipe(rid), NtApi.getRecipeRevisions(rid)]);
+            // Worked out here so the model only has to read it (#54).
+            return historyForTrace($_, r, h);
           } catch (e) { return { error: e.message || 'Not found' }; }
         }
         case 'get_pantry': {
@@ -720,6 +729,7 @@ You have tool access to the user's recipe library, pantry, cook diary, shopping 
 - "I'm out of butter" → call get_pantry with query='butter' to find the id, then set_pantry_stock with in_stock=false
 - "Plan tacos for Friday" → call get_recipes to find the recipe, then plan_cook with that date
 - "What are my favorites?" / "Pick a favorite for tonight" → call get_recipes and filter where favorite is true
+- "What did I change since my best batch of scones?" / "Which version did I like most?" → call get_recipes to find it, then get_recipe_history
 
 When you write to the user's data, summarise what you did briefly and concretely (e.g. "Logged 'Spaghetti Bolognese' as cooked today, count is now 7"). Keep replies short and actionable. Use the user's preferred units. If a tool returns { error: ... }, tell the user what went wrong and how to fix it.`;
   }

@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import {
   cookContent, revisionOf, revOf, parseRevision, compareContent, changeSummary, diffWords, numberRevisions,
 } from '../src/lib/recipe-content.js';
+import { historyForTrace } from '../src/lib/version-text.js';
 
 test('the server and the app use the same recipe-content.js', () => {
   assert.equal(readFileSync(new URL('../server/lib/recipe-content.js', import.meta.url), 'utf8'),
@@ -102,4 +103,23 @@ test('word changes in a step, and versions numbered by when they appeared', () =
     [{ kind: 'removed', text: '220°C' }, { kind: 'added', text: '200°C' }, { kind: 'removed', text: '12' }, { kind: 'added', text: '15' }]);
   const n = numberRevisions([{ id: 3, created_at: '2026-10-03 09:00:00' }, { id: 1, created_at: '2026-10-01 09:00:00' }, { id: 2, created_at: '2026-10-03 09:00:00' }]);
   assert.deepEqual(n.map(r => [r.id, r.number]), [[1, 1], [2, 2], [3, 3]]);
+});
+
+test("Trace reads a recipe's history worked out: changes in words, the best version, what changed since", () => {
+  const en = { 'history.change_changed': '{name}: {from} → {to}', 'history.change_added': 'Added {name}' };
+  const t = (k, o) => (en[k] || k).replace(/\{(\w+)\}/g, (_, x) => o?.values?.[x] ?? '');
+  const v = (n, flour, extra, cooks, current = false) => ({
+    number: n, rev: `v${n}`, label: n === 2 ? 'Less flour' : null, created_at: `2030-01-0${n} 10:00:00`, current, cooks,
+    data: cookContent({ ingredients: [{ items: [{ id: 'a', qty: flour, unit: 'g', name: 'flour' }, ...extra] }], steps: ['Bake'] }),
+  });
+  const h = { revisions: [
+    v(1, '300', [], [{ date: '2030-01-01', rating: 3 }]),
+    v(2, '250', [], [{ date: '2030-01-02', rating: 5 }, { date: '2030-01-03', rating: 4 }]),
+    v(3, '250', [{ id: 'b', qty: '2', unit: 'tbsp', name: 'sugar' }], [], true),
+  ], unversioned: [{ id: 9 }] };
+  const out = historyForTrace(t, { name: 'Scones' }, h);
+  assert.deepEqual(out.versions.map(x => x.changes_from_previous), [[], ['flour: 300 g → 250 g'], ['Added sugar']]);
+  assert.deepEqual(out.best_rated_version, { version: 2, name: 'Less flour', average_rating: 4.5 });
+  assert.deepEqual(out.changes_from_best_to_now, ['Added sugar']);
+  assert.equal(out.cooks_before_history, 1);
 });
