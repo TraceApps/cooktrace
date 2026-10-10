@@ -118,7 +118,7 @@
   }
   .icon-btn:hover { background: var(--surface-2); }
   .row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .row-label { width: 76px; flex: none; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
+  .row-label { width: 88px; flex: none; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
   .chip {
     display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: var(--radius-full);
     background: var(--surface-2); color: var(--text-2); font-size: 12px; font-weight: 500;

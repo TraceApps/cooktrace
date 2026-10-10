@@ -204,7 +204,7 @@
         // 0 stars in the UI means unrated — send null so the column
         // stores NULL instead of forcing a 0 score.
         rating: rating > 0 ? rating : null,
-        ...(versions.length > 1 && recipeRev ? { recipe_rev: recipeRev } : {}),
+        ...(versions.length > 1 && recipeRev && (!editing || editing.kind !== 'planned') ? { recipe_rev: recipeRev } : {}),
       };
       dispatch('save', payload);
       open = false;
@@ -284,10 +284,12 @@
           </div>
         </div>
 
-        {#if versions.length > 1}
+        <!-- A planned cook isn't made from a version yet. -->
+        {#if versions.length > 1 && (!editing || editing.kind !== 'planned')}
           <label class="cl-field">
             <span class="cl-label">{$_('cook_log_dialog.version')} <span class="cl-hint">{$_('cook_log_dialog.version_hint')}</span></span>
             <select class="input" bind:value={recipeRev} on:change={() => (revPicked = true)}>
+              {#if !recipeRev}<option value={null}>{$_('cook_log_dialog.version_unknown')}</option>{/if}
               {#each [...versions].reverse() as v (v.rev)}
                 <option value={v.rev}>{v.rev === currentRev
                   ? $_('cook_log_dialog.version_current', { values: { n: v.number } })

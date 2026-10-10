@@ -243,7 +243,8 @@
   }
   .tile-value { display: inline-flex; align-items: center; gap: 3px; font-size: 19px; font-weight: 800; line-height: 1.1; color: var(--text-1); }
   .tile-value .material-symbols-rounded { font-size: 16px; }
-  .tile-label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
+  /* Long words ("PLANIFICADAS") get the room to wrap rather than clip. */
+  .tile-label { font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-2); overflow-wrap: anywhere; hyphens: auto; }
   .tile.good { background: var(--accent-dim); }
   .tile.good .tile-value, .tile.good .tile-label { color: var(--accent); }
   .summary-actions { display: flex; gap: 8px; flex-wrap: wrap; }

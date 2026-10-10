@@ -1344,6 +1344,7 @@
   "cook_log_dialog": {
     "version": "Made From",
     "version_hint": "(which version of the recipe)",
+    "version_unknown": "Not known (made before history was kept)",
     "version_current": "Version {n} (current)",
     "version_option": "Version {n}, saved {date}",
     "date":                      "Date",

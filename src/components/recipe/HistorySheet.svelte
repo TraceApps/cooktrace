@@ -91,7 +91,7 @@
                 </span>
                 {#if lines}
                   {#if lines.lines.length}
-                    <span class="changes">{lines.lines.join(' · ')}{#if lines.more} · {$_('history.and_more', { values: { count: lines.more } })}{/if}</span>
+                    <span class="changes">{lines.lines.join(' · ')}{#if lines.more}{' · '}{$_('history.and_more', { values: { count: lines.more } })}{/if}</span>
                   {:else}
                     <span class="changes muted">{$_('history.no_changes')}</span>
                   {/if}
