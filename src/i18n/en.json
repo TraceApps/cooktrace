@@ -1726,6 +1726,27 @@
     "dietary_preferences":       "Dietary Preferences",
     "open_cooktrace":            "Open CookTrace"
   },
+  "shopping_item": {
+    "on_list":                   "On the List",
+    "no_amount":                 "No amount",
+    "for_n_cooks":               "{n, plural, one {For # cook} other {For # cooks}}",
+    "in_pantry":                 "In Your Pantry",
+    "not_tracked":               "Not in the pantry",
+    "in_stock":                  "In stock",
+    "out_of_stock":              "Out of stock",
+    "use_by":                    "Use by {date}",
+    "for_these_cooks":           "For These Cooks",
+    "recipe":                    "Recipe",
+    "as_needed":                 "As needed",
+    "kinds":                     "Kinds you buy",
+    "size_piece":                "One is about {amount}.",
+    "size_weight":               "{amount} is about {grams} g.",
+    "note":                      "Note",
+    "note_placeholder":          "Add a note",
+    "open_pantry":               "Open in Pantry",
+    "check_off":                 "Check Off",
+    "uncheck":                   "Uncheck"
+  },
   "shopping_page": {
     "toast": {
       "cleared":                 "Cleared",

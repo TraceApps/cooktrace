@@ -1725,6 +1725,27 @@
     "dietary_preferences": "Preferencias alimentarias",
     "open_cooktrace": "Abrir CookTrace"
   },
+  "shopping_item": {
+    "on_list": "En la lista",
+    "no_amount": "Sin cantidad",
+    "for_n_cooks": "{n, plural, one {Para # comida} other {Para # comidas}}",
+    "in_pantry": "En tu despensa",
+    "not_tracked": "No está en la despensa",
+    "in_stock": "En stock",
+    "out_of_stock": "Agotado",
+    "use_by": "Usar antes del {date}",
+    "for_these_cooks": "Para estas comidas",
+    "recipe": "Receta",
+    "as_needed": "Al gusto",
+    "kinds": "Tipos que compras",
+    "size_piece": "Una unidad pesa unos {amount}.",
+    "size_weight": "{amount} pesan unos {grams} g.",
+    "note": "Nota",
+    "note_placeholder": "Agrega una nota",
+    "open_pantry": "Abrir en la despensa",
+    "check_off": "Marcar",
+    "uncheck": "Desmarcar"
+  },
   "shopping_page": {
     "toast": {
       "cleared": "Lista vaciada",

@@ -20,6 +20,7 @@
   import { longpress } from '../lib/long-press.js';
   import { foldText } from '../lib/search-text.js';
   import { displayQty, parseQty } from '../lib/qty.js';
+  import ShoppingItemSheet from '../components/shopping/ShoppingItemSheet.svelte';
   import {
     buildShoppingCardSvg, buildShoppingText,
     svgToPngBlob, shareBlob, shareText,
@@ -272,6 +273,33 @@
       await load();
     }
   }
+
+  // ── An item in full (the sheet) ────────────────────────────────
+  let itemSheetOpen = false;
+  let itemSheetItem = null;
+  let sheetRecipes = new Map();
+  let sheetPantry = [];
+  async function openItem(it) {
+    itemSheetItem = it;
+    itemSheetOpen = true;
+    const [recipes, pantry] = await Promise.all([
+      NtApi.getRecipes().catch(() => null),
+      NtApi.getPantry().catch(() => null),
+    ]);
+    if (recipes) sheetRecipes = new Map(recipes.map(r => [r.id, r]));
+    if (pantry) sheetPantry = pantry;
+  }
+  async function saveItemNote(ev) {
+    const { item, notes } = ev.detail;
+    const id = (item.members || [item])[0].id;
+    items = items.map(i => (i.id === id ? { ...i, notes: notes || null } : i));
+    try { await NtApi.updateShoppingItem(id, { notes }); }
+    catch (e) { showError(e.message || 'Could not save the note'); await load(); }
+  }
+  // The sheet follows the list: a check or a note shows at once.
+  $: sheetItem = itemSheetItem && !itemSheetItem.members
+    ? (items.find(i => i.id === itemSheetItem.id) || itemSheetItem)
+    : itemSheetItem;
 
   async function toggleGroupChecked(group, next) {
     const targets = group.rows.flatMap(r => r.members || [r]).filter(r => r.checked !== next);
@@ -986,7 +1014,7 @@
                   <button class="check" on:click={() => toggleCheck(it)} aria-label={it.checked ? 'Uncheck' : 'Check'}>
                     <span class="material-symbols-rounded">{it.checked ? 'check_box' : 'check_box_outline_blank'}</span>
                   </button>
-                  <div class="row-body">
+                  <button class="row-body" on:click={() => openItem(it)}>
                     <span class="row-name">{it.name}</span>
                     {#if it.quantity != null || it.unit}
                       <span class="row-qty">{displayQty(it.quantity, it.unit)}{it.quantity != null && it.unit ? ' ' : ''}{it.unit ?? ''}</span>
@@ -1001,7 +1029,10 @@
                         </span>
                       {/each}
                     {/if}
-                  </div>
+                    {#if (it.members || [it])[0].notes}
+                      <span class="row-note">{(it.members || [it])[0].notes}</span>
+                    {/if}
+                  </button>
                   <button class="btn-icon small" on:click={() => openAislePicker(it)}
                           aria-label={$_('routes.shopping.change_aisle')}
                           title={$_('routes.shopping.change_aisle')}>
@@ -1019,6 +1050,15 @@
     {/if}
   </div>
 </div>
+
+<ShoppingItemSheet
+  bind:open={itemSheetOpen}
+  item={sheetItem}
+  recipes={sheetRecipes}
+  pantry={sheetPantry}
+  on:check={(ev) => toggleCheck(ev.detail)}
+  on:note={saveItemNote}
+/>
 
 <!-- Share action sheet — image or plain text. -->
 <ActionSheet
@@ -1596,7 +1636,11 @@
   .row-body {
     flex: 1; min-width: 0;
     display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    /* A button that opens the item: no button look of its own. */
+    background: none; border: none; padding: 6px 0; margin: 0; min-height: 40px;
+    font: inherit; color: inherit; text-align: left; cursor: pointer;
   }
+  .row-note { flex-basis: 100%; font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row-name { font-weight: 500; color: var(--text-1); }
   .row-qty { font-size: 12px; font-weight: 600; color: var(--accent); flex-shrink: 0; }
   .row-aisle-pill, .row-recipe-pill {
