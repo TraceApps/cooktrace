@@ -83,6 +83,12 @@ export function importRecipeFromText(text, hint = null) {
 }
 
 function _importFromJson(parsed) {
+  // A schema.org Recipe reads as one (pictures, times, tools, notes and
+  // the original link), before the looser Mealie shape below claims it.
+  if (_isSchemaRecipe(parsed)) {
+    const r = normaliseSchemaOrgRecipe(parsed, null);
+    if (r) return _withSchemaExtras(r, parsed);
+  }
   // Mealie shapes are very loose across versions. Use a permissive
   // ingredient-presence check first, then defer to the importer.
   // (v1+ uses recipe_ingredient; older versions used recipeIngredient
@@ -102,7 +108,7 @@ function _importFromJson(parsed) {
   // schema.org/Recipe — has @type or recipeIngredient
   if (parsed && (parsed['@type'] === 'Recipe' || parsed.recipeIngredient)) {
     const r = normaliseSchemaOrgRecipe(parsed, null);
-    if (r) return r;
+    if (r) return _withSchemaExtras(r, parsed);
   }
   // CookTrace-shape passthrough
   if (parsed && parsed.name && (parsed.ingredients || parsed.steps)) {
@@ -504,7 +510,11 @@ export async function scanLoadedZip(zip) {
     // Tandoor and generic exports vary, so we fall back to "any image
     // in the same directory."
     const dir = entry.name.replace(/[^/]+$/, '');
-    const imageEntry = _findSiblingImage(zip, dir);
+    // A picture the file names by its path in the export ("../images/
+    // x.jpg" beside "recipes/"), else any picture next to the file.
+    const ref = _relativeImageRef(json);
+    const named = ref ? zip.file(_zipPath(dir, ref)) : null;
+    const imageEntry = named || _findSiblingImage(zip, dir);
     const thumbEntry = _findSiblingThumbnail(zip, dir) || imageEntry;
 
     out.push({
@@ -871,4 +881,52 @@ function _parseNumber(v) {
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
   const m = String(v).match(/[\d.]+/);
   return m ? Number(m[0]) : null;
+}
+
+// ── schema.org extras ───────────────────────────────────────────────────
+// A file that says it's a schema.org Recipe (the Mealime exporter's, for
+// one) carries the cook's notes in `comment` and where the recipe came
+// from in `isBasedOn`; its picture can be a path inside the export.
+function _isSchemaRecipe(p) {
+  const t = p?.['@type'];
+  return t === 'Recipe' || (Array.isArray(t) && t.includes('Recipe'));
+}
+function _commentText(c) {
+  if (!c) return null;
+  const list = Array.isArray(c) ? c : [c];
+  const texts = list.map(x => (typeof x === 'string' ? x : x?.text || x?.description || '')).map(s => String(s).trim()).filter(Boolean);
+  return texts.length ? texts.join('\n\n') : null;
+}
+function _basedOnUrl(b) {
+  for (const x of Array.isArray(b) ? b : [b]) {
+    const u = typeof x === 'string' ? x : (x?.url || x?.['@id'] || '');
+    if (/^https?:\/\//i.test(String(u).trim())) return String(u).trim();
+  }
+  return null;
+}
+function _isRemoteImage(u) { return /^(https?:|data:)/i.test(String(u || '').trim()); }
+function _withSchemaExtras(r, p) {
+  if (!r.notes) r.notes = _commentText(p.comment);
+  if (!r.source_url) r.source_url = _basedOnUrl(p.isBasedOn);
+  // A path inside an export isn't an address: the zip scan finds the file.
+  for (const k of ['imgUrl', 'img_url']) if (r[k] && !_isRemoteImage(r[k])) r[k] = null;
+  return r;
+}
+// The picture a recipe file names by a path in the export, if any.
+function _relativeImageRef(json) {
+  const imgs = Array.isArray(json?.image) ? json.image : [json?.image];
+  for (const i of imgs) {
+    const u = typeof i === 'string' ? i : (i?.url || i?.contentUrl || '');
+    if (u && !_isRemoteImage(u) && !String(u).startsWith('/')) return String(u).trim();
+  }
+  return null;
+}
+// dir ("recipes/") + a relative path ("../images/x.jpg") → "images/x.jpg".
+function _zipPath(dir, rel) {
+  const out = [];
+  for (const part of (dir + rel).split('/')) {
+    if (!part || part === '.') continue;
+    if (part === '..') out.pop(); else out.push(part);
+  }
+  return out.join('/');
 }

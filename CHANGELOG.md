@@ -25,6 +25,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Recipes exported from Mealime import with their photo, notes and original link.** The export names each photo by its path inside the zip, which the import didn't follow, and the notes (`comment`) and link (`isBasedOn`) weren't read. Any schema.org recipe file gains from this: its times, tools and picture come through too.
 - **The Android app shows how many of a recipe's ingredients you have** on recipe cards and in cookbooks. It was always empty there.
 - **Plan a Cook on a recipe card opens the planner with that recipe picked.** It went to the Diary and did nothing more.
 - **Photos synced from the Android app are stored as files on the server.** A photo that reached the sync embedded in its recipe, pantry item, cookbook or cook diary entry was kept inline, so every list carried it and share cards and link previews couldn't show it. Photos already stored that way are turned into files when the server starts.
