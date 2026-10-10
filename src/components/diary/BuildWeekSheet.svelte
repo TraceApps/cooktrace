@@ -5,8 +5,12 @@
   why, a Swap for the next best, and the totals update as you go. Add to
   Week plans them on the week's free days (the rest for any day).
 
+  With a household (Settings), a recipe that's a problem for someone home
+  that day is left out (said so, with Include Them), one someone home
+  doesn't like ranks lower, and each dinner's servings are who's home.
+
   Props: open (bindable), weekStart (YYYY-MM-DD), planned (the week's
-  planned cooks), recipes (array), pantry, today
+  planned cooks), recipes (array), pantry, today, members (the household)
   Events: added ({ count })
 -->
 <script>
@@ -19,6 +23,8 @@
   import { showError, showSuccess } from '../../stores/toast.js';
   import { buildWeek, freeDays, picksNeeds } from '../../lib/plan-ideas.js';
   import { fromIso, isoDay, planHorizon } from '../../lib/week.js';
+  import AllergenChips from '../allergens/AllergenChips.svelte';
+  import { cardAllergens, conflicts, dislikesIn, homeOn } from '../../lib/allergens.js';
 
   export let open = false;
   export let weekStart = '';
@@ -26,6 +32,7 @@
   export let recipes = [];
   export let pantry = [];
   export let today = '';
+  export let members = [];
 
   const dispatch = createEventDispatcher();
 
@@ -37,17 +44,36 @@
   let skip = {};
   let saving = false;
   let wasOpen = false;
+  let servingsSet = false;
+  let leaveOut = true;
 
   $: weekEnd = weekStart ? isoDay(new Date(fromIso(weekStart).getFullYear(), fromIso(weekStart).getMonth(), fromIso(weekStart).getDate() + 6)) : '';
   $: days = weekStart ? freeDays(weekStart, planned.filter(e => !e.any_day).map(e => e.date), today) : [];
   // Each time it opens: as many dinners as free days (up to five), fresh picks.
-  $: if (open && !wasOpen) { wasOpen = true; count = Math.max(1, Math.min(days.length || 5, 5)); skip = {}; }
+  $: if (open && !wasOpen) {
+    wasOpen = true; count = Math.max(1, Math.min(days.length || 5, 5)); skip = {};
+    servingsSet = false; leaveOut = true;
+    if (members.length) servings = members.length;
+  }
   $: if (!open) wasOpen = false;
   $: options = { useExpiring, notRecent, quick };
+  // A recipe and a day: left out when it's a problem for someone home then,
+  // lower when someone home doesn't like an ingredient.
+  $: fit = members.length ? (r, slot) => {
+    const date = days[slot] || null;
+    if (leaveOut && conflicts(cardAllergens(r), members, { date }).contains.length) return false;
+    return dislikesIn(r, members, { date }).length ? -1.5 : 0;
+  } : null;
+  $: exclude = new Set(planned.map(e => e.recipe_id));
   $: picks = open ? buildWeek({
         recipes, pantry, today, horizon: planHorizon(weekEnd, today), count, options,
-        exclude: new Set(planned.map(e => e.recipe_id)), skip,
+        exclude, skip, fit,
       }) : [];
+  // Recipes that couldn't go on any of the days being planned.
+  $: slotDates = Array.from({ length: count }, (_, i) => days[i] || null);
+  $: blocked = members.length && open
+    ? recipes.filter(r => !exclude.has(r.id) && slotDates.every(date => conflicts(cardAllergens(r), members, { date }).contains.length)).length
+    : 0;
   $: totals = picksNeeds(picks, pantry, { today, horizon: planHorizon(weekEnd, today) });
   $: list = new Intl.ListFormat($locale || undefined, { style: 'long', type: 'conjunction' });
 
@@ -67,6 +93,7 @@
     s.add(id);
     skip = { ...skip, [i]: s };
   }
+  const servingsFor = day => (servingsSet || !members.length ? servings : Math.max(1, homeOn(members, day || null).length));
   function toggle(name) {
     if (name === 'expiring') useExpiring = !useExpiring;
     else if (name === 'recent') notRecent = !notRecent;
@@ -84,7 +111,7 @@
           date: day || weekStart,
           kind: 'planned',
           meal_type: 'dinner',
-          servings,
+          servings: servingsFor(day),
           any_day: !day,
         });
       }
@@ -110,7 +137,7 @@
       <div class="opt-row">
         <span class="material-symbols-rounded" aria-hidden="true">group</span>
         <span class="opt-label">{$_('build_week.servings')}</span>
-        <ServingsStepper bind:value={servings} label={$_('build_week.servings')} />
+        <ServingsStepper bind:value={servings} label={$_('build_week.servings')} on:change={() => (servingsSet = true)} />
       </div>
       <div class="chips">
         <button type="button" class="chip" class:on={useExpiring} aria-pressed={useExpiring} on:click={() => toggle('expiring')}>
@@ -125,19 +152,42 @@
       </div>
     </section>
 
+    {#if blocked > 0}
+      <p class="left-out">
+        <span class="material-symbols-rounded" aria-hidden="true">{leaveOut ? 'shield' : 'warning'}</span>
+        <span class="left-out-text">{$_('allergen_info.left_out', { values: { count: blocked } })}</span>
+        <button type="button" class="left-out-btn" on:click={() => { leaveOut = !leaveOut; skip = {}; }}>
+          {leaveOut ? $_('allergen_info.include_anyway') : $_('allergen_info.leave_out')}
+        </button>
+      </p>
+    {/if}
+
     {#if !picks.length}
       <p class="empty">{$_('build_week.none')}</p>
     {:else}
       <ol class="picks">
         {#each picks as p, i (p.recipe.id)}
           <li class="pick">
-            <span class="pick-day">{dayLabel(i)}</span>
+            <span class="pick-day">
+              {dayLabel(i)}
+              {#if members.length && !servingsSet}
+                <span class="pick-serves" aria-label={$_('cookdiary_page.servings_count', { values: { count: servingsFor(days[i]) } })}>
+                  <span class="material-symbols-rounded" aria-hidden="true">person</span>{servingsFor(days[i])}
+                </span>
+              {/if}
+            </span>
             {#if p.recipe.imgUrl || p.recipe.img_url}
               <img src={p.recipe.imgUrl || resolveAssetUrl(p.recipe.img_url)} alt="" loading="lazy" />
             {:else}<span class="ph material-symbols-rounded" aria-hidden="true">restaurant</span>{/if}
             <span class="pick-text">
               <span class="name">{p.recipe.name}</span>
               <span class="why" class:good={p.reason.kind === 'uses'}>{reasonText(p.reason)}</span>
+              {#if members.length}
+                <AllergenChips summary={cardAllergens(p.recipe)} {members} date={days[i] || ''} />
+                {#each dislikesIn(p.recipe, members, { date: days[i] || null }) as d (d.item)}
+                  <span class="why">{$_(d.who.length > 1 ? 'allergen_info.dislikes_many' : 'allergen_info.dislikes', { values: { who: list.format(d.who), item: d.item } })}</span>
+                {/each}
+              {/if}
             </span>
             <button class="swap" on:click={() => swap(i, p.recipe.id)} aria-label={$_('build_week.swap', { values: { name: p.recipe.name } })}>
               <span class="material-symbols-rounded" aria-hidden="true">swap_horiz</span>
@@ -177,12 +227,24 @@
   .chip.on { background: var(--accent-dim); border-color: transparent; color: var(--accent); }
   .chip .material-symbols-rounded { font-size: 16px; }
   .empty { margin: 8px 0; color: var(--text-2); font-size: 14px; }
+  .left-out {
+    margin: 0; display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px;
+    border-radius: var(--radius-md); background: var(--surface-2); font-size: 13px; color: var(--text-2);
+  }
+  .left-out .material-symbols-rounded { font-size: 18px; }
+  .left-out-text { flex: 1; min-width: 0; }
+  .left-out-btn {
+    min-height: 36px; padding: 0 10px; border: none; border-radius: var(--radius-md); background: transparent;
+    color: var(--accent); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  }
   .picks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
   .pick {
     display: flex; align-items: center; gap: 10px; padding: 8px;
     background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius-lg);
   }
-  .pick-day { width: 34px; flex: none; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
+  .pick-day { width: 34px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
+  .pick-serves { display: inline-flex; align-items: center; font-weight: 600; letter-spacing: 0; color: var(--text-3); }
+  .pick-serves .material-symbols-rounded { font-size: 12px; }
   .pick img, .pick .ph { width: 52px; height: 52px; border-radius: var(--radius-md); object-fit: cover; flex: none; }
   .ph { display: flex; align-items: center; justify-content: center; background: var(--surface-2); color: var(--text-3); font-size: 22px; }
   .pick-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }

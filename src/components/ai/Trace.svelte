@@ -26,6 +26,8 @@
     aiKeyVerified, energyUnit, measurementSystem, dateFormat, smartLogEnabled,
     traceChefHat, smartLogVoiceLang,
   } from '../../stores/settings.js';
+  import { household } from '../../stores/settings.js';
+  import { cleanHousehold, homeOn, allergenKey } from '../../lib/allergens.js';
   // Voice input language from Settings; 'auto' means the device locale.
   function _resolveVoiceLang() {
     const v = smartLogVoiceLang.get();
@@ -520,7 +522,10 @@
             const id = parseInt(args?.recipe_id, 10);
             const date = args?.date;
             if (!Number.isFinite(id) || !date) return { error: 'recipe_id and date required' };
-            const servings = parseInt(args?.servings, 10);
+            // Not said: who's home that day, when the household is set up.
+            const members = cleanHousehold($household);
+            let servings = parseInt(args?.servings, 10);
+            if (!(servings > 0) && members.length) servings = Math.max(1, homeOn(members, args?.any_day ? null : date).length);
             const r = await NtApi.createDiaryEntry({
               recipe_id: id, kind: 'planned',
               // Any day of a week is dated the week's first day.
@@ -670,6 +675,25 @@
     };
   }
 
+  // Who the user cooks for (Settings > Household), worked out here so the
+  // model doesn't have to: allergies, diets, dislikes and days home.
+  function _householdLine() {
+    const members = cleanHousehold($household);
+    if (!members.length) return '';
+    const dayName = d => new Date(2023, 0, 1 + d).toLocaleDateString('en-US', { weekday: 'short' });
+    const people = members.map(m => {
+      const bits = [];
+      if (m.allergies.length) bits.push('allergic to ' + m.allergies.map(allergenKey).join(', ').replace(/_/g, ' '));
+      if (m.diet.length) bits.push(m.diet.join(', ').replace(/_/g, ' '));
+      if (m.dislikes.length) bits.push('dislikes ' + m.dislikes.join(', '));
+      if (m.days.length) bits.push('home ' + m.days.map(dayName).join(', '));
+      return bits.length ? `${m.name} (${bits.join('; ')})` : m.name;
+    });
+    return `
+
+The user cooks for: ${people.join('; ')}. Recipes from get_recipes carry "allergens" (Open Food Facts codes; "meat" and "honey" for diets). When suggesting or planning, leave out what someone home that day is allergic to or their diet excludes, and say why; mention dislikes. Allergens are worked out from names and labels, so remind the user to check packaging when it matters. plan_cook without servings uses who's home that day.`;
+  }
+
   function _systemPrompt(smartLog = false) {
     const today = new Date().toISOString().slice(0, 10);
     const energy = $energyUnit === 'kJ' ? 'kilojoules (kJ)' : 'kilocalories (kcal)';
@@ -683,7 +707,7 @@
 - "I need a quick Italian meal under 30 minutes" → create_recipe with a generated recipe matching the criteria → "Created 'Quick Cacio e Pepe' (10 min prep, 15 min cook)."` : '';
     return `You are ${assistantName}, the cooking assistant inside CookTrace. You help with planning, cooking, scaling, substitutions, pantry management, and recipe discovery.${smartLogPreamble}
 
-Today is ${today}. The user prefers ${sys} measurements and ${energy} for energy values. The user's date format is ${$dateFormat}.
+Today is ${today}. The user prefers ${sys} measurements and ${energy} for energy values. The user's date format is ${$dateFormat}.${_householdLine()}
 
 You have tool access to the user's recipe library, pantry, cook diary, shopping list, and cookbooks. ALWAYS use tools to get real data instead of guessing. Examples:
 - "What can I cook tonight?" → call find_recipes_from_pantry, then propose a few candidates with their have/need ratio

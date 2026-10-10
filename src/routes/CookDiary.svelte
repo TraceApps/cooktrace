@@ -5,7 +5,9 @@
   import { push, replace, querystring } from 'svelte-spa-router';
   import { fade, slide } from 'svelte/transition';
   import { _, locale } from 'svelte-i18n';
-  import { pageBanners, bannerStyle } from '../stores/settings.js';
+  import { pageBanners, bannerStyle, household } from '../stores/settings.js';
+  import { cleanHousehold, homeOn, cardAllergens } from '../lib/allergens.js';
+  import AllergenChips from '../components/allergens/AllergenChips.svelte';
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { confirmDialog } from '../stores/confirmDialog.js';
@@ -467,10 +469,17 @@
     }
     if (recipeId != null) pickPlanRecipe(Number(recipeId));
   }
-  // Servings start at the recipe's own until changed by hand.
+  // Who you cook for (Settings > Household): planned servings start at
+  // who's home that day (everyone, for any day of the week).
+  $: householdMembers = cleanHousehold($household);
+  $: if (planOpen && !planServingsSet && householdMembers.length) {
+    planServings = Math.max(1, homeOn(householdMembers, planAnyDay ? null : planDate).length);
+  }
+  // Without a household, servings start at the recipe's own. Either way
+  // a change by hand stays.
   function pickPlanRecipe(id) {
     planRecipeId = id;
-    if (planServingsSet) return;
+    if (planServingsSet || householdMembers.length) return;
     const r = planRecipes.find(x => x.id === id);
     const n = Math.round(Number(r?.servings));
     planServings = Number.isFinite(n) && n > 0 ? n : 2;
@@ -732,6 +741,8 @@
         needs={weekPlanNeeds}
         building={weekBuilding}
         usesUp={weekUsesUp}
+        recipes={weekRecipes}
+        members={householdMembers}
         on:open={(ev) => ev.detail.recipe_id && push(`/recipes/${ev.detail.recipe_id}`)}
         on:actions={(ev) => onEntryLongPress(ev.detail)}
         on:cooked={(ev) => markPlannedAsCooked(ev.detail)}
@@ -915,6 +926,7 @@
   planned={weekPlanned}
   recipes={[...weekRecipes.values()]}
   pantry={weekPantry}
+  members={householdMembers}
   today={todayIso}
   on:added={onWeekBuilt}
 />
@@ -977,7 +989,10 @@
               {:else}
                 <span class="material-symbols-rounded">restaurant</span>
               {/if}
-              <span class="recipe-name">{r.name}</span>
+              <span class="recipe-text">
+                <span class="recipe-name">{r.name}</span>
+                {#if householdMembers.length}<AllergenChips summary={cardAllergens(r)} members={householdMembers} date={planAnyDay ? '' : planDate} />{/if}
+              </span>
               {#if planRecipeId === r.id}<span class="material-symbols-rounded check">check</span>{/if}
             </button>
           {:else}
@@ -1585,7 +1600,8 @@
   .recipe-row.active { background: var(--accent-dim); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
   .recipe-row img { width: 36px; height: 36px; border-radius: var(--radius-sm); object-fit: cover; }
   .recipe-row .material-symbols-rounded:first-of-type { color: var(--text-3); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
-  .recipe-name { flex: 1; font-size: 13px; color: var(--text-1); }
+  .recipe-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; }
+  .recipe-name { font-size: 13px; color: var(--text-1); }
   .recipe-row.active .recipe-name { color: var(--accent); font-weight: 600; }
   .recipe-row .check { color: var(--accent); }
   .empty-line { color: var(--text-3); font-size: 13px; text-align: center; padding: 16px; margin: 0; font-style: italic; }

@@ -67,3 +67,12 @@ test('new dinners go on free days from today, and the totals count each need onc
   assert.deepEqual(freeDays('2030-01-13', [], '2030-01-07').length, 7, 'a week ahead is all free');
   assert.deepEqual(picksNeeds([{ recipe: tacos }, { recipe: guac }], pantry, { today, horizon }), { toBuy: 1, expiring: 2 }, 'tortillas to buy; cilantro and avocados used up');
 });
+
+test('a recipe can be left out of a day, or ranked lower', () => {
+  const noGuacMonday = (r, slot) => (r.name === 'Guacamole' && slot === 0 ? false : 0);
+  const picks = buildWeek({ recipes, pantry, today, horizon, count: 2, options: {}, fit: noGuacMonday });
+  assert.notEqual(picks[0].recipe.name, 'Guacamole', 'not on the first day');
+  assert.equal(picks[1].recipe.name, 'Guacamole', 'the next day it can be');
+  const disliked = buildWeek({ recipes, pantry, today, horizon, count: 1, options: {}, fit: r => (r.name === 'Guacamole' ? -10 : 0) });
+  assert.notEqual(disliked[0].recipe.name, 'Guacamole');
+});

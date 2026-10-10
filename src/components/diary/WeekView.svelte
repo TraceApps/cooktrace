@@ -13,6 +13,9 @@
     needs: weekNeeds() for the week's plan, or null for a week gone by
     building: the list is being built
     usesUp: usesUp() for the week ({ items, ideas }), or null
+    recipes: Map of recipe id -> recipe, for allergens
+    members: the household; a planned cook names who it's a problem for
+      among those home that day (lib/allergens.js)
   Events: open (entry), actions (entry), cooked (entry), servings ({ entry, value }),
     plan ({ date }), planAnyDay, build, buildWeek, planRecipe (recipe)
 -->
@@ -22,12 +25,20 @@
   import ServingsStepper from '../ui/ServingsStepper.svelte';
   import { resolveAssetUrl } from '../../lib/platform.js';
   import { longpress } from '../../lib/long-press.js';
+  import AllergenChips from '../allergens/AllergenChips.svelte';
+  import { cardAllergens } from '../../lib/allergens.js';
 
   export let days = [];
   export let anyDay = [];
   export let needs = null;
   export let building = false;
   export let usesUp = null;
+  export let recipes = new Map();
+  export let members = [];
+  const allergensOf = e => {
+    const r = e.recipe_id != null ? recipes.get(e.recipe_id) : null;
+    return r ? cardAllergens(r) : null;
+  };
   let usesUpEl;
   $: list = new Intl.ListFormat($locale || undefined, { style: 'long', type: 'conjunction' });
 
@@ -98,6 +109,7 @@
           <span class="tray-text">
             <span class="name">{e.recipe_name || 'Recipe'}</span>
             <span class="sub">{$_('cookdiary_page.servings_count', { values: { count: servingsOf(e) } })}</span>
+            {#if members.length}<AllergenChips summary={allergensOf(e)} {members} />{/if}
           </span>
         </button>
       {/each}
@@ -147,6 +159,7 @@
                     {#if e.meal_type}
                       <span class="chips"><span class="chip"><span class="material-symbols-rounded" aria-hidden="true">{MEAL_ICONS[e.meal_type] || 'restaurant'}</span>{$_(`cookdiary_page.week.meal_${e.meal_type}`)}</span></span>
                     {/if}
+                    {#if members.length}<AllergenChips summary={allergensOf(e)} {members} date={d.iso} />{/if}
                   </span>
                 </button>
                 <ServingsStepper value={servingsOf(e)} label={$_('cookdiary_page.servings')}
@@ -198,6 +211,7 @@
         <span class="idea-text">
           <span class="name">{idea.recipe.name}</span>
           <span class="sub">{$_('cookdiary_page.week.idea_uses', { values: { items: list.format(idea.uses) } })}</span>
+          {#if members.length}<AllergenChips summary={cardAllergens(idea.recipe)} {members} />{/if}
         </span>
         <button class="btn btn-primary idea-plan" on:click={() => dispatch('planRecipe', idea.recipe)}
           aria-label={$_('cookdiary_page.week.plan_recipe', { values: { name: idea.recipe.name } })}>

@@ -1,7 +1,8 @@
 <!--
   ShoppingItemSheet: one list item in full. What's on the list, what the
   pantry has, which planned cooks need it (on which day, how much), the
-  kinds the pantry keeps of it, a size hint, and a note.
+  kinds the pantry keeps of it, a size hint, its allergens (from the
+  pantry item's label or its name) and who they're a problem for, and a note.
 
   Props:
     open (bindable)
@@ -20,6 +21,9 @@
   import { parseSources } from '../../lib/shopping-plan.js';
   import { lookupCommonDensity } from '../../lib/recipe-nutrition.js';
   import { fromIso } from '../../lib/week.js';
+  import AllergenChips from '../allergens/AllergenChips.svelte';
+  import { household } from '../../stores/settings.js';
+  import { cleanHousehold, itemAllergens } from '../../lib/allergens.js';
 
   export let open = false;
   export let item = null;
@@ -60,6 +64,10 @@
     };
   })();
   $: soon = stock?.expires && stock.expires <= _inDays(3);
+  // What it contains: the pantry item's label, else what its name says.
+  $: householdMembers = cleanHousehold($household);
+  $: allergens = item ? itemAllergens({ name: item.name, pantry_item_id: pantryItem?.id ?? null }, pantryItem ? new Map([[pantryItem.id, pantryItem]]) : null) : null;
+  $: hasAllergens = !!(allergens && (allergens.contains.length || allergens.traces.length));
   function _inDays(n) {
     const d = new Date(); d.setDate(d.getDate() + n);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -129,6 +137,13 @@
             {#if stock?.expires}<span class="tile-sub" class:soon>{$_('shopping_item.use_by', { values: { date: fromIso(stock.expires).toLocaleDateString($locale || undefined, { month: 'short', day: 'numeric' }) } })}</span>{/if}
           </div>
         </div>
+
+        {#if hasAllergens}
+          <section class="block">
+            <h4>{$_('allergen_info.section')}</h4>
+            <AllergenChips summary={allergens} members={householdMembers} only="all" />
+          </section>
+        {/if}
 
         {#if cookRows.length}
           <section class="block">

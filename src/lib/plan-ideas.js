@@ -95,11 +95,13 @@ export function usesUp({ recipes, pantry, planned, today, horizon, limit = 3 }) 
  *   options: { useExpiring, notRecent, quick }
  *   exclude: recipe ids not to pick (already planned that week)
  *   skip: per-slot recipe ids passed over by Swap ({ [slot]: Set })
+ *   fit: (recipe, slot) => false to leave it out of that slot (an allergy
+ *     of someone home that day), or a number added to its score (a dislike)
  * Returns [{ recipe, reason }] where reason is
  *   { kind: 'uses', items } | { kind: 'shares', item, with } | { kind: 'have', have, need }
  *   | { kind: 'not_cooked', weeks } | { kind: 'new' }.
  */
-export function buildWeek({ recipes, pantry, today, horizon, count, options = {}, exclude = new Set(), skip = {} }) {
+export function buildWeek({ recipes, pantry, today, horizon, count, options = {}, exclude = new Set(), skip = {}, fit = null }) {
   const idx = pantryIndex(pantry, { today, horizon });
   const now = _dayNumber(today);
   const pool = (recipes || []).filter(r => {
@@ -124,8 +126,10 @@ export function buildWeek({ recipes, pantry, today, horizon, count, options = {}
     let best = null;
     for (const c of pool) {
       if (chosen.some(x => x.c === c) || skip[slot]?.has(c.r.id)) continue;
+      const f = fit ? fit(c.r, slot) : 0;
+      if (f === false) continue;
       const ratio = c.need.count ? c.have / c.need.count : 0;
-      let score = 2 * ratio;
+      let score = 2 * ratio + (Number(f) || 0);
       if (options.useExpiring !== false) score += 1.5 * c.expiring.length;
       const shared = [...c.need.families].filter(f => families.has(f));
       score += 0.5 * Math.min(shared.length, 3);
