@@ -17,18 +17,15 @@
  * members identically to one created in the app — the exact class of
  * bug that shipped for the native-Android write path before it was
  * fixed (see server/lib/auto-share.js).
+ *
+ * Ingredient, step and nutrition shapes come from ../recipe-input.js,
+ * shared with update_recipe.
  */
 import { z } from 'zod';
 import db from '../../../db.js';
 import { toolResult, toolError } from '../_util.js';
 import { autoShareNewRecipe } from '../../auto-share.js';
-
-const ingredientSchema = z.object({
-  name: z.string().min(1).max(200),
-  qty:  z.union([z.string(), z.number()]).optional(),
-  unit: z.string().max(20).optional(),
-  note: z.string().max(200).optional(),
-});
+import { ingredientSchema, stepsSchema, nutritionSchema, toStoredIngredients, toStoredSteps, mergeNutrition } from '../recipe-input.js';
 
 export function registerCreateRecipe(server, { userId }) {
   server.registerTool(
@@ -38,7 +35,7 @@ export function registerCreateRecipe(server, { userId }) {
       description:
         'Add a new recipe. Requires confirm=true. Ingredients are a flat list of ' +
         '{name, qty, unit, note} objects (no need to group them). Steps are a plain ' +
-        'list of instruction strings, one per step.',
+        'list of instruction strings, one per step. nutrition is per serving.',
       inputSchema: {
         confirm:      z.boolean(),
         name:         z.string().min(1).max(200),
@@ -46,14 +43,18 @@ export function registerCreateRecipe(server, { userId }) {
         servings:     z.number().int().positive().max(1000).optional(),
         prep_minutes: z.number().int().min(0).max(10000).optional(),
         cook_minutes: z.number().int().min(0).max(10000).optional(),
+        rest_minutes: z.number().int().min(0).max(10000).optional(),
+        total_minutes: z.number().int().min(0).max(10000).optional()
+          .describe('Only when it differs from prep + cook + rest, e.g. when steps overlap.'),
         ingredients:  z.array(ingredientSchema).min(1),
-        steps:        z.array(z.string().min(1).max(2000)).min(1),
+        steps:        stepsSchema,
         tags:         z.array(z.string().min(1).max(50)).max(20).optional(),
         source_url:   z.string().url().max(500).optional(),
         notes:        z.string().max(2000).optional(),
+        nutrition:    nutritionSchema.optional(),
       },
     },
-    async ({ confirm, name, description, servings, prep_minutes, cook_minutes, ingredients, steps, tags, source_url, notes }) => {
+    async ({ confirm, name, description, servings, prep_minutes, cook_minutes, rest_minutes, total_minutes, ingredients, steps, tags, source_url, notes, nutrition }) => {
       if (confirm !== true) {
         return toolError(
           'create_recipe requires confirm=true. This safeguards against accidental ' +
@@ -63,19 +64,15 @@ export function registerCreateRecipe(server, { userId }) {
       const cleanName = name.trim();
       if (!cleanName) return toolError('name is required and cannot be blank.');
 
-      const storedIngredients = ingredients.map(it => ({
-        name: it.name.trim(),
-        qty:  it.qty != null ? String(it.qty) : '',
-        unit: it.unit || '',
-        note: it.note || '',
-      }));
-      const storedSteps = steps.map(s => ({ title: '', text: s.trim(), refIds: [], imgUrl: '' }));
+      const storedIngredients = toStoredIngredients(ingredients);
+      const storedSteps = toStoredSteps(steps);
 
       const result = db.prepare(
         `INSERT INTO recipes
            (user_id, name, description, servings, prep_minutes, cook_minutes,
-            ingredients, steps, tags, source_url, notes, visibility)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'private')`
+            rest_minutes, total_minutes, ingredients, steps, tags, source_url, notes,
+            nutrition, visibility)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'private')`
       ).run(
         userId,
         cleanName,
@@ -83,11 +80,14 @@ export function registerCreateRecipe(server, { userId }) {
         servings ?? null,
         prep_minutes ?? null,
         cook_minutes ?? null,
+        rest_minutes ?? null,
+        total_minutes ?? null,
         JSON.stringify(storedIngredients),
         JSON.stringify(storedSteps),
         JSON.stringify(tags || []),
         source_url || null,
         notes || null,
+        nutrition ? mergeNutrition(null, nutrition) : '{}',
       );
 
       const recipeId = result.lastInsertRowid;

@@ -10,6 +10,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - **Earlier versions of a recipe.** When edits from two devices change the same part of a recipe, the newer one stays, and the recipe page says so and lists the other, with what differs and a preview. Restore puts it back, and a restore can be undone the same way. A kitchen member sees the versions that were their own edits.
+- **An MCP agent can edit a recipe, set its nutrition and give it a photo.** `update_recipe` changes only the fields it's sent: ingredients, steps and tags replace the whole list, and nutrition merges, so setting protein keeps the calories already there. `set_recipe_image` stores an image from a URL or from the image itself, the same way a photo uploaded in the app is stored. `create_recipe` also takes nutrition, rest time and a total time. Both new tools need `mcp:write`, and the copy an edit replaces is kept as an earlier version, so an agent's change can be undone from the recipe page. `get_recipe` now includes the image.
 - **Shared recipe links show a preview in chat apps**: the recipe's name, a line about it, and its photo. Links are now a plain address (`/r/...`) instead of a `#/` one, which a server never sees. Links copied before this still open.
 
 ### Changed
