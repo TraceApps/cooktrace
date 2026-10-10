@@ -14,6 +14,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **Plan a Cook asks for servings**, starting at the recipe's own. The Diary shows them on each planned cook, and the shopping list scales to them.
+- **Amounts on the shopping list read the way a cook writes them** (3/8 cup, not 0.375 cup), things you count round up to whole ones (8 tomatoes, not 7.5), and the quantity fields take fractions like 1/2.
 - **The week's plan on the shopping list is scaled and added up.** Each recipe is scaled to the servings planned, the same ingredient from several recipes becomes one item (1 cup and 120 ml of milk add up), and every item remembers which recipes and cooks it's for. Building the list for the same week again updates it instead of adding everything twice, a cook taken off the plan takes its ingredients out, and items already checked off aren't added back.
 - **Adding a recipe to the shopping list adds to an item that's already there** instead of making a second one.
 - **A sync keeps the newer edit, field by field.** An edit made offline in the Android app or in the browser no longer overwrites a newer change made on another device to a recipe, a pantry item, the shopping list, a category, a custom unit, a cookbook or the diary, even when a phone's clock is off. Changes to different fields are both kept: an item checked off on the phone and renamed on the web keeps both. Fields that belong together, such as an amount and its unit, stay together. An item deleted on one device stays deleted when another only edited it earlier or reordered the list. Cook counts follow the cook diary. Older versions of the app sync as before, and a recipe copy they replace is kept as an earlier version.
@@ -22,6 +24,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Plan a Cook on a recipe card opens the planner with that recipe picked.** It went to the Diary and did nothing more.
 - **Photos synced from the Android app are stored as files on the server.** A photo that reached the sync embedded in its recipe, pantry item, cookbook or cook diary entry was kept inline, so every list carried it and share cards and link previews couldn't show it. Photos already stored that way are turned into files when the server starts.
 - **The Android app no longer opens on a blank screen after signing in on the setup screen.** Now and then it stayed blank until it was closed and opened again.
 - **A recipe's ingredients made or edited in the Android app link the right pantry items on the server.** They sent the phone's own numbers for the items, so a link could point at another item, or at nothing, once synced, and a recipe from the web linked the wrong items on the phone. A link to another account's pantry item is no longer kept.

@@ -303,9 +303,15 @@ export function sumAmounts(parts) {
   return { qty: withQty.reduce((s, p) => s + p.qty, 0), unit: normalizeUnit(firstUnit) || null };
 }
 
-/** A total rounded for a shopping list: eighths where cooks use fractions, else two decimals. */
+/**
+ * A total rounded for a shopping list: things counted round up to whole
+ * ones (7.5 tomatoes is 8 to buy, half a can is a can), cooking measures
+ * to the nearest eighth, weights and metric volume to two decimals.
+ */
 export function roundForList(qty, unit) {
   if (qty == null || !Number.isFinite(qty)) return null;
+  const fam = unitFamily(unit);
+  if (!fam || fam === 'count') return Math.max(Math.ceil(qty - 1e-9), qty > 0 ? 1 : 0);
   if (FRACTION_UNITS.has(normalizeUnit(unit))) return Math.round(qty * 8) / 8;
   return Math.round(qty * 100) / 100;
 }

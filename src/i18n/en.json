@@ -1630,7 +1630,16 @@
   "manage_ct": {
     "title":                     "Manage"
   },
+  "servings_stepper": {
+    "servings":                  "Servings",
+    "fewer":                     "Fewer Servings",
+    "more":                      "More Servings"
+  },
   "cookdiary_page": {
+    "servings":                  "Servings",
+    "servings_count":            "{count, plural, one {# serving} other {# servings}}",
+    "plan_it":                   "Plan It",
+    "saving":                    "Saving…",
     "toast": {
       "pick_recipe":             "Pick a recipe",
       "planned":                 "Planned",

@@ -14,7 +14,7 @@
  * mapSourceIds() turns them into the other side's ids during a sync.
  */
 import {
-  parseQty, qtyToBuy, normalizeUnit, unitFamily, convertWithinFamily,
+  parseQty, qtyToBuy, normalizeUnit, convertWithinFamily,
   amountKey, sumAmounts, roundForList, ingredientKey,
 } from './quantity.js';
 
@@ -88,19 +88,20 @@ const _sourceKey = s => `${s.diary_id ?? ''}|${s.recipe_id ?? ''}|${s.ref ?? ''}
 const _rowKey = (name, unit) => `${ingredientKey(name)}|${amountKey(unit)}`;
 
 // The part of a row's amount that didn't come from its sources: what was
-// typed by hand. Null when the row has no number at all.
+// typed by hand. Null when the row has no number at all. Compared with the
+// sources' total as the list shows it (rounded, 7.5 tomatoes as 8), so the
+// rounding never counts as typed.
 function _manualPart(row, sources) {
   const q = Number(row.quantity);
   if (row.quantity == null || row.quantity === '' || !Number.isFinite(q)) return null;
+  const mine = sources.filter(s => s.qty != null && amountKey(s.unit) === amountKey(row.unit));
   let fromSources = 0;
-  for (const s of sources) {
-    if (s.qty == null) continue;
-    const v = convertWithinFamily(s.qty, s.unit, row.unit);
-    if (v == null && amountKey(s.unit) !== amountKey(row.unit)) continue;
-    fromSources += v ?? s.qty;
+  if (mine.length) {
+    const t = _total(null, row.unit, mine);
+    fromSources = t.quantity == null ? 0 : (convertWithinFamily(t.quantity, t.unit, row.unit) ?? t.quantity);
   }
   const rest = q - fromSources;
-  // Rounding leaves crumbs; anything under 2% of the row is one.
+  // Anything under 2% of the row is a crumb of rounding, not typed.
   return rest > Math.max(1e-6, Math.abs(q) * 0.02) ? rest : 0;
 }
 
@@ -235,4 +236,3 @@ export function cleanSourceIds(json, recipeOk, diaryOk) {
   return mapSourceIds(json, id => (recipeOk(id) ? id : null), id => (diaryOk(id) ? id : null)).json;
 }
 
-export { unitFamily };

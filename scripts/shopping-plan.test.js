@@ -105,6 +105,15 @@ test('adding a recipe (not a plan) adds each time, onto a hand-made row of the s
   assert.ok(Math.abs(r2.updates[0].quantity - 1.95) < 0.02, `twice the recipe, twice the milk: ${r2.updates[0].quantity}`);
 });
 
+test('counted things round up to whole ones, and the rounding is never taken for a typed amount', () => {
+  const r = { id: 5, servings: 4, ingredients: [{ items: [{ id: 't', name: 'tomatoes', qty: '6' }] }] };
+  const first = mergeIntoList([], recipeContributions(r, { diaryId: 1, date: '2030-01-07', servings: 5 }), { window: WEEK });
+  assert.equal(first.inserts[0].quantity, 8, '7.5 tomatoes is 8 to buy');
+  const rows = asRows(first);
+  const fewer = mergeIntoList(rows, recipeContributions(r, { diaryId: 1, date: '2030-01-07', servings: 4 }), { window: WEEK });
+  assert.equal(fewer.updates[0].quantity, 6, 'planned for 4 again: 6, not 6 plus the half rounded up before');
+});
+
 test('ids in sources map to the other side, and unknown ones wait', () => {
   const json = JSON.stringify([{ recipe_id: 1, diary_id: 10, name: 'x' }, { recipe_id: 2, diary_id: null, name: 'y' }]);
   const m = mapSourceIds(json, id => ({ 1: 101, 2: 102 })[id], id => ({ 10: 110 })[id]);

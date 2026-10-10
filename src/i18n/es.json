@@ -1632,7 +1632,16 @@
   "manage_ct": {
     "title": "Gestión"
   },
+  "servings_stepper": {
+    "servings": "Porciones",
+    "fewer": "Menos porciones",
+    "more": "Más porciones"
+  },
   "cookdiary_page": {
+    "servings": "Porciones",
+    "servings_count": "{count, plural, one {# porción} other {# porciones}}",
+    "plan_it": "Planificar",
+    "saving": "Guardando…",
     "toast": {
       "pick_recipe": "Elige una receta",
       "planned": "Planificada",

@@ -13,6 +13,7 @@
  */
 
 import { brandFooter } from './brand-mark.js';
+import { displayQty } from './qty.js';
 
 const W = 600;
 const HEAD_H = 160;
@@ -114,7 +115,7 @@ export function buildShoppingCardSvg(items, opts = {}) {
   shown.forEach((it, i) => {
     const y = HEAD_H + 8 + i * ROW_H + ROW_H / 2;
     const baseline = y + 7;
-    const qty = it.quantity != null && it.quantity !== '' ? String(it.quantity) : '';
+    const qty = it.quantity != null && it.quantity !== '' ? displayQty(it.quantity, it.unit) : '';
     const unit = it.unit || '';
     const qtyUnit = [qty, unit].filter(Boolean).join(' ');
     const name = clip(it.name || '', qtyUnit ? 30 : 40);
@@ -176,7 +177,7 @@ export function buildShoppingText(items, opts = {}) {
     '',
   ];
   for (const it of toBuy) {
-    const qty = it.quantity != null && it.quantity !== '' ? String(it.quantity) : '';
+    const qty = it.quantity != null && it.quantity !== '' ? displayQty(it.quantity, it.unit) : '';
     const unit = it.unit || '';
     const qu = [qty, unit].filter(Boolean).join(' ');
     lines.push(`• ${it.name}${qu ? ` — ${qu}` : ''}`);

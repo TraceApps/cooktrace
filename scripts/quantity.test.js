@@ -109,6 +109,11 @@ test('amounts of one ingredient add up across units of a family', () => {
   assert.deepEqual(sumAmounts([{ qty: 2, unit: 'clove' }, { qty: null, unit: 'clove' }]), { qty: 2, unit: 'clove' });
   assert.equal(roundForList(1.507, 'cup'), 1.5);
   assert.equal(roundForList(0.7004, 'kg'), 0.7);
+  // Things counted are bought whole.
+  assert.equal(roundForList(7.5, null), 8);
+  assert.equal(roundForList(0.5, 'cans'), 1);
+  assert.equal(roundForList(0.2, 'clove'), 1);
+  assert.equal(roundForList(3, null), 3);
 });
 
 test('ingredient names match across plural and case', () => {

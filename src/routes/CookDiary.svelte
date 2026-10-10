@@ -2,7 +2,7 @@
   import { closeOnBack } from '../lib/back-stack.js';
   import { onSyncChanges } from '../lib/sync-refresh.js';
   import { onMount } from 'svelte';
-  import { push } from 'svelte-spa-router';
+  import { push, replace, querystring } from 'svelte-spa-router';
   import { fade, slide } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
   import { pageBanners, bannerStyle } from '../stores/settings.js';
@@ -13,6 +13,7 @@
   import { relativeTime, shortDate } from '../lib/relative-time.js';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import DateInput from '../components/ui/DateInput.svelte';
+  import ServingsStepper from '../components/ui/ServingsStepper.svelte';
   import CookHeatmap from '../components/diary/CookHeatmap.svelte';
   import { longpress } from '../lib/long-press.js';
   import { resolveAssetUrl } from '../lib/platform.js';
@@ -298,6 +299,8 @@
   let planDate = todayIso;
   let planRecipeId = null;
   let planMealType = null;  // 'breakfast' | 'lunch' | 'dinner' | 'snack' | null
+  let planServings = 2;     // how many to cook for: the list scales to it
+  let planServingsSet = false; // changed by hand: picking a recipe keeps it
   let planRecipes = [];     // user's recipes for the picker
   let planSearch = '';
   let planBusy = false;
@@ -316,12 +319,16 @@
     return m ? m.icon : 'restaurant';
   }
 
-  async function openPlan() {
+  // Opens the dialog, with a recipe already picked when one is given (a
+  // recipe card's Plan a Cook links here as /diary?plan=<id>).
+  async function openPlan(recipeId = null) {
     planOpen = true;
     planDate = todayIso;
     planRecipeId = null;
     planMealType = null;
     planSearch = '';
+    planServingsSet = false;
+    planServings = 2;
     if (planRecipes.length === 0) {
       try {
         const list = await NtApi.getRecipes();
@@ -331,7 +338,23 @@
       }
       catch { planRecipes = []; }
     }
+    if (recipeId != null) pickPlanRecipe(Number(recipeId));
   }
+  // Servings start at the recipe's own until changed by hand.
+  function pickPlanRecipe(id) {
+    planRecipeId = id;
+    if (planServingsSet) return;
+    const r = planRecipes.find(x => x.id === id);
+    const n = Math.round(Number(r?.servings));
+    planServings = Number.isFinite(n) && n > 0 ? n : 2;
+  }
+  onMount(() => {
+    const want = new URLSearchParams($querystring || '').get('plan');
+    if (want && /^\d+$/.test(want)) {
+      openPlan(want);
+      replace('/diary'); // so Back and a reload don't open it again
+    }
+  });
   $: filteredPlanRecipes = planSearch.trim()
     ? planRecipes.filter(r => foldText(r.name).includes(foldText(planSearch).trim()))
     : planRecipes;
@@ -345,6 +368,7 @@
         date: planDate,
         kind: 'planned',
         meal_type: planMealType || null,
+        servings: planServings,
       });
       showSuccess($_('cookdiary_page.toast.planned'));
       planOpen = false;
@@ -417,7 +441,7 @@
 <div class="page-shell">
   <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
     <h1>{$_('routes.diary.title')}</h1>
-    <button class="btn-icon header-action" on:click={openPlan} aria-label="Plan a Cook" title="Plan a Cook">
+    <button class="btn-icon header-action" on:click={() => openPlan()} aria-label="Plan a Cook" title="Plan a Cook">
       <span class="material-symbols-rounded">event_available</span>
     </button>
   </header>
@@ -555,7 +579,7 @@
         <span class="material-symbols-rounded empty-icon">event_note</span>
         <h2>{$_('routes.diary.empty_title')}</h2>
         <p>{$_('routes.diary.empty_desc')}</p>
-        <button class="btn btn-primary" on:click={openPlan}>{$_('routes.diary.plan_cook')}</button>
+        <button class="btn btn-primary" on:click={() => openPlan()}>{$_('routes.diary.plan_cook')}</button>
       </div>
     {:else if (filterRecipeId || mealFilter || _diaryQuery) && displayEntries.length === 0}
       <div class="state empty" in:fade={{ duration: 120 }}>
@@ -606,6 +630,12 @@
                       <span class="entry-meal" title={_mealLabel(e.meal_type)}>
                         <span class="material-symbols-rounded">{_mealIcon(e.meal_type)}</span>
                         {_mealLabel(e.meal_type)}
+                      </span>
+                    {/if}
+                    {#if e.kind === 'planned' && e.servings > 0}
+                      <span class="entry-meal">
+                        <span class="material-symbols-rounded">person</span>
+                        {$_('cookdiary_page.servings_count', { values: { count: e.servings } })}
                       </span>
                     {/if}
                   </div>
@@ -734,13 +764,18 @@
             {/each}
           </div>
         </div>
+        <div class="field plan-servings">
+          <span class="field-label">{$_('cookdiary_page.servings')}</span>
+          <ServingsStepper bind:value={planServings} label={$_('cookdiary_page.servings')}
+            on:change={() => planServingsSet = true} />
+        </div>
         <label class="field">
           <span class="field-label">{$_('cookdiary_page.recipe')}</span>
           <input class="input" type="search" placeholder="Search…" bind:value={planSearch} />
         </label>
         <div class="recipe-picker">
           {#each filteredPlanRecipes as r (r.id)}
-            <button class="recipe-row" class:active={planRecipeId === r.id} on:click={() => planRecipeId = r.id}>
+            <button class="recipe-row" class:active={planRecipeId === r.id} on:click={() => pickPlanRecipe(r.id)}>
               {#if r.imgUrl}
                 <img src={r.imgUrl} alt="" loading="lazy" />
               {:else}
@@ -757,7 +792,7 @@
       <footer class="modal-footer">
         <button class="btn btn-secondary" on:click={() => planOpen = false}>{$_('cookdiary_page.cancel')}</button>
         <button class="btn btn-primary" on:click={savePlan} disabled={planBusy}>
-          {planBusy ? 'Saving…' : 'Plan it'}
+          {planBusy ? $_('cookdiary_page.saving') : $_('cookdiary_page.plan_it')}
         </button>
       </footer>
     </div>
@@ -1276,6 +1311,13 @@
   /* Plan dialog meal-type chip row — same look as the CookLogDialog
      so the planner + log experience match. */
   .plan-meal-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  /* Servings: the label on the left, the stepper on the right. */
+  .field.plan-servings {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
   .plan-meal-chip {
     display: inline-flex;
     align-items: center;

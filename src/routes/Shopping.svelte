@@ -19,6 +19,7 @@
   import DateInput from '../components/ui/DateInput.svelte';
   import { longpress } from '../lib/long-press.js';
   import { foldText } from '../lib/search-text.js';
+  import { displayQty, parseQty } from '../lib/qty.js';
   import {
     buildShoppingCardSvg, buildShoppingText,
     svgToPngBlob, shareBlob, shareText,
@@ -250,7 +251,7 @@
     try {
       const created = await NtApi.addShoppingItem({
         name,
-        quantity: addQty === '' ? null : Number(addQty),
+        quantity: String(addQty).trim() === '' ? null : parseQty(addQty),
       });
       items = [...items, created];
       addName = ''; addNameTyped = ''; addQty = '';
@@ -497,7 +498,8 @@
   function openEdit(it) {
     editTarget = it;
     editName   = it.name || '';
-    editQty    = it.quantity != null ? String(it.quantity) : '';
+    // As a cook writes it ("3/8"), and read back the same way.
+    editQty    = it.quantity != null ? displayQty(it.quantity, it.unit) : '';
     editUnit   = it.unit || '';
     editSheetOpen = true;
   }
@@ -506,14 +508,14 @@
     const it = editTarget;
     const payload = {
       name:     editName.trim() || it.name,
-      quantity: editQty === '' ? null : Number(editQty),
+      quantity: editQty === '' ? null : parseQty(editQty),
       unit:     editUnit.trim() || null,
     };
     editSheetOpen = false;
     editTarget = null;
     const members = it.members || [it];
     const shownQty = it.quantity != null && it.quantity !== '' ? Number(it.quantity) : null;
-    const enteredQty = editQty === '' || editQty == null ? null : Number(editQty);
+    const enteredQty = editQty === '' || editQty == null ? null : parseQty(editQty);
     // A merged row's quantity is a total across rows. Changing it folds
     // them into the first row with the new amount; leaving it alone just
     // renames / re-units every row and keeps each recipe's own amount.
@@ -843,9 +845,8 @@
       </div>
       <input
         class="input qa-qty"
-        type="number"
-        min="0"
-        step="0.01"
+        type="text"
+        autocomplete="off"
         bind:value={addQty}
         placeholder="qty"
         aria-label="Quantity (optional)"
@@ -988,7 +989,7 @@
                   <div class="row-body">
                     <span class="row-name">{it.name}</span>
                     {#if it.quantity != null || it.unit}
-                      <span class="row-qty">{it.quantity ?? ''}{it.quantity != null && it.unit ? ' ' : ''}{it.unit ?? ''}</span>
+                      <span class="row-qty">{displayQty(it.quantity, it.unit)}{it.quantity != null && it.unit ? ' ' : ''}{it.unit ?? ''}</span>
                     {/if}
                     {#if $shoppingGroupBy !== 'aisle' && it.aisle}
                       <span class="row-aisle-pill" title="Aisle">{it.aisle}</span>
@@ -1113,7 +1114,8 @@
         <div class="edit-qty-row">
           <label class="field field-qty">
             <span class="field-label">{$_('shopping_page.quantity')}</span>
-            <input class="input" type="number" min="0" step="0.01"
+            <!-- Text, like the recipe editor's: "1/2" and "1 1/2" are amounts too. -->
+            <input class="input" type="text" autocomplete="off"
                    bind:value={editQty}
                    placeholder="0" />
           </label>
