@@ -72,6 +72,7 @@ export function listRevisions(recipe, viewer) {
       rev: v.rev,
       number: i + 1,
       created_at: v.created_at,
+      created_by: v.created_by ?? null,
       created_by_name: v.created_by_name || null,
       current: v.rev === recipe.rev,
       used: used.has(v.rev),

@@ -542,11 +542,21 @@
   // ── Long-press / right-click action sheet ─────────────────────────
   let actionSheetOpen = false;
   let actionSheetEntry = null;
+  // A cook opens its recipe as it was made (#54), at the version it was
+  // made from; a planned cook, or one from before the history, the recipe.
+  function openEntry(e) {
+    if (!e?.recipe_id) return;
+    if (e.kind === 'cooked' && e.recipe_rev) push(`/recipes/${e.recipe_id}/history/${e.recipe_rev}?cook=${e.id}`);
+    else push(`/recipes/${e.recipe_id}`);
+  }
+
   function onEntryLongPress(e) {
     actionSheetEntry = e;
     actionSheetOpen = true;
   }
   $: entryActions = actionSheetEntry ? [
+    ...(actionSheetEntry.recipe_id && actionSheetEntry.kind === 'cooked' && actionSheetEntry.recipe_rev
+      ? [{ label: $_('history.as_made'), icon: 'history', value: 'as_made' }] : []),
     ...(actionSheetEntry.recipe_id ? [{ label: 'Open Recipe', icon: 'open_in_new', value: 'open' }] : []),
     ...(actionSheetEntry.kind === 'planned'
       ? [{ label: 'Mark as Cooked', icon: 'restaurant', value: 'cooked' }]
@@ -562,6 +572,7 @@
     actionSheetEntry = null;
     if (!e) return;
     if (v === 'open' && e.recipe_id) push(`/recipes/${e.recipe_id}`);
+    if (v === 'as_made') openEntry(e);
     else if (v === 'cooked') await markPlannedAsCooked(e);
     else if (v === 'move') { moveEntry = e; moveSheetOpen = true; }
     else if (v === 'delete') await removeEntry(e);
@@ -743,7 +754,7 @@
         usesUp={weekUsesUp}
         recipes={weekRecipes}
         members={householdMembers}
-        on:open={(ev) => ev.detail.recipe_id && push(`/recipes/${ev.detail.recipe_id}`)}
+        on:open={(ev) => openEntry(ev.detail)}
         on:actions={(ev) => onEntryLongPress(ev.detail)}
         on:cooked={(ev) => markPlannedAsCooked(ev.detail)}
         on:servings={onWeekServings}
@@ -788,12 +799,12 @@
               <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
               <li class="entry"
                 class:planned={e.kind === 'planned'}
-                on:click={() => e.recipe_id && push(`/recipes/${e.recipe_id}`)}
+                on:click={() => openEntry(e)}
                 use:longpress
                 on:longpress={() => onEntryLongPress(e)}
                 on:contextmenu|preventDefault={() => onEntryLongPress(e)}
                 role="button" tabindex="0"
-                on:keydown={(ev) => { if (ev.key === 'Enter' && e.recipe_id) push(`/recipes/${e.recipe_id}`); }}>
+                on:keydown={(ev) => { if (ev.key === 'Enter') openEntry(e); }}>
                 <div class="entry-recipe">
                   {#if e.recipe_img_url}
                     <img src={resolveAssetUrl(e.recipe_img_url)} alt="" loading="lazy" />

@@ -47,6 +47,8 @@
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import Sheet from '../components/ui/Sheet.svelte';
   import RecipeAllergens from '../components/allergens/RecipeAllergens.svelte';
+  import HistorySheet from '../components/recipe/HistorySheet.svelte';
+  import { revisionOf } from '../lib/recipe-content.js';
   import { household } from '../stores/settings.js';
   import { ALLERGENS, allergenKey, avoids, cleanHousehold, cleanOverrides, itemAllergens } from '../lib/allergens.js';
   import { buildRecipeCardPages, buildRecipeShareText } from '../lib/recipe-card.js';
@@ -561,6 +563,7 @@
     // matters, since cook mode survives closing the app.
     if (recipe) { describeCook(id, { name: recipe.name, img: recipe.imgUrl || '', serverId: _watchRecipeId() }); _tellWatch({ now: true }); }
     loadVersions();
+    loadHistory();
     // And the watch may have ticked something off while the phone was shut.
     _hearWatch();
     // Kick off the pantry load so the FDA box can render "~Xg per
@@ -687,6 +690,22 @@
       showError(e.message || 'Could not share');
     }
   }
+
+  // ── History (#54) ────────────────────────────────────────
+  // Every version of what the recipe has you cook, each cook with the one
+  // it was made from (lib/recipe-content.js). Whoever can open the recipe
+  // sees it; on a phone, from its own copy (offline too).
+  let history = null;
+  let historyOpen = false;
+  async function loadHistory() {
+    const rid = id;
+    try {
+      const h = await NtApi.getRecipeRevisions(rid);
+      if (rid === id) history = h;
+    } catch { if (rid === id) history = null; }
+  }
+  $: versionNumberOf = rev => history?.revisions?.find(v => v.rev === rev)?.number ?? null;
+  function openConflicts() { historyOpen = false; openVersions(); }
 
   // ── Earlier versions ─────────────────────────────────────
   // Copies of this recipe a sync didn't keep (an edit from another device
@@ -855,13 +874,15 @@
         await NtApi.updateCook(recipe.id, editingCook.id, { ...e.detail, _base: editingCook });
         showSuccess($_('recipe_view_ct.toast.diary_updated'));
       } else {
-        recipe = await NtApi.markCooked(recipe.id, e.detail);
+        // Made from the recipe as this page shows it (#54).
+        recipe = await NtApi.markCooked(recipe.id, { ...e.detail, recipe_rev: revisionOf(recipe).rev });
         showSuccess($_('recipe_view_ct.toast.logged_cooked'));
         // "I made this" is the natural end of a cook session — clear
         // checks + drop out of cook mode so the next visit is fresh.
         if (cookMode) endCookMode();
       }
       await loadCooks();
+      loadHistory();
       // Recipe aggregates change after cook events — re-fetch.
       if (editingCook) recipe = await NtApi.getRecipe(recipe.id);
     } catch (err) {
@@ -1196,10 +1217,12 @@
             {/if}
             <!-- With the rest of the recipe's history rather than a fifth
                  header icon: they're rare, and the header has no room. -->
-            {#if versions.length}
+            {#if history?.revisions?.length || versions.length}
               <span class="byline-versions-wrap">
-                <button type="button" class="byline-versions" on:click={openVersions}>
-                  <span class="material-symbols-rounded" aria-hidden="true">history</span>{$_('recipe_view_ct.versions.title')}
+                <button type="button" class="byline-versions" on:click={() => (history ? (historyOpen = true) : openVersions())}>
+                  <span class="material-symbols-rounded" aria-hidden="true">history</span>{history
+                    ? $_('history.byline', { values: { count: history.revisions.length } })
+                    : $_('recipe_view_ct.versions.title')}
                 </button>
               </span>
             {/if}
@@ -1681,6 +1704,16 @@
                       <p class="cook-by">by {c.cooked_by_full_name || c.cooked_by_username}</p>
                     {/if}
                     {#if c.notes}<p class="cook-notes">{c.notes}</p>{/if}
+                    {#if history}
+                      {@const n = c.recipe_rev ? versionNumberOf(c.recipe_rev) : null}
+                      {#if n}
+                        <a class="cook-version" href={`#/recipes/${recipe.id}/history/${c.recipe_rev}?cook=${c.id}`}>
+                          <span class="material-symbols-rounded" aria-hidden="true">history</span>{$_('history.made_with', { values: { n } })}
+                        </a>
+                      {:else}
+                        <span class="cook-version none">{$_('history.before_history_one')}</span>
+                      {/if}
+                    {/if}
                   </div>
                   <div class="cook-actions">
                     <button class="btn-icon small" on:click={() => openCookLog(c)} aria-label="Edit" title="Edit">
@@ -1712,6 +1745,8 @@
     {/if}
   </div>
 </div>
+
+<HistorySheet bind:open={historyOpen} recipeId={recipe?.id} {history} conflicts={versions.length} on:conflicts={openConflicts} />
 
 <CookLogDialog
   bind:open={cookDialogOpen}
@@ -3229,4 +3264,13 @@
   }
   .ing-allergen.warn { background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--warning); }
   .ing-allergen .material-symbols-rounded { font-size: 13px; }
+  /* The version a cook was made from (#54): opens it as it was. */
+  .cook-version {
+    align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; margin-top: 4px;
+    padding: 3px 10px; border-radius: var(--radius-full); background: var(--surface-2);
+    color: var(--accent); font-size: 12px; font-weight: 600; text-decoration: none;
+  }
+  .cook-version:hover { background: var(--surface-3); }
+  .cook-version.none { color: var(--text-3); font-weight: 500; }
+  .cook-version .material-symbols-rounded { font-size: 14px; }
 </style>

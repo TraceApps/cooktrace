@@ -186,6 +186,7 @@
   const RecipeEditor   = wrap({ asyncComponent: () => import('./routes/RecipeEditor.svelte') });
   const PantryEditor   = wrap({ asyncComponent: () => import('./routes/PantryEditor.svelte') });
   const PantryView     = wrap({ asyncComponent: () => import('./routes/PantryView.svelte') });
+  const RecipeVersion  = wrap({ asyncComponent: () => import('./routes/RecipeVersion.svelte') });
   const Manage         = wrap({ asyncComponent: () => import('./routes/Manage.svelte') });
   const CookbookView   = wrap({ asyncComponent: () => import('./routes/CookbookView.svelte') });
   const PublicRecipe   = wrap({ asyncComponent: () => import('./routes/PublicRecipe.svelte') });
@@ -201,6 +202,7 @@
     '/recipes':            Recipes,
     '/recipes/edit':       RecipeEditor,
     '/recipes/edit/:id':   RecipeEditor,
+    '/recipes/:id/history/:rev': RecipeVersion,
     '/recipes/:id':        RecipeView,
     '/pantry':             Pantry,
     '/pantry/edit':        PantryEditor,

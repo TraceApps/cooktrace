@@ -1050,7 +1050,7 @@ router.get('/:id/cooks', wrap((req, res) => {
   }
 
   const rows = db.prepare(
-    `SELECT cd.id, cd.date, cd.notes, cd.photo_url, cd.photos, cd.created_at,
+    `SELECT cd.id, cd.date, cd.notes, cd.photo_url, cd.photos, cd.created_at, cd.rating, cd.recipe_rev,
             cd.user_id AS cooked_by_user_id,
             u.username AS cooked_by_username, u.full_name AS cooked_by_full_name
      FROM cook_diary cd
