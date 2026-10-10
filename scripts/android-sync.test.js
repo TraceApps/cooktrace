@@ -537,6 +537,19 @@ test('"any day" plans and list notes sync both ways, and an app from before leav
   } finally { srv.stop(); }
 });
 
+test('recipe history: versions and cooks from the phone, a restore and an edit on the web, one row per version', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('history');
+  assert.deepEqual(r.phone, { versions: 2, cooks: [[3], [5]] });
+  assert.deepEqual(r.server, { versions: 2, cooks: [[3], [5]], sameCurrent: true }, 'the same versions, each cook with its own');
+  assert.deepEqual(r.after, { versions: 3, rows: 3, qty: '200', current: 3 }, 'the restore made no copy; the edit is version 3');
+  assert.deepEqual(r.end, { refused: 'used', numbers: [1, 2], current: 2 }, 'a cooked version stays; the uncooked one went');
+});
+
+test('a pull with a table or column this app does not know yet still goes in', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('newerServer');
+  assert.deepEqual(r.applied, { done: true, row: { local: true, date: '2030-02-01' } });
+});
+
 test('allergens: a label on the phone and a recipe\'s correction sync both ways, and an app from before leaves them be', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const srv = await startServer();
   const call = async (tok, method, path, body) => {

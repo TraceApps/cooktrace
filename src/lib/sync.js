@@ -24,6 +24,7 @@ import {
 import { mapSmartFilterCategory } from './smart-cookbook.js';
 import { mapSourceIds } from './shopping-plan.js';
 import { localDataIsThisAccount, accountGeneration } from './local-account.js';
+import { SYNC_SCHEMA } from './sync-fields.js';
 
 let _syncInFlight = null;
 // A sync asked for while one runs (an edit saved, the app coming back):
@@ -31,6 +32,8 @@ let _syncInFlight = null;
 let _syncAgain = false;
 let _interval = null;
 const LAST_PULL_KEY = 'last_pull_at';
+// The SYNC_SCHEMA this phone last pulled with.
+const PULL_SCHEMA_KEY = 'pull_schema';
 // How far this phone's clock is behind the server's, as the server last
 // said. It keeps edit times on its own clock, and a pull compares them
 // with edits waiting here.
@@ -706,9 +709,12 @@ async function pullChanges({ token = getAuthToken(), signal = null, gen = accoun
   // write (lib/local-account.js accountGeneration, dbApplyPull's live()).
   const live = () => gen === accountGeneration();
   if (!live() || !(await localDataIsThisAccount(token))) return { pulled: 0, changed: 0, stopped: true };
-  const since = (await dbGetMeta(LAST_PULL_KEY)) || '1970-01-01T00:00:00';
+  // An app that now knows more of the tables (SYNC_SCHEMA) pulls everything
+  // once: rows it already had were sent without what it didn't know then.
+  const knew = Number(await dbGetMeta(PULL_SCHEMA_KEY)) || 1;
+  const since = (knew >= SYNC_SCHEMA && (await dbGetMeta(LAST_PULL_KEY))) || '1970-01-01T00:00:00';
   // synced_at=1: each row comes with the server's stamp of that copy.
-  const res = await fetch(apiUrl(`/api/sync/pull?since=${encodeURIComponent(since)}&synced_at=1`), {
+  const res = await fetch(apiUrl(`/api/sync/pull?since=${encodeURIComponent(since)}&synced_at=1&schema=${SYNC_SCHEMA}`), {
     method: 'GET',
     headers: _headers(token),
     signal: _deadline(signal),
@@ -723,6 +729,7 @@ async function pullChanges({ token = getAuthToken(), signal = null, gen = accoun
   const done = await dbApplyPull(body, { clockOffsetMs, live });
   if (done === false || !live()) return { pulled: 0, changed: 0, stopped: true };
   await dbSetMeta(LAST_PULL_KEY, body.now || new Date().toISOString());
+  if (knew < SYNC_SCHEMA) await dbSetMeta(PULL_SCHEMA_KEY, String(SYNC_SCHEMA));
   let pulled = 0;
   // Rows that came down (the replace-sets, sent whole every time, aside):
   // what the pages on show read again (ct:sync-complete).

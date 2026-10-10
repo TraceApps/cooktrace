@@ -256,6 +256,42 @@ export function diffWords(from, to) {
 }
 
 /**
+ * A version's ingredients, put back on a recipe: each keeps the pantry link
+ * the recipe has now for it (by ingredient id, else by name: "tomato" and
+ * "Tomatoes"), since a version doesn't hold links. `currentIngredients` is
+ * the recipe's as stored (JSON text or groups). Returns groups.
+ */
+export function withPantryLinks(currentIngredients, data) {
+  const byId = new Map(), byKey = new Map();
+  for (const g of _groups(currentIngredients)) for (const it of g.items) {
+    if (it?.pantry_item_id == null) continue;
+    if (it.id != null) byId.set(String(it.id), it.pantry_item_id);
+    const k = ingredientKey(it.name);
+    if (k && !byKey.has(k)) byKey.set(k, it.pantry_item_id);
+  }
+  return (data?.ingredients || []).map(g => ({
+    name: g.name || '',
+    items: (g.items || []).map(it => {
+      const link = (it.id != null ? byId.get(String(it.id)) : undefined) ?? byKey.get(ingredientKey(it.name));
+      return link != null ? { ...it, pantry_item_id: link } : { ...it };
+    }),
+  }));
+}
+
+/**
+ * The recipe columns that put a version back: what you cook, with
+ * ingredients and steps as JSON text, as stored.
+ */
+export function restoreValues(recipe, data) {
+  const vals = {
+    ingredients: JSON.stringify(withPantryLinks(recipe?.ingredients, data)),
+    steps: JSON.stringify(data?.steps || []),
+  };
+  for (const f of COOK_FIELDS) if (!(f in vals)) vals[f] = data?.[f] ?? null;
+  return vals;
+}
+
+/**
  * Versions in order, numbered: [{ ...revision, number }] oldest first by
  * when each first appeared. `revisions` rows carry created_at and id.
  */

@@ -20,6 +20,7 @@ import { cleanSmartFilter, matchesSmartFilter } from './smart-cookbook.js';
 import { recipeContributions, mergeIntoList, parseSources } from './shopping-plan.js';
 import { ingredientKey } from './quantity.js';
 import { allergenSummary, cleanCodes, cleanOverrides, knownCodes } from './allergens.js';
+import { revisionOf, parseRevision, restoreValues } from './recipe-content.js';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
 // ── Small utilities ──────────────────────────────────────────────────
@@ -387,6 +388,7 @@ export const CtApiNative = {
         d.category_id ?? null,
       ]
     );
+    await _recordRevision(id);
     return this.getRecipe(id);
   },
 
@@ -432,6 +434,7 @@ export const CtApiNative = {
         id,
       ]
     );
+    await _recordRevision(id);
     return this.getRecipe(id);
   },
 
@@ -472,14 +475,16 @@ export const CtApiNative = {
 
   async markCooked(id, payload = {}) {
     const date = payload.date || new Date().toISOString().slice(0, 10);
+    // The version it was made from: the one the page showed, else the current one.
+    const recipeRev = _validRev(payload.recipe_rev) || await _recordRevision(id);
     const photos = payload.photos != null ? _stringify(payload.photos) : null;
     const photoUrl = photos && Array.isArray(payload.photos) && payload.photos.length
       ? payload.photos[0]
       : (payload.photo_url ?? null);
     await _runInsert(
       `INSERT INTO cook_diary
-         (user_id, recipe_id, date, kind, servings, notes, photo_url, photos, meal_type, rating, sync_status)
-       VALUES (?, ?, ?, 'cooked', ?, ?, ?, ?, ?, ?, 'pending')`,
+         (user_id, recipe_id, date, kind, servings, notes, photo_url, photos, meal_type, rating, recipe_rev, sync_status)
+       VALUES (?, ?, ?, 'cooked', ?, ?, ?, ?, ?, ?, ?, 'pending')`,
       [
         LOCAL_USER_ID, id, date,
         payload.servings ?? null,
@@ -488,6 +493,7 @@ export const CtApiNative = {
         photos,
         payload.meal_type || null,
         payload.rating ?? null,
+        recipeRev,
       ]
     );
     await _recomputeCookAggregates(id);
@@ -521,6 +527,17 @@ export const CtApiNative = {
     if (d.meal_type !== undefined){ fields.push('meal_type = ?');params.push(d.meal_type || null); }
     if (d.rating !== undefined){ fields.push('rating = ?');   params.push(d.rating ?? null); }
     if (d.kind != null)      { fields.push('kind = ?');      params.push(d.kind); }
+    // Which version it was made from (as the server does): said, else the
+    // recipe's current one when it's being marked cooked; none while planned.
+    const before = (await _query(`SELECT kind, recipe_id, recipe_rev FROM cook_diary WHERE id = ?`, [cookId]))[0];
+    const kindAfter = d.kind ?? before?.kind;
+    if (kindAfter !== 'cooked') {
+      if (before?.recipe_rev != null) fields.push('recipe_rev = NULL');
+    } else if (d.recipe_rev !== undefined && _validRev(d.recipe_rev)) {
+      fields.push('recipe_rev = ?'); params.push(d.recipe_rev);
+    } else if (before && before.kind !== 'cooked' && !before.recipe_rev && before.recipe_id) {
+      fields.push('recipe_rev = ?'); params.push(await _recordRevision(before.recipe_id));
+    }
     // Cooked, or given a day, it's no longer "any day" (as the server does).
     if (d.kind === 'cooked') fields.push('any_day = 0');
     else if (d.any_day !== undefined) { fields.push('any_day = ?'); params.push(d.any_day ? 1 : 0); }
@@ -991,10 +1008,12 @@ export const CtApiNative = {
 
   async createDiaryEntry(data) {
     const d = data || {};
+    const recipeRev = d.kind === 'cooked' && d.recipe_id
+      ? (_validRev(d.recipe_rev) || await _recordRevision(d.recipe_id)) : null;
     const id = await _runInsert(
       `INSERT INTO cook_diary
-         (user_id, recipe_id, date, kind, servings, notes, photo_url, photos, meal_type, rating, any_day, sync_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+         (user_id, recipe_id, date, kind, servings, notes, photo_url, photos, meal_type, rating, any_day, recipe_rev, sync_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
       [
         LOCAL_USER_ID, d.recipe_id ?? null, d.date,
         d.kind === 'cooked' ? 'cooked' : 'planned',
@@ -1004,6 +1023,7 @@ export const CtApiNative = {
         d.meal_type || null,
         d.rating ?? null,
         d.kind !== 'cooked' && d.any_day ? 1 : 0,
+        recipeRev,
       ]
     );
     if (d.kind === 'cooked' && d.recipe_id) await _recomputeCookAggregates(d.recipe_id);
@@ -1655,6 +1675,59 @@ export const CtApiNative = {
   // Earlier versions come from syncing with a server; a phone on its own
   // has none.
   async getRecipeVersions()        { return []; },
+
+  // ── History (#54): the versions of what a recipe has you cook ─────────
+  // The same answers as the server's routes (routes/recipes.js /revisions),
+  // from this phone's own copy, so they work offline and with no server.
+  async getRecipeRevisions(id) {
+    const recipe = (await _query(`SELECT * FROM recipes WHERE id = ?`, [id]))[0];
+    if (!recipe) throw new Error('Recipe not found');
+    const current = await _recordRevision(id);
+    const rows = await _query(
+      `SELECT id, rev, data, created_at, deleted_at FROM recipe_revisions WHERE recipe_id = ? ORDER BY created_at ASC, id ASC`, [id]);
+    const cooks = await _query(
+      `SELECT id, date, rating, notes, photo_url, photos, servings, recipe_rev, meal_type FROM cook_diary
+        WHERE recipe_id = ? AND kind = 'cooked' AND deleted_at IS NULL ORDER BY date DESC, id DESC`, [id]);
+    const used = new Set(cooks.map(c => c.recipe_rev).filter(Boolean));
+    const revisions = [];
+    rows.forEach((v, i) => {
+      if (v.deleted_at) return;
+      revisions.push({
+        id: v.id, rev: v.rev, number: i + 1, created_at: v.created_at, created_by_name: null,
+        current: v.rev === current, used: used.has(v.rev), data: parseRevision(v.data),
+        cooks: cooks.filter(c => c.recipe_rev === v.rev),
+      });
+    });
+    return { current, revisions, unversioned: cooks.filter(c => !c.recipe_rev || !revisions.some(v => v.rev === c.recipe_rev)) };
+  },
+  async getRecipeRevision(id, rev) {
+    const all = await this.getRecipeRevisions(id);
+    const v = all.revisions.find(x => x.rev === rev);
+    if (!v) throw new Error('Not found');
+    const { cooks, used, ...one } = v;
+    return one;
+  },
+  async restoreRecipeRevision(id, rev) {
+    const recipe = (await _query(`SELECT * FROM recipes WHERE id = ?`, [id]))[0];
+    const v = (await _query(`SELECT data FROM recipe_revisions WHERE recipe_id = ? AND rev = ? AND deleted_at IS NULL`, [id, rev]))[0];
+    if (!recipe || !v) throw new Error('Not found');
+    const vals = restoreValues(recipe, parseRevision(v.data));
+    const cols = Object.keys(vals);
+    await _run(
+      `UPDATE recipes SET ${cols.map(c => `${c} = ?`).join(', ')}, updated_at = datetime('now'), sync_status = 'pending' WHERE id = ?`,
+      [...cols.map(c => vals[c]), id]
+    );
+    await _recordRevision(id);
+    return this.getRecipe(id);
+  },
+  async deleteRecipeRevision(id, rev) {
+    const current = await _recordRevision(id);
+    if (rev === current) throw Object.assign(new Error("This is the recipe's current version."), { code: 'current' });
+    const used = (await _query(`SELECT 1 FROM cook_diary WHERE recipe_id = ? AND recipe_rev = ? AND deleted_at IS NULL LIMIT 1`, [id, rev]))[0];
+    if (used) throw Object.assign(new Error('A cook was made from this version, so it stays.'), { code: 'used' });
+    await _run(`UPDATE recipe_revisions SET deleted_at = datetime('now'), updated_at = datetime('now'), sync_status = 'pending' WHERE recipe_id = ? AND rev = ?`, [id, rev]);
+    return { ok: true };
+  },
   async markRecipeVersionsSeen()   { return { ok: true }; },
   async restoreRecipeVersion()     { throw new Error('Earlier versions require a server connection.'); },
 
@@ -1840,6 +1913,29 @@ function _importedToRecipePayload(r) {
     video_url: r.video_url ?? null,
     notes: r.notes ?? null,
   };
+}
+
+// ── Recipe history (#54), as the server keeps it (lib/recipe-history.js) ──
+const _REV_RX = /^v[0-9a-f]{14}$/;
+const _validRev = v => (typeof v === 'string' && _REV_RX.test(v) ? v : null);
+
+// The recipe's content as a version: added when new, brought back when it
+// was deleted. Returns its key (the recipe's current version).
+async function _recordRevision(recipeId) {
+  const r = (await _query(`SELECT * FROM recipes WHERE id = ?`, [recipeId]))[0];
+  if (!r) return null;
+  const { rev, data } = revisionOf(r);
+  const v = (await _query(`SELECT id, deleted_at FROM recipe_revisions WHERE recipe_id = ? AND rev = ?`, [recipeId, rev]))[0];
+  if (!v) {
+    await _runInsert(
+      `INSERT INTO recipe_revisions (user_id, recipe_id, rev, data, created_at, updated_at, sync_status)
+       VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), 'pending')`,
+      [r.user_id ?? LOCAL_USER_ID, recipeId, rev, JSON.stringify(data)]
+    );
+  } else if (v.deleted_at) {
+    await _run(`UPDATE recipe_revisions SET deleted_at = NULL, updated_at = datetime('now'), sync_status = 'pending' WHERE id = ?`, [v.id]);
+  }
+  return rev;
 }
 
 async function _recomputeCookAggregates(recipeId) {

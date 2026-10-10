@@ -41,7 +41,8 @@ export const mirrorKey = (url) => String(url).replace(/^https?:\/\/[^/]+/, '');
 export const MIRRORED_GETS = [
   /^\/api\/recipes$/,
   /^\/api\/recipes\/\d+$/,
-  /^\/api\/recipes\/\d+\/(comments|cooks|tools|tags|versions)$/,
+  /^\/api\/recipes\/\d+\/(comments|cooks|tools|tags|versions|revisions)$/,
+  /^\/api\/recipes\/\d+\/revisions\/v[0-9a-f]{14}$/,
   /^\/api\/recipes\/categories$/,
   /^\/api\/cookbooks$/,
   /^\/api\/cookbooks\/\d+$/,

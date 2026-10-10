@@ -18,7 +18,7 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import AdmZip from 'adm-zip';
 import multer from 'multer';
-import db from '../db.js';
+import db, { backfillRevisions } from '../db.js';
 import { logger } from '../logger.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
@@ -204,6 +204,7 @@ function dumpDatabase() {
     cookbooks:             _selectIfExists('cookbooks'),
     recipe_cookbook_links: _selectIfExists('recipe_cookbook_links'),
     recipe_versions:       _selectIfExists('recipe_versions'),
+    recipe_revisions:      _selectIfExists('recipe_revisions'),
     recipe_shares:         _selectIfExists('recipe_shares'),
     cookbook_shares:       _selectIfExists('cookbook_shares'),
     kitchens:              _selectIfExists('kitchens'),
@@ -336,6 +337,7 @@ function restoreFromZip(zip) {
     _restoreTable('cookbook_shares',       data.cookbook_shares);
     _restoreTable('recipe_comments',       data.recipe_comments);
     _restoreTable('recipe_versions',       data.recipe_versions);
+    _restoreTable('recipe_revisions',      data.recipe_revisions);
     // See TODO(review) in dumpDatabase — pending invitations only.
     _restoreTable('invite_tokens',         data.invite_tokens);
 
@@ -374,6 +376,9 @@ function restoreFromZip(zip) {
       }));
     } catch {} // tables don't exist — skip silently
   })();
+  // A backup from before the recipe history (or without it): each recipe
+  // starts its history with what it holds now.
+  backfillRevisions();
 
   // Restore images — guard against zip-slip and zip-bomb attacks
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });

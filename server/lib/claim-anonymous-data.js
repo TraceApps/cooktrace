@@ -29,6 +29,8 @@ export const CLAIM_NULL = [
   'sync_deletions',
   // Earlier versions of recipes, kept with the recipes they belong to.
   'recipe_versions',
+  // And their history (#54), likewise.
+  'recipe_revisions',
 ];
 
 const ORPHAN_EXTRA_COUNTS = [];

@@ -17,7 +17,7 @@ const TABLES = ['recipes', 'pantry_items', 'cook_diary', 'shopping_list'];
 // filter as TABLES on export; not touched by DELETE / because DELETE
 // is scoped to the primary content set only (recipes / pantry /
 // diary / shopping).
-const TABLES_SOFT_DELETE_EXTRA = ['user_settings', 'cookbooks', 'recipe_comments'];
+const TABLES_SOFT_DELETE_EXTRA = ['user_settings', 'cookbooks', 'recipe_comments', 'recipe_revisions'];
 
 // User-owned tables with no deleted_at — hard-delete only. Include
 // everything on export.

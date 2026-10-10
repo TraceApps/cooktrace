@@ -190,11 +190,14 @@ router.post('/', wrap((req, res) => {
   const rating   = _coerceRating(body.rating);
   // Planned for some day of the week (its date is the week's Monday).
   const anyDay   = kind === 'planned' && body.any_day ? 1 : 0;
+  // The version a cook was made from, when the app says; else the recipe's
+  // current one (db.js). A planned cook has none until it's cooked.
+  const recipeRev = kind === 'cooked' ? _rev(body.recipe_rev) : null;
 
   const result = db.prepare(
-    `INSERT INTO cook_diary (user_id, recipe_id, date, kind, servings, notes, photo_url, meal_type, rating, any_day)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(u, recipeId, date, kind, servings, notes, photoUrl, mealType, rating, anyDay);
+    `INSERT INTO cook_diary (user_id, recipe_id, date, kind, servings, notes, photo_url, meal_type, rating, any_day, recipe_rev)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(u, recipeId, date, kind, servings, notes, photoUrl, mealType, rating, anyDay, recipeRev);
 
   setCreateKey('cook_diary', result.lastInsertRowid, createKey);
   if (kind === 'cooked') recomputeRecipeAggregates(recipeId);
@@ -232,10 +235,23 @@ router.put('/:id', wrap((req, res) => {
   const rating   = body.rating    !== undefined ? _coerceRating(body.rating)      : existing.rating;
   // Cooked, or given a day, it's no longer "any day".
   const anyDay   = kindIn === 'cooked' ? 0 : body.any_day !== undefined ? (body.any_day ? 1 : 0) : (existing.any_day ? 1 : 0);
+  // Which version it was made from: said (marking it cooked from a page,
+  // or choosing another of the recipe's versions), else as it is. A cook
+  // being marked cooked without one gets the recipe's current (db.js).
+  let recipeRev = existing.recipe_rev;
+  if (body.recipe_rev !== undefined) {
+    const want = _rev(body.recipe_rev);
+    // Choosing another version for a cook: one this recipe has.
+    if (want && existing.kind === 'cooked' && existing.recipe_id != null && !_isRevisionOf(existing.recipe_id, want)) {
+      return res.status(400).json({ error: "That version isn't one of this recipe's." });
+    }
+    recipeRev = want;
+  }
+  if (kindIn !== 'cooked') recipeRev = null;
 
   // With _sync, merged with changes made elsewhere (lib/rest-merge.js):
   // what stays may not be all of this save.
-  saveRow('cook_diary', id, existing, { date, kind: kindIn, notes, photo_url: photoUrl, servings, meal_type: mealType, rating, any_day: anyDay }, body._sync);
+  saveRow('cook_diary', id, existing, { date, kind: kindIn, notes, photo_url: photoUrl, servings, meal_type: mealType, rating, any_day: anyDay, recipe_rev: recipeRev }, body._sync);
   const kind = db.prepare(`SELECT kind FROM cook_diary WHERE id = ?`).get(id).kind;
 
   // Recompute aggregates if cooked-state or recipe changed.
@@ -275,6 +291,12 @@ router.delete('/:id', wrap((req, res) => {
 // Whitelist meal-type strings; everything else stores as NULL.
 // Matches the planner / log-dialog options.
 const _MEAL_TYPES = new Set(['breakfast', 'lunch', 'dinner', 'snack']);
+// A version's key (lib/recipe-content.js), or null.
+const _rev = v => (typeof v === 'string' && /^v[0-9a-f]{14}$/.test(v) ? v : null);
+const _isRevisionOf = (recipeId, rev) => !!db.prepare(
+  `SELECT 1 FROM recipe_revisions WHERE recipe_id = ? AND rev = ? AND deleted_at IS NULL`
+).get(recipeId, rev);
+
 function _coerceMealType(v) {
   if (v == null || v === '') return null;
   const norm = String(v).toLowerCase().trim();

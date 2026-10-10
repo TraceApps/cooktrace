@@ -22,6 +22,7 @@ import { z } from 'zod';
 import db from '../../../db.js';
 import { toolResult, toolError } from '../_util.js';
 import { autoShareNewRecipe } from '../../auto-share.js';
+import { recordRevision } from '../../recipe-history.js';
 
 const ingredientSchema = z.object({
   name: z.string().min(1).max(200),
@@ -91,6 +92,7 @@ export function registerCreateRecipe(server, { userId }) {
       );
 
       const recipeId = result.lastInsertRowid;
+      recordRevision(recipeId, { by: userId });
       try { autoShareNewRecipe(userId, recipeId); } catch { /* non-fatal — recipe is already saved */ }
 
       return toolResult({

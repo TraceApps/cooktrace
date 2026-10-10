@@ -169,6 +169,45 @@ wrapped.setRecipeAllergens = async function (id, fix) {
   return { ...rest, imgUrl: resolveAssetUrl(img_url) || '' };
 };
 
+// A recipe's history (#54): this phone's copy for the recipes it has (so it
+// works offline), the server's for one shared with the user. Restoring or
+// deleting a version here is synced like any edit.
+async function _serverCall(method, path, body) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    throw new Error("A recipe shared with you needs a connection for its history.");
+  }
+  const { getServerUrl, getAuthToken, apiUrl, resolveAssetUrl } = await import('./platform.js');
+  const headers = body ? { 'Content-Type': 'application/json' } : {};
+  if (getServerUrl()) {
+    const token = getAuthToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(apiUrl(path), { method, headers, credentials: 'include', body: body ? JSON.stringify(body) : undefined });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(out.error || `HTTP ${res.status}`), { code: out.code });
+  if (out && out.img_url !== undefined) { const { img_url, ...rest } = out; return { ...rest, imgUrl: resolveAssetUrl(img_url) || '' }; }
+  return out;
+}
+async function _isLocalRecipe(id) {
+  try { return !!(await CtApiNative.getRecipe(id)); } catch { return false; }
+}
+wrapped.getRecipeRevisions = async id => ((await _isLocalRecipe(id))
+  ? CtApiNative.getRecipeRevisions(id) : _serverCall('GET', `/api/recipes/${id}/revisions`));
+wrapped.getRecipeRevision = async (id, rev) => ((await _isLocalRecipe(id))
+  ? CtApiNative.getRecipeRevision(id, rev) : _serverCall('GET', `/api/recipes/${id}/revisions/${rev}`));
+wrapped.restoreRecipeRevision = async (id, rev) => {
+  if (!(await _isLocalRecipe(id))) return _serverCall('POST', `/api/recipes/${id}/revisions/${rev}/restore`);
+  const r = await CtApiNative.restoreRecipeRevision(id, rev);
+  _schedulePush();
+  return r;
+};
+wrapped.deleteRecipeRevision = async (id, rev) => {
+  if (!(await _isLocalRecipe(id))) return _serverCall('DELETE', `/api/recipes/${id}/revisions/${rev}`);
+  const r = await CtApiNative.deleteRecipeRevision(id, rev);
+  _schedulePush();
+  return r;
+};
+
 // Kick off the periodic background sync the first time anything calls
 // into the cached impl. Safe to call repeatedly (startSyncLoop is
 // idempotent).

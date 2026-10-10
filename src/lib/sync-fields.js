@@ -1,4 +1,13 @@
 /**
+ * What an app knows of the synced tables, as a number it sends with each
+ * pull. An app writes every column it's sent into its own tables, so the
+ * server sends a column or table added later only to apps that know it
+ * (routes/sync.js LATER_COLS): 1, before 1.5 (none sent); 2, 1.5's (list
+ * sources and notes, "any day" plans, allergens, recipe versions).
+ */
+export const SYNC_SCHEMA = 2;
+
+/**
  * The fields of each synced table, as the server merges two edits of a row
  * (server/lib/sync-fields.js, kept the same by a test). The phone and the
  * web app both say which of them an edit changed.
@@ -20,8 +29,11 @@ export const SYNC_FIELDS = {
     'serving_size', 'serving_unit', 'serving_label', 'nutrition', 'g_per_cup',
     'generic_parent_id', 'nutrition_source_variant_id', 'allergens', 'traces', 'allergens_source', 'deleted_at',
   ],
-  cook_diary: ['recipe_id', 'date', 'kind', 'servings', 'notes', 'photo_url', 'photos', 'meal_type', 'rating', 'any_day', 'deleted_at'],
+  cook_diary: ['recipe_id', 'date', 'kind', 'servings', 'notes', 'photo_url', 'photos', 'meal_type', 'rating', 'any_day', 'recipe_rev', 'deleted_at'],
   shopping_list: ['name', 'quantity', 'unit', 'aisle', 'checked', 'pantry_id', 'recipe_id', 'sort_order', 'sources', 'notes', 'deleted_at'],
   recipe_comments: ['recipe_id', 'parent_id', 'body', 'deleted_at'],
   ai_chat_history: ['role', 'content'],
+  // A recipe's versions (lib/recipe-content.js): made once, never changed;
+  // only deleted, by hand.
+  recipe_revisions: ['recipe_id', 'rev', 'data', 'deleted_at'],
 };

@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { foldText } from './lib/search-text.js';
 import { SYNC_FIELDS } from './lib/sync-fields.js';
+import { revisionOf } from './lib/recipe-content.js';
 
 const dbPath = process.env.DB_PATH || './cooktrace.db';
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -976,6 +977,85 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_recipe_versions_recipe ON recipe_versions(recipe_id, id);
 `);
 
+// ── Recipe history (#54) ──────────────────────────────────────────────────
+// Every version of what a recipe has you cook (lib/recipe-content.js): one
+// row per recipe and content (`rev`, its key), never changed once made, so
+// a phone and the server that reach the same content have the same
+// version. A save that changes what you cook adds one (lib/recipe-history.js);
+// going back to an earlier one makes it current again. `recipes.rev` is the
+// current one, and each cook keeps the one it was made from
+// (`cook_diary.recipe_rev`), so a diary entry opens the recipe as it was.
+// All kept: a version is deleted only by hand, and only when no cook used it.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS recipe_revisions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipe_id  INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+    user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    rev        TEXT NOT NULL,
+    data       TEXT NOT NULL,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    deleted_at TEXT DEFAULT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_recipe_revisions_rev ON recipe_revisions(recipe_id, rev);
+  CREATE INDEX IF NOT EXISTS idx_recipe_revisions_user ON recipe_revisions(user_id);
+`);
+if (!columnExists('recipes', 'rev')) db.exec(`ALTER TABLE recipes ADD COLUMN rev TEXT`);
+if (!columnExists('cook_diary', 'recipe_rev')) db.exec(`ALTER TABLE cook_diary ADD COLUMN recipe_rev TEXT`);
+{
+  const STAMP = `strftime('%Y-%m-%d %H:%M:%f', 'now')`;
+  if (!columnExists('recipe_revisions', 'synced_at')) db.exec(`ALTER TABLE recipe_revisions ADD COLUMN synced_at TEXT`);
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_recipe_revisions_synced ON recipe_revisions(synced_at);
+    CREATE TRIGGER IF NOT EXISTS trg_recipe_revisions_synced_ins AFTER INSERT ON recipe_revisions
+    BEGIN UPDATE recipe_revisions SET synced_at = ${STAMP} WHERE id = NEW.id; END;
+    CREATE TRIGGER IF NOT EXISTS trg_recipe_revisions_synced_upd AFTER UPDATE ON recipe_revisions
+    BEGIN UPDATE recipe_revisions SET synced_at = ${STAMP} WHERE id = NEW.id; END;
+  `);
+  // A cook logged, or a planned one marked cooked, without saying which
+  // version (an older app, the API, Trace): the recipe's current one. A
+  // cook moved to another recipe takes that one's, unless it says.
+  db.exec(`
+    DROP TRIGGER IF EXISTS trg_cook_diary_rev_ins;
+    CREATE TRIGGER trg_cook_diary_rev_ins AFTER INSERT ON cook_diary
+    FOR EACH ROW WHEN NEW.kind = 'cooked' AND NEW.recipe_rev IS NULL AND NEW.recipe_id IS NOT NULL
+    BEGIN UPDATE cook_diary SET recipe_rev = (SELECT rev FROM recipes WHERE id = NEW.recipe_id) WHERE id = NEW.id; END;
+    DROP TRIGGER IF EXISTS trg_cook_diary_rev_cooked;
+    CREATE TRIGGER trg_cook_diary_rev_cooked AFTER UPDATE OF kind ON cook_diary
+    FOR EACH ROW WHEN NEW.kind = 'cooked' AND OLD.kind IS NOT 'cooked' AND NEW.recipe_rev IS NULL AND NEW.recipe_id IS NOT NULL
+    BEGIN UPDATE cook_diary SET recipe_rev = (SELECT rev FROM recipes WHERE id = NEW.recipe_id) WHERE id = NEW.id; END;
+    DROP TRIGGER IF EXISTS trg_cook_diary_rev_recipe;
+    CREATE TRIGGER trg_cook_diary_rev_recipe AFTER UPDATE OF recipe_id ON cook_diary
+    FOR EACH ROW WHEN NEW.kind = 'cooked' AND NEW.recipe_id IS NOT OLD.recipe_id AND NEW.recipe_rev IS OLD.recipe_rev
+    BEGIN UPDATE cook_diary SET recipe_rev = (SELECT rev FROM recipes WHERE id = NEW.recipe_id) WHERE id = NEW.id; END;
+  `);
+}
+
+/**
+ * Every recipe without a current version gets one: what it holds now,
+ * dated when it was last changed (the history starts there; what came
+ * before isn't known). Run at start and after a restore.
+ */
+export function backfillRevisions() {
+  const rows = db.prepare(`SELECT * FROM recipes WHERE rev IS NULL`).all();
+  if (!rows.length) return 0;
+  const ins = db.prepare(
+    `INSERT OR IGNORE INTO recipe_revisions (recipe_id, user_id, rev, data, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  );
+  const setRev = db.prepare(`UPDATE recipes SET rev = ? WHERE id = ?`);
+  db.transaction(() => {
+    for (const r of rows) {
+      const { rev, data } = revisionOf(r);
+      const at = r.updated_at || r.created_at || null;
+      ins.run(r.id, r.user_id ?? null, rev, JSON.stringify(data), r.last_edited_by ?? r.user_id ?? null, at, at);
+      setRev.run(rev, r.id);
+    }
+  })();
+  return rows.length;
+}
+
 // When each synced field of a row last changed here: field_stamps holds
 // { field: [synced_at, updated_at] } of the write that changed it. Two
 // edits of a row meet field by field (lib/field-merge.js): a field changed
@@ -1024,5 +1104,8 @@ for (const t of Object.keys(SYNC_FIELDS)) {
   const ins = db.prepare(`INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)`);
   for (const [k, v] of seeds) ins.run(k, v);
 }
+
+// Recipes from before the history, or restored from a backup without it.
+backfillRevisions();
 
 export default db;

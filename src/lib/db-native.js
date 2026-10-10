@@ -141,6 +141,7 @@ const SCHEMA = `
     meal_type    TEXT,
     rating       INTEGER,
     any_day      INTEGER NOT NULL DEFAULT 0,
+    recipe_rev   TEXT,
     created_at   TEXT DEFAULT (datetime('now')),
     updated_at   TEXT DEFAULT (datetime('now')),
     deleted_at   TEXT DEFAULT NULL,
@@ -276,6 +277,24 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_comments_recipe ON recipe_comments(recipe_id);
   CREATE INDEX IF NOT EXISTS idx_comments_server ON recipe_comments(server_id);
   CREATE INDEX IF NOT EXISTS idx_comments_sync   ON recipe_comments(sync_status);
+
+  -- A recipe's versions (recipe-content.js): one per recipe and content
+  -- (rev), never changed once made; deleted only by hand.
+  CREATE TABLE IF NOT EXISTS recipe_revisions (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id    INTEGER,
+    user_id      INTEGER DEFAULT 1,
+    recipe_id    INTEGER NOT NULL,
+    rev          TEXT NOT NULL,
+    data         TEXT NOT NULL,
+    created_at   TEXT DEFAULT (datetime('now')),
+    updated_at   TEXT DEFAULT (datetime('now')),
+    deleted_at   TEXT DEFAULT NULL,
+    sync_status  TEXT DEFAULT 'synced'
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_revisions_rev    ON recipe_revisions(recipe_id, rev);
+  CREATE INDEX IF NOT EXISTS idx_revisions_server        ON recipe_revisions(server_id);
+  CREATE INDEX IF NOT EXISTS idx_revisions_sync          ON recipe_revisions(sync_status);
 
   -- Settings table — every change writes here first (sync_status='pending'),
   -- the sync engine pushes pending rows to the server, server pull marks
@@ -465,6 +484,10 @@ async function _migrateShoppingAisle() {
     const diaryCols = new Set((diaryInfo?.values || []).map(c => c.name));
     if (!diaryCols.has('any_day')) {
       await db.run(`ALTER TABLE cook_diary ADD COLUMN any_day INTEGER NOT NULL DEFAULT 0`);
+    }
+    // The version of its recipe a cook was made from (recipe-content.js).
+    if (!diaryCols.has('recipe_rev')) {
+      await db.run(`ALTER TABLE cook_diary ADD COLUMN recipe_rev TEXT`);
     }
     // Allergens (allergens.js): a pantry item's, and a recipe's correction.
     const pantryInfo = await db.query(`PRAGMA table_info(pantry_items)`);
@@ -751,7 +774,7 @@ export async function dbSetMeta(key, value) {
 // translation has parent ids minted by the time children push.
 const SYNC_TABLES = [
   'recipe_categories', 'pantry_categories', 'custom_units', 'cookbooks',
-  'recipes', 'pantry_items',
+  'recipes', 'recipe_revisions', 'pantry_items',
   'cook_diary', 'shopping_list', 'recipe_comments',
   'ai_chat_history',
 ];
@@ -831,6 +854,7 @@ export const SYNC_PARENTS = {
   cook_diary: { recipe_id: 'recipes' },
   shopping_list: { pantry_id: 'pantry_items', recipe_id: 'recipes' },
   recipe_comments: { recipe_id: 'recipes', parent_id: 'recipe_comments' },
+  recipe_revisions: { recipe_id: 'recipes' },
 };
 
 /** All rows with sync_status='pending' grouped by table. */
@@ -948,9 +972,21 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
   // same pull finds it.
   const order = t => (t === 'pantry_items' ? -1 : 0);
   const tablesInOrder = Object.entries(payload.tables).sort((x, y) => order(x[0]) - order(y[0]));
+  // The columns each table here has: a server newer than this app may send
+  // a table or column it doesn't know yet, which is left out rather than
+  // stopping the pull (and every one after it) on it.
+  const known = new Map();
+  async function columnsOf(table) {
+    if (!known.has(table)) {
+      const info = await db.query(`PRAGMA table_info(${table})`, []);
+      known.set(table, new Set((info?.values || []).map(c => c.name)));
+    }
+    return known.get(table);
+  }
   for (const [table, rows] of tablesInOrder) {
     if (!Array.isArray(rows)) continue;
     if (table === 'disabled_units' || table === 'recipe_cookbook_links' || table === 'settings') continue;
+    if (!/^[a-z_]+$/.test(table) || !(await columnsOf(table)).size) continue;
 
     for (const row of rows) {
       if (!live()) return false;
@@ -958,6 +994,15 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
         `SELECT * FROM ${table} WHERE server_id = ? LIMIT 1`,
         [row.id]
       ))?.values?.[0];
+      // A version made here and one from the server with the same content
+      // are the same version: one row.
+      if (!existing && table === 'recipe_revisions' && row.rev) {
+        const rid = await translateFK(row.recipe_id, 'recipes');
+        if (rid != null) {
+          existing = (await db.query(`SELECT * FROM recipe_revisions WHERE recipe_id = ? AND rev = ? LIMIT 1`, [rid, row.rev]))?.values?.[0];
+          if (existing) await db.run(`UPDATE recipe_revisions SET server_id = ? WHERE id = ?`, [row.id, existing.id]);
+        }
+      }
       // One made here before it synced, with the same name (slug) as one
       // made elsewhere: they're the same, and inserting a second would
       // break the unique name and stop every sync. Join them.
@@ -1004,6 +1049,8 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
           translated[fk] = await translateFK(translated[fk], parentTable);
         }
       }
+      // A version of a recipe this phone doesn't have: nothing to keep it with.
+      if (table === 'recipe_revisions' && translated.recipe_id == null) continue;
       // An ingredient's pantry link: the server's id there, this phone's
       // here. One to an item the phone doesn't have is taken out.
       if (table === 'recipes' && translated.ingredients != null) {
@@ -1074,8 +1121,10 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
         continue;
       }
 
-      // Build column list dynamically from the row's keys (minus `id`).
-      const cols = Object.keys(translated).filter(k => k !== 'id');
+      // Build column list dynamically from the row's keys (minus `id`), the
+      // ones this table has.
+      const have = await columnsOf(table);
+      const cols = Object.keys(translated).filter(k => k !== 'id' && have.has(k));
       const values = cols.map(k => {
         const v = translated[k];
         if (v == null) return null;
@@ -1255,7 +1304,8 @@ export async function dbCountUnsynced() {
   const db = await getDb();
   const n = async sql => Number((await db.query(sql, []))?.values?.[0]?.n || 0);
   let total = 0;
-  for (const t of SYNC_TABLES) total += await n(`SELECT COUNT(*) AS n FROM ${t} WHERE sync_status = 'pending'`);
+  // A recipe's versions follow its edits: not changes of their own.
+  for (const t of SYNC_TABLES) if (t !== 'recipe_revisions') total += await n(`SELECT COUNT(*) AS n FROM ${t} WHERE sync_status = 'pending'`);
   total += await n(`SELECT COUNT(*) AS n FROM recipe_cookbook_links WHERE sync_status = 'pending'`);
   total += await n(`SELECT COUNT(*) AS n FROM sync_deletes`);
   total += await n(`SELECT COUNT(*) AS n FROM user_settings WHERE sync_status = 'pending'`);

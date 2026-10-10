@@ -59,6 +59,8 @@ import { autoShareNewRecipe as _autoShareNewRecipe } from '../lib/auto-share.js'
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
 import { ownId, ownIngredientLinks } from '../lib/link-checks.js';
 import { allergenSummary, cleanOverrides } from '../lib/allergens.js';
+import { recordRevision, listRevisions, getRevision, revisionUsed, restoreColumns } from '../lib/recipe-history.js';
+import { revisionOf, parseRevision } from '../lib/recipe-content.js';
 
 // Recipe row -> API-shape hydration lives in server/lib/recipe-hydrate.js
 // so cookbooks.js can hydrate cookbook recipe cards identically (they
@@ -596,6 +598,7 @@ router.post('/', wrap((req, res) => {
     data.allergen_overrides ?? null,
   );
   setCreateKey('recipes', result.lastInsertRowid, createKey);
+  recordRevision(result.lastInsertRowid, { by: u });
   _autoShareNewRecipe(u, result.lastInsertRowid);
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(result.lastInsertRowid);
   res.status(201).json(_withCreatorAvatar(_hydrate(row), row));
@@ -723,6 +726,8 @@ router.put('/:id', wrap((req, res) => {
     id,
   );
   if (applied) stampFields('recipes', id, applied.fields, applied.at);
+  // A change to what you cook is a new version (lib/recipe-history.js).
+  recordRevision(id, { by: u, at: editedAt });
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(id);
   res.json({ ..._withCreatorAvatar(_hydrate(row), row), ...(keptServer ? { kept: 'server' } : {}) });
 }));
@@ -747,6 +752,96 @@ router.put('/:id/allergens', wrap((req, res) => {
   }
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(id);
   res.json(_withCreatorAvatar(_hydrate(row), row));
+}));
+
+// ── History (#54): every version of what the recipe has you cook ──────
+// lib/recipe-history.js. Whoever can open the recipe sees its versions,
+// each with their own cooks of it; whoever may edit it can restore one or
+// delete one nobody has cooked.
+function _historyAccess(req, res, { edit = false } = {}) {
+  const u = uid(req);
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: 'Invalid id' }); return null; }
+  const recipe = db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(id);
+  if (!recipe) { res.status(404).json({ error: 'Not found' }); return null; }
+  const isOwner = (u == null && recipe.user_id == null) || recipe.user_id === u;
+  const isAdmin = req.user?.role === 'admin';
+  const canEdit = isOwner || isAdmin || _canEditViaKitchen(id, u);
+  const canView = canEdit || recipe.visibility === 'group'
+    || (u != null && !!db.prepare(`SELECT 1 FROM recipe_shares WHERE recipe_id = ? AND grantee_id = ?`).get(id, u));
+  if (edit ? !canEdit : !canView) { res.status(403).json({ error: 'Forbidden' }); return null; }
+  // A recipe from before the history: its version now is the first one.
+  if (!recipe.rev) recipe.rev = recordRevision(recipe.id);
+  return { u, recipe, isOwner };
+}
+const _REV_RX = /^v[0-9a-f]{14}$/;
+
+// GET /:id/revisions: { current, revisions: [{ rev, number, created_at,
+// current, used, data, cooks }], unversioned } oldest first.
+router.get('/:id/revisions', wrap((req, res) => {
+  const a = _historyAccess(req, res);
+  if (!a) return;
+  res.json(listRevisions(a.recipe, a.u));
+}));
+
+// GET /:id/revisions/:rev: one version, for a cook's "as you made it".
+router.get('/:id/revisions/:rev', wrap((req, res) => {
+  const a = _historyAccess(req, res);
+  if (!a) return;
+  const v = _REV_RX.test(req.params.rev) ? getRevision(a.recipe.id, req.params.rev) : null;
+  if (!v) return res.status(404).json({ error: 'Not found' });
+  res.json({ ...v, current: v.rev === a.recipe.rev });
+}));
+
+// POST /:id/revisions: a version made elsewhere, kept with its date: a
+// phone's own history when it moves its recipes to this server
+// (lib/migrate.js). { data, created_at }. The same content is the same version.
+router.post('/:id/revisions', wrap((req, res) => {
+  const a = _historyAccess(req, res, { edit: true });
+  if (!a) return;
+  const { rev, data } = revisionOf(parseRevision(req.body?.data ?? {}));
+  const raw = String(req.body?.created_at || '');
+  const at = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?/.test(raw) ? raw.replace('T', ' ').slice(0, 19) : null;
+  const when = at && at < new Date().toISOString().replace('T', ' ').slice(0, 19) ? at : new Date().toISOString().replace('T', ' ').slice(0, 19);
+  db.prepare(
+    `INSERT INTO recipe_revisions (recipe_id, user_id, rev, data, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(recipe_id, rev) DO UPDATE SET created_at = MIN(recipe_revisions.created_at, excluded.created_at)`
+  ).run(a.recipe.id, a.recipe.user_id ?? null, rev, JSON.stringify(data), a.u ?? null, when, when);
+  res.status(201).json(getRevision(a.recipe.id, rev));
+}));
+
+// POST /:id/revisions/:rev/restore: the version becomes what the recipe has
+// you cook again (its name, photo and notes stay as they are). Nothing is
+// lost: the version it replaces is in the history too.
+router.post('/:id/revisions/:rev/restore', wrap((req, res) => {
+  const a = _historyAccess(req, res, { edit: true });
+  if (!a) return;
+  const v = _REV_RX.test(req.params.rev) ? getRevision(a.recipe.id, req.params.rev) : null;
+  if (!v) return res.status(404).json({ error: 'Not found' });
+  const vals = restoreColumns(a.recipe, v.data);
+  const cols = Object.keys(vals);
+  db.transaction(() => {
+    db.prepare(
+      `UPDATE recipes SET ${cols.map(c => `${c} = ?`).join(', ')}, last_edited_by = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(...cols.map(c => vals[c]), a.isOwner ? null : a.u, a.recipe.id);
+    recordRevision(a.recipe.id, { by: a.u });
+  })();
+  const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(a.recipe.id);
+  res.json(_withCreatorAvatar(_hydrate(row), row));
+}));
+
+// DELETE /:id/revisions/:rev: a version nobody cooked, and not the current one.
+router.delete('/:id/revisions/:rev', wrap((req, res) => {
+  const a = _historyAccess(req, res, { edit: true });
+  if (!a) return;
+  const rev = req.params.rev;
+  const v = _REV_RX.test(rev) ? getRevision(a.recipe.id, rev) : null;
+  if (!v || v.deleted) return res.status(404).json({ error: 'Not found' });
+  if (rev === a.recipe.rev) return res.status(409).json({ error: "This is the recipe's current version.", code: 'current' });
+  if (revisionUsed(a.recipe.id, rev)) return res.status(409).json({ error: 'A cook was made from this version, so it stays.', code: 'used' });
+  db.prepare(`UPDATE recipe_revisions SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE recipe_id = ? AND rev = ?`).run(a.recipe.id, rev);
+  res.json({ ok: true });
 }));
 
 // ── Earlier versions ──────────────────────────────────────────────────
@@ -826,6 +921,7 @@ router.post('/:id/versions/:vid/restore', wrap((req, res) => {
     db.prepare(
       `UPDATE recipes SET ${cols.map(c => `${c} = ?`).join(', ')}, last_edited_by = ?, updated_at = datetime('now') WHERE id = ?`
     ).run(...vals, a.isOwner ? null : a.u, recipe.id);
+    recordRevision(recipe.id, { by: a.u });
   })();
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(recipe.id);
   res.json(_withCreatorAvatar(_hydrate(row), row));
@@ -915,10 +1011,13 @@ router.post('/:id/cooked', wrap((req, res) => {
     return Math.max(0, Math.min(5, n)) || null;
   })();
 
+  // The version it was made from, when the page says (the one it shows);
+  // else the recipe's current one (db.js).
+  const recipeRev = _REV_RX.test(String(req.body?.recipe_rev || '')) ? req.body.recipe_rev : null;
   db.prepare(
-    `INSERT INTO cook_diary (user_id, recipe_id, date, kind, notes, photo_url, photos, meal_type, rating)
-     VALUES (?, ?, ?, 'cooked', ?, ?, ?, ?, ?)`
-  ).run(u, id, date, notes, photoUrl, photosJson, mealType, rating);
+    `INSERT INTO cook_diary (user_id, recipe_id, date, kind, notes, photo_url, photos, meal_type, rating, recipe_rev)
+     VALUES (?, ?, ?, 'cooked', ?, ?, ?, ?, ?, ?)`
+  ).run(u, id, date, notes, photoUrl, photosJson, mealType, rating, recipeRev);
 
   _recomputeCookAggregates(id);
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(id);
@@ -1602,6 +1701,7 @@ function _saveImportedRecipe(u, parsed, opts = {}) {
     }
   }
 
+  recordRevision(result.lastInsertRowid, { by: u });
   _autoShareNewRecipe(u, result.lastInsertRowid);
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(result.lastInsertRowid);
   return _hydrate(row);

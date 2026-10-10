@@ -242,6 +242,18 @@ export async function uploadLocalToServer({ serverUrl, authToken, onProgress } =
       if (created?.id) recipeIdMap.set(id, created.id);
       went('recipes', id, created);
       summary.success.recipes++;
+      // Its history goes with it, each version with its date, so the
+      // diary's cooks still open the recipe as they were made (#54).
+      if (created?.id) {
+        const history = await NtApi.getRecipeRevisions(id).catch(() => null);
+        for (const v of history?.revisions || []) {
+          try {
+            await _post(`${serverUrl}/api/recipes/${created.id}/revisions`, headers, { data: v.data, created_at: v.created_at });
+          } catch (e) {
+            summary.errors.push({ stage: 'recipes', name: `${r.name || 'recipe'}, version ${v.number}`, message: e.message });
+          }
+        }
+      }
     } catch (e) {
       summary.errors.push({ stage: 'recipes', name: r.name || `recipe #${r.id}`, message: e.message });
     }
@@ -338,7 +350,7 @@ export async function wipeLocalData() {
   const tables = [
     'recipes', 'pantry_items', 'cook_diary', 'shopping_list',
     'recipe_categories', 'pantry_categories', 'cookbooks', 'recipe_cookbook_links',
-    'recipe_comments', 'custom_units', 'disabled_units',
+    'recipe_comments', 'custom_units', 'disabled_units', 'recipe_revisions',
     // Deletes noted for the old server must not reach the one pulled next.
     'sync_deletes',
   ];

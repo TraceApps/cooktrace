@@ -844,6 +844,51 @@ const scenarios = {
     out.phoneAfter = (await api.getRecipes()).find(x => x.id === r.id).allergens;
     out.ids = { flour: sFlour, recipe: sRecipe };
   },
+  // Recipe history (#54): versions and cooks made on the phone, a restore
+  // and an edit on the web, both ways, one row per version.
+  async history() {
+    const flour = q => [{ name: '', items: [{ id: 'i1', qty: q, unit: 'g', name: 'flour' }] }];
+    const r = await api.createRecipe({ name: 'Scones', steps: [{ title: '', text: 'Bake' }], ingredients: flour('300') });
+    await api.markCooked(r.id, { date: '2030-01-02', rating: 3 });
+    await api.updateRecipe(r.id, { ...(await api.getRecipe(r.id)), ingredients: flour('250') });
+    await api.markCooked(r.id, { date: '2030-01-03', rating: 5 });
+    const here = await api.getRecipeRevisions(r.id);
+    out.phone = { versions: here.revisions.length, cooks: here.revisions.map(v => v.cooks.map(c => c.rating)) };
+    await sync();
+    const sid = (await db.query(`SELECT server_id FROM recipes WHERE id = ?`, [r.id])).values[0].server_id;
+    const h = await web('GET', `/api/recipes/${sid}/revisions`);
+    out.server = { versions: h.revisions.length, cooks: h.revisions.map(v => v.cooks.map(c => c.rating)), sameCurrent: h.current === here.current };
+    // On the web: version 1 back, then a third.
+    await web('POST', `/api/recipes/${sid}/revisions/${h.revisions[0].rev}/restore`);
+    await webSave(sid, { ingredients: flour('200') });
+    await sync();
+    const after = await api.getRecipeRevisions(r.id);
+    const rows = (await db.query(`SELECT COUNT(*) AS n FROM recipe_revisions WHERE recipe_id = ?`, [r.id])).values[0].n;
+    out.after = { versions: after.revisions.length, rows, qty: (await api.getRecipe(r.id)).ingredients[0].items[0].qty, current: after.revisions.find(v => v.current)?.number };
+    // On the phone: version 2 back, and version 3 (never cooked) deleted.
+    await api.restoreRecipeRevision(r.id, after.revisions[1].rev);
+    let refused = null;
+    try { await api.deleteRecipeRevision(r.id, after.revisions[0].rev); } catch (e) { refused = e.code; }
+    await api.deleteRecipeRevision(r.id, after.revisions[2].rev);
+    await sync();
+    const end = await web('GET', `/api/recipes/${sid}/revisions`);
+    out.end = { refused, numbers: end.revisions.map(v => v.number), current: end.revisions.find(v => v.current)?.number };
+  },
+  // A pull from a server that knows more than this app: what it doesn't
+  // know is left out, not stopping the pull.
+  async newerServer() {
+    const r = await api.createRecipe({ name: 'Soup', steps: [{ text: 'Boil' }], ingredients: [{ items: [{ name: 'water' }] }] });
+    await sync();
+    const { dbApplyPull } = dbn;
+    const sid = (await db.query(`SELECT server_id FROM recipes WHERE id = ?`, [r.id])).values[0].server_id;
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const done = await dbApplyPull({ now, tables: {
+      cook_diary: [{ id: 9001, recipe_id: sid, date: '2030-02-01', kind: 'planned', servings: 2, a_later_column: 'x', created_at: now, updated_at: now, deleted_at: null }],
+      a_later_table: [{ id: 1, anything: true }],
+    } });
+    const row = (await db.query(`SELECT recipe_id, date FROM cook_diary WHERE server_id = 9001`)).values[0];
+    out.applied = { done, row: row ? { local: row.recipe_id === r.id, date: row.date } : null };
+  },
 };
 
 const name = process.argv[2];

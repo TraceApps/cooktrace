@@ -1,4 +1,13 @@
 /**
+ * What an app knows of the synced tables, as a number it sends with each
+ * pull. An app writes every column it's sent into its own tables, so the
+ * server sends a column or table added later only to apps that know it
+ * (routes/sync.js LATER_COLS): 1, before 1.5 (none sent); 2, 1.5's (list
+ * sources and notes, "any day" plans, allergens, recipe versions).
+ */
+export const SYNC_SCHEMA = 2;
+
+/**
  * The fields of each synced table, as two edits of a row meet them.
  *
  * The same columns a device writes through /api/sync/push (TABLES[t].cols
@@ -25,10 +34,13 @@ export const SYNC_FIELDS = {
     'serving_size', 'serving_unit', 'serving_label', 'nutrition', 'g_per_cup',
     'generic_parent_id', 'nutrition_source_variant_id', 'allergens', 'traces', 'allergens_source', 'deleted_at',
   ],
-  cook_diary: ['recipe_id', 'date', 'kind', 'servings', 'notes', 'photo_url', 'photos', 'meal_type', 'rating', 'any_day', 'deleted_at'],
+  cook_diary: ['recipe_id', 'date', 'kind', 'servings', 'notes', 'photo_url', 'photos', 'meal_type', 'rating', 'any_day', 'recipe_rev', 'deleted_at'],
   shopping_list: ['name', 'quantity', 'unit', 'aisle', 'checked', 'pantry_id', 'recipe_id', 'sort_order', 'sources', 'notes', 'deleted_at'],
   recipe_comments: ['recipe_id', 'parent_id', 'body', 'deleted_at'],
   ai_chat_history: ['role', 'content'],
+  // A recipe's versions (lib/recipe-content.js): made once, never changed;
+  // only deleted, by hand.
+  recipe_revisions: ['recipe_id', 'rev', 'data', 'deleted_at'],
 };
 
 /**
@@ -60,9 +72,11 @@ export const SYNC_GROUPS = {
     // What a label says, and that it's the label's (or the user's) word.
     ['allergens', 'traces', 'allergens_source'],
   ],
-  cook_diary: [['photos', 'photo_url'], ['date', 'meal_type', 'kind', 'any_day']],
+  // A cook's version belongs to its recipe.
+  cook_diary: [['photos', 'photo_url'], ['date', 'meal_type', 'kind', 'any_day'], ['recipe_id', 'recipe_rev']],
   // An amount and where it came from (lib/shopping-plan.js) go together.
   shopping_list: [['quantity', 'unit', 'pantry_id', 'sources']],
   recipe_comments: [['recipe_id', 'parent_id']],
   ai_chat_history: [['role', 'content']],
+  recipe_revisions: [['recipe_id', 'rev', 'data']],
 };

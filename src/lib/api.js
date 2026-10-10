@@ -267,6 +267,14 @@ const _CtApiHttp = {
   markRecipeVersionsSeen(id)            { return this.post(`/api/recipes/${id}/versions/seen`); },
   async restoreRecipeVersion(id, versionId) { return this._imgFromApi(await this.post(`/api/recipes/${id}/versions/${versionId}/restore`)); },
 
+  // History (#54): every version of what a recipe has you cook, each with
+  // your cooks of it; one version, a cook's "as you made it"; and putting
+  // one back, or deleting one nobody cooked.
+  getRecipeRevisions(id)                { return this.get(`/api/recipes/${id}/revisions`); },
+  getRecipeRevision(id, rev)            { return this.get(`/api/recipes/${id}/revisions/${rev}`); },
+  async restoreRecipeRevision(id, rev)  { return this._imgFromApi(await this.post(`/api/recipes/${id}/revisions/${rev}/restore`)); },
+  deleteRecipeRevision(id, rev)         { return this.del(`/api/recipes/${id}/revisions/${rev}`); },
+
   // Recipe sharing — per-user grants
   getSharePeers()                            { return this.get('/api/recipes/peers'); },
   async getRecipesSharedWithMe() {
