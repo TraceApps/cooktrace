@@ -35,7 +35,7 @@
   import RecipeComments from '../components/recipe/RecipeComments.svelte';
   import KitchenGear from '../components/recipe/KitchenGear.svelte';
   import { splitWithTimes } from '../lib/parseTimes.js';
-  import { formatStepText } from '../lib/step-format.js';
+  import { formatStepText, scaleStepText, scaledAmountHtml } from '../lib/step-format.js';
   import { startTimer, formatRemaining } from '../stores/cookTimers.js';
   import { cookModeActive } from '../stores/cookMode.js';
   import { currentUser } from '../stores/auth.js';
@@ -1425,7 +1425,7 @@
                 {@const title = typeof step === 'string' ? '' : (step.title || '')}
                 {@const text  = typeof step === 'string' ? step : (step.text || '')}
                 {@const stepImg = typeof step === 'string' ? null : (step.imgUrl || null)}
-                {@const parts = splitWithTimes(text)}
+                {@const parts = splitWithTimes(scaleStepText(text, scale))}
                 {@const stepRefIds = (typeof step === 'string' || !Array.isArray(step.refIds)) ? [] : step.refIds}
                 {@const stepIngs = stepRefIds.length > 0 ? _resolveStepIngs(stepRefIds) : []}
                 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
@@ -1480,14 +1480,14 @@
                                   {_checked ? 'check_box' : 'check_box_outline_blank'}
                                 </span>
                                 {#if ing.qty || ing.unit}
-                                  <span class="step-ing-qty">{ing.qty || ''}{ing.qty && ing.unit ? ' ' : ''}{ing.unit || ''}</span>
+                                  <span class="step-ing-qty">{displayQty(ing.qty, ing.unit, scale)}{ing.qty && ing.unit ? ' ' : ''}{ing.unit || ''}</span>
                                 {/if}
                                 <span class="step-ing-name">{ing.name}</span>
                                 {#if ing.note}<span class="step-ing-note">{ing.note}</span>{/if}
                               </button>
                             {:else}
                               {#if ing.qty || ing.unit}
-                                <span class="step-ing-qty">{ing.qty || ''}{ing.qty && ing.unit ? ' ' : ''}{ing.unit || ''}</span>
+                                <span class="step-ing-qty">{displayQty(ing.qty, ing.unit, scale)}{ing.qty && ing.unit ? ' ' : ''}{ing.unit || ''}</span>
                               {/if}
                               <span class="step-ing-name">{ing.name}</span>
                               {#if ing.note}<span class="step-ing-note">{ing.note}</span>{/if}
@@ -1502,7 +1502,7 @@
                     {#if text}
                       <span class="step-text">
                         {#each parts as p}
-                          {#if p.type === 'text'}{@html formatStepText(p.value)}{:else}<button
+                          {#if p.type === 'text'}{@html scaledAmountHtml(formatStepText(p.value))}{:else}<button
                             class="time-chip"
                             on:click={() => startTimer({
                               label: title || `Step ${i + 1}`,
@@ -2859,6 +2859,8 @@
     color: var(--text-1);
   }
   .step-text { color: var(--text-1); line-height: 1.5; font-size: 15px; }
+  /* An amount in the step scaled with the servings. */
+  .step-text :global(.step-amount) { color: var(--accent); font-weight: 600; }
 
   /* Per-step linked ingredients (issue #40) — small inline list so
      users don't scroll back to the top ingredients section during

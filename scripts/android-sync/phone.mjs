@@ -762,6 +762,22 @@ const scenarios = {
     const l3 = await list();
     out.afterCancel = { tomato: row(l3, 'tomato')?.quantity ?? null, oil: row(l3, 'olive')?.quantity ?? 'gone' };
   },
+  // The recipe card's "you have N of M" on the phone, as the server counts
+  // it: in stock, or a generic item with a variant in stock.
+  async pantryMatch() {
+    const flour = await api.createPantryItem({ name: 'Flour', in_stock: true });
+    const sugar = await api.createPantryItem({ name: 'Sugar', in_stock: false });
+    const milk = await api.createPantryItem({ name: 'Milk', in_stock: false });
+    await api.createPantryItem({ name: 'Oat Milk', in_stock: true, generic_parent_id: milk.id });
+    const r = await api.createRecipe({ name: 'Cake', steps: [{ text: 'Bake' }], ingredients: [{ items: [
+      { name: 'flour', pantry_item_id: flour.id }, { name: 'sugar', pantry_item_id: sugar.id },
+      { name: 'milk', pantry_item_id: milk.id }, { name: 'love' },
+    ] }] });
+    out.list = (await api.getRecipes()).find(x => x.id === r.id).pantry_match;
+    const cb = await api.createCookbook({ name: 'Baking' });
+    await api.addRecipesToCookbook(cb.id, [r.id]);
+    out.cookbook = (await api.getCookbook(cb.id)).recipes.find(x => x.id === r.id).pantry_match;
+  },
 };
 
 const name = process.argv[2];

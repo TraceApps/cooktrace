@@ -157,6 +157,40 @@ function _shoppingFromRow(row) {
 
 // Aisle auto-lookup mirror of server/routes/shopping.js's helper: linked
 // pantry item → its category default_aisle → the category name → null.
+// Pantry items that count as in stock, as the server counts them
+// (server/lib/recipe-hydrate.js buildStockSet): in stock itself, or a
+// generic item with a variant in stock.
+async function _stockSet() {
+  const all = await _query(
+    `SELECT id, generic_parent_id, in_stock FROM pantry_items WHERE user_id = ? AND deleted_at IS NULL`,
+    [LOCAL_USER_ID]
+  );
+  const set = new Set();
+  const parents = new Set();
+  for (const r of all) {
+    if (r.in_stock) {
+      set.add(r.id);
+      if (r.generic_parent_id != null) parents.add(r.generic_parent_id);
+    }
+  }
+  for (const r of all) if (parents.has(r.id)) set.add(r.id);
+  return set;
+}
+
+// "You have 9 of 11": the recipe card's pantry match (matchSummary on the
+// server), worked out here from the phone's own pantry.
+function _withPantryMatch(recipe, stock) {
+  if (!recipe) return recipe;
+  let have = 0, need = 0;
+  for (const g of Array.isArray(recipe.ingredients) ? recipe.ingredients : []) {
+    for (const it of (g?.items || [])) {
+      need++;
+      if (it?.pantry_item_id && stock.has(it.pantry_item_id)) have++;
+    }
+  }
+  return { ...recipe, pantry_match: { have, need } };
+}
+
 // The account's in-stock pantry items, by id.
 async function _inStockIds() {
   return new Set(
@@ -278,7 +312,8 @@ export const CtApiNative = {
         ORDER BY name COLLATE NOCASE ASC`,
       [LOCAL_USER_ID]
     );
-    return rows.map(_recipeFromRow);
+    const stock = await _stockSet();
+    return rows.map(r => _withPantryMatch(_recipeFromRow(r), stock));
   },
 
   async getRecipe(id) {
@@ -1370,7 +1405,8 @@ export const CtApiNative = {
           ORDER BY l.sort_order ASC, r.name COLLATE NOCASE ASC`,
         [id]
       );
-    out.recipes = recipes.map(_recipeFromRow);
+    const stock = await _stockSet();
+    out.recipes = recipes.map(r => _withPantryMatch(_recipeFromRow(r), stock));
     out.recipe_count = out.recipes.length;
     return out;
   },

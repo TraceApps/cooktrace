@@ -18,6 +18,7 @@
   import KitchenGear from '../components/recipe/KitchenGear.svelte';
   import NutritionFactsBox from '../components/recipe/NutritionFactsBox.svelte';
   import { splitWithTimes } from '../lib/parseTimes.js';
+  import { scaledStepParts } from '../lib/step-format.js';
   import { startTimer, formatRemaining } from '../stores/cookTimers.js';
   import { apiUrl } from '../lib/platform.js';
 
@@ -192,7 +193,7 @@
                     <div>
                       {#if title}<strong>{title}: </strong>{/if}
                       {#each parts as p}
-                        {#if p.type === 'text'}{p.value}{:else}<button
+                        {#if p.type === 'text'}{#each scaledStepParts(p.value, scale) as a}{#if a.type === 'amount'}<span class="step-amount">{a.value}</span>{:else}{a.value}{/if}{/each}{:else}<button
                           class="time-chip"
                           on:click={() => startTimer({
                             label: `${recipe.name} · Step ${i + 1}`,
@@ -398,6 +399,8 @@
 
   .steps { padding-left: 0; margin: 0; list-style: none; display: flex; flex-direction: column; gap: 14px; }
   .steps li { display: flex; gap: 12px; font-size: 14px; line-height: 1.55; color: var(--text-1); }
+  /* An amount in the step scaled with the servings. */
+  .step-amount { color: var(--accent); font-weight: 600; }
   .step-num {
     flex-shrink: 0;
     width: 28px; height: 28px;

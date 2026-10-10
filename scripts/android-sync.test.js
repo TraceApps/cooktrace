@@ -488,3 +488,9 @@ test("a week's plan on the list: scaled, added up, kept with each side's ids, re
   assert.deepEqual(r.phoneAfterPull.ids, r.phoneAfterPull.want, "the phone has its own ids for both");
   assert.deepEqual(r.afterCancel, { tomato: 2, oil: 'gone' }, "the cancelled cook's share leaves the list");
 });
+
+test('the Android app shows how many of a recipe\'s ingredients are in stock, as the server does', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('pantryMatch');
+  assert.deepEqual(r.list, { have: 2, need: 4 }, 'flour, and milk through its in-stock variant');
+  assert.deepEqual(r.cookbook, { have: 2, need: 4 });
+});

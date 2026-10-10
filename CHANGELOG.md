@@ -14,6 +14,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **Amounts in a recipe's steps follow the servings.** Scale a recipe and the cups, spoons, grams and other measures written in its steps change with it, tinted so you can see which, as do the ingredients listed under each step. Times, temperatures, pan sizes, and amounts for each piece ("2 tbsp per pancake") stay as written.
 - **Plan a Cook asks for servings**, starting at the recipe's own. The Diary shows them on each planned cook, and the shopping list scales to them.
 - **Amounts on the shopping list read the way a cook writes them** (3/8 cup, not 0.375 cup), things you count round up to whole ones (8 tomatoes, not 7.5), and the quantity fields take fractions like 1/2.
 - **The week's plan on the shopping list is scaled and added up.** Each recipe is scaled to the servings planned, the same ingredient from several recipes becomes one item (1 cup and 120 ml of milk add up), and every item remembers which recipes and cooks it's for. Building the list for the same week again updates it instead of adding everything twice, a cook taken off the plan takes its ingredients out, and items already checked off aren't added back.
@@ -24,6 +25,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **The Android app shows how many of a recipe's ingredients you have** on recipe cards and in cookbooks. It was always empty there.
 - **Plan a Cook on a recipe card opens the planner with that recipe picked.** It went to the Diary and did nothing more.
 - **Photos synced from the Android app are stored as files on the server.** A photo that reached the sync embedded in its recipe, pantry item, cookbook or cook diary entry was kept inline, so every list carried it and share cards and link previews couldn't show it. Photos already stored that way are turned into files when the server starts.
 - **The Android app no longer opens on a blank screen after signing in on the setup screen.** Now and then it stayed blank until it was closed and opened again.
