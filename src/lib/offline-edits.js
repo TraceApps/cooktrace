@@ -118,6 +118,9 @@ export function writeOp(method, url, body) {
   }
   match = path.match(/^\/api\/recipes\/(-?\d+)\/comments$/);
   if (match && m === 'POST') return { kind: 'comment-create', key: null };
+  // A version's name ({ label }): the latest wins (#54).
+  match = path.match(/^\/api\/recipes\/(-?\d+)\/revisions\/(v[0-9a-f]{14})$/);
+  if (match && m === 'PUT') return { kind: 'revision-label', key: `revision-label:${match[1]}:${match[2]}`, id: Number(match[1]), rev: match[2] };
   // A recipe's allergen correction ({ allergen_overrides }): the latest wins.
   match = path.match(/^\/api\/recipes\/(-?\d+)\/allergens$/);
   if (match && m === 'PUT') return { kind: 'recipe-allergens', key: `recipe-allergens:${match[1]}`, id: Number(match[1]) };
@@ -402,6 +405,14 @@ export function answerWithOps(url, mirrored, ops) {
     if (!edit && !fix) return mirrored;
     return { ...mirrored, ...(edit?.body || {}), ...(fix?.body || {}), _pending: true };
   }
+  // A recipe's history, with names given offline.
+  const history = path.match(/^\/api\/recipes\/(-?\d+)\/revisions(?:\/(v[0-9a-f]{14}))?$/);
+  if (history && mirrored) {
+    const named = new Map((ops || []).filter(op => op.kind === 'revision-label' && Number(op.id) === Number(history[1])).map(op => [op.rev, op.body?.label ?? null]));
+    if (!named.size) return mirrored;
+    const name = v => (named.has(v.rev) ? { ...v, label: named.get(v.rev) || null } : v);
+    return history[2] ? name(mirrored) : { ...mirrored, revisions: (mirrored.revisions || []).map(name) };
+  }
   const comments = path.match(/^\/api\/recipes\/(-?\d+)\/comments$/);
   if (comments) {
     const made = (ops || []).filter(op => op.kind === 'comment-create' && op.path === path);
@@ -501,6 +512,7 @@ export function describeOp(op) {
     case 'recipe-update':    return 'a recipe you changed';
     case 'recipe-delete':    return 'a recipe you deleted';
     case 'recipe-allergens': return 'the allergens you corrected on a recipe';
+    case 'revision-label':   return 'the name you gave a version of a recipe';
     case 'comment-create':   return 'the note you left on a recipe';
     case 'profile':          return 'your profile';
     case 'setting':          return `the "${op.body?.key || 'setting'}" setting`;

@@ -287,6 +287,7 @@ const SCHEMA = `
     recipe_id    INTEGER NOT NULL,
     rev          TEXT NOT NULL,
     data         TEXT NOT NULL,
+    label        TEXT,
     created_at   TEXT DEFAULT (datetime('now')),
     updated_at   TEXT DEFAULT (datetime('now')),
     deleted_at   TEXT DEFAULT NULL,
@@ -484,6 +485,11 @@ async function _migrateShoppingAisle() {
     const diaryCols = new Set((diaryInfo?.values || []).map(c => c.name));
     if (!diaryCols.has('any_day')) {
       await db.run(`ALTER TABLE cook_diary ADD COLUMN any_day INTEGER NOT NULL DEFAULT 0`);
+    }
+    // A version's own name ("Less flour").
+    const revInfo = await db.query(`PRAGMA table_info(recipe_revisions)`);
+    if (!(revInfo?.values || []).some(c => c.name === 'label')) {
+      await db.run(`ALTER TABLE recipe_revisions ADD COLUMN label TEXT`);
     }
     // The version of its recipe a cook was made from (recipe-content.js).
     if (!diaryCols.has('recipe_rev')) {

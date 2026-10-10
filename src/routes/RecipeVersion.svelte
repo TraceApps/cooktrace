@@ -19,7 +19,7 @@
   import { fromIso } from '../lib/week.js';
   import { displayQty } from '../lib/quantity.js';
   import { changeSummary } from '../lib/recipe-content.js';
-  import { changeLines, detailRows } from '../lib/version-text.js';
+  import { changeLines, detailRows, versionName } from '../lib/version-text.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { confirmDialog } from '../stores/confirmDialog.js';
   import VersionCompare from '../components/recipe/VersionCompare.svelte';
@@ -39,6 +39,22 @@
   let busy = false;
   let compareWith = null; // 'current' | 'previous' | null
   let logOpen = false;
+  // Naming the version ("Less flour").
+  let naming = false;
+  let labelText = '';
+  function startNaming() { labelText = v?.label || ''; naming = true; }
+  async function saveLabel() {
+    const next = labelText.replace(/\s+/g, ' ').trim();
+    if (next === (v.label || '')) { naming = false; return; }
+    busy = true;
+    try {
+      await NtApi.setRecipeRevisionLabel(id, v.rev, next || null);
+      history = { ...history, revisions: history.revisions.map(x => (x.rev === v.rev ? { ...x, label: next || null } : x)) };
+      showSuccess(next ? $_('history.label_saved', { values: { n: v.number } }) : $_('history.label_cleared', { values: { n: v.number } }));
+      naming = false;
+    } catch (e) { showError(e.message || $_('history.label_failed')); }
+    finally { busy = false; }
+  }
 
   async function load() {
     loading = true; loadError = null;
@@ -162,6 +178,27 @@
       {/if}
 
       <section class="card status">
+        {#if naming}
+          <form class="name-form" on:submit|preventDefault={saveLabel}>
+            <input class="input" type="text" maxlength="60" bind:value={labelText}
+              placeholder={$_('history.label_placeholder')} aria-label={$_('history.label')} />
+            <button type="submit" class="btn btn-primary" disabled={busy}>{$_('history.label_save')}</button>
+            <button type="button" class="btn btn-ghost" on:click={() => (naming = false)}>{$_('history.label_cancel')}</button>
+          </form>
+        {:else if v.label}
+          <div class="name-row">
+            <p class="version-label">{v.label}</p>
+            {#if canEdit}
+              <button type="button" class="btn-icon" on:click={startNaming} aria-label={$_('history.rename')} title={$_('history.rename')}>
+                <span class="material-symbols-rounded">edit</span>
+              </button>
+            {/if}
+          </div>
+        {:else if canEdit}
+          <button type="button" class="name-btn" on:click={startNaming}>
+            <span class="material-symbols-rounded" aria-hidden="true">label</span>{$_('history.name_version')}
+          </button>
+        {/if}
         <div class="status-head">
           <span class="badge" class:current={v.current}>
             {v.current ? $_('history.current') : $_('history.version_of', { values: { n: v.number, total } })}
@@ -197,16 +234,16 @@
             {/if}
             {#if prev}
               <button type="button" class="chip" class:on={compareWith === 'previous'} aria-pressed={compareWith === 'previous'}
-                on:click={() => (compareWith = compareWith === 'previous' ? null : 'previous')}>{$_('history.version', { values: { n: prev.number } })}</button>
+                on:click={() => (compareWith = compareWith === 'previous' ? null : 'previous')}>{versionName($_, prev)}</button>
             {/if}
           </div>
         {/if}
         {#if compareWith === 'current' && current}
           <VersionCompare from={v.data} to={current.data}
-            fromLabel={$_('history.version', { values: { n: v.number } })} toLabel={$_('history.the_current')} />
+            fromLabel={versionName($_, v)} toLabel={$_('history.the_current')} />
         {:else if compareWith === 'previous' && prev}
           <VersionCompare from={prev.data} to={v.data}
-            fromLabel={$_('history.version', { values: { n: prev.number } })} toLabel={$_('history.version', { values: { n: v.number } })} />
+            fromLabel={versionName($_, prev)} toLabel={versionName($_, v)} />
         {/if}
       </section>
 
@@ -320,6 +357,20 @@
   .made-title { margin: 0; font-size: 15px; font-weight: 700; }
   .made-notes { margin: 0; font-size: 13px; color: var(--text-2); }
   .status-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .name-row { display: flex; align-items: center; gap: 4px; }
+  .version-label { margin: 0; flex: 1; min-width: 0; font-size: 20px; font-weight: 800; color: var(--text-1); overflow-wrap: anywhere; }
+  .name-btn {
+    align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px;
+    border: 1px dashed var(--border-strong); border-radius: var(--radius-full); background: transparent;
+    color: var(--text-2); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .name-btn .material-symbols-rounded { font-size: 16px; }
+  .name-form { display: flex; gap: 8px; flex-wrap: wrap; }
+  .name-form .input {
+    flex: 1 1 180px; min-height: 44px; box-sizing: border-box; padding: 0 12px; border-radius: var(--radius-md);
+    border: 1px solid var(--border-strong); background: var(--bg); color: var(--text-1); font: inherit; font-size: 15px;
+  }
+  .name-form .btn { min-height: 44px; }
   .badge {
     padding: 3px 10px; border-radius: var(--radius-full); background: var(--surface-2);
     font-size: 12px; font-weight: 700; color: var(--text-2);

@@ -201,6 +201,12 @@ wrapped.restoreRecipeRevision = async (id, rev) => {
   _schedulePush();
   return r;
 };
+wrapped.setRecipeRevisionLabel = async (id, rev, label) => {
+  if (!(await _isLocalRecipe(id))) return _serverCall('PUT', `/api/recipes/${id}/revisions/${rev}`, { label });
+  const r = await CtApiNative.setRecipeRevisionLabel(id, rev, label);
+  _schedulePush();
+  return r;
+};
 wrapped.deleteRecipeRevision = async (id, rev) => {
   if (!(await _isLocalRecipe(id))) return _serverCall('DELETE', `/api/recipes/${id}/revisions/${rev}`);
   const r = await CtApiNative.deleteRecipeRevision(id, rev);

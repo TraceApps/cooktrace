@@ -142,6 +142,16 @@ test('a recipe\'s allergens corrected offline show on the recipe and its card', 
   assert.match(describeOp(op), /allergens you corrected/);
 });
 
+test("a version named offline shows its name in the recipe's history", () => {
+  const op = writeOp('PUT', '/api/recipes/4/revisions/v0123456789abcd', { label: 'Less flour' });
+  assert.deepEqual([op.kind, op.rev], ['revision-label', 'v0123456789abcd']);
+  const ops = [{ seq: 1, ...op, body: { label: 'Less flour' } }];
+  const list = answerWithOps('/api/recipes/4/revisions', { current: 'x', revisions: [{ rev: 'v0123456789abcd', label: null }, { rev: 'v1', label: null }] }, ops);
+  assert.deepEqual(list.revisions.map(v => v.label), ['Less flour', null]);
+  assert.equal(answerWithOps('/api/recipes/4/revisions/v0123456789abcd', { rev: 'v0123456789abcd', label: null }, ops).label, 'Less flour');
+  assert.equal(answerWithOps('/api/recipes/5/revisions', { revisions: [{ rev: 'v0123456789abcd' }] }, ops).revisions[0].label, undefined, 'only that recipe');
+});
+
 test('a note left on a recipe offline shows on that recipe, not another', () => {
   const ops = [{ seq: 1, kind: 'comment-create', path: '/api/recipes/4/comments', body: { body: 'more salt' }, tempId: -1 }];
   assert.equal(answerWithOps('/api/recipes/4/comments', [], ops).length, 1);

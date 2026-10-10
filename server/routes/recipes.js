@@ -59,7 +59,7 @@ import { autoShareNewRecipe as _autoShareNewRecipe } from '../lib/auto-share.js'
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
 import { ownId, ownIngredientLinks } from '../lib/link-checks.js';
 import { allergenSummary, cleanOverrides } from '../lib/allergens.js';
-import { recordRevision, listRevisions, getRevision, revisionUsed, restoreColumns } from '../lib/recipe-history.js';
+import { recordRevision, listRevisions, getRevision, revisionUsed, restoreColumns, cleanLabel } from '../lib/recipe-history.js';
 import { revisionOf, parseRevision } from '../lib/recipe-content.js';
 
 // Recipe row -> API-shape hydration lives in server/lib/recipe-hydrate.js
@@ -829,6 +829,18 @@ router.post('/:id/revisions/:rev/restore', wrap((req, res) => {
   })();
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(a.recipe.id);
   res.json(_withCreatorAvatar(_hydrate(row), row));
+}));
+
+// PUT /:id/revisions/:rev: a version's name ({ label }; empty takes it off).
+router.put('/:id/revisions/:rev', wrap((req, res) => {
+  const a = _historyAccess(req, res, { edit: true });
+  if (!a) return;
+  const rev = req.params.rev;
+  const v = _REV_RX.test(rev) ? getRevision(a.recipe.id, rev) : null;
+  if (!v || v.deleted) return res.status(404).json({ error: 'Not found' });
+  db.prepare(`UPDATE recipe_revisions SET label = ?, updated_at = datetime('now') WHERE recipe_id = ? AND rev = ?`)
+    .run(cleanLabel(req.body?.label), a.recipe.id, rev);
+  res.json({ ...getRevision(a.recipe.id, rev), current: rev === a.recipe.rev });
 }));
 
 // DELETE /:id/revisions/:rev: a version nobody cooked, and not the current one.

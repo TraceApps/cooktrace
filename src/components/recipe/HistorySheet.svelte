@@ -17,7 +17,7 @@
   import { dateFormat } from '../../stores/settings.js';
   import { formatDate } from '../../lib/format.js';
   import { changeSummary } from '../../lib/recipe-content.js';
-  import { changeLines } from '../../lib/version-text.js';
+  import { changeLines, versionName } from '../../lib/version-text.js';
   import { currentUser } from '../../stores/auth.js';
 
   export let open = false;
@@ -85,7 +85,7 @@
             <li>
               <button type="button" class="version" class:folded={it.fold} on:click={() => openVersion(v)}>
                 <span class="head">
-                  <span class="name">{$_('history.version', { values: { n: v.number } })}</span>
+                  <span class="name">{versionName($_, v)}</span>
                   {#if v.current}<span class="badge">{$_('history.current')}</span>{/if}
                   <span class="date">{when(v.created_at)}{#if v.created_by_name && v.created_by != null && v.created_by !== $currentUser?.id}{' · '}{v.created_by_name}{/if}</span>
                 </span>

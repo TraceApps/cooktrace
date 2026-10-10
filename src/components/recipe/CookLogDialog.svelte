@@ -291,7 +291,7 @@
               {#each [...versions].reverse() as v (v.rev)}
                 <option value={v.rev}>{v.rev === currentRev
                   ? $_('cook_log_dialog.version_current', { values: { n: v.number } })
-                  : $_('cook_log_dialog.version_option', { values: { n: v.number, date: versionDate(v) } })}</option>
+                  : $_('cook_log_dialog.version_option', { values: { n: v.number, date: versionDate(v) } })}{v.label ? `: ${v.label}` : ''}</option>
               {/each}
             </select>
           </label>

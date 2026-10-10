@@ -56,7 +56,7 @@ import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-key
 import { ownIngredientLinks, ownId, linkableRecipeId } from '../lib/link-checks.js';
 import { cleanSourceIds } from '../lib/shopping-plan.js';
 import { localizeRowPhotos } from '../lib/inline-photos.js';
-import { recordRevision, revisionUsed } from '../lib/recipe-history.js';
+import { recordRevision, revisionUsed, cleanLabel } from '../lib/recipe-history.js';
 import { revisionOf, parseRevision } from '../lib/recipe-content.js';
 
 // Unique per account (server/db.js), so one made on two devices is one row.
@@ -184,7 +184,7 @@ const TABLES = {
   // version of their content (the key is worked out here, not taken), the
   // same as one already here when the content is; never changed after.
   recipe_revisions: {
-    cols: ['recipe_id', 'rev', 'data'],
+    cols: ['recipe_id', 'rev', 'data', 'label'],
     parents: { recipe_id: 'recipes' },
     softDelete: true,
   },
@@ -769,13 +769,21 @@ function _pushRevision(row, translated, u, offsetMs) {
   if (!v) v = db.prepare(`SELECT * FROM recipe_revisions WHERE recipe_id = ? AND rev = ?`).get(recipe.id, rev);
   if (!v) {
     const info = db.prepare(
-      `INSERT INTO recipe_revisions (recipe_id, user_id, rev, data, created_by, created_at, updated_at, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(recipe.id, recipe.user_id ?? null, rev, JSON.stringify(data), u ?? null, at, at, translated.deleted_at ?? null);
+      `INSERT INTO recipe_revisions (recipe_id, user_id, rev, data, label, created_by, created_at, updated_at, deleted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(recipe.id, recipe.user_id ?? null, rev, JSON.stringify(data), cleanLabel(translated.label), u ?? null, at, at, translated.deleted_at ?? null);
     setCreateKey('recipe_revisions', info.lastInsertRowid, row.server_id ? null : cleanCreateKey(row.client_key));
     return db.prepare(`SELECT * FROM recipe_revisions WHERE id = ?`).get(info.lastInsertRowid);
   }
   if (at < String(v.created_at || '')) db.prepare(`UPDATE recipe_revisions SET created_at = ? WHERE id = ?`).run(at, v.id);
+  // Its name: the newer of the two edits. A device from before names
+  // nothing (no label sent), which leaves it.
+  if ('label' in translated) {
+    const label = cleanLabel(translated.label);
+    if (label !== (v.label ?? null) && at >= String(v.updated_at || '')) {
+      db.prepare(`UPDATE recipe_revisions SET label = ?, updated_at = ? WHERE id = ?`).run(label, at, v.id);
+    }
+  }
   const wantDeleted = translated.deleted_at != null;
   if (wantDeleted && v.deleted_at == null) {
     if (v.rev !== recipe.rev && !revisionUsed(recipe.id, v.rev)) {

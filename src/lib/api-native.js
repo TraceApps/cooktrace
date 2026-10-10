@@ -1684,7 +1684,7 @@ export const CtApiNative = {
     if (!recipe) throw new Error('Recipe not found');
     const current = await _recordRevision(id);
     const rows = await _query(
-      `SELECT id, rev, data, created_at, deleted_at FROM recipe_revisions WHERE recipe_id = ? ORDER BY created_at ASC, id ASC`, [id]);
+      `SELECT id, rev, data, label, created_at, deleted_at FROM recipe_revisions WHERE recipe_id = ? ORDER BY created_at ASC, id ASC`, [id]);
     const cooks = await _query(
       `SELECT id, date, rating, notes, photo_url, photos, servings, recipe_rev, meal_type FROM cook_diary
         WHERE recipe_id = ? AND kind = 'cooked' AND deleted_at IS NULL ORDER BY date DESC, id DESC`, [id]);
@@ -1693,7 +1693,7 @@ export const CtApiNative = {
     rows.forEach((v, i) => {
       if (v.deleted_at) return;
       revisions.push({
-        id: v.id, rev: v.rev, number: i + 1, created_at: v.created_at, created_by_name: null,
+        id: v.id, rev: v.rev, number: i + 1, label: v.label || null, created_at: v.created_at, created_by_name: null,
         current: v.rev === current, used: used.has(v.rev), data: parseRevision(v.data),
         cooks: cooks.filter(c => c.recipe_rev === v.rev),
       });
@@ -1719,6 +1719,15 @@ export const CtApiNative = {
     );
     await _recordRevision(id);
     return this.getRecipe(id);
+  },
+  // A version's name (routes/recipes.js PUT /:id/revisions/:rev).
+  async setRecipeRevisionLabel(id, rev, label) {
+    const s = label == null ? '' : String(label).replace(/\s+/g, ' ').trim();
+    await _run(
+      `UPDATE recipe_revisions SET label = ?, updated_at = datetime('now'), sync_status = 'pending' WHERE recipe_id = ? AND rev = ? AND deleted_at IS NULL`,
+      [s ? s.slice(0, 60) : null, id, rev]
+    );
+    return this.getRecipeRevision(id, rev);
   },
   async deleteRecipeRevision(id, rev) {
     const current = await _recordRevision(id);

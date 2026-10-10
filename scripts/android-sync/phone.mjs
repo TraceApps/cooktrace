@@ -874,6 +874,22 @@ const scenarios = {
     const end = await web('GET', `/api/recipes/${sid}/revisions`);
     out.end = { refused, numbers: end.revisions.map(v => v.number), current: end.revisions.find(v => v.current)?.number };
   },
+  // A version's name, given on the phone and changed on the web, both ways;
+  // the newer of two names stays.
+  async historyLabel() {
+    const r = await api.createRecipe({ name: 'Bread', steps: [{ title: '', text: 'Knead' }], ingredients: [{ items: [{ id: 'f', qty: '500', unit: 'g', name: 'flour' }] }] });
+    const rev = (await api.getRecipeRevisions(r.id)).current;
+    await api.setRecipeRevisionLabel(r.id, rev, 'The base');
+    await sync();
+    const sid = (await db.query(`SELECT server_id FROM recipes WHERE id = ?`, [r.id])).values[0].server_id;
+    out.server = (await web('GET', `/api/recipes/${sid}/revisions/${rev}`)).label;
+    await new Promise(res => setTimeout(res, 1100));
+    await web('PUT', `/api/recipes/${sid}/revisions/${rev}`, { label: 'Base, no sugar' });
+    await sync();
+    out.phone = (await api.getRecipeRevision(r.id, rev)).label;
+    const rows = (await db.query(`SELECT COUNT(*) AS n FROM recipe_revisions WHERE recipe_id = ?`, [r.id])).values[0].n;
+    out.rows = rows;
+  },
   // A pull from a server that knows more than this app: what it doesn't
   // know is left out, not stopping the pull.
   async newerServer() {

@@ -38,9 +38,9 @@ export const SYNC_FIELDS = {
   shopping_list: ['name', 'quantity', 'unit', 'aisle', 'checked', 'pantry_id', 'recipe_id', 'sort_order', 'sources', 'notes', 'deleted_at'],
   recipe_comments: ['recipe_id', 'parent_id', 'body', 'deleted_at'],
   ai_chat_history: ['role', 'content'],
-  // A recipe's versions (lib/recipe-content.js): made once, never changed;
-  // only deleted, by hand.
-  recipe_revisions: ['recipe_id', 'rev', 'data', 'deleted_at'],
+  // A recipe's versions (lib/recipe-content.js): made once, never changed
+  // but for their name (label); only deleted, by hand.
+  recipe_revisions: ['recipe_id', 'rev', 'data', 'label', 'deleted_at'],
 };
 
 /**

@@ -545,6 +545,11 @@ test('recipe history: versions and cooks from the phone, a restore and an edit o
   assert.deepEqual(r.end, { refused: 'used', numbers: [1, 2], current: 2 }, 'a cooked version stays; the uncooked one went');
 });
 
+test("a version's name goes up from the phone and comes back changed from the web", { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('historyLabel');
+  assert.deepEqual(r, { server: 'The base', phone: 'Base, no sugar', rows: 1 });
+});
+
 test('a pull with a table or column this app does not know yet still goes in', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const r = await run('newerServer');
   assert.deepEqual(r.applied, { done: true, row: { local: true, date: '2030-02-01' } });

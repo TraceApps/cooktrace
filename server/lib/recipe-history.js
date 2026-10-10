@@ -11,6 +11,12 @@
 import db from '../db.js';
 import { revisionOf, parseRevision, restoreValues } from './recipe-content.js';
 
+/** A version's name: trimmed, at most 60 characters, or null. */
+export function cleanLabel(v) {
+  const s = v == null ? '' : String(v).replace(/\s+/g, ' ').trim();
+  return s ? s.slice(0, 60) : null;
+}
+
 const _now = () => new Date().toISOString().replace('T', ' ').slice(0, 19);
 
 /**
@@ -49,7 +55,7 @@ export function revisionUsed(recipeId, rev) {
  */
 export function listRevisions(recipe, viewer) {
   const rows = db.prepare(
-    `SELECT v.id, v.rev, v.data, v.created_at, v.deleted_at, v.created_by,
+    `SELECT v.id, v.rev, v.data, v.label, v.created_at, v.deleted_at, v.created_by,
             COALESCE(u.full_name, u.username) AS created_by_name
        FROM recipe_revisions v LEFT JOIN users u ON u.id = v.created_by
       WHERE v.recipe_id = ?
@@ -71,6 +77,7 @@ export function listRevisions(recipe, viewer) {
       id: v.id,
       rev: v.rev,
       number: i + 1,
+      label: v.label || null,
       created_at: v.created_at,
       created_by: v.created_by ?? null,
       created_by_name: v.created_by_name || null,
@@ -95,7 +102,7 @@ export function getRevision(recipeId, rev) {
   const number = db.prepare(
     `SELECT COUNT(*) AS n FROM recipe_revisions WHERE recipe_id = ? AND (created_at < ? OR (created_at = ? AND id <= ?))`
   ).get(recipeId, v.created_at, v.created_at, v.id).n;
-  return { id: v.id, rev: v.rev, number, created_at: v.created_at, deleted: !!v.deleted_at, data: parseRevision(v.data) };
+  return { id: v.id, rev: v.rev, number, label: v.label || null, created_at: v.created_at, deleted: !!v.deleted_at, data: parseRevision(v.data) };
 }
 
 /** The columns that put a version back on its recipe (recipe-content.js). */

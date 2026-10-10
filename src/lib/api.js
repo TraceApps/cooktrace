@@ -274,6 +274,7 @@ const _CtApiHttp = {
   getRecipeRevision(id, rev)            { return this.get(`/api/recipes/${id}/revisions/${rev}`); },
   async restoreRecipeRevision(id, rev)  { return this._imgFromApi(await this.post(`/api/recipes/${id}/revisions/${rev}/restore`)); },
   deleteRecipeRevision(id, rev)         { return this.del(`/api/recipes/${id}/revisions/${rev}`); },
+  setRecipeRevisionLabel(id, rev, label) { return this.put(`/api/recipes/${id}/revisions/${rev}`, { label }); },
 
   // Recipe sharing — per-user grants
   getSharePeers()                            { return this.get('/api/recipes/peers'); },

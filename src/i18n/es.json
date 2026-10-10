@@ -2094,6 +2094,16 @@
     "you": "Tú"
   },
   "history": {
+    "version_named": "Versión {n}: {label}",
+    "label": "Nombre de la versión",
+    "name_version": "Poner nombre",
+    "rename": "Cambiar nombre",
+    "label_placeholder": "Por ejemplo, menos harina",
+    "label_save": "Guardar",
+    "label_cancel": "Cancelar",
+    "label_saved": "Versión {n} con nombre",
+    "label_cleared": "Se quitó el nombre de la versión {n}",
+    "label_failed": "No se pudo poner el nombre.",
     "title": "Historial",
     "byline": "{count, plural, one {Historial · # versión} other {Historial · # versiones}}",
     "intro": "Cada cambio en los ingredientes, los pasos, las raciones o los tiempos se guarda como una versión, y cada vez que cocinas se recuerda la versión que usaste. Un nombre, una foto o una nota nuevos no son una versión nueva.",

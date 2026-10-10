@@ -2093,6 +2093,16 @@
     "you": "You"
   },
   "history": {
+    "version_named": "Version {n}: {label}",
+    "label": "Version name",
+    "name_version": "Name This Version",
+    "rename": "Rename",
+    "label_placeholder": "For example, less flour",
+    "label_save": "Save",
+    "label_cancel": "Cancel",
+    "label_saved": "Version {n} named",
+    "label_cleared": "Name removed from Version {n}",
+    "label_failed": "Couldn't name the version.",
     "title": "History",
     "byline": "{count, plural, one {History · # version} other {History · # versions}}",
     "intro": "Every change to the ingredients, steps, servings or times is kept as a version, and each cook remembers the one it was made from. A new name, photo or note isn't a new version.",

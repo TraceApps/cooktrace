@@ -1002,6 +1002,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_recipe_revisions_user ON recipe_revisions(user_id);
 `);
 if (!columnExists('recipes', 'rev')) db.exec(`ALTER TABLE recipes ADD COLUMN rev TEXT`);
+// A version's own name ("Less flour"), the one thing about it that changes.
+if (!columnExists('recipe_revisions', 'label')) db.exec(`ALTER TABLE recipe_revisions ADD COLUMN label TEXT`);
 if (!columnExists('cook_diary', 'recipe_rev')) db.exec(`ALTER TABLE cook_diary ADD COLUMN recipe_rev TEXT`);
 {
   const STAMP = `strftime('%Y-%m-%d %H:%M:%f', 'now')`;

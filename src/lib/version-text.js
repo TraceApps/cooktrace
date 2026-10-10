@@ -20,6 +20,11 @@ function _detailValue(t, field, v) {
   return String(v);
 }
 
+/** A version as named in a list: "Version 3" or "Version 3: Less flour". */
+export const versionName = (t, v) => (v?.label
+  ? t('history.version_named', { values: { n: v.number, label: v.label } })
+  : t('history.version', { values: { n: v?.number } }));
+
 /** The name of a detail field: "Servings", "Prep time". */
 export const detailLabel = (t, field) => t(DETAIL_KEYS[field] || 'history.detail_servings');
 

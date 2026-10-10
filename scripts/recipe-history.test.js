@@ -206,3 +206,19 @@ test("editing a cook from the recipe saves its rating, meal and version (the rat
     assert.equal((await s.call('PUT', `/api/recipes/${r.id}/cooks/${cook.id}`, { recipe_rev: 'v00000000000000' })).status, 400);
   } finally { await s.stop(); }
 });
+
+test('a version can be named, renamed and unnamed; the name is trimmed and kept short', { skip, timeout: 60_000 }, async () => {
+  const s = await start();
+  try {
+    const r = await s.ok('POST', '/api/recipes', scones());
+    const v1 = (await s.ok('GET', `/api/recipes/${r.id}/revisions`)).current;
+    const named = await s.ok('PUT', `/api/recipes/${r.id}/revisions/${v1}`, { label: '  The   base  ' });
+    assert.equal(named.label, 'The base');
+    assert.equal((await s.ok('GET', `/api/recipes/${r.id}/revisions`)).revisions[0].label, 'The base');
+    await s.ok('PUT', `/api/recipes/${r.id}/revisions/${v1}`, { label: 'x'.repeat(80) });
+    assert.equal((await s.ok('GET', `/api/recipes/${r.id}/revisions/${v1}`)).label.length, 60);
+    await s.ok('PUT', `/api/recipes/${r.id}/revisions/${v1}`, { label: '' });
+    assert.equal((await s.ok('GET', `/api/recipes/${r.id}/revisions/${v1}`)).label, null);
+    assert.equal((await s.call('PUT', `/api/recipes/${r.id}/revisions/vffffffffffffff`, { label: 'x' })).status, 404);
+  } finally { await s.stop(); }
+});
