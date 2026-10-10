@@ -4,7 +4,7 @@
   import { onMount } from 'svelte';
   import { push, replace, querystring } from 'svelte-spa-router';
   import { fade, slide } from 'svelte/transition';
-  import { _ } from 'svelte-i18n';
+  import { _, locale } from 'svelte-i18n';
   import { pageBanners, bannerStyle } from '../stores/settings.js';
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
@@ -14,6 +14,8 @@
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import DateInput from '../components/ui/DateInput.svelte';
   import ServingsStepper from '../components/ui/ServingsStepper.svelte';
+  import WeekView from '../components/diary/WeekView.svelte';
+  import { firstDayOfWeek, weekStartOf, weekDays, weekdayNames, weekRangeLabel, weekNeeds, isoDay, fromIso } from '../lib/week.js';
   import CookHeatmap from '../components/diary/CookHeatmap.svelte';
   import { longpress } from '../lib/long-press.js';
   import { resolveAssetUrl } from '../lib/platform.js';
@@ -23,7 +25,10 @@
   let entries = [];
   let loading = true;
   let loadError = null;
-  let view = 'list';                    // 'list' | 'month' | 'photos'
+  let view = 'list';                    // 'list' | 'week' | 'month' | 'photos'
+  // The week as the person's locale has it (Sunday or Monday first).
+  const firstDay = firstDayOfWeek();
+  let weekAnchor = weekStartOf(new Date(), firstDay);
 
   // Recipe filter — when set, narrows list / month / photos views to a
   // single recipe. Picker reuses the planRecipes list (loaded lazily).
@@ -158,7 +163,7 @@
   let segW = 0;
   function _measureSegPill() {
     if (!segContainer) return;
-    const idx = view === 'list' ? 0 : view === 'month' ? 1 : 2;
+    const idx = ['list', 'week', 'month', 'photos'].indexOf(view);
     const btn = segBtns[idx];
     if (!btn) return;
     const cRect = segContainer.getBoundingClientRect();
@@ -211,8 +216,8 @@
       // Pull a wide window so both list + month view share data.
       const monthFrom = _isoDate(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() - 1, 1));
       const monthTo   = _isoDate(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 2, 0));
-      const from = view === 'month' ? monthFrom : rangeFrom;
-      const to   = view === 'month' ? monthTo   : rangeTo;
+      const from = view === 'month' ? monthFrom : view === 'week' ? weekFromIso : rangeFrom;
+      const to   = view === 'month' ? monthTo   : view === 'week' ? weekToIso   : rangeTo;
       const got = await NtApi.getCookDiary({ from, to });
       if (seq === _loadSeq) { entries = got; loadError = null; }
     } catch (e) {
@@ -229,7 +234,10 @@
   onMount(() => { load(); loadStats(); loadHeatmap(); });
   // A sync that brought changes down shows them here at once.
   onMount(() => onSyncChanges(() => { load({ quiet: true }); loadStats(); loadHeatmap(); }));
-  $: if (monthAnchor || view) { /* trigger reload on view change */ load(); }
+  // Reads again when the view, month or week changes. It names the week's
+  // dates (not just the week) so it runs after they're worked out: naming
+  // weekAnchor alone ran it first, with the week before's dates.
+  $: if (monthAnchor || view || weekFromIso || weekToIso) { load(); }
 
   // Group list-view entries by date (descending — future first, then past).
   $: groupedByDate = (() => {
@@ -272,7 +280,7 @@
   // Month grid cells (6 weeks × 7 days)
   $: monthCells = (() => {
     const first = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1);
-    const startOffset = first.getDay(); // 0 = Sun
+    const startOffset = (first.getDay() - firstDay + 7) % 7;
     const start = new Date(first);
     start.setDate(start.getDate() - startOffset);
     const cells = [];
@@ -294,6 +302,105 @@
   function prevMonth() { monthAnchor = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() - 1, 1); }
   function nextMonth() { monthAnchor = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 1); }
 
+
+  // ── Week view ──────────────────────────────────────────────────────
+  $: weekFromIso = isoDay(weekAnchor);
+  $: weekToIso = isoDay(new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + 6));
+  $: thisWeekIso = isoDay(weekStartOf(new Date(), firstDay));
+  $: weekLabel = (() => {
+    const diff = Math.round((weekAnchor - fromIso(thisWeekIso)) / 864e5 / 7);
+    return diff === 0 ? $_('cookdiary_page.week.this_week')
+      : diff === 1 ? $_('cookdiary_page.week.next_week')
+      : diff === -1 ? $_('cookdiary_page.week.last_week') : '';
+  })();
+  $: weekRange = weekRangeLabel(weekAnchor, $locale || undefined);
+  function shiftWeek(n) { weekAnchor = new Date(weekAnchor.getFullYear(), weekAnchor.getMonth(), weekAnchor.getDate() + 7 * n); }
+
+  // What the summary reads: recipes (ingredients), the pantry and the list.
+  let weekRecipes = new Map();
+  let weekPantry = [];
+  let weekList = [];
+  async function loadWeekExtras() {
+    const [recipes, pantry, list] = await Promise.all([
+      NtApi.getRecipes().catch(() => null),
+      NtApi.getPantry().catch(() => null),
+      NtApi.getShoppingList().catch(() => null),
+    ]);
+    if (recipes) weekRecipes = new Map(recipes.map(r => [r.id, r]));
+    if (pantry) weekPantry = pantry;
+    if (list) weekList = list;
+  }
+  $: if (view === 'week') loadWeekExtras();
+
+  $: weekNames = weekdayNames($locale, firstDay);
+  $: weekDayRows = weekDays(weekAnchor).map((d, i) => ({
+    iso: d.iso,
+    weekday: weekNames[i],
+    num: d.date.getDate(),
+    label: d.date.toLocaleDateString($locale || undefined, { weekday: 'long', month: 'long', day: 'numeric' }),
+    isToday: d.iso === todayIso,
+    isPast: d.iso < todayIso,
+    entries: view === 'week' ? displayEntries.filter(e => e.date === d.iso && !(e.any_day && e.kind === 'planned')) : [],
+  }));
+  $: weekAnyDay = view === 'week' ? displayEntries.filter(e => e.any_day && e.kind === 'planned') : [];
+  $: weekPlanNeeds = view === 'week' && weekToIso >= todayIso
+    ? weekNeeds({
+        planned: displayEntries.filter(e => e.kind === 'planned'),
+        recipes: weekRecipes, pantry: weekPantry, list: weekList, weekEnd: weekToIso, today: todayIso,
+      })
+    : null;
+
+  // Servings change at once; the save waits for the taps to settle.
+  const _servingsTimers = new Map();
+  function onWeekServings(ev) {
+    const { entry, value } = ev.detail;
+    entries = entries.map(x => (x.id === entry.id ? { ...x, servings: value } : x));
+    clearTimeout(_servingsTimers.get(entry.id));
+    _servingsTimers.set(entry.id, setTimeout(async () => {
+      _servingsTimers.delete(entry.id);
+      try { await NtApi.updateDiaryEntry(entry.id, { servings: value }); }
+      catch (e) { showError(e.message || 'Could not update'); load({ quiet: true }); }
+    }, 600));
+  }
+
+  let weekBuilding = false;
+  async function buildWeekList() {
+    weekBuilding = true;
+    try {
+      const result = await NtApi.shopFromPlan({ from: weekFromIso, to: weekToIso, only_missing: true });
+      const touched = (result.added || 0) + (result.updated || 0);
+      if (touched > 0) showSuccess($_('shopping_page.toast.plan_added', { values: { count: touched, cooks: result.planned_cooks } }));
+      else if (result.removed > 0) showSuccess($_('shopping_page.toast.plan_removed', { values: { count: result.removed } }));
+      else showSuccess($_('shopping_page.toast.already_in_pantry'));
+      await loadWeekExtras();
+    } catch (e) {
+      showError(e.message || 'Could not build the list');
+    } finally {
+      weekBuilding = false;
+    }
+  }
+
+  // Giving an any-day plan its day.
+  let moveSheetOpen = false;
+  let moveEntry = null;
+  $: moveActions = moveEntry ? weekDays(fromIso(moveEntry.date)).map((d, i) => ({
+    label: d.date.toLocaleDateString($locale || undefined, { weekday: 'long', month: 'short', day: 'numeric' }),
+    icon: d.iso === todayIso ? 'today' : 'event',
+    value: d.iso,
+  })) : [];
+  async function onMoveSelect(ev) {
+    const iso = ev.detail?.value;
+    const e = moveEntry;
+    moveEntry = null;
+    if (!e || !iso) return;
+    try {
+      await NtApi.updateDiaryEntry(e.id, { date: iso, any_day: false });
+      await load({ quiet: true });
+    } catch (err) {
+      showError(err.message || 'Could not update');
+    }
+  }
+
   // Add planned dialog state
   let planOpen = false;
   let planDate = todayIso;
@@ -301,6 +408,7 @@
   let planMealType = null;  // 'breakfast' | 'lunch' | 'dinner' | 'snack' | null
   let planServings = 2;     // how many to cook for: the list scales to it
   let planServingsSet = false; // changed by hand: picking a recipe keeps it
+  let planAnyDay = false;   // for any day of the date's week
   let planRecipes = [];     // user's recipes for the picker
   let planSearch = '';
   let planBusy = false;
@@ -321,9 +429,10 @@
 
   // Opens the dialog, with a recipe already picked when one is given (a
   // recipe card's Plan a Cook links here as /diary?plan=<id>).
-  async function openPlan(recipeId = null) {
+  async function openPlan(recipeId = null, date = null) {
     planOpen = true;
-    planDate = todayIso;
+    planDate = date || todayIso;
+    planAnyDay = false;
     planRecipeId = null;
     planMealType = null;
     planSearch = '';
@@ -363,12 +472,14 @@
     if (!planRecipeId) { showError($_('cookdiary_page.toast.pick_recipe')); return; }
     planBusy = true;
     try {
+      // Any day of the week: dated the week's first day.
       await NtApi.createDiaryEntry({
         recipe_id: planRecipeId,
-        date: planDate,
+        date: planAnyDay ? isoDay(weekStartOf(fromIso(planDate), firstDay)) : planDate,
         kind: 'planned',
         meal_type: planMealType || null,
         servings: planServings,
+        any_day: planAnyDay,
       });
       showSuccess($_('cookdiary_page.toast.planned'));
       planOpen = false;
@@ -384,7 +495,14 @@
 
   async function markPlannedAsCooked(entry) {
     try {
-      await NtApi.updateDiaryEntry(entry.id, { kind: 'cooked' });
+      // A plan for any day of its week is cooked today, when today is in it.
+      const patch = { kind: 'cooked' };
+      if (entry.any_day) {
+        const start = entry.date;
+        const end = isoDay(new Date(fromIso(start).getFullYear(), fromIso(start).getMonth(), fromIso(start).getDate() + 6));
+        if (todayIso >= start && todayIso <= end) patch.date = todayIso;
+      }
+      await NtApi.updateDiaryEntry(entry.id, patch);
       showSuccess($_('cookdiary_page.toast.marked_cooked'));
       await load();
       loadStats();
@@ -406,6 +524,9 @@
     ...(actionSheetEntry.kind === 'planned'
       ? [{ label: 'Mark as Cooked', icon: 'restaurant', value: 'cooked' }]
       : []),
+    ...(actionSheetEntry.kind === 'planned' && actionSheetEntry.any_day
+      ? [{ label: $_('cookdiary_page.week.pick_day'), icon: 'event', value: 'move' }]
+      : []),
     { label: 'Delete', icon: 'delete', value: 'delete', danger: true },
   ] : [];
   async function onEntryAction(ev) {
@@ -415,6 +536,7 @@
     if (!e) return;
     if (v === 'open' && e.recipe_id) push(`/recipes/${e.recipe_id}`);
     else if (v === 'cooked') await markPlannedAsCooked(e);
+    else if (v === 'move') { moveEntry = e; moveSheetOpen = true; }
     else if (v === 'delete') await removeEntry(e);
   }
 
@@ -505,14 +627,25 @@
         style="--seg-x:{segX}px; --seg-w:{segW}px">
         <span class="seg-pill" aria-hidden="true"></span>
         <button class="seg" class:active={view === 'list'}   on:click={() => view = 'list'}   aria-pressed={view === 'list'}   bind:this={segBtns[0]}>{$_('cookdiary_page.view_list')}</button>
-        <button class="seg" class:active={view === 'month'}  on:click={() => view = 'month'}  aria-pressed={view === 'month'}  bind:this={segBtns[1]}>{$_('cookdiary_page.view_month')}</button>
-        <button class="seg" class:active={view === 'photos'} on:click={() => view = 'photos'} aria-pressed={view === 'photos'} bind:this={segBtns[2]}>{$_('cookdiary_page.view_photos')}</button>
+        <button class="seg" class:active={view === 'week'}   on:click={() => view = 'week'}   aria-pressed={view === 'week'}   bind:this={segBtns[1]}>{$_('cookdiary_page.view_week')}</button>
+        <button class="seg" class:active={view === 'month'}  on:click={() => view = 'month'}  aria-pressed={view === 'month'}  bind:this={segBtns[2]}>{$_('cookdiary_page.view_month')}</button>
+        <button class="seg" class:active={view === 'photos'} on:click={() => view = 'photos'} aria-pressed={view === 'photos'} bind:this={segBtns[3]}>{$_('cookdiary_page.view_photos')}</button>
       </div>
       {#if view === 'month'}
         <div class="month-nav">
           <button class="btn-icon" on:click={prevMonth} aria-label="Previous month"><span class="material-symbols-rounded">chevron_left</span></button>
           <span class="month-label">{monthAnchor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</span>
           <button class="btn-icon" on:click={nextMonth} aria-label="Next month"><span class="material-symbols-rounded">chevron_right</span></button>
+        </div>
+      {:else if view === 'week'}
+        <div class="month-nav week-nav">
+          <button class="btn-icon" on:click={() => shiftWeek(-1)} aria-label={$_('cookdiary_page.week.previous')}><span class="material-symbols-rounded">chevron_left</span></button>
+          <button class="week-label" on:click={() => (weekAnchor = weekStartOf(new Date(), firstDay))}
+            aria-label={$_('cookdiary_page.week.go_this_week')}>
+            {#if weekLabel}<span class="week-rel">{weekLabel}</span>{/if}
+            <span class="month-label">{weekRange}</span>
+          </button>
+          <button class="btn-icon" on:click={() => shiftWeek(1)} aria-label={$_('cookdiary_page.week.next')}><span class="material-symbols-rounded">chevron_right</span></button>
         </div>
       {/if}
     </div>
@@ -574,6 +707,19 @@
         <p>{loadError}</p>
         <button class="btn btn-secondary" on:click={load}>{$_('cookdiary_page.retry')}</button>
       </div>
+    {:else if view === 'week'}
+      <WeekView
+        days={weekDayRows}
+        anyDay={weekAnyDay}
+        needs={weekPlanNeeds}
+        building={weekBuilding}
+        on:open={(ev) => ev.detail.recipe_id && push(`/recipes/${ev.detail.recipe_id}`)}
+        on:actions={(ev) => onEntryLongPress(ev.detail)}
+        on:cooked={(ev) => markPlannedAsCooked(ev.detail)}
+        on:servings={onWeekServings}
+        on:plan={(ev) => openPlan(null, ev.detail.date)}
+        on:build={buildWeekList}
+      />
     {:else if entries.length === 0}
       <div class="state empty" in:fade={{ duration: 120 }}>
         <span class="material-symbols-rounded empty-icon">event_note</span>
@@ -632,6 +778,12 @@
                         {_mealLabel(e.meal_type)}
                       </span>
                     {/if}
+                    {#if e.kind === 'planned' && e.any_day}
+                      <span class="entry-meal">
+                        <span class="material-symbols-rounded">inbox</span>
+                        {$_('cookdiary_page.week.any_day_badge')}
+                      </span>
+                    {/if}
                     {#if e.kind === 'planned' && e.servings > 0}
                       <span class="entry-meal">
                         <span class="material-symbols-rounded">person</span>
@@ -665,7 +817,7 @@
     {:else if view === 'month'}
       <!-- Month grid -->
       <div class="month-grid">
-        {#each ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as wd}
+        {#each weekdayNames($locale, firstDay) as wd}
           <div class="weekday">{wd}</div>
         {/each}
         {#each monthCells as cell}
@@ -736,6 +888,14 @@
   on:select={onEntryAction}
 />
 
+<!-- Giving a plan for any day of its week a day. -->
+<ActionSheet
+  bind:open={moveSheetOpen}
+  title={$_('cookdiary_page.week.pick_day')}
+  actions={moveActions}
+  on:select={onMoveSelect}
+/>
+
 <!-- Plan-a-cook dialog -->
 {#if planOpen}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
@@ -750,6 +910,11 @@
           <span class="field-label">{$_('cookdiary_page.date')}</span>
           <DateInput bind:value={planDate} />
         </label>
+        <button type="button" class="plan-meal-chip any-day-toggle" class:active={planAnyDay}
+          aria-pressed={planAnyDay} on:click={() => planAnyDay = !planAnyDay}>
+          <span class="material-symbols-rounded">{planAnyDay ? 'check' : 'inbox'}</span>
+          {$_('cookdiary_page.week.any_day_toggle')}
+        </button>
         <div class="field">
           <span class="field-label">{$_('cookdiary_page.meal')} <span class="field-hint">{$_('cookdiary_page.optional')}</span></span>
           <div class="plan-meal-chips" role="radiogroup" aria-label="Meal type">
@@ -1091,6 +1256,13 @@
   .seg.active { color: var(--accent); }
 
   .month-nav { display: flex; align-items: center; gap: 8px; }
+  .week-label {
+    display: flex; flex-direction: column; align-items: center; gap: 1px;
+    background: none; border: none; cursor: pointer; padding: 2px 6px; min-height: 40px; justify-content: center;
+    font: inherit; color: inherit;
+  }
+  .week-rel { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+  .any-day-toggle { align-self: flex-start; }
   .month-label { font-size: 14px; font-weight: 600; color: var(--text-1); min-width: 130px; text-align: center; }
   .btn-icon {
     background: transparent; border: none; cursor: pointer;

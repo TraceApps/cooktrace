@@ -9,11 +9,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **A Week view in the Cook Diary**, next to List, Month and Photos. Days behind you show what you cooked; today and the days ahead show your planned cooks, each with a servings stepper, and a plan for today can be marked cooked. A free day has a Plan a Cook button for that date. A summary for the week counts the meals planned, what to buy, what's already in the pantry and how many items about to expire it uses up, and builds or updates the shopping list for the week in one tap. Weeks start on Sunday or Monday, as your locale has them.
+- **Plan a cook for any day of a week.** Plan a Cook has an Any Day That Week option; those plans wait in a tray at the top of the Week view until you pick a day for them, and the week's shopping list includes them.
 - **Earlier versions of a recipe.** When edits from two devices change the same part of a recipe, the newer one stays, and the recipe page says so and lists the other, with what differs and a preview. Restore puts it back, and a restore can be undone the same way. A kitchen member sees the versions that were their own edits.
 - **Shared recipe links show a preview in chat apps**: the recipe's name, a line about it, and its photo. Links are now a plain address (`/r/...`) instead of a `#/` one, which a server never sees. Links copied before this still open.
 
 ### Changed
 
+- **The Diary's Month calendar starts the week on your locale's first day** (Monday in most of Europe) instead of always Sunday.
 - **Amounts in a recipe's steps follow the servings.** Scale a recipe and the cups, spoons, grams and other measures written in its steps change with it, tinted so you can see which, as do the ingredients listed under each step. Times, temperatures, pan sizes, and amounts for each piece ("2 tbsp per pancake") stay as written.
 - **Plan a Cook asks for servings**, starting at the recipe's own. The Diary shows them on each planned cook, and the shopping list scales to them.
 - **Amounts on the shopping list read the way a cook writes them** (3/8 cup, not 0.375 cup), things you count round up to whole ones (8 tomatoes, not 7.5), and the quantity fields take fractions like 1/2.
