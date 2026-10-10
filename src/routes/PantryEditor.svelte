@@ -176,6 +176,12 @@
       item.serving_unit = result.serving_unit || item.serving_unit;
       item.nutrition = deriveSodiumSalt({ ...(item.nutrition || {}), ...(result.nutrition || {}) });
       if (result.img_url && !item.img_url) item.img_url = result.img_url;
+      // The label's allergens (lib/allergens.js), unless set by hand.
+      if (result.allergens != null && item.allergens_source !== 'user') {
+        item.allergens = result.allergens;
+        item.traces = result.traces || [];
+        item.allergens_source = 'label';
+      }
       _lastServingSize = item.serving_size;
       downloadSuccess = true;
       setTimeout(() => downloadSuccess = false, 2000);
@@ -374,6 +380,8 @@
         serving_label: item.serving_label?.trim() || null,
         g_per_cup:    item.g_per_cup === '' || item.g_per_cup == null ? null : Number(item.g_per_cup),
         nutrition: item.nutrition && Object.keys(item.nutrition).length ? item.nutrition : null,
+        // Only when a lookup here filled them: otherwise what's stored stays.
+        ...(item.allergens !== undefined ? { allergens: item.allergens, traces: item.traces ?? null, allergens_source: item.allergens_source ?? null } : {}),
       };
       if (isEdit) {
         await NtApi.updatePantryItem(id, { ...payload, _base: loadedBase });

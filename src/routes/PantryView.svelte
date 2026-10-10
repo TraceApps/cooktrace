@@ -18,6 +18,9 @@
   import { confirmDialog } from '../stores/confirmDialog.js';
   import NutritionFactsBox from '../components/recipe/NutritionFactsBox.svelte';
   import { categoryLabel, categoryIcon } from '../lib/pantry-categories.js';
+  import PantryAllergens from '../components/pantry/PantryAllergens.svelte';
+  import { household } from '../stores/settings.js';
+  import { cleanHousehold } from '../lib/allergens.js';
 
   export let params = {};
 
@@ -104,6 +107,16 @@
   }
 
   function startEdit() { push(`/pantry/edit/${id}`); }
+
+  // Allergens changed here: saved at once (lib/allergens.js).
+  async function saveAllergens(e) {
+    if (!item) return;
+    try {
+      await NtApi.updatePantryItem(item.id, { ...e.detail, _base: item });
+      item = { ...item, ...e.detail };
+      showSuccess($_('allergen_info.saved'));
+    } catch (err) { showError(err.message || 'Could not update'); }
+  }
 
   async function deleteItem() {
     if (!item) return;
@@ -231,6 +244,9 @@
           />
         </div>
       {/if}
+
+      <PantryAllergens allergens={item.allergens ?? null} traces={item.traces ?? null} source={item.allergens_source ?? null}
+        members={cleanHousehold($household)} on:change={saveAllergens} />
 
       <!-- Notes -->
       {#if item.notes}

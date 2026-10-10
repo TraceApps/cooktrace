@@ -25,6 +25,9 @@
   import { dragHandleZone, dragHandle } from 'svelte-dnd-action';
 
   import { foldText } from '../lib/search-text.js';
+  import AllergenChips from '../components/allergens/AllergenChips.svelte';
+  import { household } from '../stores/settings.js';
+  import { cardAllergens, cleanHousehold } from '../lib/allergens.js';
 
   export let params = {};
   $: id = parseInt(params.id, 10);
@@ -501,6 +504,7 @@
                       {/each}
                     {/if}
                   </div>
+                  <AllergenChips summary={cardAllergens(r)} members={cleanHousehold($household)} />
                 </div>
               </button>
               </div>

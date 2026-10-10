@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   nameCodes, cleanCodes, knownCodes, itemAllergens, recipeAllergens, allergenSummary,
-  cleanHousehold, homeOn, conflicts, dislikesIn, allergenKey,
+  cleanHousehold, homeOn, conflicts, dislikesIn, allergenKey, applyOverrides, cardAllergens,
 } from '../src/lib/allergens.js';
 
 test('the server and the app use the same allergens.js', () => {
@@ -104,4 +104,12 @@ test('the household: who is home, what they avoid, what they dislike', () => {
   const recipe = { ingredients: [{ items: [{ name: 'Mushrooms' }, { name: 'rice' }] }] };
   assert.deepEqual(dislikesIn(recipe, members, { date: '2030-01-07' }), [{ item: 'Mushrooms', who: ['Sam'] }]);
   assert.deepEqual(dislikesIn(recipe, members, { date: '2030-01-05' }), []);
+});
+
+test('a card applies the recipe\'s correction once, however often', () => {
+  const fix = { add: ['en:sesame-seeds'], remove: ['en:milk'] };
+  const once = applyOverrides({ contains: ['en:milk', 'en:eggs'], traces: ['en:sesame-seeds'] }, fix);
+  assert.deepEqual(once, { contains: ['en:eggs', 'en:sesame-seeds'], traces: [] });
+  assert.deepEqual(applyOverrides(once, fix), once);
+  assert.deepEqual(cardAllergens({ ingredients: [{ items: [{ name: 'butter' }] }] }), { contains: ['en:milk'], traces: [] }, 'no summary from the server: the names');
 });

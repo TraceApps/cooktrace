@@ -46,6 +46,9 @@
   import { computeRecipeNutrition, computeRecipeMass, lookupCommonDensity } from '../lib/recipe-nutrition.js';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import Sheet from '../components/ui/Sheet.svelte';
+  import RecipeAllergens from '../components/allergens/RecipeAllergens.svelte';
+  import { household } from '../stores/settings.js';
+  import { ALLERGENS, allergenKey, avoids, cleanHousehold, cleanOverrides, itemAllergens } from '../lib/allergens.js';
   import { buildRecipeCardPages, buildRecipeShareText } from '../lib/recipe-card.js';
   import { svgToPngBlob, shareBlobs } from '../lib/shopping-card.js';
 
@@ -567,6 +570,19 @@
     _ensurePantryLoaded();
   }
   $: if (Number.isFinite(id)) load();
+
+  // Allergens (lib/allergens.js): the household they're a problem for,
+  // and each ingredient's own, marked on its line.
+  $: householdMembers = cleanHousehold($household);
+  $: avoidedCodes = new Set(householdMembers.flatMap(m => [...avoids(m)]));
+  $: recipeFix = cleanOverrides(recipe?.allergen_overrides);
+  $: ingTag = (ing) => {
+    if (!ing?.name) return null;
+    const codes = itemAllergens(ing, pantryById).contains
+      .filter(c => !recipeFix.remove.includes(c) && (ALLERGENS.includes(c) || avoidedCodes.has(c)));
+    if (!codes.length) return null;
+    return { warn: codes.some(c => avoidedCodes.has(c)), text: codes.map(c => $_(`allergens.${allergenKey(c)}`)).join(', ') };
+  };
 
   // Mass per serving for the FDA box. Null until pantry is loaded; null
   // forever if any ingredient lacks convertible mass data (the box
@@ -1270,6 +1286,8 @@
             </div>
           </div>
         {/if}
+        <RecipeAllergens {recipe} {pantryById} members={householdMembers} canCorrect={canEdit}
+          on:corrected={(e) => (recipe = { ...recipe, ...e.detail })} />
           </div><!-- /.recipe-meta -->
         </div><!-- /.recipe-header -->
 
@@ -1392,6 +1410,12 @@
                       <span class="ing-name">{ing.name || ''}</span>
                       {#if ing.note}<span class="ing-note">{ing.note}</span>{/if}
                     </span>
+                    {#if ingTag(ing)}
+                      {@const t = ingTag(ing)}
+                      <span class="ing-allergen" class:warn={t.warn}>
+                        <span class="material-symbols-rounded" aria-hidden="true">{t.warn ? 'warning' : 'label'}</span>{t.text}
+                      </span>
+                    {/if}
                   </li>
                 {/each}
               </ul>
@@ -3197,4 +3221,12 @@
       max-height: min(60vh, 520px);
     }
   }
+  /* An ingredient's allergens, on its line (lib/allergens.js). */
+  .ing-allergen {
+    align-self: center; flex: none; display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 8px; border-radius: var(--radius-full); white-space: nowrap;
+    background: var(--surface-2); color: var(--text-2); font-size: 11px; font-weight: 600;
+  }
+  .ing-allergen.warn { background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--warning); }
+  .ing-allergen .material-symbols-rounded { font-size: 13px; }
 </style>

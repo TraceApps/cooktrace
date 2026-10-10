@@ -18,6 +18,7 @@
 import { apiUrl, isNative, getServerUrl } from './platform.js';
 import { deriveSodiumSalt } from './nutriments.js';
 import { settingPrefix } from './setting-key.js';
+import { cleanCodes } from './allergens.js';
 
 const OFF_BASE = 'https://world.openfoodfacts.org';
 
@@ -286,6 +287,13 @@ function _mapOFFProduct(p) {
                  || (Array.isArray(p.manufacturing_places_tags) && p.manufacturing_places_tags[0])
                  || null;
 
+  // Allergens from the label, as Open Food Facts codes (lib/allergens.js).
+  // An empty list only means "none" when the ingredients were read;
+  // otherwise nobody knows yet (null).
+  const read = Array.isArray(p.allergens_tags) && (p.allergens_tags.length > 0 || !!p.ingredients_text || (Array.isArray(p.ingredients_tags) && p.ingredients_tags.length > 0));
+  const allergens = read ? cleanCodes(p.allergens_tags) : null;
+  const traces = Array.isArray(p.traces_tags) && (read || p.traces_tags.length) ? cleanCodes(p.traces_tags) : null;
+
   return {
     name:         (p.product_name || '').trim(),
     brand:        (Array.isArray(p.brands) ? (p.brands[0] || '') : (p.brands || '').split(',')[0] || '').trim(),
@@ -298,6 +306,9 @@ function _mapOFFProduct(p) {
     nutriscore,
     nova,
     originTag,
+    allergens,
+    traces:       allergens != null || traces?.length ? (traces || []) : null,
+    allergens_source: allergens != null || traces?.length ? 'label' : null,
     _source:      'off',
   };
 }

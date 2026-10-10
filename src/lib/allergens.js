@@ -244,6 +244,25 @@ export function allergenSummary(recipe, pantryById) {
   return { contains: a.contains.map(x => x.code), traces: a.traces.map(x => x.code) };
 }
 
+/**
+ * A card's summary with the recipe's correction applied: what a recipe
+ * card shows when the summary came before the correction (one made with
+ * no connection). Applying it twice changes nothing.
+ */
+export function applyOverrides(summary, overrides) {
+  const fix = cleanOverrides(overrides);
+  const contains = new Set((summary?.contains || []).map(x => (typeof x === 'string' ? x : x.code)));
+  const traces = new Set((summary?.traces || []).map(x => (typeof x === 'string' ? x : x.code)));
+  for (const c of fix.remove) { contains.delete(c); traces.delete(c); }
+  for (const c of fix.add) { contains.add(c); traces.delete(c); }
+  return { contains: _ORDER.filter(c => contains.has(c)), traces: _ORDER.filter(c => traces.has(c) && !contains.has(c)) };
+}
+
+/** What a recipe card shows: the server's summary, else worked out from the names. */
+export function cardAllergens(recipe) {
+  return applyOverrides(recipe?.allergens || allergenSummary(recipe, null), recipe?.allergen_overrides);
+}
+
 // ── The household ───────────────────────────────────────────────────────
 // A member: { id, name, allergies: [codes], diet: [diet ids],
 // dislikes: [words], days: [0-6, Sunday 0] } where no days means every day.

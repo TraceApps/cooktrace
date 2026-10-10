@@ -51,6 +51,9 @@
   import { foldText } from '../../lib/search-text.js';
   import { visibleNutriments, offEnabled, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks } from '../../stores/settings.js';
   import { scanNutritionLabel } from '../../lib/scan-nutrition.js';
+  import PantryAllergens from './PantryAllergens.svelte';
+  import { household } from '../../stores/settings.js';
+  import { cleanHousehold } from '../../lib/allergens.js';
 
   export let open = false;
   export let itemId = null;
@@ -615,6 +618,12 @@
       draft.serving_unit = result.serving_unit || draft.serving_unit;
       draft.nutrition = deriveSodiumSalt({ ...(draft.nutrition || {}), ...(result.nutrition || {}) });
       if (result.img_url && !draft.img_url) draft.img_url = result.img_url;
+      // The label's allergens, unless they were set by hand here.
+      if (result.allergens != null && draft.allergens_source !== 'user') {
+        draft.allergens = result.allergens;
+        draft.traces = result.traces || [];
+        draft.allergens_source = 'label';
+      }
       _lastServingSize = draft.serving_size;
       draft = { ...draft };
       downloadSuccess = true;
@@ -726,6 +735,19 @@
     return Number.isFinite(v) ? v : '';
   }
 
+  $: householdMembers = cleanHousehold($household);
+
+  // Allergens changed from the item's view: saved at once.
+  async function saveAllergens(e) {
+    if (!item || itemId == null) return;
+    try {
+      await NtApi.updatePantryItem(itemId, { ...e.detail, _base: item });
+      item = { ...item, ...e.detail };
+      dispatch('changed', { ...item });
+      showSuccess($_('allergen_info.saved'));
+    } catch (err) { showError(err.message || 'Save failed'); }
+  }
+
   // ── Save / Cancel / Delete ─────────────────────────────────────────
   async function saveEdit() {
     if (!draft.name?.trim()) { showError($_('pantry_sheet_extra.toast.name_required')); return; }
@@ -746,6 +768,10 @@
         serving_unit: draft.serving_unit || null,
         nutrition: draft.nutrition && Object.keys(draft.nutrition).length ? draft.nutrition : null,
         expires_on: draft.expires_on || null,
+        // Allergens (lib/allergens.js): null means nobody knows them yet.
+        allergens: draft.allergens ?? null,
+        traces: draft.traces ?? null,
+        allergens_source: draft.allergens_source ?? null,
       };
       if (itemId == null) {
         const row = await NtApi.createPantryItem(payload);
@@ -1182,6 +1208,20 @@
             <p class="notes-body">{item.notes}</p>
           </div>
         {/if}
+      {/if}
+
+      <!-- Allergens: from the label, or set here. Recipes that use the
+           item pick them up (lib/allergens.js). -->
+      {#if editing && draft}
+        <div class="field full">
+          <PantryAllergens allergens={draft.allergens ?? null} traces={draft.traces ?? null} source={draft.allergens_source ?? null}
+            members={householdMembers} on:change={e => { draft = { ...draft, ...e.detail }; }} />
+        </div>
+      {:else if item && !loading}
+        <div class="field full">
+          <PantryAllergens allergens={item.allergens ?? null} traces={item.traces ?? null} source={item.allergens_source ?? null}
+            members={householdMembers} on:change={saveAllergens} />
+        </div>
       {/if}
 
       <!-- Variants section (Issue #4). Visible only on a saved item
