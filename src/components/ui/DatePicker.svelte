@@ -17,6 +17,7 @@
 -->
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { _, locale } from 'svelte-i18n';
   import { localDateStr } from '../../lib/db.js';
 
   export let value = '';
@@ -53,7 +54,7 @@
 
   let showYearPicker  = false;
   let showMonthPicker = false;
-  $: calMonthName = new Date(calYear, calMonth, 1).toLocaleDateString(undefined, { month: 'long' });
+  $: calMonthName = new Date(calYear, calMonth, 1).toLocaleDateString($locale || undefined, { month: 'long' });
 
   // Year-grid range: respect min/max if set, otherwise default ±10 years from
   // today (suitable for date-jumping in Diary). When max is set without min
@@ -77,12 +78,14 @@
     return Array.from({ length: 22 }, (_, i) => (today - 10) + i);
   })();
 
-  const monthNames = [
-    {idx:0,short:'Jan'},{idx:1,short:'Feb'},{idx:2,short:'Mar'},
-    {idx:3,short:'Apr'},{idx:4,short:'May'},{idx:5,short:'Jun'},
-    {idx:6,short:'Jul'},{idx:7,short:'Aug'},{idx:8,short:'Sep'},
-    {idx:9,short:'Oct'},{idx:10,short:'Nov'},{idx:11,short:'Dec'},
-  ];
+  // Month and weekday names come from Intl in the app's language.
+  $: monthNames = Array.from({ length: 12 }, (_x, idx) => ({
+    idx,
+    short: new Date(2024, idx, 1).toLocaleDateString($locale || undefined, { month: 'short' }),
+  }));
+  // 2024-01-07 is a Sunday, so the row starts on Sunday like the grid.
+  $: weekdayNames = Array.from({ length: 7 }, (_x, i) =>
+    new Date(2024, 0, 7 + i).toLocaleDateString($locale || undefined, { weekday: 'short' }));
 
   function _todayStr() { return localDateStr(); }
 
@@ -108,18 +111,18 @@
 <div class="date-picker">
   <!-- Month / year navigation -->
   <div class="dp-nav">
-    <button class="btn-icon dp-nav-btn" on:click={calPrevMonth} disabled={calAtMin} aria-label="Previous month">
+    <button class="btn-icon dp-nav-btn" on:click={calPrevMonth} disabled={calAtMin} aria-label={$_('date_picker_ui.previous_month')}>
       <span class="material-symbols-rounded">chevron_left</span>
     </button>
     <div class="dp-month-year">
-      <button class="dp-month-btn" on:click={() => { showMonthPicker = !showMonthPicker; showYearPicker = false; }} title="Pick month">
+      <button class="dp-month-btn" on:click={() => { showMonthPicker = !showMonthPicker; showYearPicker = false; }} title={$_('date_picker_ui.pick_month')}>
         {calMonthName}<span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-left:2px">{showMonthPicker ? 'expand_less' : 'expand_more'}</span>
       </button>
-      <button class="dp-year-btn" on:click={() => { showYearPicker = !showYearPicker; showMonthPicker = false; }} title="Pick year">
+      <button class="dp-year-btn" on:click={() => { showYearPicker = !showYearPicker; showMonthPicker = false; }} title={$_('date_picker_ui.pick_year')}>
         {calYear}<span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle;margin-left:2px">{showYearPicker ? 'expand_less' : 'expand_more'}</span>
       </button>
     </div>
-    <button class="btn-icon dp-nav-btn" on:click={calNextMonth} disabled={calAtMax} aria-label="Next month">
+    <button class="btn-icon dp-nav-btn" on:click={calNextMonth} disabled={calAtMax} aria-label={$_('date_picker_ui.next_month')}>
       <span class="material-symbols-rounded">chevron_right</span>
     </button>
   </div>
@@ -140,13 +143,13 @@
     </div>
   {:else}
     <div class="dp-grid">
-      {#each ['Su','Mo','Tu','We','Th','Fr','Sa'] as dh}
+      {#each weekdayNames as dh}
         <div class="dp-dh">{dh}</div>
       {/each}
-      {#each {length: calFirstDay} as _}
+      {#each {length: calFirstDay} as _blank}
         <div></div>
       {/each}
-      {#each {length: calDaysInMonth} as _, di}
+      {#each {length: calDaysInMonth} as _day, di}
         {@const day = di + 1}
         {@const ds = calYear + '-' + String(calMonth+1).padStart(2,'0') + '-' + String(day).padStart(2,'0')}
         {@const blocked = (max && ds > max) || (min && ds < min)}

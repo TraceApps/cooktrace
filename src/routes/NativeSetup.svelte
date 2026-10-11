@@ -94,7 +94,7 @@
         data: { username: username.trim(), password },
       });
       const loginData = typeof loginRes.data === 'string' ? JSON.parse(loginRes.data) : loginRes.data;
-      if (loginRes.status < 200 || loginRes.status >= 300) throw new Error(loginData.error || 'Login failed');
+      if (loginRes.status < 200 || loginRes.status >= 300) throw new Error(loginData.error || $_('native_setup_ui.login_failed'));
 
       setServerUrl(validatedUrl);
       setAuthToken(loginData.token);
@@ -171,19 +171,13 @@
         <button class="setup-card" on:click={chooseLocal}>
           <span class="material-symbols-rounded setup-card-icon">smartphone</span>
           <div class="setup-card-title">{$_('native_setup_ct.use_locally')}</div>
-          <p class="setup-card-desc">
-            All data stays on this device. Works offline, no server needed.
-            You can connect to a server later in Settings.
-          </p>
+          <p class="setup-card-desc">{$_('native_setup_ui.local_desc')}</p>
         </button>
 
         <button class="setup-card" on:click={chooseServer}>
           <span class="material-symbols-rounded setup-card-icon">cloud_sync</span>
           <div class="setup-card-title">{$_('native_setup_ct.connect_to_server')}</div>
-          <p class="setup-card-desc">
-            Sync with your CookTrace server. Your data is available on all
-            devices and the web app.
-          </p>
+          <p class="setup-card-desc">{$_('native_setup_ui.server_desc')}</p>
         </button>
       </div>
 
@@ -199,18 +193,15 @@
             autocapitalize="off"
             autocorrect="off"
           />
-          <p class="form-hint">
-            After you enter your server, sign-in options (password or SSO)
-            will be shown based on what your server supports.
-          </p>
+          <p class="form-hint">{$_('native_setup_ui.server_url_hint')}</p>
         </div>
 
         <div class="setup-form-actions">
           <button class="btn btn-ghost" on:click={backToChoose} disabled={connecting}>
-            Back
+            {$_('common.back')}
           </button>
           <button class="btn btn-primary" on:click={validateAndNext} disabled={connecting}>
-            {connecting ? 'Checking…' : 'Next'}
+            {connecting ? $_('updates.checking') : $_('wizard_ct.next')}
           </button>
         </div>
       </div>
@@ -240,7 +231,7 @@
                 {:else}
                   <span class="material-symbols-rounded" style="font-size:20px">login</span>
                 {/if}
-                Sign in with {p.display_name || p.name || p.id}
+                {$_('login.sso_sign_in_with', { values: { provider: p.display_name || p.name || p.id } })}
               </button>
             {/each}
           </div>
@@ -249,7 +240,7 @@
         <!-- Password form only when the server has it enabled. Divider only
              shown when both auth methods are available. -->
         {#if passwordLoginEnabled && providers.length}
-          <div class="auth-divider"><span>or</span></div>
+          <div class="auth-divider"><span>{$_('login.sso_or')}</span></div>
         {/if}
         {#if passwordLoginEnabled}
           <div class="form-group">
@@ -284,20 +275,17 @@
         {#if !providers.length && !passwordLoginEnabled}
           <div class="no-auth-warning">
             <span class="material-symbols-rounded">warning</span>
-            <div>
-              This server has no sign-in methods configured. Ask your admin
-              to enable password login or configure an OIDC provider.
-            </div>
+            <div>{$_('native_setup_ui.no_auth_methods')}</div>
           </div>
         {/if}
 
         <div class="setup-form-actions">
           <button class="btn btn-ghost" on:click={backToServerUrl} disabled={connecting}>
-            Back
+            {$_('common.back')}
           </button>
           {#if passwordLoginEnabled}
             <button class="btn btn-primary" on:click={loginWithPassword} disabled={connecting}>
-              {connecting ? 'Signing in…' : 'Sign In'}
+              {connecting ? $_('login.signing_in') : $_('login.sign_in')}
             </button>
           {/if}
         </div>

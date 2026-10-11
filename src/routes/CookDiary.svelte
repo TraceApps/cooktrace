@@ -46,7 +46,7 @@
        || null)
     : null;
   $: filterRecipeName = filterRecipe
-    ? (filterRecipe.name || filterRecipe.recipe_name || 'Recipe')
+    ? (filterRecipe.name || filterRecipe.recipe_name || $_('cookdiary_page.recipe'))
     : '';
   // Text search across recipe name + notes + cook name. Applies
   // uniformly to List / Month / Photos alongside the recipe filter
@@ -433,16 +433,17 @@
   let planRecipes = [];     // user's recipes for the picker
   let planSearch = '';
   let planBusy = false;
-  const PLAN_MEAL_TYPES = [
-    { id: 'breakfast', label: 'Breakfast', icon: 'free_breakfast' },
-    { id: 'lunch',     label: 'Lunch',     icon: 'lunch_dining'   },
-    { id: 'dinner',    label: 'Dinner',    icon: 'restaurant'     },
-    { id: 'snack',     label: 'Snack',     icon: 'cookie'         },
+  $: PLAN_MEAL_TYPES = [
+    { id: 'breakfast', label: $_('cookdiary_page.week.meal_breakfast'), icon: 'free_breakfast' },
+    { id: 'lunch',     label: $_('cookdiary_page.week.meal_lunch'),     icon: 'lunch_dining'   },
+    { id: 'dinner',    label: $_('cookdiary_page.week.meal_dinner'),    icon: 'restaurant'     },
+    { id: 'snack',     label: $_('cookdiary_page.week.meal_snack'),     icon: 'cookie'         },
   ];
-  function _mealLabel(id) {
+  // Reactive so the labels follow a language switch.
+  $: _mealLabel = (id) => {
     const m = PLAN_MEAL_TYPES.find(x => x.id === id);
     return m ? m.label : '';
-  }
+  };
   function _mealIcon(id) {
     const m = PLAN_MEAL_TYPES.find(x => x.id === id);
     return m ? m.icon : 'restaurant';
@@ -558,14 +559,14 @@
   $: entryActions = actionSheetEntry ? [
     ...(actionSheetEntry.recipe_id && actionSheetEntry.kind === 'cooked' && actionSheetEntry.recipe_rev
       ? [{ label: $_('history.as_made'), icon: 'history', value: 'as_made' }] : []),
-    ...(actionSheetEntry.recipe_id ? [{ label: 'Open Recipe', icon: 'open_in_new', value: 'open' }] : []),
+    ...(actionSheetEntry.recipe_id ? [{ label: $_('diary_entry.actions.open_recipe'), icon: 'open_in_new', value: 'open' }] : []),
     ...(actionSheetEntry.kind === 'planned'
-      ? [{ label: 'Mark as Cooked', icon: 'restaurant', value: 'cooked' }]
+      ? [{ label: $_('cookdiary_page.week.mark_cooked'), icon: 'restaurant', value: 'cooked' }]
       : []),
     ...(actionSheetEntry.kind === 'planned' && actionSheetEntry.any_day
       ? [{ label: $_('cookdiary_page.week.pick_day'), icon: 'event', value: 'move' }]
       : []),
-    { label: 'Delete', icon: 'delete', value: 'delete', danger: true },
+    { label: $_('common.delete'), icon: 'delete', value: 'delete', danger: true },
   ] : [];
   async function onEntryAction(ev) {
     const v = ev.detail?.value;
@@ -581,9 +582,9 @@
 
   async function removeEntry(entry) {
     const ok = await confirmDialog({
-      title: entry.kind === 'planned' ? 'Cancel planned cook?' : 'Delete cook entry?',
-      message: `${entry.recipe_name || 'Recipe'} on ${shortDate(entry.date)}`,
-      confirmText: 'Remove',
+      title: entry.kind === 'planned' ? $_('cook_diary_ui.cancel_planned_title') : $_('cook_diary_ui.delete_entry_title'),
+      message: $_('cook_diary_ui.entry_on_date', { values: { name: entry.recipe_name || $_('cookdiary_page.recipe'), date: shortDate(entry.date) } }),
+      confirmText: $_('cook_diary_ui.remove'),
       dangerous: true,
     });
     if (!ok) return;
@@ -602,7 +603,7 @@
 <div class="page-shell">
   <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
     <h1>{$_('routes.diary.title')}</h1>
-    <button class="btn-icon header-action" on:click={() => openPlan()} aria-label="Plan a Cook" title="Plan a Cook">
+    <button class="btn-icon header-action" on:click={() => openPlan()} aria-label={$_('cookdiary_page.plan_a_cook')} title={$_('cookdiary_page.plan_a_cook')}>
       <span class="material-symbols-rounded">event_available</span>
     </button>
   </header>
@@ -640,9 +641,9 @@
         {#if stats.top_recipe}
           <button class="stat-tile stat-link"
             on:click={() => push(`/recipes/${stats.top_recipe.id}`)}
-            title="Open recipe">
+            title={$_('diary_entry.actions.open_recipe')}>
             <span class="stat-value stat-top-name">{stats.top_recipe.name}</span>
-            <span class="stat-label">Most Cooked This Month · {stats.top_recipe.count}×</span>
+            <span class="stat-label">{$_('cook_diary_ui.most_cooked', { values: { count: stats.top_recipe.count } })}</span>
           </button>
         {:else}
           <div class="stat-tile">
@@ -661,7 +662,7 @@
     <div class="diary-toolbar">
     <!-- View switcher -->
     <div class="view-switch">
-      <div class="view-chips" role="radiogroup" aria-label="View"
+      <div class="view-chips" role="radiogroup" aria-label={$_('cook_diary_ui.view')}
         bind:this={segContainer}
         style="--seg-x:{segX}px; --seg-w:{segW}px">
         <span class="seg-pill" aria-hidden="true"></span>
@@ -672,9 +673,9 @@
       </div>
       {#if view === 'month'}
         <div class="month-nav">
-          <button class="btn-icon" on:click={prevMonth} aria-label="Previous month"><span class="material-symbols-rounded">chevron_left</span></button>
-          <span class="month-label">{monthAnchor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</span>
-          <button class="btn-icon" on:click={nextMonth} aria-label="Next month"><span class="material-symbols-rounded">chevron_right</span></button>
+          <button class="btn-icon" on:click={prevMonth} aria-label={$_('cook_diary_ui.previous_month')}><span class="material-symbols-rounded">chevron_left</span></button>
+          <span class="month-label">{monthAnchor.toLocaleDateString($locale || undefined, { month: 'long', year: 'numeric' })}</span>
+          <button class="btn-icon" on:click={nextMonth} aria-label={$_('cook_diary_ui.next_month')}><span class="material-symbols-rounded">chevron_right</span></button>
         </div>
       {:else if view === 'week'}
         <div class="month-nav week-nav">
@@ -693,10 +694,10 @@
          Applies alongside the recipe + meal-type filters. -->
     <div class="diary-search">
       <span class="material-symbols-rounded search-icon">search</span>
-      <input class="search-input" type="search" placeholder="Search recipes, notes…"
+      <input class="search-input" type="search" placeholder={$_('cook_diary_ui.search_placeholder')}
         bind:value={diarySearch} />
       {#if diarySearch}
-        <button class="search-clear" on:click={() => diarySearch = ''} title="Clear search" aria-label="Clear search">
+        <button class="search-clear" on:click={() => diarySearch = ''} title={$_('cook_diary_ui.clear_search')} aria-label={$_('cook_diary_ui.clear_search')}>
           <span class="material-symbols-rounded" style="font-size:18px">close</span>
         </button>
       {/if}
@@ -708,23 +709,23 @@
       {#if filterRecipeId}
         <span class="filter-chip active" transition:fade={{ duration: 120 }}>
           <span class="material-symbols-rounded">filter_alt</span>
-          <span class="filter-chip-name">{filterRecipeName || 'Recipe'}</span>
-          <button class="filter-clear" on:click={clearFilter} aria-label="Clear recipe filter">
+          <span class="filter-chip-name">{filterRecipeName || $_('cookdiary_page.recipe')}</span>
+          <button class="filter-clear" on:click={clearFilter} aria-label={$_('cook_diary_ui.clear_recipe_filter')}>
             <span class="material-symbols-rounded">close</span>
           </button>
         </span>
       {:else}
         <button class="filter-chip" on:click={openFilterPicker}>
           <span class="material-symbols-rounded">filter_alt</span>
-          Filter by Recipe
+          {$_('cookdiary_page.filter_by_recipe')}
         </button>
       {/if}
-      <span class="meal-chips" role="radiogroup" aria-label="Filter by meal type">
+      <span class="meal-chips" role="radiogroup" aria-label={$_('cook_diary_ui.filter_meal_type')}>
         {#each [
-          { v: 'breakfast', label: 'Breakfast', icon: 'wb_sunny' },
-          { v: 'lunch',     label: 'Lunch',     icon: 'lunch_dining' },
-          { v: 'dinner',    label: 'Dinner',    icon: 'restaurant' },
-          { v: 'snack',     label: 'Snack',     icon: 'cookie' },
+          { v: 'breakfast', label: $_('cookdiary_page.week.meal_breakfast'), icon: 'wb_sunny' },
+          { v: 'lunch',     label: $_('cookdiary_page.week.meal_lunch'),     icon: 'lunch_dining' },
+          { v: 'dinner',    label: $_('cookdiary_page.week.meal_dinner'),    icon: 'restaurant' },
+          { v: 'snack',     label: $_('cookdiary_page.week.meal_snack'),     icon: 'cookie' },
         ] as m}
           <button class="meal-chip" class:active={mealFilter === m.v}
             aria-pressed={mealFilter === m.v}
@@ -775,8 +776,8 @@
       <div class="state empty" in:fade={{ duration: 120 }}>
         <span class="material-symbols-rounded empty-icon">filter_alt_off</span>
         <h2>{$_('routes.diary.no_matches_title')}</h2>
-        <p>Try clearing the search, meal-type, or recipe filter.</p>
-        <button class="btn btn-secondary" on:click={() => { filterRecipeId = null; mealFilter = ''; diarySearch = ''; }}>Clear filters</button>
+        <p>{$_('cook_diary_ui.no_matches_desc')}</p>
+        <button class="btn btn-secondary" on:click={() => { filterRecipeId = null; mealFilter = ''; diarySearch = ''; }}>{$_('cook_diary_ui.clear_filters')}</button>
       </div>
     {:else if view === 'list'}
       <!-- Day-groups grid: single column on mobile, masonry auto-fill
@@ -790,8 +791,8 @@
           <div class="day-header">
             <span class="day-date">{shortDate(date)}</span>
             <span class="day-rel">{relativeTime(date)}</span>
-            <span class="day-count" title={`${items.length} ${items.length === 1 ? 'cook' : 'cooks'}`}>
-              {items.length} {items.length === 1 ? 'cook' : 'cooks'}
+            <span class="day-count" title={$_('cook_diary_ui.cook_count', { values: { n: items.length } })}>
+              {$_('cook_diary_ui.cook_count', { values: { n: items.length } })}
             </span>
             {#if planned}<span class="day-tag">{$_('cookdiary_page.planned_tag')}</span>{/if}
           </div>
@@ -815,7 +816,7 @@
                 </div>
                 <div class="entry-body">
                   <div class="entry-name-row">
-                    <span class="entry-name">{e.recipe_name || 'Recipe'}</span>
+                    <span class="entry-name">{e.recipe_name || $_('cookdiary_page.recipe')}</span>
                     {#if e.meal_type}
                       <span class="entry-meal" title={_mealLabel(e.meal_type)}>
                         <span class="material-symbols-rounded">{_mealIcon(e.meal_type)}</span>
@@ -836,7 +837,7 @@
                     {/if}
                   </div>
                   {#if Number.isFinite(e.rating) && e.rating > 0}
-                    <div class="entry-stars" aria-label={`${e.rating} of 5 stars`}>
+                    <div class="entry-stars" aria-label={$_('cookdiary_page.week.stars', { values: { n: e.rating } })}>
                       {#each [1,2,3,4,5] as n}
                         <span class="material-symbols-rounded" class:on={e.rating >= n}>
                           {e.rating >= n ? 'star' : 'star_outline'}
@@ -845,7 +846,7 @@
                     </div>
                   {/if}
                   {#if e.cooked_by_full_name || e.cooked_by_username}
-                    <div class="entry-by">by {e.cooked_by_full_name || e.cooked_by_username}</div>
+                    <div class="entry-by">{$_('cook_diary_ui.cooked_by', { values: { name: e.cooked_by_full_name || e.cooked_by_username } })}</div>
                   {/if}
                   {#if e.notes}<div class="entry-notes">{e.notes}</div>{/if}
                 </div>
@@ -874,7 +875,7 @@
                 {#if it.meal_type}
                   <span class="material-symbols-rounded cell-pill-meal">{_mealIcon(it.meal_type)}</span>
                 {/if}
-                <span class="cell-pill-name">{it.recipe_name || 'Recipe'}</span>
+                <span class="cell-pill-name">{it.recipe_name || $_('cookdiary_page.recipe')}</span>
               </button>
             {/each}
           </div>
@@ -887,20 +888,20 @@
         <div class="state empty" in:fade={{ duration: 120 }}>
           <span class="material-symbols-rounded empty-icon">photo_library</span>
           <h2>{$_('cookdiary_page.no_photos')}</h2>
-          <p>Add a photo when you log a cook and it'll show up here.</p>
+          <p>{$_('cook_diary_ui.no_photos_desc')}</p>
         </div>
       {:else}
         <div class="photo-grid">
           {#each photoTiles as t (`${t.entry.id}:${t.index}`)}
-            <button class="photo-tile" on:click={() => openLightbox(t.entry, t.index)} title={`${t.entry.recipe_name || 'Recipe'} · ${shortDate(t.entry.date)}`}>
+            <button class="photo-tile" on:click={() => openLightbox(t.entry, t.index)} title={`${t.entry.recipe_name || $_('cookdiary_page.recipe')} · ${shortDate(t.entry.date)}`}>
               <img
                 src={resolveAssetUrl(t.url)}
-                alt={t.entry.recipe_name || 'Cook photo'}
+                alt={t.entry.recipe_name || $_('cook_diary_ui.cook_photo')}
                 loading="lazy"
                 on:error={(e) => e.currentTarget?.closest('.photo-tile')?.classList.add('photo-missing')}
               />
               <div class="photo-overlay">
-                <span class="photo-name">{t.entry.recipe_name || 'Recipe'}</span>
+                <span class="photo-name">{t.entry.recipe_name || $_('cookdiary_page.recipe')}</span>
                 <span class="photo-date">{shortDate(t.entry.date)}</span>
               </div>
               {#if t.count > 1}
@@ -927,7 +928,7 @@
      NutriTrace's diary item context menu — Open / Mark cooked / Delete. -->
 <ActionSheet
   bind:open={actionSheetOpen}
-  title={actionSheetEntry?.recipe_name || 'Diary entry'}
+  title={actionSheetEntry?.recipe_name || $_('cook_diary_ui.diary_entry')}
   actions={entryActions}
   on:select={onEntryAction}
 />
@@ -958,7 +959,7 @@
     <div class="modal" on:click|stopPropagation>
       <header class="modal-header">
         <h2>{$_('cookdiary_page.plan_a_cook')}</h2>
-        <button class="btn-icon" on:click={() => planOpen = false} aria-label="Close"><span class="material-symbols-rounded">close</span></button>
+        <button class="btn-icon" on:click={() => planOpen = false} aria-label={$_('common.close')}><span class="material-symbols-rounded">close</span></button>
       </header>
       <div class="modal-body">
         <label class="field">
@@ -972,7 +973,7 @@
         </button>
         <div class="field">
           <span class="field-label">{$_('cookdiary_page.meal')} <span class="field-hint">{$_('cookdiary_page.optional')}</span></span>
-          <div class="plan-meal-chips" role="radiogroup" aria-label="Meal type">
+          <div class="plan-meal-chips" role="radiogroup" aria-label={$_('cook_diary_ui.meal_type')}>
             {#each PLAN_MEAL_TYPES as m}
               <button type="button"
                 class="plan-meal-chip" class:active={planMealType === m.id}
@@ -991,7 +992,7 @@
         </div>
         <label class="field">
           <span class="field-label">{$_('cookdiary_page.recipe')}</span>
-          <input class="input" type="search" placeholder="Search…" bind:value={planSearch} />
+          <input class="input" type="search" placeholder={$_('cook_diary_ui.search')} bind:value={planSearch} />
         </label>
         <div class="recipe-picker">
           {#each filteredPlanRecipes as r (r.id)}
@@ -1008,7 +1009,7 @@
               {#if planRecipeId === r.id}<span class="material-symbols-rounded check">check</span>{/if}
             </button>
           {:else}
-            <p class="empty-line">No recipes match.</p>
+            <p class="empty-line">{$_('cook_diary_ui.no_recipes_match')}</p>
           {/each}
         </div>
       </div>
@@ -1029,12 +1030,12 @@
     <div class="modal" on:click|stopPropagation>
       <header class="modal-header">
         <h2>{$_('cookdiary_page.filter_by_recipe')}</h2>
-        <button class="btn-icon" on:click={() => filterPickerOpen = false} aria-label="Close"><span class="material-symbols-rounded">close</span></button>
+        <button class="btn-icon" on:click={() => filterPickerOpen = false} aria-label={$_('common.close')}><span class="material-symbols-rounded">close</span></button>
       </header>
       <div class="modal-body">
         <label class="field">
           <span class="field-label">{$_('cookdiary_page.recipe')}</span>
-          <input class="input" type="search" placeholder="Search…" bind:value={filterSearch} />
+          <input class="input" type="search" placeholder={$_('cook_diary_ui.search')} bind:value={filterSearch} />
         </label>
         <div class="recipe-picker">
           {#each filteredFilterRecipes as r (r.id)}
@@ -1048,7 +1049,7 @@
               {#if filterRecipeId === r.id}<span class="material-symbols-rounded check">check</span>{/if}
             </button>
           {:else}
-            <p class="empty-line">No recipes match.</p>
+            <p class="empty-line">{$_('cook_diary_ui.no_recipes_match')}</p>
           {/each}
         </div>
       </div>
@@ -1069,21 +1070,21 @@
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
   <div class="lightbox-backdrop" on:click|self={closeLightbox} use:closeOnBack={closeLightbox} transition:fade={{ duration: 160 }}>
     <div class="lightbox" on:click|stopPropagation>
-      <button class="lightbox-close btn-icon" on:click={closeLightbox} aria-label="Close">
+      <button class="lightbox-close btn-icon" on:click={closeLightbox} aria-label={$_('common.close')}>
         <span class="material-symbols-rounded">close</span>
       </button>
       <div class="lightbox-img-wrap">
         <img
           class="lightbox-img"
           src={resolveAssetUrl(lightboxPhoto)}
-          alt={lightboxEntry.recipe_name || 'Cook photo'}
+          alt={lightboxEntry.recipe_name || $_('cook_diary_ui.cook_photo')}
           on:error={(e) => e.currentTarget?.closest('.lightbox-img-wrap')?.classList.add('photo-missing')}
         />
         {#if lightboxPhotos.length > 1}
-          <button class="lightbox-nav prev" on:click={lightboxPrev} aria-label="Previous photo">
+          <button class="lightbox-nav prev" on:click={lightboxPrev} aria-label={$_('cook_diary_ui.previous_photo')}>
             <span class="material-symbols-rounded">chevron_left</span>
           </button>
-          <button class="lightbox-nav next" on:click={lightboxNext} aria-label="Next photo">
+          <button class="lightbox-nav next" on:click={lightboxNext} aria-label={$_('cook_diary_ui.next_photo')}>
             <span class="material-symbols-rounded">chevron_right</span>
           </button>
           <span class="lightbox-index">{lightboxIndex + 1} / {lightboxPhotos.length}</span>
@@ -1091,7 +1092,7 @@
       </div>
       <div class="lightbox-meta">
         <div class="lightbox-title-row">
-          <span class="lightbox-title">{lightboxEntry.recipe_name || 'Recipe'}</span>
+          <span class="lightbox-title">{lightboxEntry.recipe_name || $_('cookdiary_page.recipe')}</span>
           {#if lightboxEntry.meal_type}
             <span class="entry-meal">
               <span class="material-symbols-rounded">{_mealIcon(lightboxEntry.meal_type)}</span>
@@ -1105,7 +1106,7 @@
           <span>{relativeTime(lightboxEntry.date)}</span>
         </div>
         {#if Number.isFinite(lightboxEntry.rating) && lightboxEntry.rating > 0}
-          <div class="entry-stars" aria-label={`${lightboxEntry.rating} of 5 stars`}>
+          <div class="entry-stars" aria-label={$_('cookdiary_page.week.stars', { values: { n: lightboxEntry.rating } })}>
             {#each [1,2,3,4,5] as n}
               <span class="material-symbols-rounded" class:on={lightboxEntry.rating >= n}>
                 {lightboxEntry.rating >= n ? 'star' : 'star_outline'}
@@ -1117,7 +1118,7 @@
         {#if lightboxEntry.recipe_id}
           <button class="btn btn-secondary lightbox-open" on:click={() => { const id = lightboxEntry.recipe_id; closeLightbox(); push(`/recipes/${id}`); }}>
             <span class="material-symbols-rounded">open_in_new</span>
-            Open Recipe
+            {$_('diary_entry.actions.open_recipe')}
           </button>
         {/if}
       </div>

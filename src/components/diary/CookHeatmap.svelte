@@ -13,7 +13,7 @@
   GitHub uses on phones. Pinning the labels makes it scannable.
 -->
 <script>
-  import { _ } from 'svelte-i18n';
+  import { _, locale } from 'svelte-i18n';
   import { createEventDispatcher } from 'svelte';
 
   /** Array of { date: 'YYYY-MM-DD', count: number } */
@@ -34,7 +34,7 @@
   // container with `grid-auto-flow: column` paints everything in the
   // right slot. We include exactly `weeks + 1` columns so today's
   // partial week shows up on the right.
-  $: gridCells = (() => {
+  $: gridCells = ((loc) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     // Start at the Sunday of the leftmost visible week.
@@ -56,12 +56,17 @@
           // First-week marker for month labels — we paint the label on
           // the first cell of each new month at row 0.
           isMonthStart: d === 0 && date.getDate() <= 7,
-          monthLabel: date.toLocaleString(undefined, { month: 'short' }),
+          monthLabel: date.toLocaleString(loc, { month: 'short' }),
         });
       }
     }
     return cells;
-  })();
+  })($locale || undefined);
+
+  // Weekday names for rows 1, 3 and 5 (Mon / Wed / Fri) in the app
+  // locale. 2024-01-01 was a Monday.
+  $: dayLabels = [1, 3, 5].map(d =>
+    new Date(2024, 0, d).toLocaleDateString($locale || undefined, { weekday: 'short' }));
 
   // Aggregate stats for the legend / hover summary.
   $: total = (data || []).reduce((sum, d) => sum + (d.count || 0), 0);
@@ -80,14 +85,15 @@
     if (count <= 4) return 3;
     return 4;
   }
-  function _tooltip(cell) {
+  // Reactive so the tooltips follow a language switch.
+  $: _tooltip = (cell) => {
     if (cell.future) return '';
-    const niceDate = cell.jsDate.toLocaleDateString(undefined, {
+    const niceDate = cell.jsDate.toLocaleDateString($locale || undefined, {
       weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
     });
-    if (cell.count === 0) return `No cooks · ${niceDate}`;
-    return `${cell.count} cook${cell.count === 1 ? '' : 's'} · ${niceDate}`;
-  }
+    if (cell.count === 0) return $_('cook_heatmap_ui.tooltip_none', { values: { date: niceDate } });
+    return $_('cook_heatmap_ui.tooltip_count', { values: { count: cell.count, date: niceDate } });
+  };
   function _click(cell) {
     if (cell.future) return;
     dispatch('select', { date: cell.date, count: cell.count });
@@ -108,14 +114,14 @@
   })();
 </script>
 
-<section class="heatmap-card" aria-label="Cook heatmap">
+<section class="heatmap-card" aria-label={$_('cook_heatmap_ui.aria_label')}>
   <header class="hm-head">
     <div class="hm-title">
       <span class="material-symbols-rounded">grid_on</span>
       <h2>{$_('cook_heatmap.title')}</h2>
     </div>
     <div class="hm-summary">
-      {total} {total === 1 ? 'Cook' : 'Cooks'} · {activeDays} Active {activeDays === 1 ? 'Day' : 'Days'}
+      {$_('cook_heatmap_ui.summary', { values: { total, days: activeDays } })}
     </div>
   </header>
 
@@ -131,11 +137,11 @@
       <!-- Day labels on the left (sparse — Mon/Wed/Fri only) -->
       <div class="hm-days">
         <span></span>
-        <span>Mon</span>
+        <span>{dayLabels[0]}</span>
         <span></span>
-        <span>Wed</span>
+        <span>{dayLabels[1]}</span>
         <span></span>
-        <span>Fri</span>
+        <span>{dayLabels[2]}</span>
         <span></span>
       </div>
 

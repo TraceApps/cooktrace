@@ -1,7 +1,7 @@
 <script>
   import { closeOnBack } from '../../lib/back-stack.js';
   /**
-   * BulkFileImportDialog — Issue #2 Phase 2.
+   * BulkFileImportDialog: Issue #2 Phase 2.
    *
    * Drop zone + per-file picker for importing many recipes in one go.
    * Accepts multi-file drop / select, folder picker (webkitdirectory),
@@ -123,7 +123,7 @@
   async function _upload(fileList) {
     if (!fileList || !fileList.length) return;
     phase = 'uploading';
-    progressLabel = `Uploading ${fileList.length} file${fileList.length === 1 ? '' : 's'}…`;
+    progressLabel = $_('bulk_file_import_dialog_ui.uploading_n', { values: { count: fileList.length } });
     errorMessage = '';
 
     const form = new FormData();
@@ -140,7 +140,7 @@
       const data = await res.json();
       if (!res.ok) {
         phase = 'error';
-        errorMessage = data?.error || `Scan failed (HTTP ${res.status})`;
+        errorMessage = data?.error || $_('bulk_file_import_dialog_ui.scan_failed_http', { values: { status: res.status } });
         return;
       }
       scanResult = data;
@@ -155,7 +155,7 @@
       phase = 'scanned';
     } catch (e) {
       phase = 'error';
-      errorMessage = e.message || 'Upload failed.';
+      errorMessage = e.message || $_('bulk_file_import_dialog_ui.upload_failed');
     }
   }
 
@@ -185,7 +185,7 @@
     if (!scanResult?.cacheUuid) return;
     aiBusyId = item.id;
     _aiError(item.id, '');
-    progressLabel = `Trace is re-reading "${_displayName(item)}"…`;
+    progressLabel = $_('bulk_file_import_dialog_ui.rereading', { values: { name: _displayName(item) } });
 
     let textPayload;
     try {
@@ -197,7 +197,7 @@
       textPayload = data;
     } catch (e) {
       aiBusyId = null;
-      _aiError(item.id, e.message || 'Could not load text for AI fallback.');
+      _aiError(item.id, e.message || $_('bulk_file_import_dialog_ui.load_text_failed'));
       return;
     }
 
@@ -243,7 +243,7 @@ ${textPayload.text}
       });
     } catch (e) {
       aiBusyId = null;
-      _aiError(item.id, toolsUnsupported ? $_('trace_ai_ct.tools_unsupported_import') : (e.message || 'AI re-parse failed.'));
+      _aiError(item.id, toolsUnsupported ? $_('trace_ai_ct.tools_unsupported_import') : (e.message || $_('bulk_file_import_dialog_ui.reparse_failed')));
       return;
     }
 
@@ -276,7 +276,7 @@ ${textPayload.text}
       return;
     }
     phase = 'saving';
-    progressLabel = `Saving ${selected.size} recipe${selected.size === 1 ? '' : 's'}…`;
+    progressLabel = $_('bulk_file_import_dialog_ui.saving_n', { values: { count: selected.size } });
     try {
       const res = await fetch('/api/recipes/bulk-commit', {
         method: 'POST',
@@ -290,7 +290,7 @@ ${textPayload.text}
       const data = await res.json();
       if (!res.ok) {
         phase = 'error';
-        errorMessage = data?.error || `Save failed (HTTP ${res.status})`;
+        errorMessage = data?.error || $_('bulk_file_import_dialog_ui.save_failed_http', { values: { status: res.status } });
         return;
       }
       savedRecipes = data.recipes || [];
@@ -298,17 +298,17 @@ ${textPayload.text}
       phase = 'done';
     } catch (e) {
       phase = 'error';
-      errorMessage = e.message || 'Save failed.';
+      errorMessage = e.message || $_('bulk_file_import_dialog_ui.save_failed');
     }
   }
 
   function _displayName(item) {
-    return item.name || item.filename || 'Untitled';
+    return item.name || item.filename || $_('bulk_file_import_dialog_ui.untitled');
   }
   function _confidenceLabel(c) {
-    if (c >= confidenceThreshold) return 'Clean';
-    if (c >= 0.4) return 'Partial';
-    return 'Best effort';
+    if (c >= confidenceThreshold) return 'bulk_file_import_dialog_ui.clean';
+    if (c >= 0.4) return 'bulk_file_import_dialog_ui.partial';
+    return 'bulk_file_import_dialog_ui.best_effort';
   }
   function _confidenceClass(c) {
     if (c >= confidenceThreshold) return 'high';
@@ -327,19 +327,13 @@ ${textPayload.text}
     <div class="modal" on:click|stopPropagation>
       <header class="head">
         <h3>{$_('bulk_import_dialog.title')}</h3>
-        <button class="btn-icon" on:click={close} aria-label="Close" title="Close">
+        <button class="btn-icon" on:click={close} aria-label={$_('common.close')} title={$_('common.close')}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </header>
 
       {#if phase === 'pick'}
-        <p class="hint">
-          Drop a folder, a stack of recipe files (PDF / RTF / TXT / MD),
-          or a ZIP of them. Each entry runs through the built-in parser;
-          weak parses get a "Try with AI" button if Trace is enabled.
-          Original files are not retained: only the parsed previews live
-          in a temporary cache that's cleared on commit or cancel.
-        </p>
+        <p class="hint">{$_('bulk_file_import_dialog_ui.hint')}</p>
         <div class="dropzone {dragOver ? 'over' : ''}"
           on:dragover={_onDragOver}
           on:dragleave={_onDragLeave}
@@ -347,12 +341,12 @@ ${textPayload.text}
           on:click={_pickFiles}>
           <span class="material-symbols-rounded">cloud_upload</span>
           <p class="dz-title">{$_('bulk_import_dialog.dz_title')}</p>
-          <p class="dz-sub">PDF, RTF, TXT, MD, or a ZIP of any of these</p>
+          <p class="dz-sub">{$_('bulk_file_import_dialog_ui.dz_sub')}</p>
         </div>
         <div class="picker-aux">
           <button class="btn btn-secondary" on:click={_pickFolder}>
             <span class="material-symbols-rounded">folder_open</span>
-            Pick a Folder
+            {$_('bulk_file_import_dialog_ui.pick_folder')}
           </button>
         </div>
         <input type="file" multiple
@@ -367,16 +361,16 @@ ${textPayload.text}
       {:else if phase === 'uploading' || phase === 'saving'}
         <div class="state busy">
           <span class="material-symbols-rounded spin">progress_activity</span>
-          <p class="progress">{progressLabel || 'Working…'}</p>
+          <p class="progress">{progressLabel || $_('bulk_file_import_dialog_ui.working')}</p>
         </div>
 
       {:else if phase === 'scanned'}
         <div class="scan-summary">
           <div class="summary-row">
-            <span class="summary-stat clean">{cleanCount} clean</span>
-            <span class="summary-stat partial">{items.length - cleanCount - errorCount} partial</span>
-            {#if errorCount}<span class="summary-stat error">{errorCount} skipped</span>{/if}
-            <span class="summary-meta">{selected.size} selected</span>
+            <span class="summary-stat clean">{$_('bulk_file_import_dialog_ui.clean_n', { values: { count: cleanCount } })}</span>
+            <span class="summary-stat partial">{$_('bulk_file_import_dialog_ui.partial_n', { values: { count: items.length - cleanCount - errorCount } })}</span>
+            {#if errorCount}<span class="summary-stat error">{$_('bulk_file_import_dialog_ui.skipped_n', { values: { count: errorCount } })}</span>{/if}
+            <span class="summary-meta">{$_('bulk_file_import_dialog_ui.selected_n', { values: { count: selected.size } })}</span>
           </div>
           <div class="summary-actions">
             <button class="link-btn" on:click={_selectAll}>{$_('bulk_import_dialog.select_all')}</button>
@@ -403,9 +397,9 @@ ${textPayload.text}
                     <span class="confidence-pill low">{$_('bulk_import_dialog.no_text')}</span>
                     <span class="row-msg">{item.hint}</span>
                   {:else}
-                    <span class="confidence-pill {_confidenceClass(item.confidence)}">{_confidenceLabel(item.confidence)} ({Math.round(item.confidence * 100)}%)</span>
+                    <span class="confidence-pill {_confidenceClass(item.confidence)}">{$_(_confidenceLabel(item.confidence))} ({Math.round(item.confidence * 100)}%)</span>
                     <span class="row-msg">
-                      {item.ingredientCount}&nbsp;ing &middot; {item.stepCount}&nbsp;steps
+                      {$_('bulk_file_import_dialog_ui.ing_steps', { values: { ingredients: item.ingredientCount, steps: item.stepCount } })}
                     </span>
                   {/if}
                 </div>
@@ -422,7 +416,7 @@ ${textPayload.text}
                     <span class="material-symbols-rounded spin">progress_activity</span>
                   {:else}
                     <span class="material-symbols-rounded">smart_toy</span>
-                    Try AI
+                    {$_('bulk_file_import_dialog_ui.try_ai')}
                   {/if}
                 </button>
               {/if}
@@ -433,24 +427,24 @@ ${textPayload.text}
           <button class="btn btn-secondary" on:click={close}>{$_('bulk_import_dialog.cancel')}</button>
           <button class="btn btn-primary" on:click={commit} disabled={selected.size === 0}>
             <span class="material-symbols-rounded">save</span>
-            Save {selected.size || ''} Recipe{selected.size === 1 ? '' : 's'}
+            {$_('bulk_file_import_dialog_ui.save_n_recipes', { values: { count: selected.size } })}
           </button>
         </footer>
 
       {:else if phase === 'done'}
         <div class="state done">
           <span class="material-symbols-rounded done-icon">check_circle</span>
-          <h4>Imported {savedRecipes.length} recipe{savedRecipes.length === 1 ? '' : 's'}</h4>
+          <h4>{$_('bulk_file_import_dialog_ui.imported_n', { values: { count: savedRecipes.length } })}</h4>
           {#if saveFailures.length}
-            <p class="muted">{saveFailures.length} entr{saveFailures.length === 1 ? 'y' : 'ies'} could not be saved. Re-upload the affected files if you need them.</p>
+            <p class="muted">{$_('bulk_file_import_dialog_ui.not_saved_n', { values: { count: saveFailures.length } })}</p>
           {:else}
-            <p>Saved to your library. Cache cleared.</p>
+            <p>{$_('bulk_file_import_dialog_ui.saved_cache_cleared')}</p>
           {/if}
         </div>
         <footer class="actions">
           <button class="btn btn-primary" on:click={() => { open = false; dispatch('close'); push('/recipes'); }}>
             <span class="material-symbols-rounded">open_in_new</span>
-            Open Recipes
+            {$_('bulk_file_import_dialog_ui.open_recipes')}
           </button>
         </footer>
 

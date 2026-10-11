@@ -26,6 +26,7 @@
  * the box — kilojoules is derived from calories at display time, salt
  * from sodium via the EU regulatory factor.
  */
+import { tr } from './messages.js';
 
 export const NUTRIMENTS = [
   // Energy
@@ -82,6 +83,12 @@ export const NUTRIMENTS = [
   { id: 'caffeine',            label: 'Caffeine',            unit: 'mg',   category: 'other',   default: false, bold: false, dv: null, fdaBlock: 'micros' },
   { id: 'alcohol',             label: 'Alcohol',             unit: 'g',    category: 'other',   default: false, bold: false, dv: null, fdaBlock: 'micros' },
 ];
+
+// Each name shows in the app's language; the English stays as the fallback.
+for (const n of NUTRIMENTS) {
+  const en = n.label;
+  Object.defineProperty(n, 'label', { get: () => tr(`nutriments.${n.id}`, en), enumerable: true });
+}
 
 /** Just the IDs of default-visible nutriments — used as the visibleNutriments setting default. */
 export const DEFAULT_VISIBLE_NUTRIMENT_IDS = NUTRIMENTS.filter(n => n.default).map(n => n.id);

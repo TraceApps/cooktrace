@@ -2,7 +2,7 @@
   import { failed } from '../lib/messages.js';
   import { closeOnBack } from '../lib/back-stack.js';
   /**
-   * CookbookView — single cookbook detail page.
+   * CookbookView: single cookbook detail page.
    *
    * Layout: hero strip (cover + name + description + recipe count + edit
    * controls), then a recipe grid identical in shape to the Recipes
@@ -44,7 +44,7 @@
   let allRecipesLoading = false;
   let addSelected = new Set();
 
-  // Move/Copy modal — prompts the user to pick another cookbook to
+  // Move/Copy modal: prompts the user to pick another cookbook to
   // move or copy a single recipe into.
   let moveOpen = false;
   let moveDialogRecipe = null;
@@ -102,13 +102,13 @@
     }
   }
 
-  // Search + sort for the cookbook's own recipe grid. View-only — the
+  // Search + sort for the cookbook's own recipe grid. View-only: the
   // underlying cookbook.recipes array (the manually-curated order the
   // ↑/↓ reorder buttons operate on) is never touched by these. A
   // cookbook with 30+ recipes has no way to find one otherwise.
   let cbQuery = '';
   let cbSort = 'manual'; // 'manual' | 'alpha' | 'fav'
-  // Note: intentionally NOT gated on !cookbook.is_smart — smart
+  // Note: intentionally NOT gated on !cookbook.is_smart: smart
   // cookbooks can still be searched, and need the "no matches" empty
   // state below to fire correctly. Reorder buttons are independently
   // protected by their own !cookbook.is_smart check where they render.
@@ -125,19 +125,19 @@
     }
     return list;
   })();
-  // Reorder buttons only make sense against the true manual order —
+  // Reorder buttons only make sense against the true manual order:
   // when a search or non-manual sort is active, the visible list's
   // position no longer matches cookbook.recipes indices, so ↑/↓ would
   // silently reorder against the wrong neighbors. Hide them (remove /
-  // move stay available — those are id-based, always safe).
+  // move stay available: those are id-based, always safe).
   $: cbReorderable = !cbFilterActive;
 
   // Drag-and-drop reorder via svelte-dnd-action (same library Shopping
-  // uses for its aisle groups). Only active when cbReorderable — the
+  // uses for its aisle groups). Only active when cbReorderable: the
   // grid is showing cookbook.recipes' true order (no search, sort =
   // Manual). The pickup target is the whole card (image, name,
   // description, everything inside .card-clickable) rather than a
-  // small dedicated handle — see maybeDragHandle below for how that's
+  // small dedicated handle: see maybeDragHandle below for how that's
   // wired without fighting the card's own click-to-open button or the
   // remove/move buttons, which sit as later siblings on top of it and
   // so keep receiving their own clicks untouched.
@@ -168,7 +168,7 @@
   // already blocks an actual drag from starting whenever reordering
   // isn't valid, but leaving the handle itself always mounted would
   // leave a stray role="button" + tabindex sitting on every card in
-  // non-reorderable views (search active, sort != Manual) — a false
+  // non-reorderable views (search active, sort != Manual): a false
   // affordance for screen readers. Detaching it entirely when
   // `enabled` is false keeps that clean, same as the old dedicated
   // handle span did with its {#if cbReorderable} guard.
@@ -214,7 +214,7 @@
         await NtApi.removeRecipeFromCookbook(id, moveDialogRecipe.id);
         cookbook = { ...cookbook, recipes: cookbook.recipes.filter(x => x.id !== moveDialogRecipe.id) };
       }
-      const targetName = allCookbooks.find(c => c.id === targetId)?.name || 'cookbook';
+      const targetName = allCookbooks.find(c => c.id === targetId)?.name || $_('cookbook_view_ui.fallback_name');
       showSuccess(moveAction === 'move' ? $_('done.moved_to', { values: { name: targetName } }) : $_('done.copied_to', { values: { name: targetName } }));
       closeMoveDialog();
     } catch (e) {
@@ -225,9 +225,9 @@
 
   async function removeRecipe(r) {
     const ok = await confirmDialog({
-      title: `Remove "${r.name}" from cookbook?`,
-      message: 'The recipe stays in your library.',
-      confirmText: 'Remove',
+      title: $_('cookbook_view_ui.remove_title', { values: { name: r.name } }),
+      message: $_('cookbook_view_ui.remove_message'),
+      confirmText: $_('cookbook_view_ui.remove'),
     });
     if (!ok) return;
     try {
@@ -241,9 +241,9 @@
   async function deleteCookbook() {
     if (!cookbook) return;
     const ok = await confirmDialog({
-      title: `Delete "${cookbook.name}"?`,
-      message: `Removes the cookbook (${cookbook.recipes.length} recipe${cookbook.recipes.length === 1 ? '' : 's'} stay in your library).`,
-      confirmText: 'Delete',
+      title: $_('cookbook_view_ui.delete_title', { values: { name: cookbook.name } }),
+      message: $_('cookbook_view_ui.delete_message', { values: { count: cookbook.recipes.length } }),
+      confirmText: $_('common.delete'),
       dangerous: true,
     });
     if (!ok) return;
@@ -257,7 +257,7 @@
   }
 
   // Cookbook cover image picker. Server already supports
-  // cover_image_url on create/update (server/routes/cookbooks.js) —
+  // cover_image_url on create/update (server/routes/cookbooks.js):
   // there was just no client UI to set it. Reuses the shared
   // ImagePicker + the same header-X modal shell the Step Photo
   // picker in RecipeEditor uses.
@@ -294,23 +294,23 @@
 
 <div class="page-shell editor-page">
   <header class="editor-header">
-    <button class="btn-icon" on:click={() => push('/recipes?view=cookbooks')} aria-label="Back" title="Back">
+    <button class="btn-icon" on:click={() => push('/recipes?view=cookbooks')} aria-label={$_('common.back')} title={$_('common.back')}>
       <span class="material-symbols-rounded">arrow_back</span>
     </button>
-    <h2 class="editor-title">{cookbook?.name || 'Cookbook'}</h2>
+    <h2 class="editor-title">{cookbook?.name || $_('cookbook_view_ui.cookbook')}</h2>
     {#if cookbook}
       {#if cookbook.shared_with_me}
-        <span class="shared-chip" title={cookbook.shared_by ? `Shared by ${cookbook.shared_by}${cookbook.via_kitchen_name ? ' via ' + cookbook.via_kitchen_name : ''}` : 'Shared with you — read only'}>
+        <span class="shared-chip" title={cookbook.shared_by ? (cookbook.via_kitchen_name ? $_('cookbook_view_ui.shared_by_via', { values: { name: cookbook.shared_by, kitchen: cookbook.via_kitchen_name } }) : $_('cookbook_view_ui.shared_by', { values: { name: cookbook.shared_by } })) : $_('cookbook_view_ui.shared_read_only')}>
           <span class="material-symbols-rounded">lock</span>
           <span class="shared-chip-label">{$_('cookbook_view_ct.shared_chip')}</span>
         </span>
       {:else}
         {#if !cookbook.is_smart}
-          <button class="btn-icon" on:click={openAddDialog} aria-label="Add recipes" title="Add recipes">
+          <button class="btn-icon" on:click={openAddDialog} aria-label={$_('cookbook_view_ct.add_recipes')} title={$_('cookbook_view_ct.add_recipes')}>
             <span class="material-symbols-rounded">add</span>
           </button>
         {/if}
-        <button class="btn-icon danger" on:click={deleteCookbook} aria-label="Delete" title="Delete cookbook">
+        <button class="btn-icon danger" on:click={deleteCookbook} aria-label={$_('common.delete')} title={$_('cookbook_view_ui.delete_cookbook')}>
           <span class="material-symbols-rounded">delete</span>
         </button>
       {/if}
@@ -332,7 +332,7 @@
       <header class="cb-hero">
         {#if cbEditable}
           <button class="cb-cover cb-cover-editable" on:click={openCoverSheet}
-            aria-label="Set cookbook cover" title="Set cookbook cover">
+            aria-label={$_('cookbook_view_ui.set_cover')} title={$_('cookbook_view_ui.set_cover')}>
             {#if cookbook.cover_image_url}
               <img src={resolveAssetUrl(cookbook.cover_image_url)} alt="" />
             {:else}
@@ -354,13 +354,13 @@
         <div class="cb-meta">
           <div class="cb-name-row">
             <h1 class="cb-name">{cookbook.name}</h1>
-            {#if cookbook.is_smart}<span class="smart-badge" title="Auto-populated from a saved filter">{$_('cookbook_view_ct.smart_badge')}</span>{/if}
+            {#if cookbook.is_smart}<span class="smart-badge" title={$_('cookbook_view_ui.smart_tooltip')}>{$_('cookbook_view_ct.smart_badge')}</span>{/if}
           </div>
           {#if cookbook.description}
             <p class="cb-desc">{cookbook.description}</p>
           {/if}
           <span class="cb-count">
-            {cookbook.recipes.length} {cookbook.recipes.length === 1 ? 'recipe' : 'recipes'}
+            {$_('cookbook_view_ui.recipe_count', { values: { count: cookbook.recipes.length } })}
             {#if cookbook.is_smart && cookbook.smart_filter}
               {@const f = cookbook.smart_filter}
               {@const bits = []}
@@ -376,12 +376,12 @@
       {#if cookbook.recipes.length === 0}
         <div class="state empty">
           <span class="material-symbols-rounded empty-icon">{cookbook.is_smart ? 'filter_alt' : 'menu_book'}</span>
-          <h2>{cookbook.is_smart ? 'No Recipes Match the Filter' : 'No Recipes Yet'}</h2>
+          <h2>{cookbook.is_smart ? $_('cookbook_view_ui.empty_smart_title') : $_('routes.recipes.empty_title')}</h2>
           <p>
             {#if cookbook.is_smart}
-              Edit the filter in Manage &rarr; Cookbooks, or add tags / categories to your existing recipes.
+              {$_('cookbook_view_ui.empty_smart_desc')}
             {:else}
-              Add recipes from your library to start building this cookbook.
+              {$_('cookbook_view_ui.empty_desc')}
             {/if}
           </p>
           {#if !cookbook.is_smart}
@@ -398,18 +398,18 @@
           <div class="cb-search-row">
             <div class="cb-search">
               <span class="material-symbols-rounded">search</span>
-              <input type="search" placeholder="Search this cookbook…" bind:value={cbQuery} />
+              <input type="search" placeholder={$_('cookbook_view_ui.search_placeholder')} bind:value={cbQuery} />
               {#if cbQuery}
-                <button class="cb-search-clear" on:click={() => cbQuery = ''} aria-label="Clear search">
+                <button class="cb-search-clear" on:click={() => cbQuery = ''} aria-label={$_('cookbook_view_ui.clear_search')}>
                   <span class="material-symbols-rounded">close</span>
                 </button>
               {/if}
             </div>
             {#if !cookbook.is_smart}
-              <select class="cb-sort" bind:value={cbSort} title="Sort">
-                <option value="manual">Manual Order</option>
+              <select class="cb-sort" bind:value={cbSort} title={$_('cookbook_view_ui.sort')}>
+                <option value="manual">{$_('cookbook_view_ui.sort_manual')}</option>
                 <option value="alpha">A → Z</option>
-                <option value="fav">Favorites First</option>
+                <option value="fav">{$_('cookbook_view_ui.sort_fav')}</option>
               </select>
             {/if}
           </div>
@@ -418,8 +418,8 @@
         {#if cbFilterActive && displayRecipes.length === 0}
           <div class="state empty">
             <span class="material-symbols-rounded empty-icon">search_off</span>
-            <h2>No recipes match "{cbQuery}"</h2>
-            <button class="btn btn-secondary" on:click={() => { cbQuery = ''; cbSort = 'manual'; }}>Clear search</button>
+            <h2>{$_('cookbook_view_ui.no_match_title', { values: { q: cbQuery } })}</h2>
+            <button class="btn btn-secondary" on:click={() => { cbQuery = ''; cbSort = 'manual'; }}>{$_('cookbook_view_ui.clear_search')}</button>
           </div>
         {:else}
         <div class="grid"
@@ -431,18 +431,18 @@
             {#if r?.isDndShadowItem}
               <div class="card recipe-card dnd-shadow" aria-hidden="true"></div>
             {:else if r.locked}
-              <!-- Locked placeholder — the reader doesn't have their
+              <!-- Locked placeholder: the reader doesn't have their
                    own access to this recipe. Show the name so they
                    know what's here + a hint about how to unlock it,
                    but don't navigate anywhere. -->
               <div class="card recipe-card locked-card"
-                title="This recipe isn't shared with you individually. Ask the cookbook owner to share the recipe or add it to a Kitchen you're both in.">
+                title={$_('cookbook_view_ui.locked_tooltip')}>
                 <div class="card-image">
                   <span class="material-symbols-rounded card-image-fallback">lock</span>
                 </div>
                 <div class="card-body">
                   <h3 class="card-name">{r.name}</h3>
-                  <p class="card-desc locked-hint">Not shared with you — ask the cookbook owner to share it.</p>
+                  <p class="card-desc locked-hint">{$_('cookbook_view_ui.locked_hint')}</p>
                 </div>
               </div>
             {:else}
@@ -458,12 +458,12 @@
                     <span class="material-symbols-rounded card-image-fallback">restaurant</span>
                   {/if}
                   {#if r.favorite}
-                    <span class="card-fav material-symbols-rounded" title="Favorite">favorite</span>
+                    <span class="card-fav material-symbols-rounded" title={$_('cookbook_view_ui.favorite')}>favorite</span>
                   {/if}
                 </div>
                 <div class="card-body">
                   <!-- Same field set as the Recipes tab's own card
-                       (category, rating, tags, pantry-match) — a
+                       (category, rating, tags, pantry-match): a
                        cookbook recipe now carries identical info to
                        its counterpart on the Recipes tab. Was a
                        thinner card here before: the server only
@@ -478,7 +478,7 @@
                   {/if}
                   <h3 class="card-name">{r.name}</h3>
                   {#if r.rating}
-                    <div class="card-rating" aria-label={`Rated ${r.rating} of 5`}>
+                    <div class="card-rating" aria-label={$_('cookbook_view_ui.rated', { values: { rating: r.rating } })}>
                       {#each [1,2,3,4,5] as n}
                         <span class="material-symbols-rounded star" class:filled={n <= r.rating}>{n <= r.rating ? 'star' : 'star_border'}</span>
                       {/each}
@@ -511,11 +511,11 @@
               </div>
               {#if cbEditable}
                 <button class="remove-btn" on:click={() => removeRecipe(r)}
-                  aria-label={`Remove ${r.name}`} title="Remove from cookbook">
+                  aria-label={$_('cookbook_view_ui.remove_aria', { values: { name: r.name } })} title={$_('cookbook_view_ui.remove_tooltip')}>
                   <span class="material-symbols-rounded">close</span>
                 </button>
                 <button class="move-btn" on:click={() => openMoveDialog(r)}
-                  aria-label={`Move or copy ${r.name}`} title="Move / copy to another cookbook">
+                  aria-label={$_('cookbook_view_ui.move_aria', { values: { name: r.name } })} title={$_('cookbook_view_ui.move_tooltip')}>
                   <span class="material-symbols-rounded">drive_file_move</span>
                 </button>
               {/if}
@@ -534,13 +534,13 @@
   <div use:portal class="modal-backdrop" on:click={closeCoverSheet} use:closeOnBack={closeCoverSheet}>
     <div class="modal" on:click|stopPropagation style="max-width:420px">
       <header class="modal-head">
-        <h3>Cookbook Cover</h3>
-        <button class="btn-icon" on:click={closeCoverSheet} aria-label="Close" title="Close">
+        <h3>{$_('cookbook_view_ui.cookbook_cover')}</h3>
+        <button class="btn-icon" on:click={closeCoverSheet} aria-label={$_('common.close')} title={$_('common.close')}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </header>
       <div class="modal-body">
-        <ImagePicker bind:value={coverDraft} aspect="1 / 1" placeholder="Add a Cover Image" />
+        <ImagePicker bind:value={coverDraft} aspect="1 / 1" placeholder={$_('cookbook_view_ui.add_cover_image')} />
       </div>
       <footer class="modal-actions">
         <button class="btn btn-primary" on:click={saveCover}>{$_('recipe_editor_ct.done')}</button>
@@ -554,12 +554,12 @@
     <div class="modal" on:click|stopPropagation style="max-width:420px">
       <header class="modal-head">
         <h3>{$_('cookbook_view_ct.move_or_copy')}</h3>
-        <button class="btn-icon" on:click={closeMoveDialog} aria-label="Close" title="Close">
+        <button class="btn-icon" on:click={closeMoveDialog} aria-label={$_('common.close')} title={$_('common.close')}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </header>
       <div style="padding: 12px 16px 0; color: var(--text-3); font-size: 13px;">
-        "{moveDialogRecipe.name}" → another cookbook
+        {$_('cookbook_view_ui.move_subtitle', { values: { name: moveDialogRecipe.name } })}
       </div>
       <div style="padding: 12px 16px;">
         <div class="seg-radio">
@@ -574,14 +574,14 @@
           </label>
         </div>
         <select class="input" style="width: 100%; margin-top: 12px;" bind:value={moveTargetId}>
-          <option value="">— Pick a cookbook —</option>
+          <option value="">{$_('cookbook_view_ui.pick_cookbook')}</option>
           {#each moveTargets as c (c.id)}
             <option value={String(c.id)}>{c.name}</option>
           {/each}
         </select>
         {#if moveTargets.length === 0}
           <p style="color: var(--text-3); font-size: 12px; margin-top: 8px;">
-            No other regular cookbooks to move into. Smart cookbooks are auto-populated.
+            {$_('cookbook_view_ui.no_move_targets')}
           </p>
         {/if}
       </div>
@@ -589,7 +589,7 @@
         <button class="btn btn-secondary" on:click={closeMoveDialog}>{$_('cookbook_view_ct.cancel')}</button>
         <button class="btn btn-primary" on:click={confirmMove}
           disabled={!moveTargetId}>
-          {moveAction === 'move' ? 'Move' : 'Copy'}
+          {moveAction === 'move' ? $_('cookbook_view_ui.move') : $_('cookbook_view_ui.copy')}
         </button>
       </footer>
     </div>
@@ -601,18 +601,18 @@
     <div class="modal" on:click|stopPropagation>
       <header class="modal-head">
         <h3>{$_('cookbook_view_ct.add_recipes')}</h3>
-        <button class="btn-icon" on:click={closeAddDialog} aria-label="Close" title="Close">
+        <button class="btn-icon" on:click={closeAddDialog} aria-label={$_('common.close')} title={$_('common.close')}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </header>
       <div class="modal-search">
-        <input class="input" type="search" placeholder="Search your library…" bind:value={addQuery} autofocus />
+        <input class="input" type="search" placeholder={$_('cookbook_view_ui.search_library')} bind:value={addQuery} autofocus />
       </div>
       <div class="modal-list">
         {#if allRecipesLoading}
-          <Spinner block label="Loading…" />
+          <Spinner block label={$_('common.loading')} />
         {:else if addCandidates.length === 0}
-          <p class="empty">{allRecipes.length === 0 ? 'No recipes in your library yet.' : 'No more recipes to add.'}</p>
+          <p class="empty">{allRecipes.length === 0 ? $_('cookbook_view_ui.no_recipes_library') : $_('cookbook_view_ui.no_more_recipes')}</p>
         {:else}
           {#each addCandidates as r (r.id)}
             <label class="add-row" class:on={addSelected.has(r.id)}>
@@ -634,7 +634,7 @@
         <button class="btn btn-secondary" on:click={closeAddDialog}>{$_('cookbook_view_ct.cancel')}</button>
         <button class="btn btn-primary" on:click={confirmAddRecipes}
           disabled={addSelected.size === 0}>
-          Add {addSelected.size > 0 ? addSelected.size : ''}
+          {addSelected.size > 0 ? $_('cookbook_view_ui.add_count', { values: { count: addSelected.size } }) : $_('cookbook_view_ui.add')}
         </button>
       </footer>
     </div>
@@ -672,7 +672,7 @@
 
   .editor-content {
     padding: 16px var(--page-px) 32px;
-    /* Was a flat 1180px cap at every viewport width — the same class
+    /* Was a flat 1180px cap at every viewport width: the same class
        of bug Manage.svelte had before its wide-screen pass. The
        .grid below is repeat(auto-fill, minmax(220px, 1fr)), so it
        already flows more columns automatically once the wrapper has
@@ -817,7 +817,7 @@
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 14px;
   }
-  /* Transparent pass-through wrapper — the actual grid item and the
+  /* Transparent pass-through wrapper: the actual grid item and the
      element animate:flip targets. Svelte requires animate: to sit on
      the single direct child of a keyed {#each}, but each recipe can
      render one of three different top-level elements (shadow /
@@ -827,7 +827,7 @@
      sizes exactly as if it were the direct grid child.
 
      Smooth drag-reorder: this wrapper is what actually gets the CSS
-     transform applied — both svelte-dnd-action's own drag animation
+     transform applied: both svelte-dnd-action's own drag animation
      AND Svelte's animate:flip on the other cards making room animate
      THIS element, not .recipe-card inside it. Without compositor
      hints here the browser re-layouts/repaints every image-heavy
@@ -838,14 +838,14 @@
      isolates its repaint cost so animating one doesn't force the
      browser to reconsider its neighbors. */
   /* Grid's default align-items: stretch equalizes THIS wrapper's
-     height across a row, but the card inside it (its one child —
+     height across a row, but the card inside it (its one child:
      shadow / locked / normal, whichever the {#if} renders) doesn't
      inherit that automatically: a plain block child sizes to its own
      content, so taller cards (a wrapped 2-line title, a category
      badge, more tag pills) end up visibly taller than their row
      neighbors. display: flex + the card's own flex: 1 below is what
      actually stretches it to match, so every card in a row ends up
-     the same height — matching the Recipes tab, whose card IS the
+     the same height: matching the Recipes tab, whose card IS the
      direct grid item with nothing in the way. */
   .cb-grid-item {
     min-width: 0;
@@ -914,7 +914,7 @@
   }
   /* The actively-dragged item, id-targeted by svelte-dnd-action
      (DRAGGED_ELEMENT_ID). The library marks .cb-grid-item itself
-     (the true dnd-zone child) with this id — that wrapper has no
+     (the true dnd-zone child) with this id: that wrapper has no
      border-radius of its own, so the lifted shadow targets the
      .recipe-card nested inside it instead, matching the card's
      rounded corners. Pointer-events disabled on the whole dragged
@@ -926,7 +926,7 @@
   :global(#dnd-action-dragged-el) {
     cursor: grabbing;
     /* contain: paint on .cb-grid-item clips anything painted past its
-       own border-box — including the lifted shadow above, since the
+       own border-box: including the lifted shadow above, since the
        wrapper is sized identically to its single child. Drop
        containment on just the one actively-dragged item so its
        shadow renders in full; every other (non-dragged) card keeps
@@ -938,7 +938,7 @@
     pointer-events: none;
   }
   /* No box of its own (display: contents) so it adds zero layout
-     footprint around .card-clickable — it exists purely so
+     footprint around .card-clickable: it exists purely so
      maybeDragHandle has a DOM node to mark as the drag pickup target
      that's an ANCESTOR of (not the same element as) the button, which
      keeps the button's native keyboard semantics (Enter/Space =
@@ -1001,7 +1001,7 @@
   .remove-btn:hover { background: rgba(220, 38, 38, 0.85); }
   .remove-btn .material-symbols-rounded { font-size: 16px; }
 
-  /* Move-to-cookbook button — same hover-reveal as remove, on the
+  /* Move-to-cookbook button: same hover-reveal as remove, on the
      opposite top corner. */
   .move-btn {
     position: absolute;
@@ -1121,7 +1121,7 @@
     display: flex; justify-content: flex-end; gap: 8px;
     border-top: 1px solid var(--border);
   }
-  /* "Shared" chip in the editor header — signals read-only cookbook.
+  /* "Shared" chip in the editor header: signals read-only cookbook.
      Same shape as RecipeView's shared chip for cross-page consistency. */
   .shared-chip {
     display: inline-flex;
@@ -1141,7 +1141,7 @@
     .shared-chip-label { display: none; }
     .shared-chip { padding: 4px 8px; }
   }
-  /* Locked recipe card placeholder — recipe is in the cookbook but
+  /* Locked recipe card placeholder: recipe is in the cookbook but
      the reader hasn't been granted their own access, so the row is a
      hint, not a link. Dim and non-interactive to avoid promising
      something the tap won't deliver. */

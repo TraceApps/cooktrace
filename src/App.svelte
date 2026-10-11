@@ -696,7 +696,7 @@
     <button
       class="hamburger"
       on:click={() => sidebarOpen = !sidebarOpen}
-      aria-label="Open menu"
+      aria-label={$_('app_ui.open_menu')}
     >
       <span class="material-symbols-rounded">menu</span>
       {#if (_syncModeActive && !_serverReachable) || _webOffline || _webFailing}

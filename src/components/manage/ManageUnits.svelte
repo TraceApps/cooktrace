@@ -48,6 +48,20 @@
   const BUILTIN_ABBRS = new Set();
   for (const g of UNIT_GROUPS) for (const u of g.units) BUILTIN_ABBRS.add(u.abbr);
   const CATEGORY_OPTIONS = [...UNIT_GROUPS.map(g => g.label), 'Custom'];
+  // Group labels double as stored category values, so only the shown
+  // text is translated. Keys follow UNIT_GROUPS order.
+  const GROUP_KEYS = [
+    'unit_picker_ui.group_volume_us',
+    'unit_picker_ui.group_volume_metric',
+    'unit_picker_ui.group_weight_us',
+    'unit_picker_ui.group_weight_metric',
+    'unit_picker_ui.group_count',
+  ];
+  function groupName(label, t) {
+    if (label === 'Custom') return t('manage_units.custom_group');
+    const i = UNIT_GROUPS.findIndex(g => g.label === label);
+    return i >= 0 && GROUP_KEYS[i] ? t(GROUP_KEYS[i]) : label;
+  }
 
   // Filter — one input filters both built-in groups and the custom
   // list. Matches abbr OR full name so users can type either. Groups
@@ -153,9 +167,9 @@
 
   async function removeCustom(u) {
     const ok = await confirmDialog({
-      title: `Delete "${u.abbr}"?`,
-      message: 'Recipes already using this unit keep the abbreviation as free text.',
-      confirmText: 'Delete',
+      title: $_('manage_ui.delete_title', { values: { name: u.abbr } }),
+      message: $_('manage_units_ui.delete_message'),
+      confirmText: $_('common.delete'),
       dangerous: true,
     });
     if (!ok) return;
@@ -171,9 +185,9 @@
   async function resetAll() {
     if (disabled.size === 0) return;
     const ok = await confirmDialog({
-      title: 'Re-enable all built-in units?',
-      message: 'Restores every hidden built-in. Your custom units stay.',
-      confirmText: 'Re-enable',
+      title: $_('manage_units_ui.reset_title'),
+      message: $_('manage_units_ui.reset_message'),
+      confirmText: $_('manage_units_ui.reset_confirm'),
     });
     if (!ok) return;
     for (const abbr of disabled) {
@@ -188,46 +202,42 @@
 <div class="mgr">
   <header class="mgr-head">
     <h2>{$_('manage_units.title')}</h2>
-    <p class="mgr-desc">
-      All cooking units available in recipe + pantry editors. Toggle a built-in
-      to hide it from your pickers, or add custom units. Hiding is non-destructive,
-      recipes already using the unit keep working as free text.
-    </p>
+    <p class="mgr-desc">{$_('manage_units_ui.desc')}</p>
   </header>
 
   {#if loading}
-    <Spinner block label="Loading…" />
+    <Spinner block label={$_('common.loading')} />
   {:else}
     <div class="meta-row">
-      <span class="meta">{BUILTIN_ABBRS.size} built-ins · {disabled.size} hidden</span>
-      <span class="meta">{custom.length} custom</span>
+      <span class="meta">{$_('manage_units_ui.builtin_summary', { values: { builtins: BUILTIN_ABBRS.size, hidden: disabled.size } })}</span>
+      <span class="meta">{$_('manage_units_ui.custom_count', { values: { count: custom.length } })}</span>
       {#if disabled.size > 0}
         <button class="btn btn-secondary tiny reset-btn" on:click={resetAll}>{$_('manage_units.restore_all')}</button>
       {/if}
     </div>
 
-    <input class="input filter" type="search" placeholder="Filter units by abbreviation or name…" bind:value={filter} />
+    <input class="input filter" type="search" placeholder={$_('manage_units_ui.filter_ph')} bind:value={filter} />
 
     {#if filteredEmpty}
-      <p class="empty">No units match "{filter}".</p>
+      <p class="empty">{$_('manage_units_ui.no_match', { values: { filter } })}</p>
     {/if}
 
     {#each filteredGroups as group (group.label)}
       <section class="grp">
-        <h3 class="grp-title">{group.label}</h3>
+        <h3 class="grp-title">{groupName(group.label, $_)}</h3>
         <ul class="row-list">
           {#each group.units as u (u.abbr)}
             {@const isOff = disabled.has(u.abbr)}
             {@const uses = _uses(u.abbr)}
             <li class="row" class:off={isOff}>
-              <span class="badge">Built-in</span>
+              <span class="badge">{$_('manage_units_ui.builtin_badge')}</span>
               <span class="abbr">{u.abbr}</span>
               <span class="full">{u.full}</span>
               <span class="usage-pill" class:zero={uses === 0}
-                title={uses === 0 ? 'Not used in any recipe' : `Used in ${uses} ingredient${uses === 1 ? '' : 's'}`}>
-                {uses} {uses === 1 ? 'use' : 'uses'}
+                title={uses === 0 ? $_('manage_units_ui.not_used') : $_('manage_units_ui.used_in', { values: { count: uses } })}>
+                {$_('manage_ui.uses', { values: { count: uses } })}
               </span>
-              <label class="switch" title={isOff ? 'Hidden from pickers' : 'Visible in pickers'}>
+              <label class="switch" title={isOff ? $_('manage_units_ui.hidden_in_pickers') : $_('manage_units_ui.visible_in_pickers')}>
                 <input type="checkbox" checked={!isOff} on:change={() => toggleBuiltin(u.abbr)} />
                 <span class="track"><span class="thumb"></span></span>
               </label>
@@ -241,17 +251,17 @@
     <section class="grp">
       <h3 class="grp-title">{$_('manage_units.custom_group')}</h3>
       {#if custom.length === 0}
-        <p class="empty">No custom units yet.</p>
+        <p class="empty">{$_('manage_units_ui.empty_custom')}</p>
       {:else}
         <ul class="row-list">
           {#each filteredCustom as u (u.id)}
             <li class="row">
               {#if editingId === u.id}
                 <div class="edit-form">
-                  <input class="input edit-input abbr-input" bind:value={editAbbr} placeholder="abbr" />
-                  <input class="input edit-input full-input" bind:value={editFull} placeholder="full name" />
+                  <input class="input edit-input abbr-input" bind:value={editAbbr} placeholder={$_('manage_units_ui.abbr_ph')} />
+                  <input class="input edit-input full-input" bind:value={editFull} placeholder={$_('manage_units_ui.full_name_ph')} />
                   <select class="input edit-input cat-input" bind:value={editCategory}>
-                    {#each CATEGORY_OPTIONS as cat}<option>{cat}</option>{/each}
+                    {#each CATEGORY_OPTIONS as cat}<option value={cat}>{groupName(cat, $_)}</option>{/each}
                   </select>
                   <div class="row-actions">
                     <button class="btn btn-secondary tiny" on:click={cancelEdit}>{$_('manage_units.cancel')}</button>
@@ -263,16 +273,16 @@
                 <span class="badge custom-badge">{$_('manage_units.custom_badge')}</span>
                 <span class="abbr">{u.abbr}</span>
                 <span class="full">{u.full_name}</span>
-                {#if u.category}<span class="cat-tag">{u.category}</span>{/if}
+                {#if u.category}<span class="cat-tag">{groupName(u.category, $_)}</span>{/if}
                 <span class="usage-pill" class:zero={uses === 0}
-                  title={uses === 0 ? 'Not used in any recipe' : `Used in ${uses} ingredient${uses === 1 ? '' : 's'}`}>
-                  {uses} {uses === 1 ? 'use' : 'uses'}
+                  title={uses === 0 ? $_('manage_units_ui.not_used') : $_('manage_units_ui.used_in', { values: { count: uses } })}>
+                  {$_('manage_ui.uses', { values: { count: uses } })}
                 </span>
                 <div class="row-actions">
-                  <button class="btn-icon small" on:click={() => startEdit(u)} aria-label="Edit" title="Edit">
+                  <button class="btn-icon small" on:click={() => startEdit(u)} aria-label={$_('common.edit')} title={$_('common.edit')}>
                     <span class="material-symbols-rounded">edit</span>
                   </button>
-                  <button class="btn-icon small danger" on:click={() => removeCustom(u)} aria-label="Delete" title="Delete">
+                  <button class="btn-icon small danger" on:click={() => removeCustom(u)} aria-label={$_('common.delete')} title={$_('common.delete')}>
                     <span class="material-symbols-rounded">delete</span>
                   </button>
                 </div>
@@ -283,14 +293,14 @@
       {/if}
 
       <div class="add-row">
-        <input class="input abbr-input" placeholder="abbr (e.g. head)" bind:value={newAbbr}
+        <input class="input abbr-input" placeholder={$_('manage_units_ui.new_abbr_ph')} bind:value={newAbbr}
           on:keydown={(e) => { if (e.key === 'Enter') createCustom(); }} />
-        <input class="input full-input" placeholder="full name (optional)" bind:value={newFull} />
+        <input class="input full-input" placeholder={$_('manage_units_ui.new_full_name_ph')} bind:value={newFull} />
         <select class="input cat-input" bind:value={newCategory}>
-          {#each CATEGORY_OPTIONS as cat}<option>{cat}</option>{/each}
+          {#each CATEGORY_OPTIONS as cat}<option value={cat}>{groupName(cat, $_)}</option>{/each}
         </select>
         <button class="btn btn-primary" on:click={createCustom} disabled={creating || !newAbbr.trim()}>
-          {creating ? 'Adding…' : 'Add'}
+          {creating ? $_('foods.adding') : $_('manage_ui.add')}
         </button>
       </div>
     </section>

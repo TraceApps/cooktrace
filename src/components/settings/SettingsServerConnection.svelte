@@ -63,7 +63,7 @@
 
   $: lastSyncDisplay = (_nowTick, $syncState.lastSync)
     ? relativeTime($syncState.lastSync)
-    : 'Never';
+    : $_('settings_server_connection_ui.never');
   $: lastSyncTitle = $syncState.lastSync
     ? new Date($syncState.lastSync).toLocaleString()
     : '';
@@ -132,8 +132,8 @@
     try {
       if (modeChoice === 'download') {
         const { wipeLocalData } = await import('../../lib/migrate.js');
-        mergeStage = 'local data';
-        mergeProgress = 'Clearing local data…';
+        mergeStage = $_('settings_server_connection_ui.stage_local_data');
+        mergeProgress = $_('settings_server_connection_ui.clearing_local');
         mergeProgressPct = 50;
         await wipeLocalData();
         mergeProgressPct = 100;
@@ -141,19 +141,19 @@
       if (modeChoice === 'upload' || modeChoice === 'merge') {
         const { uploadLocalToServer } = await import('../../lib/migrate.js');
         const stageLabels = {
-          categories: 'categories',
-          recipes:    'recipes',
-          pantry:     'pantry items',
-          diary:      'diary entries',
-          shopping:   'shopping list',
-          settings:   'settings',
+          categories: $_('settings_server_connection_ui.stage_categories'),
+          recipes:    $_('settings_server_connection_ui.stage_recipes'),
+          pantry:     $_('settings_server_connection_ui.stage_pantry'),
+          diary:      $_('settings_server_connection_ui.stage_diary'),
+          shopping:   $_('settings_server_connection_ui.stage_shopping'),
+          settings:   $_('settings_server_connection_ui.stage_settings'),
         };
         migrationSummary = await uploadLocalToServer({
           serverUrl: url,
           authToken: token,
           onProgress: (stage, current, total) => {
             mergeStage = stageLabels[stage] || stage;
-            mergeProgress = `Uploading ${mergeStage} (${Math.min(current + 1, total)} / ${total})`;
+            mergeProgress = $_('settings_server_connection_ui.uploading_stage', { values: { stage: mergeStage, current: Math.min(current + 1, total), total } });
             mergeProgressPct = total > 0 ? Math.round(((current + 1) / total) * 100) : 0;
           },
         });
@@ -221,9 +221,9 @@
 
   async function pushAll() {
     const ok = await confirmDialog({
-      title: 'Push all local data?',
-      message: 'Marks every recipe, pantry item, diary entry, and shopping list row as pending and sends it to the server. Use this once when first connecting a server to an existing local-mode library.',
-      confirmText: 'Push All',
+      title: $_('settings_server_connection_ui.push_all_title'),
+      message: $_('settings_server_connection_ui.push_all_message'),
+      confirmText: $_('settings_server_connection_ui.push_all'),
     });
     if (!ok) return;
     busy = true;
@@ -240,9 +240,9 @@
   // or multi-user installs).
   async function logOut() {
     const ok = await confirmDialog({
-      title: 'Log out of server?',
-      message: 'Signs you out of the server account. Your phone stays connected to the same server — sign back in next time you open the app.',
-      confirmText: 'Log Out',
+      title: $_('settings_server_connection_ui.log_out_title'),
+      message: $_('settings_server_connection_ui.log_out_message'),
+      confirmText: $_('common.log_out'),
     });
     if (!ok) return;
     busy = true;
@@ -257,9 +257,9 @@
   // local. Reloads into local-only experience.
   async function disconnect() {
     const ok = await confirmDialog({
-      title: 'Disconnect and use locally?',
-      message: 'Stops syncing with this server. Your phone keeps everything it has now; future changes stay on this device until you reconnect.',
-      confirmText: 'Disconnect',
+      title: $_('settings_server_connection_ui.disconnect_title'),
+      message: $_('settings_server_connection_ui.disconnect_message'),
+      confirmText: $_('settings_server_connection_ui.disconnect'),
       dangerous: true,
     });
     if (!ok) return;
@@ -302,27 +302,27 @@
       <div class="row sync-row" title={lastSyncTitle}>
         <div class="state-body">
           <div class="row-label">{$_('settings_server_conn.last_synced')}</div>
-          <div class="row-value">{lastSyncDisplay}{$syncState.syncing ? ' · syncing…' : ''}</div>
+          <div class="row-value">{lastSyncDisplay}{$syncState.syncing ? ' · ' + $_('settings_server_connection_ui.syncing_inline') : ''}</div>
           {#if $syncState.error}<div class="state-error">{$syncState.error}</div>{/if}
         </div>
         <button class="btn btn-secondary small" on:click={syncNow} disabled={busy || $syncState.syncing}>
           <span class="material-symbols-rounded" class:spin={$syncState.syncing}>{$syncState.syncing ? 'autorenew' : 'sync'}</span>
-          {$syncState.syncing ? 'Syncing…' : 'Sync now'}
+          {$syncState.syncing ? $_('sync.syncing') : $_('settings_server_connection_ui.sync_now')}
         </button>
       </div>
 
       <div class="row actions">
         <button class="btn btn-secondary" on:click={pushAll} disabled={busy}>
           <span class="material-symbols-rounded">upload</span>
-          Push All
+          {$_('settings_server_connection_ui.push_all')}
         </button>
         <button class="btn btn-secondary" on:click={logOut} disabled={busy}>
           <span class="material-symbols-rounded">logout</span>
-          Log Out
+          {$_('common.log_out')}
         </button>
         <button class="btn btn-secondary danger" on:click={disconnect} disabled={busy}>
           <span class="material-symbols-rounded">link_off</span>
-          Disconnect &amp; Use Locally
+          {$_('settings_server_connection_ui.disconnect_use_locally')}
         </button>
       </div>
     {:else}
@@ -331,7 +331,7 @@
         <span class="material-symbols-rounded state-icon">smartphone</span>
         <div class="state-body">
           <div class="state-title">{$_('settings_server_conn.state_local')}</div>
-          <div class="state-sub">All data stays on this device. Connect to a CookTrace server below to sync.</div>
+          <div class="state-sub">{$_('settings_server_connection_ui.local_sub')}</div>
         </div>
       </div>
 
@@ -358,14 +358,14 @@
             {:else}
               <input class="input" type="password" placeholder={$_('settings_server_conn.password_ph')} bind:value={password} />
             {/if}
-            <button type="button" class="pw-toggle" on:click={() => showPw = !showPw} aria-label={showPw ? 'Hide password' : 'Show password'}>
+            <button type="button" class="pw-toggle" on:click={() => showPw = !showPw} aria-label={showPw ? $_('settings_server_connection_ui.hide_password') : $_('settings_server_connection_ui.show_password')}>
               <span class="material-symbols-rounded">{showPw ? 'visibility_off' : 'visibility'}</span>
             </button>
           </div>
         </label>
         <div class="form-actions">
           <button class="btn btn-primary" on:click={connect} disabled={busy}>
-            {busy ? 'Connecting…' : 'Connect to Server'}
+            {busy ? $_('settings_server_connection_ui.connecting') : $_('settings_server_connection_ui.connect_to_server')}
           </button>
         </div>
       </div>
@@ -379,18 +379,18 @@
     <div class="merge-dialog">
       <h3 class="merge-title">{$_('settings_server_conn.sync_options')}</h3>
       <p class="merge-sub">
-        You have data on this phone. How should it be handled when connecting?
+        {$_('settings_server_connection_ui.merge_sub')}
       </p>
       {#if localCounts && localCounts.total > 0}
         <div class="merge-counts">
-          <div class="merge-counts-title">On this phone:</div>
+          <div class="merge-counts-title">{$_('settings_server_connection_ui.on_this_phone')}</div>
           <div class="merge-counts-grid">
-            {#if localCounts.recipes  > 0}<div><strong>{localCounts.recipes}</strong> {localCounts.recipes === 1 ? 'recipe' : 'recipes'}</div>{/if}
-            {#if localCounts.pantry   > 0}<div><strong>{localCounts.pantry}</strong> pantry {localCounts.pantry === 1 ? 'item' : 'items'}</div>{/if}
-            {#if localCounts.diary    > 0}<div><strong>{localCounts.diary}</strong> diary {localCounts.diary === 1 ? 'entry' : 'entries'}</div>{/if}
-            {#if localCounts.shopping > 0}<div><strong>{localCounts.shopping}</strong> shopping {localCounts.shopping === 1 ? 'item' : 'items'}</div>{/if}
-            {#if localCounts.categories > 0}<div><strong>{localCounts.categories}</strong> {localCounts.categories === 1 ? 'category' : 'categories'}</div>{/if}
-            {#if localCounts.settings > 0}<div><strong>{localCounts.settings}</strong> settings</div>{/if}
+            {#if localCounts.recipes  > 0}<div><strong>{localCounts.recipes}</strong> {$_('settings_server_connection_ui.count_recipes', { values: { count: localCounts.recipes } })}</div>{/if}
+            {#if localCounts.pantry   > 0}<div><strong>{localCounts.pantry}</strong> {$_('settings_server_connection_ui.count_pantry', { values: { count: localCounts.pantry } })}</div>{/if}
+            {#if localCounts.diary    > 0}<div><strong>{localCounts.diary}</strong> {$_('settings_server_connection_ui.count_diary', { values: { count: localCounts.diary } })}</div>{/if}
+            {#if localCounts.shopping > 0}<div><strong>{localCounts.shopping}</strong> {$_('settings_server_connection_ui.count_shopping', { values: { count: localCounts.shopping } })}</div>{/if}
+            {#if localCounts.categories > 0}<div><strong>{localCounts.categories}</strong> {$_('settings_server_connection_ui.count_categories', { values: { count: localCounts.categories } })}</div>{/if}
+            {#if localCounts.settings > 0}<div><strong>{localCounts.settings}</strong> {$_('settings_server_connection_ui.count_settings', { values: { count: localCounts.settings } })}</div>{/if}
           </div>
         </div>
       {/if}
@@ -399,21 +399,21 @@
           <span class="material-symbols-rounded merge-icon">cloud_upload</span>
           <div>
             <div class="merge-option-title">{$_('settings_server_conn.upload_phone_to_server')}</div>
-            <div class="merge-option-desc">Send this phone's data to the server. Existing server data stays.</div>
+            <div class="merge-option-desc">{$_('settings_server_connection_ui.upload_desc')}</div>
           </div>
         </button>
         <button class="merge-option" on:click={() => _mergeAndConnect('download')}>
           <span class="material-symbols-rounded merge-icon">cloud_download</span>
           <div>
             <div class="merge-option-title">{$_('settings_server_conn.download_server_to_phone')}</div>
-            <div class="merge-option-desc">Replace this phone's data with everything from the server. Local data is discarded.</div>
+            <div class="merge-option-desc">{$_('settings_server_connection_ui.download_desc')}</div>
           </div>
         </button>
         <button class="merge-option" on:click={() => _mergeAndConnect('merge')}>
           <span class="material-symbols-rounded merge-icon">sync</span>
           <div>
             <div class="merge-option-title">{$_('settings_server_conn.merge_both')}</div>
-            <div class="merge-option-desc">Upload phone data AND pull server data. Nothing is lost, but duplicates are possible.</div>
+            <div class="merge-option-desc">{$_('settings_server_connection_ui.merge_desc')}</div>
           </div>
         </button>
         <button class="btn btn-secondary merge-cancel" on:click={cancelMerge}>{$_('settings_server_conn.cancel')}</button>
@@ -424,8 +424,8 @@
   <div class="merge-overlay" use:portal use:closeOnBack={() => {}} transition:fade={{ duration: 150 }}>
     <div class="merge-dialog merge-syncing">
       <span class="material-symbols-rounded sync-spin">sync</span>
-      <p class="syncing-title">Syncing…</p>
-      <p class="syncing-sub">{mergeProgress || 'Preparing…'}</p>
+      <p class="syncing-title">{$_('sync.syncing')}</p>
+      <p class="syncing-sub">{mergeProgress || $_('settings_server_connection_ui.preparing')}</p>
       {#if mergeProgressPct > 0}
         <div class="merge-progress-bar">
           <div class="merge-progress-fill" style="width:{mergeProgressPct}%"></div>
@@ -437,27 +437,27 @@
   <div class="merge-overlay" use:portal use:closeOnBack={() => {}} transition:fade={{ duration: 150 }}>
     <div class="merge-dialog">
       <h3 class="merge-title">
-        {migrationSummary.errors.length === 0 ? 'Upload complete' : 'Upload finished with issues'}
+        {migrationSummary.errors.length === 0 ? $_('settings_server_connection_ui.upload_complete') : $_('settings_server_connection_ui.upload_with_issues')}
       </h3>
       <p class="merge-sub">
-        {migrationSummary.totalSuccess} of {migrationSummary.total} {migrationSummary.total === 1 ? 'item' : 'items'} uploaded successfully.
+        {$_('settings_server_connection_ui.uploaded_of_total', { values: { success: migrationSummary.totalSuccess, total: migrationSummary.total } })}
       </p>
       <div class="merge-counts">
-        <div class="merge-counts-title">Uploaded to server:</div>
+        <div class="merge-counts-title">{$_('settings_server_connection_ui.uploaded_to_server')}</div>
         <div class="merge-counts-grid">
-          {#if migrationSummary.success.recipes  > 0}<div><strong>{migrationSummary.success.recipes}</strong> {migrationSummary.success.recipes === 1 ? 'recipe' : 'recipes'}</div>{/if}
-          {#if migrationSummary.success.pantry   > 0}<div><strong>{migrationSummary.success.pantry}</strong> pantry {migrationSummary.success.pantry === 1 ? 'item' : 'items'}</div>{/if}
-          {#if migrationSummary.success.diary    > 0}<div><strong>{migrationSummary.success.diary}</strong> diary {migrationSummary.success.diary === 1 ? 'entry' : 'entries'}</div>{/if}
-          {#if migrationSummary.success.shopping > 0}<div><strong>{migrationSummary.success.shopping}</strong> shopping {migrationSummary.success.shopping === 1 ? 'item' : 'items'}</div>{/if}
-          {#if migrationSummary.success.categories > 0}<div><strong>{migrationSummary.success.categories}</strong> {migrationSummary.success.categories === 1 ? 'category' : 'categories'}</div>{/if}
-          {#if migrationSummary.success.settings > 0}<div><strong>{migrationSummary.success.settings}</strong> settings</div>{/if}
+          {#if migrationSummary.success.recipes  > 0}<div><strong>{migrationSummary.success.recipes}</strong> {$_('settings_server_connection_ui.count_recipes', { values: { count: migrationSummary.success.recipes } })}</div>{/if}
+          {#if migrationSummary.success.pantry   > 0}<div><strong>{migrationSummary.success.pantry}</strong> {$_('settings_server_connection_ui.count_pantry', { values: { count: migrationSummary.success.pantry } })}</div>{/if}
+          {#if migrationSummary.success.diary    > 0}<div><strong>{migrationSummary.success.diary}</strong> {$_('settings_server_connection_ui.count_diary', { values: { count: migrationSummary.success.diary } })}</div>{/if}
+          {#if migrationSummary.success.shopping > 0}<div><strong>{migrationSummary.success.shopping}</strong> {$_('settings_server_connection_ui.count_shopping', { values: { count: migrationSummary.success.shopping } })}</div>{/if}
+          {#if migrationSummary.success.categories > 0}<div><strong>{migrationSummary.success.categories}</strong> {$_('settings_server_connection_ui.count_categories', { values: { count: migrationSummary.success.categories } })}</div>{/if}
+          {#if migrationSummary.success.settings > 0}<div><strong>{migrationSummary.success.settings}</strong> {$_('settings_server_connection_ui.count_settings', { values: { count: migrationSummary.success.settings } })}</div>{/if}
         </div>
       </div>
       {#if migrationSummary.errors.length > 0}
         <div class="merge-errors">
           <div class="merge-counts-title err">
-            {migrationSummary.errors.length} {migrationSummary.errors.length === 1 ? 'error' : 'errors'}
-            {#if migrationSummary.errors.length > 5}(showing first 5){/if}
+            {$_('settings_server_connection_ui.error_count', { values: { count: migrationSummary.errors.length } })}
+            {#if migrationSummary.errors.length > 5}{$_('settings_server_connection_ui.showing_first_5')}{/if}
           </div>
           <ul class="merge-errors-list">
             {#each migrationSummary.errors.slice(0, 5) as err}

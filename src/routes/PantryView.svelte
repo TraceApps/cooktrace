@@ -122,9 +122,9 @@
   async function deleteItem() {
     if (!item) return;
     const ok = await confirmDialog({
-      title: 'Remove from pantry?',
-      message: `"${item.name}" will be removed. Recipes referencing it stay; this just drops it from your library.`,
-      confirmText: 'Remove',
+      title: $_('pantry_view_ui.remove_title'),
+      message: $_('pantry_view_ui.remove_message', { values: { name: item.name } }),
+      confirmText: $_('pantry_view_ui.remove'),
       dangerous: true,
     });
     if (!ok) return;
@@ -145,15 +145,15 @@
 
 <div class="page-shell editor-page">
   <header class="editor-header">
-    <button class="btn-icon" on:click={pop} aria-label="Back" title="Back">
+    <button class="btn-icon" on:click={pop} aria-label={$_('common.back')} title={$_('common.back')}>
       <span class="material-symbols-rounded">arrow_back</span>
     </button>
-    <h2 class="editor-title">{item?.name || 'Pantry Item'}</h2>
+    <h2 class="editor-title">{item?.name || $_('pantry_view_ui.title_fallback')}</h2>
     {#if item}
-      <button class="btn-icon" on:click={startEdit} aria-label="Edit" title="Edit">
+      <button class="btn-icon" on:click={startEdit} aria-label={$_('common.edit')} title={$_('common.edit')}>
         <span class="material-symbols-rounded">edit</span>
       </button>
-      <button class="btn-icon danger" on:click={deleteItem} aria-label="Delete" title="Delete">
+      <button class="btn-icon danger" on:click={deleteItem} aria-label={$_('common.delete')} title={$_('common.delete')}>
         <span class="material-symbols-rounded">delete</span>
       </button>
     {/if}
@@ -200,7 +200,7 @@
             <span class="stock-label">{$_('pantry_view_ct.in_stock')}</span>
             <button type="button" class="stock-switch" class:on={item.in_stock}
               on:click={toggleStock} disabled={toggling}
-              aria-pressed={item.in_stock} aria-label="Toggle in stock">
+              aria-pressed={item.in_stock} aria-label={$_('pantry_view_ui.toggle_in_stock')}>
               <span class="stock-knob"></span>
             </button>
           </div>
@@ -225,11 +225,11 @@
         <div class="stat">
           <div class="stat-label">{$_('pantry_view_ct.on_hand')}</div>
           <div class="stat-value qty-row">
-            <button class="qty-btn" on:click={() => bumpQty(-1)} disabled={qtyBusy || (Number(item.quantity) || 0) <= 0} aria-label="Decrease">
+            <button class="qty-btn" on:click={() => bumpQty(-1)} disabled={qtyBusy || (Number(item.quantity) || 0) <= 0} aria-label={$_('pantry_view_ui.decrease')}>
               <span class="material-symbols-rounded">remove</span>
             </button>
             <span class="qty-num">{item.quantity ?? 0}{item.unit ? ' ' + item.unit : ''}</span>
-            <button class="qty-btn" on:click={() => bumpQty(1)} disabled={qtyBusy} aria-label="Increase">
+            <button class="qty-btn" on:click={() => bumpQty(1)} disabled={qtyBusy} aria-label={$_('pantry_view_ui.increase')}>
               <span class="material-symbols-rounded">add</span>
             </button>
           </div>
@@ -260,7 +260,7 @@
       <!-- Used in N recipes -->
       <div class="card view-card">
         <div class="card-title">
-          Used in
+          {$_('pantry_view_ui.used_in')}
           {#if usedInLoading}
             <span class="material-symbols-rounded spin tiny">progress_activity</span>
           {:else}
@@ -268,7 +268,7 @@
           {/if}
         </div>
         {#if !usedInLoading && usedIn.length === 0}
-          <p class="muted">No recipes use this item yet.</p>
+          <p class="muted">{$_('pantry_view_ui.used_in_empty')}</p>
         {:else}
           <ul class="used-list">
             {#each usedIn as r (r.id)}

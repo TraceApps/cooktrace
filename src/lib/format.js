@@ -6,7 +6,14 @@
  * (no timezone marker) are coerced to UTC to match what the server stored.
  */
 
-const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+import { get } from 'svelte/store';
+import { locale } from 'svelte-i18n';
+import { relativeTime } from './relative-time.js';
+
+// The app's language, for month names ("May 4, 2026", "4 may 2026").
+function _locale() {
+  try { return get(locale) || undefined; } catch { return undefined; }
+}
 
 function _toDate(input) {
   if (input == null || input === '') return null;
@@ -50,7 +57,7 @@ export function formatDate(input, fmt = 'natural') {
     case 'US':  return `${_pad(m)}/${_pad(day)}/${y}`;
     case 'EU':  return `${_pad(day)}/${_pad(m)}/${y}`;
     case 'natural':
-    default:    return `${MONTHS_SHORT[d.getMonth()]} ${day}, ${y}`;
+    default:    return d.toLocaleDateString(_locale(), { month: 'short', day: 'numeric', year: 'numeric' });
   }
 }
 
@@ -62,22 +69,8 @@ export function formatUpdated(input, fmt = 'natural') {
   const d = _toDate(input);
   if (!d) return '';
   const ageDays = (Date.now() - d.getTime()) / 86400000;
-  if (ageDays < 7) {
-    // Mirror relative-time.js's friendly form for short ranges. Rather
-    // than re-importing, recompute the small subset we need here.
-    const sec = (Date.now() - d.getTime()) / 1000;
-    if (sec < 60) return 'Just Now';
-    if (sec < 3600) {
-      const m = Math.round(sec / 60);
-      return m === 1 ? 'A Minute Ago' : `${m} Minutes Ago`;
-    }
-    if (sec < 86400) {
-      const h = Math.round(sec / 3600);
-      return h === 1 ? 'An Hour Ago' : `${h} Hours Ago`;
-    }
-    const days = Math.round(sec / 86400);
-    return days === 1 ? 'Yesterday' : `${days} Days Ago`;
-  }
+  // Recent edits read like the rest of the app ("3 Hours Ago"), in its language.
+  if (ageDays < 7) return relativeTime(d);
   return formatDate(d, fmt);
 }
 

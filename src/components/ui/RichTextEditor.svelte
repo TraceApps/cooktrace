@@ -14,10 +14,12 @@
    * but defense-in-depth still cheap.
    */
   import { onMount, createEventDispatcher } from 'svelte';
+  import { _ } from 'svelte-i18n';
 
   /** Two-way bindable HTML string. */
   export let value = '';
-  export let placeholder = 'Tweaks, observations, who liked it…';
+  export let placeholder = '';
+  $: shownPlaceholder = placeholder || $_('rich_text_editor_ui.placeholder');
   /** Visible row count target — controls min-height. */
   export let rows = 4;
 
@@ -52,14 +54,14 @@
   // not on graphic design.
   let colorOpen = false;
   const COLORS = [
-    { name: 'Default', value: '' },
-    { name: 'Red',     value: '#EF4444' },
-    { name: 'Orange',  value: '#F59E0B' },
-    { name: 'Yellow',  value: '#EAB308' },
-    { name: 'Green',   value: '#10B981' },
-    { name: 'Blue',    value: '#3B82F6' },
-    { name: 'Purple',  value: '#A855F7' },
-    { name: 'Pink',    value: '#EC4899' },
+    { nameKey: 'rich_text_editor_ui.color_default', value: '' },
+    { nameKey: 'rich_text_editor_ui.color_red',     value: '#EF4444' },
+    { nameKey: 'rich_text_editor_ui.color_orange',  value: '#F59E0B' },
+    { nameKey: 'rich_text_editor_ui.color_yellow',  value: '#EAB308' },
+    { nameKey: 'rich_text_editor_ui.color_green',   value: '#10B981' },
+    { nameKey: 'rich_text_editor_ui.color_blue',    value: '#3B82F6' },
+    { nameKey: 'rich_text_editor_ui.color_purple',  value: '#A855F7' },
+    { nameKey: 'rich_text_editor_ui.color_pink',    value: '#EC4899' },
   ];
   function applyColor(c) {
     if (!c.value) {
@@ -91,30 +93,30 @@
 </script>
 
 <div class="rte">
-  <div class="rte-toolbar" role="toolbar" aria-label="Formatting">
-    <button type="button" class="rte-btn" on:click={() => exec('bold')} title="Bold (Ctrl+B)" aria-label="Bold">
+  <div class="rte-toolbar" role="toolbar" aria-label={$_('rich_text_editor_ui.formatting')}>
+    <button type="button" class="rte-btn" on:click={() => exec('bold')} title={$_('rich_text_editor_ui.bold_shortcut')} aria-label={$_('rich_text_editor_ui.bold')}>
       <strong>B</strong>
     </button>
-    <button type="button" class="rte-btn" on:click={() => exec('italic')} title="Italic (Ctrl+I)" aria-label="Italic">
+    <button type="button" class="rte-btn" on:click={() => exec('italic')} title={$_('rich_text_editor_ui.italic_shortcut')} aria-label={$_('rich_text_editor_ui.italic')}>
       <em>I</em>
     </button>
-    <button type="button" class="rte-btn" on:click={() => exec('underline')} title="Underline (Ctrl+U)" aria-label="Underline">
+    <button type="button" class="rte-btn" on:click={() => exec('underline')} title={$_('rich_text_editor_ui.underline_shortcut')} aria-label={$_('rich_text_editor_ui.underline')}>
       <span style="text-decoration: underline">U</span>
     </button>
-    <button type="button" class="rte-btn" on:click={() => exec('strikeThrough')} title="Strikethrough" aria-label="Strikethrough">
+    <button type="button" class="rte-btn" on:click={() => exec('strikeThrough')} title={$_('rich_text_editor_ui.strikethrough')} aria-label={$_('rich_text_editor_ui.strikethrough')}>
       <span style="text-decoration: line-through">S</span>
     </button>
     <span class="rte-sep" aria-hidden="true"></span>
     <div class="rte-color-wrap">
       <button type="button" class="rte-btn" on:click={() => colorOpen = !colorOpen}
-        title="Text Color" aria-label="Text color" aria-haspopup="true" aria-expanded={colorOpen}>
+        title={$_('rich_text_editor_ui.text_color')} aria-label={$_('rich_text_editor_ui.text_color')} aria-haspopup="true" aria-expanded={colorOpen}>
         <span class="material-symbols-rounded">format_color_text</span>
       </button>
       {#if colorOpen}
         <div class="rte-color-pop" role="menu">
           {#each COLORS as c}
             <button type="button" class="rte-color-swatch" on:click={() => applyColor(c)}
-              title={c.name} aria-label={c.name}
+              title={$_(c.nameKey)} aria-label={$_(c.nameKey)}
               style={c.value ? `background:${c.value}` : ''}
               class:default={!c.value}>
               {#if !c.value}
@@ -126,10 +128,10 @@
       {/if}
     </div>
     <span class="rte-sep" aria-hidden="true"></span>
-    <button type="button" class="rte-btn" on:click={() => exec('insertUnorderedList')} title="Bullet List" aria-label="Bullet list">
+    <button type="button" class="rte-btn" on:click={() => exec('insertUnorderedList')} title={$_('rich_text_editor_ui.bullet_list')} aria-label={$_('rich_text_editor_ui.bullet_list')}>
       <span class="material-symbols-rounded">format_list_bulleted</span>
     </button>
-    <button type="button" class="rte-btn" on:click={() => exec('insertOrderedList')} title="Numbered List" aria-label="Numbered list">
+    <button type="button" class="rte-btn" on:click={() => exec('insertOrderedList')} title={$_('rich_text_editor_ui.numbered_list')} aria-label={$_('rich_text_editor_ui.numbered_list')}>
       <span class="material-symbols-rounded">format_list_numbered</span>
     </button>
   </div>
@@ -141,11 +143,11 @@
     on:paste={_onPaste}
     role="textbox"
     aria-multiline="true"
-    aria-placeholder={placeholder}
+    aria-placeholder={shownPlaceholder}
     style="min-height: {rows * 1.5}em"
   ></div>
   {#if !value}
-    <span class="rte-placeholder" aria-hidden="true">{placeholder}</span>
+    <span class="rte-placeholder" aria-hidden="true">{shownPlaceholder}</span>
   {/if}
 </div>
 

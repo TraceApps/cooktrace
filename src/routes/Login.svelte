@@ -24,7 +24,7 @@
   async function biometricLogin() {
     try {
       const bio = await import('../lib/biometric.js');
-      const ok = await bio.authenticate('Sign in to CookTrace');
+      const ok = await bio.authenticate($_('login_ui.biometric_reason'));
       if (!ok) return;
       const saved = await bio.readSavedToken();
       if (!saved) { showError($_('login_ct.toast.no_saved')); return; }

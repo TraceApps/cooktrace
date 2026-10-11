@@ -402,9 +402,9 @@
   async function deleteItem() {
     if (!isEdit) return;
     const ok = await confirmDialog({
-      title: 'Remove from pantry?',
-      message: `"${item.name}" will be removed. Recipes referencing it stay; this just drops it from your pantry.`,
-      confirmText: 'Remove',
+      title: $_('pantry_editor_ui.remove_title'),
+      message: $_('pantry_editor_ui.remove_message', { values: { name: item.name } }),
+      confirmText: $_('pantry_editor_ui.remove'),
       dangerous: true,
     });
     if (!ok) return;
@@ -447,12 +447,12 @@
 
 <div class="page-shell editor-page">
   <header class="editor-header">
-    <button class="btn-icon" on:click={pop} aria-label="Back" title="Back">
+    <button class="btn-icon" on:click={pop} aria-label={$_('common.back')} title={$_('common.back')}>
       <span class="material-symbols-rounded">arrow_back</span>
     </button>
-    <h2 class="editor-title">{isEdit ? 'Edit Pantry Item' : 'Add Pantry Item'}</h2>
+    <h2 class="editor-title">{isEdit ? $_('pantry_editor.title_edit') : $_('pantry_editor.title_add')}</h2>
     <button class="btn btn-primary editor-save" on:click={save} disabled={saving || imgUploading}>
-      {imgUploading ? 'Uploading…' : saving ? 'Saving…' : 'Save'}
+      {imgUploading ? $_('pantry_editor.actions.uploading') : saving ? $_('common.saving') : $_('common.save')}
     </button>
   </header>
 
@@ -477,12 +477,12 @@
       <div class="card editor-card">
         <div class="editor-card-title">{$_('pantry_editor_ct.basic_info')}</div>
         <div class="form-group">
-          <label class="form-label">Name *</label>
-          <input class="input" type="text" placeholder="All-purpose flour" bind:value={item.name} />
+          <label class="form-label">{$_('pantry_editor_ct.name')} *</label>
+          <input class="input" type="text" placeholder={$_('pantry_editor.fields.name_placeholder')} bind:value={item.name} />
         </div>
         <div class="form-group">
           <label class="form-label">{$_('pantry_editor_ct.brand')}</label>
-          <input class="input" type="text" placeholder="e.g. King Arthur" bind:value={item.brand} />
+          <input class="input" type="text" placeholder={$_('pantry_editor.fields.brand_placeholder')} bind:value={item.brand} />
         </div>
         <div class="form-row" style="align-items:flex-end">
           <div class="form-group" style="flex:1">
@@ -496,9 +496,9 @@
           </div>
           <button type="button" class="btn-icon link-btn" class:linked
             title={linked
-              ? 'Linked: changing serving size scales every nutrient proportionally'
-              : 'Unlinked: nutrient values stay put when you change serving size'}
-            aria-label="Toggle proportional scaling"
+              ? $_('pantry_editor.linked.linked')
+              : $_('pantry_editor.linked.unlinked')}
+            aria-label={$_('pantry_editor_ui.toggle_scaling')}
             on:click={() => linked = !linked}>
             <span class="material-symbols-rounded" style="font-size:20px">{linked ? 'link' : 'link_off'}</span>
           </button>
@@ -512,17 +512,17 @@
         <div class="form-row" style="align-items:flex-end">
           <div class="form-group" style="flex:1">
             <label class="form-label">
-              Density <span class="field-hint">(g per cup, optional)</span>
+              {$_('pantry_editor_ui.density')} <span class="field-hint">{$_('pantry_editor_ui.density_hint')}</span>
             </label>
-            <input class="input" type="number" min="0" step="1" placeholder="e.g. 120 for flour"
+            <input class="input" type="number" min="0" step="1" placeholder={$_('pantry_editor_ui.density_placeholder')}
               bind:value={item.g_per_cup} />
           </div>
           <button type="button" class="btn btn-secondary" style="height:38px"
             on:click={lookupDensity}
             disabled={!item.name?.trim()}
-            title="Fill from the built-in density table">
+            title={$_('pantry_editor_ui.density_lookup_title')}>
             <span class="material-symbols-rounded" style="font-size:16px;vertical-align:middle;margin-right:3px">auto_awesome</span>
-            Look it up
+            {$_('pantry_editor_ui.density_lookup')}
           </button>
         </div>
         <div class="form-group">
@@ -530,7 +530,7 @@
           <div class="barcode-input-wrap">
             <input class="input barcode-input" type="text" inputmode="numeric"
               placeholder={$_('pantry_editor_ct.optional_ph')} bind:value={item.barcode} />
-            <button type="button" class="barcode-scan-inline" aria-label="Scan barcode" title="Scan barcode"
+            <button type="button" class="barcode-scan-inline" aria-label={$_('pantry.scan_barcode')} title={$_('pantry.scan_barcode')}
               on:click={() => editorScannerOpen = true}>
               <span class="material-symbols-rounded">barcode_scanner</span>
             </button>
@@ -539,17 +539,17 @@
             <div class="form-row" style="gap:8px;margin-top:8px">
               <button class="btn btn-secondary" style="flex:1"
                 on:click={shareOrViewOnOFF} disabled={contributing}
-                title={offProductExists ? 'Open this product on Open Food Facts' : !item.name ? 'Name required' : 'Submit this item to OFF (requires OFF account in Settings)'}>
+                title={offProductExists ? $_('pantry_editor_ui.off_open_title') : !item.name ? $_('pantry_editor_ui.off_name_required') : $_('pantry_editor_ui.off_submit_title')}>
                 <span class="material-symbols-rounded" style="font-size:15px;vertical-align:middle;margin-right:4px">
                   {offProductExists ? 'open_in_new' : 'upload'}
                 </span>
-                {contributing ? 'Uploading…' : offSuccess ? 'Submitted!' : offProductExists ? 'View on OFF' : 'Share to OFF'}
+                {contributing ? $_('pantry_editor.actions.uploading') : offSuccess ? $_('pantry_editor_ui.off_submitted') : offProductExists ? $_('pantry_editor_ui.off_view') : $_('pantry_editor.actions.share_to_off')}
               </button>
               <button class="btn btn-secondary" style="flex:1" on:click={downloadFromOFF}
                 disabled={downloading}
-                title="Pull data from Open Food Facts">
+                title={$_('pantry_editor_ui.off_pull_title')}>
                 <span class="material-symbols-rounded" style="font-size:15px;vertical-align:middle;margin-right:4px">download</span>
-                {downloading ? 'Loading…' : downloadSuccess ? 'Updated!' : 'Refresh from OFF'}
+                {downloading ? $_('common.loading') : downloadSuccess ? $_('pantry_editor_ui.off_updated') : $_('pantry_editor.actions.refresh_off')}
               </button>
             </div>
             {#if offSuccess}
@@ -557,17 +557,17 @@
                 {#if offVerified === null}
                   <span class="off-verify-checking">
                     <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">hourglass_top</span>
-                    Verifying on Open Food Facts…
+                    {$_('pantry_editor_ui.off_verifying')}
                   </span>
                 {:else if offVerified}
                   <span class="off-verify-ok">
                     <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">check_circle</span>
-                    Confirmed live on Open Food Facts
+                    {$_('pantry_editor_ui.off_confirmed')}
                   </span>
                 {:else}
                   <span class="off-verify-pending">
                     <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">schedule</span>
-                    Submitted, may take a few minutes to appear
+                    {$_('pantry_editor_ui.off_pending')}
                   </span>
                 {/if}
               </div>
@@ -604,23 +604,23 @@
           mode="single"
           value={categoryName}
           options={pantryCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color }))}
-          placeholder="Pick or create a category…"
+          placeholder={$_('pantry_editor_ui.category_placeholder')}
           creatable={true}
-          createLabel="Create category"
+          createLabel={$_('pantry_editor_ui.create_category')}
           on:select={onPantryCategorySelect}
           on:create={openNewPantryCategoryDialog}
           on:change={(e) => {
             if (!e.detail) { item.category_id = null; item.category = ''; item = item; }
           }}
         />
-        <p class="field-hint" style="margin-top:6px">Manage the full list in Manage &rarr; Pantry Categories.</p>
+        <p class="field-hint" style="margin-top:6px">{$_('pantry_editor_ui.category_hint')}</p>
       </div>
 
       <!-- Notes — kept above Nutrition so the field order matches NT
            FoodEditor (Photo / Basic info / Categories / Notes / Nutrition). -->
       <div class="card editor-card">
         <div class="editor-card-title">{$_('pantry_editor_ct.notes')}</div>
-        <textarea class="input textarea" rows="3" placeholder="Where you keep it, expiration, anything else…"
+        <textarea class="input textarea" rows="3" placeholder={$_('pantry_editor.fields.notes_placeholder')}
           bind:value={item.notes}></textarea>
       </div>
 
@@ -628,7 +628,7 @@
            entered in Basic info above. Sodium ↔ salt auto-derives. -->
       <div class="card editor-card">
         <div class="editor-card-title">{$_('pantry_editor_ct.nutrition')}</div>
-        <p class="card-hint">Values are per the Serving size set in Basic info. Filling these in unlocks recipe nutrition auto-calc, but they're useful on their own too.</p>
+        <p class="card-hint">{$_('pantry_editor_ui.nutrition_hint')}</p>
         {#each visibleNutriments as n (n.id)}
           {@const derived = (n.id === 'sodium' || n.id === 'salt') && isDerived(item.nutrition, n.id)}
           <div class="form-group" class:nutrient-sub={n.subOf}>
@@ -637,8 +637,8 @@
               {#if derived}
                 <span class="material-symbols-rounded derived-badge"
                   title={n.id === 'sodium'
-                    ? 'Auto-calculated from salt (× 400 mg/g)'
-                    : 'Auto-calculated from sodium (÷ 400)'}>calculate</span>
+                    ? $_('pantry_editor_ui.derived_sodium')
+                    : $_('pantry_editor_ui.derived_salt')}>calculate</span>
               {/if}
             </label>
             <input class="input"
@@ -649,7 +649,7 @@
           </div>
         {/each}
         <button class="btn btn-ghost w-full" on:click={() => showAllNutrients = !showAllNutrients}>
-          {showAllNutrients ? 'Show Less' : 'Show All Nutrients'}
+          {showAllNutrients ? $_('pantry_editor.actions.show_less') : $_('pantry_editor.actions.show_all_nutrients')}
         </button>
       </div>
 
@@ -658,7 +658,7 @@
           <div class="editor-card-title danger">{$_('pantry_editor_ct.danger_zone')}</div>
           <button class="btn btn-secondary danger-btn" on:click={deleteItem}>
             <span class="material-symbols-rounded">delete</span>
-            Remove from Pantry
+            {$_('pantry_editor.actions.remove')}
           </button>
         </div>
       {/if}

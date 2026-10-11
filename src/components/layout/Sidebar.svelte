@@ -32,12 +32,12 @@
   }
 
   const navItems = [
-    { path: '/recipes',  icon: 'menu_book',     label: 'Recipes'  },
-    { path: '/pantry',   icon: 'kitchen',       label: 'Pantry'   },
-    { path: '/diary',    icon: 'event_note',    label: 'Diary'    },
-    { path: '/shopping', icon: 'shopping_cart', label: 'Shopping' },
-    { path: '/manage',   icon: 'tune',          label: 'Manage'   },
-    { path: '/settings', icon: 'settings',      label: 'Settings' },
+    { path: '/recipes',  icon: 'menu_book',     labelKey: 'nav.recipes'  },
+    { path: '/pantry',   icon: 'kitchen',       labelKey: 'nav.pantry'   },
+    { path: '/diary',    icon: 'event_note',    labelKey: 'nav.diary'    },
+    { path: '/shopping', icon: 'shopping_cart', labelKey: 'nav.shopping' },
+    { path: '/manage',   icon: 'tune',          labelKey: 'nav.manage'   },
+    { path: '/settings', icon: 'settings',      labelKey: 'nav.settings' },
   ];
 
   function go(path) {
@@ -105,14 +105,14 @@
     class:sidebar-persistent={persistent}
     in:fly={{ x: -280, duration: persistent ? 0 : 280, easing: cubicOut }}
     out:fly={{ x: -280, duration: persistent ? 0 : 200 }}
-    aria-label="Navigation menu"
+    aria-label={$_('sidebar_ui.nav_menu')}
   >
     <!-- App branding -->
     <div class="sidebar-brand">
       <img class="brand-icon" src={iconUrl('/icons/logo.png')} alt="CookTrace" />
       <div class="brand-text">
         <span class="brand-name">{$_('sidebar_ct.brand')}</span>
-        <span class="brand-tagline">Trace Every Recipe — From Pantry to Plate</span>
+        <span class="brand-tagline">{$_('sidebar_ui.tagline')}</span>
       </div>
     </div>
 
@@ -129,10 +129,10 @@
           <span class="material-symbols-rounded sidebar-icon">
             {item.icon}
             {#if item.path === '/settings' && ($updateAvailable.available || $pwaUpdateReady)}
-              <span class="nav-update-dot" aria-label="Update available"></span>
+              <span class="nav-update-dot" aria-label={$_('updates.server.available_chip')}></span>
             {/if}
           </span>
-          <span class="sidebar-label">{item.label}</span>
+          <span class="sidebar-label">{$_(item.labelKey)}</span>
           {#if isTabActive(item.path)}
             <div class="active-indicator"></div>
           {/if}

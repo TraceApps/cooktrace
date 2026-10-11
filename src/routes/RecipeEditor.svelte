@@ -237,7 +237,7 @@
   let autoCalcStatus = '';
 
   async function autoCalcNutrition() {
-    autoCalcStatus = 'Loading pantry…';
+    autoCalcStatus = $_('recipe_editor_ui.loading_pantry');
     try {
       // Pull the latest pantry rows so we have nutrition data + serving.
       const pantry = await NtApi.getPantry();
@@ -258,16 +258,16 @@
 
       const result = computeRecipeNutrition(ingredientsForCalc, byId);
       if (result.used === 0) {
-        autoCalcStatus = `No pantry rows had nutrition data. Add serving + nutrition to pantry items first.`;
+        autoCalcStatus = $_('recipe_editor_ui.autocalc_no_data');
         return;
       }
 
       const hadValues = Object.values(nutrition).some(v => Number.isFinite(v) && v > 0);
       if (hadValues) {
         const ok = await confirmDialog({
-          title: 'Replace existing nutrition?',
-          message: 'You have manually-entered values for this recipe. Auto-calc will overwrite them.',
-          confirmText: 'Replace',
+          title: $_('recipe_editor_ui.replace_nutrition_title'),
+          message: $_('recipe_editor_ui.replace_nutrition_message'),
+          confirmText: $_('recipe_editor_ui.replace'),
         });
         if (!ok) { autoCalcStatus = ''; return; }
       }
@@ -281,10 +281,10 @@
       nutrition = perServing;
       const skipped = result.total - result.used;
       autoCalcStatus = skipped > 0
-        ? `Computed from ${result.used} of ${result.total} ingredients — ${skipped} skipped (no pantry data or unit mismatch).`
-        : `Computed from all ${result.total} ingredients.`;
+        ? $_('recipe_editor_ui.autocalc_partial', { values: { used: result.used, total: result.total, skipped } })
+        : $_('recipe_editor_ui.autocalc_all', { values: { total: result.total } });
     } catch (e) {
-      autoCalcStatus = `Couldn't compute: ${e.message || 'pantry load failed'}`;
+      autoCalcStatus = $_('recipe_editor_ui.autocalc_failed', { values: { error: e.message || $_('recipe_editor_ui.pantry_load_failed') } });
     }
   }
   $: visibleNutSet = new Set(
@@ -295,6 +295,8 @@
   // Show full catalog when the panel is "expanded all" — defer for now,
   // visibleNutriments is the single knob.
   $: editableNutriments = NUTRIMENTS.filter(n => visibleNutSet.has(n.id));
+  // Nutrient labels by id, reactive to the locale.
+  $: nutLabel = (nut) => $_(`nutriments.${nut.id}`, { default: nut.label });
 
   function _blankGroup() {
     return { name: '', items: [_blankIngredient()] };
@@ -621,7 +623,7 @@
     const head = cur.items.slice(0, ii);
     const tail = cur.items.slice(ii);
     const headGroup = head.length > 0 ? [{ ...cur, items: head }] : [];
-    const tailGroup = { name: 'New section', items: tail };
+    const tailGroup = { name: $_('recipe_editor_ui.new_section'), items: tail };
     ingredientGroups = [
       ...ingredientGroups.slice(0, gi),
       ...headGroup,
@@ -795,17 +797,17 @@
     : null;
   $: ingActions = ingActionTarget ? [
     {
-      label: (ingActionTarget.note && ingActionTarget.note.trim()) ? 'Edit Note' : 'Add Note',
+      label: (ingActionTarget.note && ingActionTarget.note.trim()) ? $_('recipe_editor_ui.edit_note') : $_('recipe_editor_ui.add_note'),
       icon: 'edit_note',
       value: 'note',
     },
     {
-      label: ingActionTarget.pantry_item_id ? 'Unlink Pantry' : 'Link to Pantry',
+      label: ingActionTarget.pantry_item_id ? $_('recipe_editor_ui.unlink_pantry') : $_('recipe_editor_ui.link_to_pantry'),
       icon: 'kitchen',
       value: 'pantry',
     },
-    { label: 'Start Section Here', icon: 'subdirectory_arrow_right', value: 'section' },
-    { label: 'Delete',              icon: 'delete',                   value: 'delete', danger: true },
+    { label: $_('recipe_editor_ui.start_section_here'), icon: 'subdirectory_arrow_right', value: 'section' },
+    { label: $_('common.delete'), icon: 'delete', value: 'delete', danger: true },
   ] : [];
   function onIngredientAction(e) {
     const v = e.detail?.value;
@@ -968,11 +970,11 @@
 
 <div class="page-shell editor-page">
   <header class="editor-header">
-    <h2 class="editor-title">{isEdit ? 'Edit Recipe' : 'New Recipe'}</h2>
+    <h2 class="editor-title">{isEdit ? $_('recipe_editor_ui.edit_recipe') : $_('recipe_editor_ui.new_recipe')}</h2>
     <button class="btn btn-primary editor-save" on:click={save} disabled={saving || imgUploading}>
-      {imgUploading ? 'Uploading…' : saving ? 'Saving…' : 'Save'}
+      {imgUploading ? $_('recipe_editor_ui.uploading') : saving ? $_('common.saving') : $_('common.save')}
     </button>
-    <button class="btn-icon close-btn" on:click={cancel} aria-label="Close" title="Close">
+    <button class="btn-icon close-btn" on:click={cancel} aria-label={$_('common.close')} title={$_('common.close')}>
       <span class="material-symbols-rounded">close</span>
     </button>
   </header>
@@ -988,7 +990,7 @@
           {#if _draftRestorable && !_draftRestored}
             <div class="draft-banner" transition:slide={{ duration: 180 }}>
               <span class="material-symbols-rounded">restore</span>
-              <span class="draft-msg">Unsaved draft from a previous session — restore?</span>
+              <span class="draft-msg">{$_('recipe_editor_ui.draft_banner')}</span>
               <div class="draft-actions">
                 <button class="btn btn-secondary tiny" type="button" on:click={discardDraft}>{$_('recipe_editor_ct.discard')}</button>
                 <button class="btn btn-primary tiny" type="button" on:click={restoreDraft}>{$_('recipe_editor_ct.restore')}</button>
@@ -1018,7 +1020,7 @@
               class="input"
               rows="4"
               bind:value={description}
-              placeholder="Quick one-bowl loaf, freezes well"
+              placeholder={$_('recipe_editor_ui.description_ph')}
             ></textarea>
           </label>
 
@@ -1039,13 +1041,13 @@
               <input class="input num" type="number" min="0" bind:value={cookMinutes} />
             </label>
             <label class="field flex">
-              <span class="field-label" title="Any hands-off time: dough rise, meat rest, marinate, chill, soak, ferment. Rolls into the auto-calculated Total below.">Rest (min)</span>
+              <span class="field-label" title={$_('recipe_editor_ui.rest_hint')}>{$_('editor.rest_min')}</span>
               <input class="input num" type="number" min="0" bind:value={restMinutes} />
             </label>
             <label class="field flex">
-              <span class="field-label" title="Auto-calculated from prep + cook + rest unless you set a value here. Use it to include time the three component fields don't cover.">Total (min)</span>
+              <span class="field-label" title={$_('recipe_editor_ui.total_hint')}>{$_('editor.total_min')}</span>
               <input class="input num" type="number" min="0"
-                placeholder={totalAutoCalc > 0 ? `auto: ${totalAutoCalc}` : 'auto'}
+                placeholder={totalAutoCalc > 0 ? $_('recipe_editor_ui.auto_n', { values: { n: totalAutoCalc } }) : $_('recipe_editor_ui.auto')}
                 bind:value={totalMinutes} />
             </label>
             <label class="field flex">
@@ -1076,10 +1078,10 @@
                       class="input ing-group-name"
                       type="text"
                       bind:value={group.name}
-                      placeholder="Section name (e.g. Sauce, Dough)"
+                      placeholder={$_('recipe_editor_ui.section_name_ph')}
                     />
                     <button class="btn-icon small" on:click={() => removeGroup(gi)}
-                      aria-label="Remove section" title="Remove section">
+                      aria-label={$_('recipe_editor_ui.remove_section')} title={$_('recipe_editor_ui.remove_section')}>
                       <span class="material-symbols-rounded">delete_sweep</span>
                     </button>
                   </div>
@@ -1098,16 +1100,16 @@
                       data-no-pull-sync
                       on:dragstart={(e) => _onDragStart(gi, ii, e)}
                       on:dragend={_onDragEnd}
-                      aria-label="Drag to reorder"
-                      title="Drag to reorder">
+                      aria-label={$_('recipe_editor_ui.drag_to_reorder')}
+                      title={$_('recipe_editor_ui.drag_to_reorder')}>
                       <span class="material-symbols-rounded">drag_indicator</span>
                     </button>
                     <input class="input ing-qty"  type="text" bind:value={ing.qty}  placeholder="1"
                       on:blur={() => ing.qty = _normaliseQtyForUnit(ing.qty, ing.unit)} />
-                    <UnitPicker bind:value={ing.unit} placeholder="unit"
+                    <UnitPicker bind:value={ing.unit} placeholder={$_('recipe_editor_ui.unit_ph')}
                       on:change={() => ing.qty = _normaliseQtyForUnit(ing.qty, ing.unit)} />
                     <div class="ing-name-wrap">
-                      <IngredientNameField bind:value={ing.name} suggestions={pantryNames} placeholder="flour" />
+                      <IngredientNameField bind:value={ing.name} suggestions={pantryNames} placeholder={$_('recipe_editor_ui.ingredient_ph')} />
                       <!-- Mobile state indicators: signal linked-pantry
                            and has-note state on the primary row so the
                            user sees what's stashed behind the kebab
@@ -1115,42 +1117,44 @@
                            kebab is the tap target. -->
                       <span class="ing-indicators">
                         {#if ing.pantry_item_id}
-                          <span class="ing-ind linked" title={pantryNamesById.get(ing.pantry_item_id) ? `Linked to ${pantryNamesById.get(ing.pantry_item_id)}` : 'Linked to Pantry'}>
+                          <span class="ing-ind linked" title={pantryNamesById.get(ing.pantry_item_id) ? $_('recipe_editor_ui.linked_to', { values: { name: pantryNamesById.get(ing.pantry_item_id) } }) : $_('recipe_editor_ui.linked_to_pantry')}>
                             <span class="material-symbols-rounded">kitchen</span>
                           </span>
                         {/if}
                         {#if ing.note && ing.note.trim()}
-                          <span class="ing-ind note" title="Has a note">
+                          <span class="ing-ind note" title={$_('recipe_editor_ui.has_note')}>
                             <span class="material-symbols-rounded">edit_note</span>
                           </span>
                         {/if}
                       </span>
                     </div>
-                    <input class="input ing-note" type="text" bind:value={ing.note} placeholder="sifted" />
+                    <input class="input ing-note" type="text" bind:value={ing.note} placeholder={$_('recipe_editor_ui.note_ph')} />
                     <button class="btn-icon small pantry-swap-btn desktop-only-btn"
                       class:linked={!!ing.pantry_item_id}
                       on:click={() => ing.pantry_item_id ? unlinkRowAt(gi, ii) : openPantrySwap(gi, ii)}
                       aria-label={ing.pantry_item_id
-                        ? `Linked to ${pantryNamesById.get(ing.pantry_item_id) || 'a Pantry item'} — click to unlink`
-                        : 'Link to a Pantry item'}
+                        ? (pantryNamesById.get(ing.pantry_item_id)
+                            ? $_('recipe_editor_ui.linked_to_unlink', { values: { name: pantryNamesById.get(ing.pantry_item_id) } })
+                            : $_('recipe_editor_ui.linked_generic_unlink'))
+                        : $_('recipe_editor_ui.link_pantry_item')}
                       title={ing.pantry_item_id
                         ? (pantryNamesById.get(ing.pantry_item_id)
-                            ? `Linked to ${pantryNamesById.get(ing.pantry_item_id)} — click to unlink`
-                            : 'Linked to a Pantry item — click to unlink')
-                        : 'Link to a Pantry item'}>
+                            ? $_('recipe_editor_ui.linked_to_unlink', { values: { name: pantryNamesById.get(ing.pantry_item_id) } })
+                            : $_('recipe_editor_ui.linked_generic_unlink'))
+                        : $_('recipe_editor_ui.link_pantry_item')}>
                       <span class="material-symbols-rounded">kitchen</span>
                     </button>
                     <button class="btn-icon small desktop-only-btn" on:click={() => toggleSectionAt(gi, ii)}
-                      aria-label="Start a section here" title="Start a new section at this row">
+                      aria-label={$_('recipe_editor_ui.start_section_aria')} title={$_('recipe_editor_ui.start_section_title')}>
                       <span class="material-symbols-rounded">subdirectory_arrow_right</span>
                     </button>
-                    <button class="btn-icon small desktop-only-btn" on:click={() => removeIngredient(gi, ii)} aria-label="Remove" title="Remove">
+                    <button class="btn-icon small desktop-only-btn" on:click={() => removeIngredient(gi, ii)} aria-label={$_('recipe_editor_ui.remove')} title={$_('recipe_editor_ui.remove')}>
                       <span class="material-symbols-rounded">delete</span>
                     </button>
                     <!-- Kebab lives on mobile only. Rolls up the three
                          actions above + note editing into one tap. -->
                     <button class="btn-icon small ing-kebab" on:click={() => openIngredientMenu(gi, ii)}
-                      aria-label="Ingredient actions" title="Actions">
+                      aria-label={$_('recipe_editor_ui.ingredient_actions')} title={$_('recipe_editor_ui.actions')}>
                       <span class="material-symbols-rounded">more_vert</span>
                     </button>
                   </div>
@@ -1163,7 +1167,7 @@
                     <div class="ing-note-row">
                       <input class="input ing-note-mobile" type="text"
                         bind:value={ing.note}
-                        placeholder="Note (e.g. sifted, room-temp)"
+                        placeholder={$_('recipe_editor_ui.note_mobile_ph')}
                         autofocus={notesExpanded.has(_ingKey(gi, ii)) && !(ing.note && ing.note.trim())} />
                     </div>
                   {/if}
@@ -1178,10 +1182,10 @@
                  add buttons would be redundant. -->
             <div class="ing-add-row">
               <button class="btn btn-secondary add-btn" on:click={() => addIngredient(ingredientGroups.length - 1)}>
-                <span class="material-symbols-rounded">add</span> Add Ingredient
+                <span class="material-symbols-rounded">add</span> {$_('editor.add_ingredient')}
               </button>
               <button class="btn btn-secondary add-btn pantry-add-btn" on:click={() => openPantryPicker(ingredientGroups.length - 1)}>
-                <span class="material-symbols-rounded">kitchen</span> Add from Pantry
+                <span class="material-symbols-rounded">kitchen</span> {$_('recipe_editor_ui.add_from_pantry')}
               </button>
             </div>
           </section>
@@ -1189,7 +1193,7 @@
           <!-- Steps -->
           <section class="section editor-col-steps">
             <h2 class="section-title">{$_('recipe_editor_ct.steps')}</h2>
-            {#each steps as _, i (i)}
+            {#each steps as _step, i (i)}
               <div class="step-row"
                 class:dragging={stepDragSource === i}
                 class:drag-over={stepDragOver === i}
@@ -1202,8 +1206,8 @@
                   on:dragstart={(e) => _onStepDragStart(i, e)}
                   on:dragend={_onStepDragEnd}
                   type="button"
-                  aria-label="Drag to reorder"
-                  title="Drag to reorder">
+                  aria-label={$_('recipe_editor_ui.drag_to_reorder')}
+                  title={$_('recipe_editor_ui.drag_to_reorder')}>
                   <span class="material-symbols-rounded">drag_indicator</span>
                 </button>
                 <span class="step-num">{i + 1}</span>
@@ -1212,7 +1216,7 @@
                     class="input step-title-input"
                     type="text"
                     bind:value={steps[i].title}
-                    placeholder="Optional summary (e.g. Preheat Oven)"
+                    placeholder={$_('recipe_editor_ui.step_title_ph')}
                   />
                   <div class="step-text-wrap">
                     <MarkdownToolbar bind:textarea={stepTextareas[i]} onChange={(v) => steps[i].text = v} />
@@ -1221,12 +1225,13 @@
                       rows="4"
                       bind:this={stepTextareas[i]}
                       bind:value={steps[i].text}
-                      placeholder="Preheat oven to 350°F…"
+                      placeholder={$_('recipe_editor_ui.step_text_ph')}
                     ></textarea>
                   </div>
                   {#if i === 0}
                     <p class="step-hint">
-                      Markdown: <strong>**bold**</strong>, <em>*italic*</em>, <u>__underline__</u>, <code>- bullet</code>, <code>1. number</code>. Time mentions like <em>15 minutes</em> become tappable timers.
+                      {$_('recipe_editor_ui.md_label')} <strong>**{$_('recipe_editor_ui.md_bold')}**</strong>, <em>*{$_('recipe_editor_ui.md_italic')}*</em>, <u>__{$_('recipe_editor_ui.md_underline')}__</u>, <code>- {$_('recipe_editor_ui.md_bullet')}</code>, <code>1. {$_('recipe_editor_ui.md_number')}</code>.
+                      {@html $_('recipe_editor_ui.timer_hint', { values: { example: `<em>${$_('recipe_editor_ui.timer_example')}</em>` } })}
                     </p>
                   {/if}
                   <!-- Per-step ingredient links (issue #40). Users tap
@@ -1244,12 +1249,12 @@
                       <button type="button" class="step-links-toggle"
                         on:click={() => toggleStepLinksPanel(i)}
                         aria-expanded={_expanded}
-                        title={_expanded ? 'Hide ingredient links' : 'Link ingredients used in this step'}>
+                        title={_expanded ? $_('recipe_editor_ui.hide_links') : $_('recipe_editor_ui.link_ingredients')}>
                         <span class="material-symbols-rounded">link</span>
                         <span class="step-links-label">
                           {_linked.size > 0
-                            ? `${_linked.size} ingredient${_linked.size === 1 ? '' : 's'} linked`
-                            : 'Link ingredients used in this step'}
+                            ? $_('recipe_editor_ui.n_linked', { values: { count: _linked.size } })
+                            : $_('recipe_editor_ui.link_ingredients')}
                         </span>
                         <span class="material-symbols-rounded step-links-chev" class:open={_expanded}>expand_more</span>
                       </button>
@@ -1258,7 +1263,7 @@
                           {#each allIngredientOptions as opt (opt.id)}
                             <button type="button" class="step-link-chip" class:active={_linked.has(opt.id)}
                               on:click={() => toggleStepIngredientRef(i, opt.id)}
-                              title={_linked.has(opt.id) ? 'Unlink from this step' : 'Link to this step'}>
+                              title={_linked.has(opt.id) ? $_('recipe_editor_ui.unlink_from_step') : $_('recipe_editor_ui.link_to_step')}>
                               {#if _linked.has(opt.id)}
                                 <span class="material-symbols-rounded">check</span>
                               {/if}
@@ -1279,26 +1284,26 @@
                     <div class="step-photo-mounted">
                       <img class="step-photo-thumb" src={resolveAssetUrl(steps[i].imgUrl)} alt="" />
                       <button class="btn btn-secondary tiny" on:click={() => steps[i].imgUrl = ''}
-                        type="button" aria-label="Remove step photo" title="Remove">
+                        type="button" aria-label={$_('recipe_editor_ui.remove_step_photo')} title={$_('recipe_editor_ui.remove')}>
                         <span class="material-symbols-rounded">close</span>
-                        Remove
+                        {$_('recipe_editor_ui.remove')}
                       </button>
                     </div>
                   {/if}
                 </div>
                 <div class="step-actions">
                   <button class="btn-icon small" on:click={() => openStepPhotoSheet(i)}
-                    aria-label="Add a step photo" title={steps[i].imgUrl ? 'Replace step photo' : 'Add a step photo'}>
+                    aria-label={$_('recipe_editor_ct.add_step_photo_ph')} title={steps[i].imgUrl ? $_('recipe_editor_ui.replace_step_photo') : $_('recipe_editor_ct.add_step_photo_ph')}>
                     <span class="material-symbols-rounded">add_a_photo</span>
                   </button>
-                  <button class="btn-icon small" on:click={() => removeStep(i)} aria-label="Remove">
+                  <button class="btn-icon small" on:click={() => removeStep(i)} aria-label={$_('recipe_editor_ui.remove')}>
                     <span class="material-symbols-rounded">delete</span>
                   </button>
                 </div>
               </div>
             {/each}
             <button class="btn btn-secondary add-btn" on:click={addStep}>
-              <span class="material-symbols-rounded">add</span> Add Step
+              <span class="material-symbols-rounded">add</span> {$_('editor.add_step')}
             </button>
           </section>
           </div><!-- /.editor-grid -->
@@ -1311,9 +1316,9 @@
               mode="single"
               value={categoryName}
               options={categories.map(c => ({ name: c.name, color: c.color }))}
-              placeholder="Pick or create a category…"
+              placeholder={$_('recipe_editor_ui.category_ph')}
               creatable={true}
-              createLabel="Create category"
+              createLabel={$_('recipe_editor_ui.create_category')}
               on:select={onCategorySelect}
               on:create={openNewCategoryDialog}
               on:change={(e) => { if (!e.detail) onCategoryClear(); }}
@@ -1327,11 +1332,11 @@
               mode="chips"
               bind:value={tags}
               options={tagOptions}
-              placeholder={tags.length ? '' : 'dessert, baking, freezer-friendly…'}
+              placeholder={tags.length ? '' : $_('recipe_editor_ui.tags_ph')}
               creatable={true}
-              createLabel="Create tag"
+              createLabel={$_('recipe_editor_ui.create_tag')}
             />
-            <span class="field-hint">Type to filter existing tags or create a new one.</span>
+            <span class="field-hint">{$_('recipe_editor_ui.tags_hint')}</span>
           </div>
 
           <div class="field">
@@ -1340,11 +1345,11 @@
               mode="chips"
               bind:value={tools}
               options={toolOptions}
-              placeholder={tools.length ? '' : 'spatula, parchment paper, sheet tray, dutch oven…'}
+              placeholder={tools.length ? '' : $_('recipe_editor_ui.gear_ph')}
               creatable={true}
-              createLabel="Add gear"
+              createLabel={$_('recipe_editor_ui.add_gear')}
             />
-            <span class="field-hint">Tools, pans, parchment, anything you'd reach for. Type to filter or create new.</span>
+            <span class="field-hint">{$_('recipe_editor_ui.gear_hint')}</span>
           </div>
 
           <!-- Nutrition (per serving) — collapsible. Renders inputs for the
@@ -1354,16 +1359,16 @@
           <section class="section">
             <button type="button" class="section-toggle" on:click={() => nutritionOpen = !nutritionOpen}>
               <span class="material-symbols-rounded">{nutritionOpen ? 'expand_less' : 'expand_more'}</span>
-              <span>{$_('recipe_editor_ct.nutrition')} <span class="field-hint">{$_('pantry_editor_ct.icon_hint')}</span></span>
+              <span>{$_('recipe_editor_ct.nutrition')} <span class="field-hint">{$_('recipe_editor_ct.nutrition_hint')}</span></span>
             </button>
             {#if nutritionOpen}
               <p class="field-hint" style="margin: 4px 0 8px;">
-                Customize which nutrients appear here in Settings &rarr; Nutrition.
+                {$_('recipe_editor_ui.nutrients_hint')}
               </p>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 12px">
                 <button type="button" class="btn btn-secondary" style="height:34px;font-size:12px" on:click={autoCalcNutrition}>
                   <span class="material-symbols-rounded" style="font-size:16px">auto_fix_high</span>
-                  Auto-calc from pantry
+                  {$_('recipe_editor_ui.autocalc_button')}
                 </button>
                 {#if autoCalcStatus}
                   <span class="field-hint" style="font-size:11px">{autoCalcStatus}</span>
@@ -1373,7 +1378,7 @@
                 {#each editableNutriments as nut (nut.id)}
                   <label class="field nut-field" class:nut-sub={nut.subOf}>
                     <span class="field-label">
-                      {nut.label}
+                      {nutLabel(nut)}
                       <span class="field-hint">{nut.unit}</span>
                     </span>
                     <input
@@ -1408,25 +1413,25 @@
               <button class="vid-btn" type="button"
                 on:click={() => _videoCameraInput?.click()}
                 disabled={videoUploading}
-                title="Record with your camera">
+                title={$_('recipe_editor_ui.record_title')}>
                 <span class="material-symbols-rounded">videocam</span>
                 <span>{$_('recipe_editor_ct.record')}</span>
               </button>
               <button class="vid-btn" type="button"
                 on:click={() => _videoFileInput?.click()}
                 disabled={videoUploading}
-                title="Upload a video file">
+                title={$_('recipe_editor_ui.upload_video_title')}>
                 <span class="material-symbols-rounded">upload</span>
                 <span>{$_('recipe_editor_ct.upload')}</span>
               </button>
               <div class="vid-url-wrap">
                 <span class="material-symbols-rounded">link</span>
                 <input class="input vid-url" type="url" bind:value={videoUrl}
-                  placeholder="Paste YouTube / Vimeo / video URL" />
+                  placeholder={$_('recipe_editor_ui.video_url_ph')} />
               </div>
             </div>
             {#if videoUploading}
-              <p class="video-hint upload">Uploading video…</p>
+              <p class="video-hint upload">{$_('recipe_editor_ui.uploading_video')}</p>
             {:else if videoUrl}
               <div class="video-preview">
                 {#if videoUrl.startsWith('/uploads/') || videoUrl.startsWith('uploads/')}
@@ -1441,7 +1446,7 @@
                   <span class="video-hint">{$_('recipe_editor_ct.external_url')}</span>
                 {/if}
                 <button class="btn-icon small" type="button" on:click={clearVideo}
-                  aria-label="Clear video" title="Clear video">
+                  aria-label={$_('recipe_editor_ui.clear_video')} title={$_('recipe_editor_ui.clear_video')}>
                   <span class="material-symbols-rounded">close</span>
                 </button>
               </div>
@@ -1450,7 +1455,7 @@
 
           <div class="field">
             <span class="field-label">{$_('recipe.notes')}</span>
-            <RichTextEditor bind:value={notes} placeholder="Tweaks, observations, who liked it…" rows={4} />
+            <RichTextEditor bind:value={notes} placeholder={$_('recipe_editor_ui.notes_ph')} rows={4} />
           </div>
 
         </div>
@@ -1466,17 +1471,17 @@
 {#if pantryPickerOpen}
   <div class="cat-modal-backdrop" on:click={closePantryPicker} use:closeOnBack={closePantryPicker}>
     <div class="cat-modal pantry-picker-modal" on:click|stopPropagation>
-      <h3 class="cat-modal-title">{pantryPickerMode === 'swap' ? 'Link to a Pantry Item' : 'Add from Pantry'}</h3>
+      <h3 class="cat-modal-title">{pantryPickerMode === 'swap' ? $_('recipe_editor_ui.link_pantry_item_title') : $_('recipe_editor_ui.add_from_pantry')}</h3>
       {#if pantryPickerMode === 'swap'}
-        <p class="pp-hint">Pick a Pantry item to link this ingredient to. Your typed name, quantity, and notes stay the same — the link just attaches the brand, nutrition, and stock data behind the scenes.</p>
+        <p class="pp-hint">{$_('recipe_editor_ui.pantry_link_hint')}</p>
       {/if}
-      <input class="input" type="search" placeholder="Search pantry…"
+      <input class="input" type="search" placeholder={$_('recipe_editor_ui.search_pantry_ph')}
         bind:value={pantryPickerQuery} autofocus />
       <div class="pantry-picker-list">
         {#if pantryPickerLoading}
-          <Spinner block label="Loading pantry…" />
+          <Spinner block label={$_('recipe_editor_ui.loading_pantry')} />
         {:else if pantryPickerFiltered.length === 0}
-          <p class="empty">{pantryPickerRows.length === 0 ? 'Your pantry is empty.' : `No pantry items match "${pantryPickerQuery}".`}</p>
+          <p class="empty">{pantryPickerRows.length === 0 ? $_('recipe_editor_ui.pantry_empty') : $_('recipe_editor_ui.pantry_no_match', { values: { query: pantryPickerQuery } })}</p>
         {:else}
           {#each pantryPickerFiltered as p (p.id)}
             <label class="pp-row" class:on={pantryPickerSelected.has(p.id)}>
@@ -1484,7 +1489,7 @@
                 on:change={() => togglePantrySelected(p.id)} />
               <span class="pp-name">{p.name}</span>
               {#if p.brand}<span class="pp-brand">{p.brand}</span>{/if}
-              {#if !p.in_stock}<span class="pp-out">Out</span>{/if}
+              {#if !p.in_stock}<span class="pp-out">{$_('recipe_editor_ui.out_of_stock')}</span>{/if}
             </label>
           {/each}
         {/if}
@@ -1493,7 +1498,7 @@
         <button class="btn btn-secondary" on:click={closePantryPicker}>{$_('recipe_editor_ct.cancel')}</button>
         <button class="btn btn-primary" on:click={confirmPantryPicker}
           disabled={pantryPickerSelected.size === 0}>
-          {pantryPickerMode === 'swap' ? 'Link' : `Add ${pantryPickerSelected.size > 0 ? pantryPickerSelected.size : ''}`}
+          {pantryPickerMode === 'swap' ? $_('recipe_editor_ui.link') : (pantryPickerSelected.size > 0 ? $_('recipe_editor_ui.add_count', { values: { count: pantryPickerSelected.size } }) : $_('recipe_editor_ui.add'))}
         </button>
       </div>
     </div>
@@ -1515,11 +1520,11 @@
             <button class="swatch" class:active={categoryNewColor === sw}
               style={`background:${sw}`}
               on:click={() => categoryNewColor = sw}
-              title={sw} aria-label={`Color ${sw}`} type="button"></button>
+              title={sw} aria-label={$_('recipe_editor_ui.color_swatch', { values: { color: sw } })} type="button"></button>
           {/each}
           <button class="swatch none" class:active={!categoryNewColor}
             on:click={() => categoryNewColor = null}
-            title="No color" aria-label="No color" type="button"></button>
+            title={$_('recipe_editor_ui.no_color')} aria-label={$_('recipe_editor_ui.no_color')} type="button"></button>
         </div>
       </label>
       <div class="cat-modal-actions">
@@ -1538,8 +1543,8 @@
   <div class="cat-modal-backdrop" on:click={closeStepPhotoSheet} use:closeOnBack={closeStepPhotoSheet}>
     <div class="cat-modal" on:click|stopPropagation>
       <header class="step-photo-modal-head">
-        <h3 class="cat-modal-title">Step {stepPhotoSheetIdx + 1} Photo</h3>
-        <button class="btn-icon" on:click={closeStepPhotoSheet} aria-label="Close" title="Close">
+        <h3 class="cat-modal-title">{$_('recipe_editor_ui.step_photo_title', { values: { n: stepPhotoSheetIdx + 1 } })}</h3>
+        <button class="btn-icon" on:click={closeStepPhotoSheet} aria-label={$_('common.close')} title={$_('common.close')}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </header>
@@ -1558,7 +1563,7 @@
      the name field the space it needs to be readable. -->
 <ActionSheet
   bind:open={ingActionOpen}
-  title={ingActionTarget?.name || 'Ingredient'}
+  title={ingActionTarget?.name || $_('recipe_editor_ui.ingredient')}
   actions={ingActions}
   on:select={onIngredientAction}
 />

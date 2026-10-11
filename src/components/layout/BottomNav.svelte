@@ -33,7 +33,7 @@
   function go(path) { push(path); }
 </script>
 
-<nav class="bottom-nav" role="navigation" aria-label="Main navigation">
+<nav class="bottom-nav" role="navigation" aria-label={$_('bottom_nav_ui.main_navigation')}>
   <div
     class="nav-pill"
     style="left: calc({(activeIdx / tabs.length * 100).toFixed(2)}%); width: calc(100% / {tabs.length})"
@@ -50,7 +50,7 @@
       <span class="material-symbols-rounded nav-icon">
         {tab.icon}
         {#if tab.path === '/settings' && ($updateAvailable.available || $pwaUpdateReady)}
-          <span class="nav-update-dot" aria-label="Update available"></span>
+          <span class="nav-update-dot" aria-label={$_('updates.server.available_chip')}></span>
         {/if}
       </span>
       <span class="nav-label">{tab.label}</span>

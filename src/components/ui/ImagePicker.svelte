@@ -39,7 +39,9 @@
   /** Placeholder text shown in the empty-state preview. Defaults to the
       hero-image phrasing used by the recipe editor. Override anywhere
       else (e.g. "Add a photo" inside the diary log dialog). */
-  export let placeholder = 'Add a Hero Image';
+  export let placeholder = undefined;
+  // Undefined falls back to the default; an empty string hides it.
+  $: shownPlaceholder = placeholder === undefined ? $_('image_picker_ui.add_hero_image') : placeholder;
 
   const dispatch = createEventDispatcher();
 
@@ -147,16 +149,16 @@
   <div class="preview-wrap" style:aspect-ratio={aspect}>
     {#if value}
       <img class="preview-img" src={value} alt="" />
-      <button class="preview-clear" on:click={clear} aria-label="Remove image" title="Remove image">
+      <button class="preview-clear" on:click={clear} aria-label={$_('image_picker_ui.remove_image')} title={$_('image_picker_ui.remove_image')}>
         <span class="material-symbols-rounded">close</span>
       </button>
     {:else}
       <div class="preview-placeholder">
         <span class="material-symbols-rounded ph-icon">photo_camera</span>
         {#if uploading}
-          <span class="ph-text">Uploading…</span>
-        {:else if placeholder}
-          <span class="ph-text">{placeholder}</span>
+          <span class="ph-text">{$_('pantry_editor.actions.uploading')}</span>
+        {:else if shownPlaceholder}
+          <span class="ph-text">{shownPlaceholder}</span>
         {/if}
       </div>
     {/if}
@@ -165,15 +167,15 @@
   <div class="picker-actions">
     <button class="btn btn-secondary action-btn" on:click={openCamera} disabled={uploading}>
       <span class="material-symbols-rounded">photo_camera</span>
-      Camera
+      {$_('attach_image.camera')}
     </button>
     <button class="btn btn-secondary action-btn" on:click={() => fileInput.click()} disabled={uploading}>
       <span class="material-symbols-rounded">photo_library</span>
-      Upload
+      {$_('recipe_editor_ct.upload')}
     </button>
     <button class="btn btn-secondary action-btn" on:click={() => { showUrl = !showUrl; urlInput = ''; }} disabled={uploading}>
       <span class="material-symbols-rounded">link</span>
-      URL
+      {$_('image_picker_ui.url')}
     </button>
   </div>
 
@@ -187,7 +189,7 @@
         on:keydown={(e) => e.key === 'Enter' && applyUrl()}
         autofocus
       />
-      <button class="btn btn-primary" on:click={applyUrl}>Use</button>
+      <button class="btn btn-primary" on:click={applyUrl}>{$_('image_picker_ui.use')}</button>
     </div>
   {/if}
 
@@ -203,7 +205,7 @@
       out:scale={{ start: 0.94, duration: 160 }}>
       <div class="cam-header">
         <span class="cam-title">{$_('image_picker_ct.title')}</span>
-        <button class="btn-icon" on:click={stopCamera} aria-label="Close camera">
+        <button class="btn-icon" on:click={stopCamera} aria-label={$_('image_picker_ui.close_camera')}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </div>
@@ -212,7 +214,7 @@
       <div class="cam-footer">
         <button class="btn btn-primary cam-capture" on:click={capture} disabled={captureBusy}>
           <span class="material-symbols-rounded">camera_alt</span>
-          {captureBusy ? 'Saving…' : 'Capture'}
+          {captureBusy ? $_('common.saving') : $_('image_picker_ui.capture')}
         </button>
       </div>
     </div>

@@ -73,9 +73,9 @@
   }
   async function revokeInvite(token) {
     if (!await confirmDialog({
-      title: 'Revoke invite?',
-      message: 'The link will stop working immediately. The recipient won\'t be able to use it after this.',
-      confirmText: 'Revoke',
+      title: $_('settings_user_management_ui.revoke_title'),
+      message: $_('settings_user_management_ui.revoke_message'),
+      confirmText: $_('settings_user_management_ui.revoke'),
       dangerous: true,
     })) return;
     try {
@@ -478,23 +478,23 @@
                 {#if editingUserId === u.id}
                   <div class="um-user-edit">
                     <label class="um-edit-field">
-                      <span>Full name</span>
+                      <span>{$_('profile.full_name')}</span>
                       <input class="input um-edit-input" type="text"
                         bind:value={editUserForm.full_name}
-                        placeholder="Full name" />
+                        placeholder={$_('settings_user_management_ui.full_name_ph')} />
                     </label>
                     <label class="um-edit-field">
-                      <span>Email</span>
+                      <span>{$_('settings_user_management_ui.email')}</span>
                       <input class="input um-edit-input" type="email"
                         bind:value={editUserForm.email}
                         placeholder="name@example.com"
                         autocomplete="off" />
                     </label>
                     <div class="um-edit-actions">
-                      <button class="btn btn-secondary tiny" on:click={cancelEditUser}>Cancel</button>
-                      <button class="btn btn-primary tiny" on:click={() => saveEditUser(u)}>Save</button>
+                      <button class="btn btn-secondary tiny" on:click={cancelEditUser}>{$_('common.cancel')}</button>
+                      <button class="btn btn-primary tiny" on:click={() => saveEditUser(u)}>{$_('common.save')}</button>
                     </div>
-                    <div class="um-edit-note">@{u.username} <span class="muted">(username can't be changed)</span></div>
+                    <div class="um-edit-note">@{u.username} <span class="muted">{$_('settings_user_management_ui.username_fixed')}</span></div>
                   </div>
                 {:else}
                   <div class="um-user-info">
@@ -504,17 +504,17 @@
                     </div>
                     <div class="um-user-role">
                       {#if u.id === $currentUser?.id}
-                        <span class="um-role-self">{u.role} {$_('settings.users.role_self_suffix')}</span>
+                        <span class="um-role-self">{u.role === 'admin' ? $_('settings.users.role_admin') : $_('settings.users.role_user')} {$_('settings.users.role_self_suffix')}</span>
                       {:else}
                         <select class="um-role-select" value={u.role}
                           on:change={e => changeUserRole(u, e.target.value)}>
-                          <option value="user">user</option>
-                          <option value="admin">admin</option>
+                          <option value="user">{$_('settings.users.role_user')}</option>
+                          <option value="admin">{$_('settings.users.role_admin')}</option>
                         </select>
                       {/if}
                     </div>
                   </div>
-                  <button class="btn btn-ghost um-del-btn" title="Edit name / email"
+                  <button class="btn btn-ghost um-del-btn" title={$_('settings_user_management_ui.edit_name_email')}
                     on:click={() => startEditUser(u)}>
                     <span class="material-symbols-rounded" style="font-size:18px;color:var(--text-3)">edit</span>
                   </button>
@@ -546,7 +546,7 @@
             class:invalid={_inviteEmailTrimmed && !_inviteEmailValid}
             bind:value={inviteEmail} placeholder={$_('settings.users.email_optional')} />
           {#if _inviteEmailTrimmed && !_inviteEmailValid}
-            <p class="invite-hint">Enter a valid email address, or clear the field to generate a shareable link.</p>
+            <p class="invite-hint">{$_('settings_user_management_ui.invite_email_hint')}</p>
           {/if}
           <div class="um-role-pair">
             <label class="um-role-label" for="invite-role-sel">{$_('settings.users.role')}</label>
@@ -567,14 +567,14 @@
               {#each pendingInvites as inv (inv.token)}
                 <div class="pending-invite-row">
                   <div class="pending-invite-info">
-                    <span class="pending-invite-email">{inv.email || 'Link-only (no email)'}</span>
+                    <span class="pending-invite-email">{inv.email || $_('settings_user_management_ui.link_only')}</span>
                     <span class="pending-invite-meta">
-                      {inv.role === 'admin' ? 'Admin' : 'User'} ·
-                      expires {new Date(inv.expires_at).toLocaleDateString()}
+                      {inv.role === 'admin' ? $_('settings_user_management_ui.invite_admin') : $_('settings_user_management_ui.invite_user')} ·
+                      {$_('settings_user_management_ui.expires', { values: { date: new Date(inv.expires_at).toLocaleDateString() } })}
                     </span>
                   </div>
                   <button class="btn-icon pending-invite-revoke" on:click={() => revokeInvite(inv.token)}
-                    aria-label="Revoke invite" title="Revoke invite">
+                    aria-label={$_('settings_user_management_ui.revoke_invite')} title={$_('settings_user_management_ui.revoke_invite')}>
                     <span class="material-symbols-rounded">close</span>
                   </button>
                 </div>
@@ -617,7 +617,7 @@
               {:else}
                 <input class="input um-pw-input" type="password" bind:value={newPassword} placeholder={$_('settings.users.password_required')} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
               {/if}
-              <button class="um-pw-eye" type="button" on:click={() => newShowPass = !newShowPass} aria-label={newShowPass ? 'Hide' : 'Show'}>
+              <button class="um-pw-eye" type="button" on:click={() => newShowPass = !newShowPass} aria-label={newShowPass ? $_('common.hide') : $_('settings_user_management_ui.show')}>
                 <span class="material-symbols-rounded">{newShowPass ? 'visibility_off' : 'visibility'}</span>
               </button>
             </div>
@@ -644,34 +644,34 @@
         <div class="setting-row">
           <div>
             <span class="setting-label">{$_('settings_users_ct.require_strong_passwords')}</span>
-            <div class="setting-desc">Reject weak passwords (zxcvbn score below 3) on top of the standard 8-char + mixed-case + number + symbol rules. Affects new sign-ups, invites, and password changes. Existing passwords aren't re-checked.</div>
+            <div class="setting-desc">{$_('settings_user_management_ui.strong_passwords_desc')}</div>
           </div>
           <Toggle checked={passwordPolicy === 'strong'} on:change={e => savePasswordPolicy(e.detail ? 'strong' : 'standard')} />
         </div>
         {#if passwordPolicySaved}
-          <p class="setting-desc" style="padding:0 16px 8px;color:var(--accent)">Saved.</p>
+          <p class="setting-desc" style="padding:0 16px 8px;color:var(--accent)">{$_('settings_user_management_ui.saved')}</p>
         {/if}
 
         <div class="setting-divider"></div>
         <div class="setting-row">
           <div>
             <span class="setting-label">{$_('settings_users_ct.session_duration')}</span>
-            <div class="setting-desc">How long users stay signed in. Applies to new logins.</div>
+            <div class="setting-desc">{$_('settings_user_management_ui.session_desc')}</div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <div class="select-wrap" style="width:130px">
               <select class="select sel-sm" bind:value={sessionHours}>
                 <option value="0">{$_('settings_users_ct.session_never')}</option>
-                <option value="8">8 hours</option>
-                <option value="24">1 day</option>
-                <option value="168">7 days</option>
-                <option value="720">30 days</option>
-                <option value="2160">90 days</option>
-                <option value="8760">1 year</option>
+                <option value="8">{$_('settings.users.session_8h')}</option>
+                <option value="24">{$_('settings.users.session_1d')}</option>
+                <option value="168">{$_('settings.users.session_7d')}</option>
+                <option value="720">{$_('settings.users.session_30d')}</option>
+                <option value="2160">{$_('settings.users.session_90d')}</option>
+                <option value="8760">{$_('settings.users.session_1y')}</option>
               </select>
             </div>
             <button class="btn btn-secondary" style="height:32px;font-size:12px;padding:0 12px;white-space:nowrap" on:click={saveSessionHours}>
-              {#if sessionSaved}<span class="material-symbols-rounded" style="font-size:14px">check</span>{:else}Save{/if}
+              {#if sessionSaved}<span class="material-symbols-rounded" style="font-size:14px">check</span>{:else}{$_('common.save')}{/if}
             </button>
           </div>
         </div>
@@ -681,7 +681,7 @@
           <span class="material-symbols-rounded si" style="color:var(--danger)">no_accounts</span>
           <div>
             <span class="setting-label" style="color:var(--danger)">{$_('settings_users_ct.disable_um')}</span>
-            <div class="setting-desc">Removes all user accounts and returns to single-user mode</div>
+            <div class="setting-desc">{$_('settings.users.disable_um_subtitle')}</div>
           </div>
         </button>
       {/if}
@@ -691,7 +691,7 @@
         <span class="material-symbols-rounded si" style="color:var(--accent)">group_add</span>
         <div>
           <span class="setting-label">{$_('settings_users_ct.enable_um')}</span>
-          <div class="setting-desc">Add multiple user accounts with separate data &amp; settings</div>
+          <div class="setting-desc">{$_('settings.users.enable_um_subtitle')}</div>
         </div>
         <span class="material-symbols-rounded text-3" style="font-size:18px">{showEnableUm ? 'expand_less' : 'expand_more'}</span>
       </button>
@@ -700,12 +700,12 @@
         <div class="section-body" style="padding:0 16px 16px" transition:slide={{ duration: 160 }}>
           <p class="um-section-label" style="margin-bottom:8px">{$_('settings_users_ct.create_admin_account')}</p>
           <p class="text-3 text-sm" style="margin:0 0 12px;line-height:1.5">
-            The first account is always admin. All existing food, meal, and diary data on this server will be assigned to it.
+            {$_('settings.users.create_admin_explainer')}
           </p>
           <div class="um-add-form">
             <div class="um-form-row">
-              <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminUser} placeholder="Username *" autocomplete="username" />
-              <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminName} placeholder="Full name (optional)" />
+              <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminUser} placeholder={$_('settings.users.username_required')} autocomplete="username" />
+              <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminName} placeholder={$_('settings_user_management_ui.full_name_optional_ph')} />
             </div>
             <!-- Optional admin email — only shown when SMTP is env-locked
                  (docker-compose configured), so we know at boot the server
@@ -715,7 +715,7 @@
               <div class="um-form-row">
                 <input class="input" style="flex:1;min-width:0" type="email"
                   bind:value={enableAdminEmail}
-                  placeholder="Email (optional)"
+                  placeholder={$_('settings_user_management_ui.email_optional_ph')}
                   autocomplete="email" />
               </div>
             {/if}
@@ -726,28 +726,28 @@
             <div class="um-form-row">
               <div style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
                 {#if enableShowPass}
-                  <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                  <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminPass} placeholder={$_('settings.users.password_required')} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
                 {:else}
-                  <input class="input" style="flex:1;min-width:0" type="password" bind:value={enableAdminPass} placeholder="Password *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                  <input class="input" style="flex:1;min-width:0" type="password" bind:value={enableAdminPass} placeholder={$_('settings.users.password_required')} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
                 {/if}
-                <button class="btn-icon" on:click={() => enableShowPass = !enableShowPass} style="flex-shrink:0" aria-label={enableShowPass ? 'Hide password' : 'Show password'}>
+                <button class="btn-icon" on:click={() => enableShowPass = !enableShowPass} style="flex-shrink:0" aria-label={enableShowPass ? $_('settings_user_management_ui.hide_password') : $_('settings_user_management_ui.show_password')}>
                   <span class="material-symbols-rounded" style="font-size:18px">{enableShowPass ? 'visibility_off' : 'visibility'}</span>
                 </button>
               </div>
               <div style="display:flex;gap:4px;align-items:center;flex:1;min-width:0">
                 {#if enableShowPass}
-                  <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                  <input class="input" style="flex:1;min-width:0" type="text" bind:value={enableAdminConf} placeholder={$_('settings.users.confirm_required')} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
                 {:else}
-                  <input class="input" style="flex:1;min-width:0" type="password" bind:value={enableAdminConf} placeholder="Confirm *" autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
+                  <input class="input" style="flex:1;min-width:0" type="password" bind:value={enableAdminConf} placeholder={$_('settings.users.confirm_required')} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
                 {/if}
-                <button class="btn-icon" on:click={() => enableShowPass = !enableShowPass} style="flex-shrink:0" aria-label={enableShowPass ? 'Hide password' : 'Show password'}>
+                <button class="btn-icon" on:click={() => enableShowPass = !enableShowPass} style="flex-shrink:0" aria-label={enableShowPass ? $_('settings_user_management_ui.hide_password') : $_('settings_user_management_ui.show_password')}>
                   <span class="material-symbols-rounded" style="font-size:18px">{enableShowPass ? 'visibility_off' : 'visibility'}</span>
                 </button>
               </div>
             </div>
             {#if enableUmError}<p class="um-error">{enableUmError}</p>{/if}
             <button class="btn btn-primary" style="width:100%" on:click={enableUserManagement} disabled={enableUmLoading}>
-              {enableUmLoading ? 'Enabling...' : 'Enable & Create Admin'}
+              {enableUmLoading ? $_('settings.users.enabling') : $_('settings.users.enable_create')}
             </button>
           </div>
         </div>

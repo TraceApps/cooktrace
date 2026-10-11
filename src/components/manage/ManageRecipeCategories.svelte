@@ -61,9 +61,9 @@
 
   async function remove(c) {
     const ok = await confirmDialog({
-      title: `Delete "${c.name}"?`,
-      message: 'Recipes in this category keep their data — they just lose the category label.',
-      confirmText: 'Delete',
+      title: $_('manage_ui.delete_title', { values: { name: c.name } }),
+      message: $_('manage_recipe_categories_ui.delete_message'),
+      confirmText: $_('common.delete'),
       dangerous: true,
     });
     if (!ok) return;
@@ -133,17 +133,17 @@
 <div class="mgr">
   <header class="mgr-head">
     <h2>{$_('manage_recipe_cats.title')}</h2>
-    <p class="mgr-desc">One category per recipe. Used for the badge above each recipe title and for filtering on the Recipes page.</p>
+    <p class="mgr-desc">{$_('manage_recipe_categories_ui.desc')}</p>
   </header>
 
   {#if loading}
-    <Spinner block label="Loading…" />
+    <Spinner block label={$_('common.loading')} />
   {:else if categories.length === 0}
-    <p class="empty">No categories yet. Add one below.</p>
+    <p class="empty">{$_('manage_ui.empty_categories')}</p>
   {:else}
-    <input class="input filter" type="search" placeholder="Filter…" bind:value={filter} />
+    <input class="input filter" type="search" placeholder={$_('manage_ui.filter_ph')} bind:value={filter} />
     {#if filteredEmpty}
-      <p class="empty">No items match "{filter}".</p>
+      <p class="empty">{$_('manage_ui.no_match', { values: { filter } })}</p>
     {:else}
     <ul class="row-list">
       {#each filtered as c (c.id)}
@@ -157,7 +157,7 @@
           on:drop={(e) => _onDrop(c, e)}
           on:dragend={_onDragEnd}>
           {#if editingId === null}
-            <span class="grip" title="Drag to reorder" aria-hidden="true">
+            <span class="grip" title={$_('manage_ui.drag_reorder')} aria-hidden="true">
               <span class="material-symbols-rounded">drag_indicator</span>
             </span>
           {/if}
@@ -169,11 +169,11 @@
                   <button class="swatch" class:active={editColor === sw}
                     style={`background:${sw}`}
                     on:click={() => editColor = sw}
-                    aria-label={`Color ${sw}`} type="button"></button>
+                    aria-label={$_('manage_recipe_categories_ui.color', { values: { color: sw } })} type="button"></button>
                 {/each}
                 <button class="swatch none" class:active={!editColor}
                   on:click={() => editColor = null}
-                  aria-label="No color" type="button"></button>
+                  aria-label={$_('manage_recipe_categories_ui.no_color')} type="button"></button>
               </div>
               <div class="row-actions">
                 <button class="btn btn-secondary tiny" on:click={cancelEdit}>{$_('manage_recipe_cats.cancel')}</button>
@@ -186,22 +186,22 @@
             {#if Number.isFinite(c.recipe_count)}
               {#if c.recipe_count > 0}
                 <button type="button" class="usage-pill linked"
-                  title={`View the ${c.recipe_count} recipe${c.recipe_count === 1 ? '' : 's'} in this category`}
+                  title={$_('manage_recipe_categories_ui.view_recipes', { values: { count: c.recipe_count } })}
                   on:click={() => push(`/recipes?category=${c.slug}`)}>
-                  {c.recipe_count} {c.recipe_count === 1 ? 'recipe' : 'recipes'}
+                  {$_('manage_ui.recipe_count', { values: { count: c.recipe_count } })}
                 </button>
               {:else}
-                <span class="usage-pill zero" title="No recipes use this category">
-                  {c.recipe_count} recipes
+                <span class="usage-pill zero" title={$_('manage_recipe_categories_ui.unused')}>
+                  {$_('manage_ui.recipe_count', { values: { count: c.recipe_count } })}
                 </span>
               {/if}
             {/if}
             <span class="row-meta">/{c.slug}</span>
             <div class="row-actions">
-              <button class="btn-icon small" on:click={() => startEdit(c)} aria-label="Edit" title="Edit">
+              <button class="btn-icon small" on:click={() => startEdit(c)} aria-label={$_('common.edit')} title={$_('common.edit')}>
                 <span class="material-symbols-rounded">edit</span>
               </button>
-              <button class="btn-icon small danger" on:click={() => remove(c)} aria-label="Delete" title="Delete">
+              <button class="btn-icon small danger" on:click={() => remove(c)} aria-label={$_('common.delete')} title={$_('common.delete')}>
                 <span class="material-symbols-rounded">delete</span>
               </button>
             </div>
@@ -213,18 +213,18 @@
   {/if}
 
   <div class="add-row">
-    <input class="input" placeholder="New category name…" bind:value={newName}
+    <input class="input" placeholder={$_('manage_ui.new_category_ph')} bind:value={newName}
       on:keydown={(e) => { if (e.key === 'Enter') create(); }} />
     <div class="swatches">
       {#each SWATCHES as sw}
         <button class="swatch" class:active={newColor === sw}
           style={`background:${sw}`}
           on:click={() => newColor = sw}
-          aria-label={`Color ${sw}`} type="button"></button>
+          aria-label={$_('manage_recipe_categories_ui.color', { values: { color: sw } })} type="button"></button>
       {/each}
     </div>
     <button class="btn btn-primary" on:click={create} disabled={creating || !newName.trim()}>
-      {creating ? 'Adding…' : 'Add'}
+      {creating ? $_('foods.adding') : $_('manage_ui.add')}
     </button>
   </div>
 </div>

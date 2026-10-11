@@ -1,6 +1,6 @@
 <script>
   /**
-   * PublicRecipe — read-only recipe viewer reachable via /r/:token.
+   * PublicRecipe: read-only recipe viewer reachable via /r/:token.
    *
    * Loads through `/api/r/:token`, an unauthenticated endpoint. The
    * page intentionally avoids any per-user state (no Cook Mode, no
@@ -168,7 +168,7 @@
                         <span class="qty">{displayQty(ing.qty, ing.unit, scale)}{ing.qty && ing.unit ? ' ' : ''}{ing.unit || ''}</span>
                       {/if}
                       <span>{ing.name}</span>
-                      {#if ing.note}<span class="note">— {ing.note}</span>{/if}
+                      {#if ing.note}<span class="note">({ing.note})</span>{/if}
                     </li>
                   {/each}
                 </ul>
@@ -196,10 +196,10 @@
                         {#if p.type === 'text'}{#each scaledStepParts(p.value, scale) as a}{#if a.type === 'amount'}<span class="step-amount">{a.value}</span>{:else}{a.value}{/if}{/each}{:else}<button
                           class="time-chip"
                           on:click={() => startTimer({
-                            label: `${recipe.name} · Step ${i + 1}`,
+                            label: $_('public_recipe_ui.timer_label', { values: { name: recipe.name, n: i + 1 } }),
                             durationSec: p.durationSec,
                           })}
-                          title={`Start ${formatRemaining(p.durationSec * 1000)} timer`}
+                          title={$_('public_recipe_ui.start_timer', { values: { time: formatRemaining(p.durationSec * 1000) } })}
                         ><span class="material-symbols-rounded">play_arrow</span>{p.value}</button>{/if}
                       {/each}
                     </div>

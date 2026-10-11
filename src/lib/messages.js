@@ -12,6 +12,12 @@ import { isOfflineError } from './offline-edits.js';
 
 const t = (key, values) => get(_)(key, values ? { values } : undefined);
 
+/** A string from the app's strings, or `fallback` before they're loaded (tests, early startup). */
+export function tr(key, fallback, values) {
+  try { const v = t(key, values); return v && v !== key ? v : fallback; }
+  catch { return fallback; }
+}
+
 // Messages that say nothing a person can use.
 const EMPTY = /^(error|failed|unknown( error)?|undefined|null|\[object object\])$/i;
 const HTTP_ONLY = /^((http|api error|server responded)\s*)?\d{3}(\s+[a-z ]+)?$/i;

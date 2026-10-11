@@ -109,7 +109,7 @@
   <div class="setting-row">
     <div>
       <span class="setting-label">{$_('settings_federation_ct.connect_to_nt')}</span>
-      <span class="setting-desc">Pull ingredient nutrition + log cooked meals to your NutriTrace diary automatically. Enter your NutriTrace URL and a personal access token (Settings → Profile → API Tokens on NutriTrace), then Save to test the connection.</span>
+      <span class="setting-desc">{$_('settings_federation_ui.connect_desc')}</span>
     </div>
   </div>
 
@@ -134,12 +134,12 @@
           placeholder={$_('settings_federation_ct.access_token_ph')}
           on:input={_invalidate} />
       {/if}
-      <button class="key-toggle" on:click={() => showToken = !showToken} aria-label={showToken ? 'Hide' : 'Show'}>
+      <button class="key-toggle" on:click={() => showToken = !showToken} aria-label={showToken ? $_('common.hide') : $_('settings_federation_ui.show')}>
         <span class="material-symbols-rounded">{showToken ? 'visibility_off' : 'visibility'}</span>
       </button>
       <button class="btn btn-primary save-btn" on:click={save}
         disabled={testing || !urlDraft.trim() || !tokenDraft.trim()}>
-        {saved ? 'Saved' : (testing ? 'Testing…' : 'Save')}
+        {saved ? $_('settings_federation_ui.saved') : (testing ? $_('settings_federation_ui.testing') : $_('common.save'))}
       </button>
     </div>
   </div>

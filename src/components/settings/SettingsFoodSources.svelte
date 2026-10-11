@@ -29,6 +29,8 @@
     'Mexico','Netherlands','New Zealand','Norway','Poland','Portugal','Singapore',
     'South Africa','South Korea','Spain','Sweden','Switzerland','United Kingdom',
     'United States'];
+  // Labels for the stored English country values above.
+  const countryKey = (c) => `settings_food_sources_ui.country_${c.toLowerCase().replace(/ /g, '_')}`;
   let offShowPass = false;
 </script>
 
@@ -56,7 +58,7 @@
       <div>
         <span class="setting-label">{$_('settings_page.off.enable')}</span>
         <div class="setting-desc">
-          Look up barcodes against the global crowd-sourced food database. No account needed for lookups; one is only required to upload edits via Share to OFF.
+          {$_('settings_added.off.enable_desc')}
         </div>
       </div>
       <input type="checkbox" class="toggle-cb" checked={$offEnabled} on:change={e => offEnabled.set(e.target.checked)} />
@@ -67,7 +69,7 @@
         <span class="setting-label">{$_('settings_page.off.search_language')}</span>
         <div class="select-wrap" style="width:120px">
           <select class="select sel-sm" value={$offSearchLanguage} on:change={e => offSearchLanguage.set(e.target.value)}>
-            {#each OFF_LANGUAGE_OPTS as [v,l]}<option value={v}>{l}</option>{/each}
+            {#each OFF_LANGUAGE_OPTS as [v]}<option value={v}>{$_(`settings_food_sources_ui.lang_${v}`)}</option>{/each}
           </select>
         </div>
       </div>
@@ -76,7 +78,7 @@
         <span class="setting-label">{$_('settings_page.off.search_country')}</span>
         <div class="select-wrap" style="width:150px">
           <select class="select sel-sm" value={$offSearchCountry} on:change={e => offSearchCountry.set(e.target.value)}>
-            {#each OFF_COUNTRY_OPTS as c}<option value={c}>{c}</option>{/each}
+            {#each OFF_COUNTRY_OPTS as c}<option value={c}>{$_(countryKey(c))}</option>{/each}
           </select>
         </div>
       </div>
@@ -86,15 +88,15 @@
         <div class="select-wrap" style="width:150px">
           <select class="select sel-sm" value={$offUploadCountry} on:change={e => offUploadCountry.set(e.target.value)}>
             <option value="Auto">{$_('settings_page.off.auto')}</option>
-            {#each OFF_COUNTRY_OPTS.filter(c => c !== 'World') as c}<option value={c}>{c}</option>{/each}
+            {#each OFF_COUNTRY_OPTS.filter(c => c !== 'World') as c}<option value={c}>{$_(countryKey(c))}</option>{/each}
           </select>
         </div>
       </div>
       <div class="setting-divider"></div>
       <div class="form-block">
         <label class="form-label">{$_('settings_page.off.account_username')}</label>
-        <p class="hint">Optional — only needed to upload edits.
-          <a href="https://world.openfoodfacts.org/cgi/user.pl" target="_blank" rel="noopener" class="link">Create an OFF account →</a>
+        <p class="hint">{$_('settings_food_sources_ui.username_hint')}
+          <a href="https://world.openfoodfacts.org/cgi/user.pl" target="_blank" rel="noopener" class="link">{$_('settings_added.off.create_account')}</a>
         </p>
         <input class="input" type="text" placeholder={$_('settings_page.off.off_username_ph')} value={$offUsername}
           on:change={e => offUsername.set(e.target.value)} />
@@ -108,7 +110,7 @@
               value={$offPassword} on:change={e => offPassword.set(e.target.value)} />
           {/if}
           <button class="btn-icon" on:click={() => offShowPass = !offShowPass}
-            title={offShowPass ? 'Hide' : 'Show'} aria-label="Toggle password visibility">
+            title={offShowPass ? $_('common.hide') : $_('settings_food_sources_ui.show')} aria-label={$_('settings_food_sources_ui.toggle_password')}>
             <span class="material-symbols-rounded">{offShowPass ? 'visibility_off' : 'visibility'}</span>
           </button>
         </div>
@@ -122,8 +124,8 @@
       <div>
         <span class="setting-label">{$_('settings_page.usda.enable')}</span>
         <div class="setting-desc">
-          Search the USDA nutrition database when adding pantry items.
-          <a href="https://fdc.nal.usda.gov/api-key-signup" target="_blank" rel="noopener" class="link">Get a free API key →</a>
+          {$_('settings_added.usda.enable_desc')}
+          <a href="https://fdc.nal.usda.gov/api-key-signup" target="_blank" rel="noopener" class="link">{$_('settings_added.usda.get_key')}</a>
         </div>
       </div>
       <input type="checkbox" class="toggle-cb" checked={$usdaEnabled} on:change={e => usdaEnabled.set(e.target.checked)} />
@@ -147,7 +149,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_page.scanner.beep_on_scan')}</span>
-        <div class="setting-desc">Short audio confirmation when a barcode is recognized.</div>
+        <div class="setting-desc">{$_('settings_added.barcode_scanner.beep_desc')}</div>
       </div>
       <input type="checkbox" class="toggle-cb" checked={$barcodeBeep} on:change={e => barcodeBeep.set(e.target.checked)} />
     </div>
@@ -155,8 +157,8 @@
       <div class="setting-divider"></div>
       <div class="setting-row">
         <div>
-          <span class="setting-label">Auto-Enable Flashlight</span>
-          <div class="setting-desc">Turn on the rear-camera flashlight automatically when the scanner opens (web only — native uses the OS camera UI's own controls).</div>
+          <span class="setting-label">{$_('settings_added.barcode_scanner.flashlight')}</span>
+          <div class="setting-desc">{$_('settings_food_sources_ui.flashlight_desc')}</div>
         </div>
         <input type="checkbox" class="toggle-cb" checked={$barcodeFlashlight} on:change={e => barcodeFlashlight.set(e.target.checked)} />
       </div>

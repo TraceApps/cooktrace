@@ -1,7 +1,7 @@
 <script>
   import { closeOnBack } from '../../lib/back-stack.js';
   /**
-   * ImportFromFileDialog — unified file import (router).
+   * ImportFromFileDialog: unified file import (router).
    *
    * One menu entry. The picker accepts:
    *   - A single image (snap a photo of a cookbook page)
@@ -106,16 +106,12 @@
     <div class="modal" on:click|stopPropagation>
       <header class="head">
         <h3>{$_('import_from_file.title')}</h3>
-        <button class="btn-icon" on:click={close} aria-label="Close" title="Close">
+        <button class="btn-icon" on:click={close} aria-label={$_('common.close')} title={$_('common.close')}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </header>
 
-      <p class="hint">
-        Drop a single recipe file for a quick import, or a folder, multiple
-        files, or a ZIP to pick which ones to save. Image (photo of a recipe
-        page), PDF, RTF, TXT, and MD are all supported.
-      </p>
+      <p class="hint">{$_('import_from_file_dialog_ui.hint')}</p>
 
       <div class="dropzone {dragOver ? 'over' : ''}"
         on:dragover={_onDragOver}
@@ -124,17 +120,17 @@
         on:click={_pickFiles}>
         <span class="material-symbols-rounded">cloud_upload</span>
         <p class="dz-title">{$_('import_from_file.dz_title')}</p>
-        <p class="dz-sub">Image, PDF, RTF, TXT, MD, or a ZIP of any of these</p>
+        <p class="dz-sub">{$_('import_from_file_dialog_ui.dz_sub')}</p>
       </div>
 
       <div class="picker-aux">
         <button class="btn btn-secondary" on:click={_pickFolder}>
           <span class="material-symbols-rounded">folder_open</span>
-          Pick a Folder
+          {$_('import_from_file_dialog_ui.pick_folder')}
         </button>
         <button class="btn btn-secondary" on:click={_openCamera}>
           <span class="material-symbols-rounded">photo_camera</span>
-          Use Camera
+          {$_('file_import_dialog.use_camera')}
         </button>
       </div>
 

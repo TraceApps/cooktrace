@@ -16,35 +16,35 @@
 
   // Theme / accent options — mirror NT exactly.
   const APPEARANCE_OPTS = [
-    { value: 'system', label: 'System Default' },
-    { value: 'dark',   label: 'Dark'           },
-    { value: 'light',  label: 'Light'          },
+    { value: 'system', labelKey: 'settings_appearance_ui.theme_system' },
+    { value: 'dark',   labelKey: 'settings_appearance_ui.theme_dark'   },
+    { value: 'light',  labelKey: 'settings_appearance_ui.theme_light'  },
   ];
   const NAV_STYLE_OPTS = [
-    { value: 'bottom',  label: 'Bottom Tab Bar' },
-    { value: 'sidebar', label: 'Side Panel'     },
-    { value: 'both',    label: 'Both'           },
+    { value: 'bottom',  labelKey: 'settings_appearance_ui.nav_bottom'  },
+    { value: 'sidebar', labelKey: 'settings_appearance_ui.nav_sidebar' },
+    { value: 'both',    labelKey: 'settings_appearance_ui.nav_both'    },
   ];
   const START_PAGE_OPTS = [
-    { value: '/',         label: 'Recipes'  },
-    { value: '/pantry',   label: 'Pantry'   },
-    { value: '/diary',    label: 'Diary'    },
-    { value: '/shopping', label: 'Shopping' },
-    { value: '/settings', label: 'Settings' },
+    { value: '/',         labelKey: 'nav.recipes'  },
+    { value: '/pantry',   labelKey: 'nav.pantry'   },
+    { value: '/diary',    labelKey: 'nav.diary'    },
+    { value: '/shopping', labelKey: 'nav.shopping' },
+    { value: '/settings', labelKey: 'nav.settings' },
   ];
   const ACCENT_COLORS = [
-    { value: 'mint',   label: 'Mint',   dark: '#4FFFB0', light: '#00C47A' },
-    { value: 'blue',   label: 'Blue',   dark: '#4FC3F7', light: '#0277BD' },
-    { value: 'red',    label: 'Red',    dark: '#FF7070', light: '#D93025' },
-    { value: 'purple', label: 'Purple', dark: '#CE93D8', light: '#8E24AA' },
-    { value: 'orange', label: 'Orange', dark: '#FFB547', light: '#E65100' },
-    { value: 'teal',   label: 'Teal',   dark: '#4DD0E1', light: '#00838F' },
-    { value: 'pink',   label: 'Pink',   dark: '#F48FB1', light: '#C2185B' },
-    { value: 'yellow', label: 'Yellow', dark: '#FFF176', light: '#F9A825' },
-    { value: 'indigo', label: 'Indigo', dark: '#9FA8DA', light: '#3949AB' },
-    { value: 'lime',   label: 'Lime',   dark: '#C5E1A5', light: '#558B2F' },
-    { value: 'rose',   label: 'Rose',   dark: '#FF80AB', light: '#E91E63' },
-    { value: 'cyan',   label: 'Cyan',   dark: '#80DEEA', light: '#0097A7' },
+    { value: 'mint',   labelKey: 'settings_appearance_ui.accent_mint',   dark: '#4FFFB0', light: '#00C47A' },
+    { value: 'blue',   labelKey: 'settings_appearance_ui.accent_blue',   dark: '#4FC3F7', light: '#0277BD' },
+    { value: 'red',    labelKey: 'settings_appearance_ui.accent_red',    dark: '#FF7070', light: '#D93025' },
+    { value: 'purple', labelKey: 'settings_appearance_ui.accent_purple', dark: '#CE93D8', light: '#8E24AA' },
+    { value: 'orange', labelKey: 'settings_appearance_ui.accent_orange', dark: '#FFB547', light: '#E65100' },
+    { value: 'teal',   labelKey: 'settings_appearance_ui.accent_teal',   dark: '#4DD0E1', light: '#00838F' },
+    { value: 'pink',   labelKey: 'settings_appearance_ui.accent_pink',   dark: '#F48FB1', light: '#C2185B' },
+    { value: 'yellow', labelKey: 'settings_appearance_ui.accent_yellow', dark: '#FFF176', light: '#F9A825' },
+    { value: 'indigo', labelKey: 'settings_appearance_ui.accent_indigo', dark: '#9FA8DA', light: '#3949AB' },
+    { value: 'lime',   labelKey: 'settings_appearance_ui.accent_lime',   dark: '#C5E1A5', light: '#558B2F' },
+    { value: 'rose',   labelKey: 'settings_appearance_ui.accent_rose',   dark: '#FF80AB', light: '#E91E63' },
+    { value: 'cyan',   labelKey: 'settings_appearance_ui.accent_cyan',   dark: '#80DEEA', light: '#0097A7' },
   ];
 
   // Determine dark vs light to pick the right swatch shade.
@@ -67,7 +67,7 @@
       <span class="setting-label">{$_('settings_page.appearance.theme')}</span>
       <div class="select-wrap" style="width:160px">
         <select class="select sel-sm" value={$appearance} on:change={e => applyAppearance(e.target.value)}>
-          {#each APPEARANCE_OPTS as o}<option value={o.value}>{o.label}</option>{/each}
+          {#each APPEARANCE_OPTS as o}<option value={o.value}>{$_(o.labelKey)}</option>{/each}
         </select>
       </div>
     </div>
@@ -80,7 +80,7 @@
             class="accent-swatch"
             class:active={$accentColor === c.value}
             style="background:{isDark ? c.dark : c.light}"
-            title={c.label}
+            title={$_(c.labelKey)}
             on:click={() => applyAccentColor(c.value)}
           >
             {#if $accentColor === c.value}
@@ -89,7 +89,7 @@
           </button>
         {/each}
         <button class="accent-swatch accent-swatch-custom" class:active={/^#[0-9a-fA-F]{6}$/.test($accentColor)}
-          title="Custom color" style={/^#[0-9a-fA-F]{6}$/.test($accentColor) ? "background:"+$accentColor : ""}
+          title={$_('settings_appearance_ui.custom_color')} style={/^#[0-9a-fA-F]{6}$/.test($accentColor) ? "background:"+$accentColor : ""}
           on:click={openColorPicker}>
           <span class="material-symbols-rounded" style="font-size:16px;color:rgba(255,255,255,0.9);text-shadow:0 0 3px rgba(0,0,0,0.5)">colorize</span>
         </button>
@@ -100,7 +100,7 @@
       <span class="setting-label">{$_('settings_page.appearance.navigation_style')}</span>
       <div class="select-wrap" style="width:160px">
         <select class="select sel-sm" value={$navStyle} on:change={e => navStyle.set(e.target.value)}>
-          {#each NAV_STYLE_OPTS as o}<option value={o.value}>{o.label}</option>{/each}
+          {#each NAV_STYLE_OPTS as o}<option value={o.value}>{$_(o.labelKey)}</option>{/each}
         </select>
       </div>
     </div>
@@ -109,7 +109,7 @@
       <div class="setting-row">
         <div>
           <span class="setting-label">{$_('settings_page.appearance.persistent_sidebar')}</span>
-          <div class="setting-desc">Sidebar stays open and shifts page content instead of overlaying it.</div>
+          <div class="setting-desc">{$_('settings_page.appearance.persistent_sidebar_desc')}</div>
         </div>
         <input type="checkbox" class="toggle-cb" checked={$sidebarPersistent} on:change={e => sidebarPersistent.set(e.target.checked)} />
       </div>
@@ -117,8 +117,8 @@
     <div class="setting-divider"></div>
     <div class="setting-row">
       <div>
-        <span class="setting-label">Force Mobile Layout</span>
-        <div class="setting-desc">Keep the mobile single-column layout even on wide screens.</div>
+        <span class="setting-label">{$_('settings_appearance_ui.force_mobile')}</span>
+        <div class="setting-desc">{$_('settings_appearance_ui.force_mobile_desc')}</div>
       </div>
       <input type="checkbox" class="toggle-cb" checked={$forceMobileLayout} on:change={e => forceMobileLayout.set(e.target.checked)} />
     </div>
@@ -127,7 +127,7 @@
       <span class="setting-label">{$_('settings_page.appearance.start_page')}</span>
       <div class="select-wrap" style="width:160px">
         <select class="select sel-sm" value={$startPage} on:change={e => startPage.set(e.target.value)}>
-          {#each START_PAGE_OPTS as o}<option value={o.value}>{o.label}</option>{/each}
+          {#each START_PAGE_OPTS as o}<option value={o.value}>{$_(o.labelKey)}</option>{/each}
         </select>
       </div>
     </div>
@@ -140,13 +140,13 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_page.appearance.page_banners')}</span>
-        <div class="setting-desc">Header style at the top of every page. Animated is a compact accent-gradient bar with a chosen motion style; Gradient is the same bar, static; Off is a plain glass header.</div>
+        <div class="setting-desc">{$_('settings_page.appearance.page_banners_desc')}</div>
       </div>
       <div class="select-wrap" style="width:130px">
         <select class="select sel-sm" value={$bannerStyle} on:change={e => bannerStyle.set(e.currentTarget.value)}>
           <option value="animated">{$_('settings_page.appearance.banner_animated')}</option>
           <option value="gradient">{$_('settings_page.appearance.banner_gradient')}</option>
-          <option value="off">Off</option>
+          <option value="off">{$_('settings_page.appearance.banner_off')}</option>
         </select>
       </div>
     </div>
@@ -154,7 +154,7 @@
       <div class="setting-row">
         <div>
           <span class="setting-label">{$_('settings_page.appearance.animation_style')}</span>
-          <div class="setting-desc">Shimmer is a soft white sweep, Drift is a slow hue rotation, Pulse is a gentle breathing, Aurora is a soft accent-tinted cloud-of-light. All honour Reduce Motion.</div>
+          <div class="setting-desc">{$_('settings_page.appearance.animation_style_desc')}</div>
         </div>
         <div class="select-wrap" style="width:130px">
           <select class="select sel-sm" value={$bannerAnimation} on:change={e => bannerAnimation.set(e.currentTarget.value)}>

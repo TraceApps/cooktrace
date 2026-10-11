@@ -14,6 +14,7 @@
    *   loadFn      — () => Promise<[{ name, count }]>
    *   renameFn    — (oldName, newName) => Promise<{ modified }>
    *   deleteFn    — (name) => Promise<{ modified }>
+   *   storageId   : stable id for the saved sort/filter prefs (defaults to title)
    */
   import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
@@ -28,6 +29,7 @@
   export let loadFn;
   export let renameFn;
   export let deleteFn;
+  export let storageId = '';
 
   let items = [];
   let loading = true;
@@ -36,8 +38,9 @@
   let filter = '';
   // Sort order + "unused only" toggle. Persisted per-list-title so
   // Tags and Kitchen Gear remember independently.
-  const _sortKey = `manage:sort:${title || 'list'}`;
-  const _unusedKey = `manage:unused:${title || 'list'}`;
+  const _prefId = storageId || title || 'list';
+  const _sortKey = `manage:sort:${_prefId}`;
+  const _unusedKey = `manage:unused:${_prefId}`;
   let sortMode = 'name'; // 'name' | 'most' | 'least'
   let unusedOnly = false;
   if (typeof localStorage !== 'undefined') {
@@ -88,9 +91,9 @@
     const existing = items.find(i => i.name.toLowerCase() === next.toLowerCase() && i.name !== item.name);
     if (existing) {
       const ok = await confirmDialog({
-        title: `Merge "${item.name}" into "${existing.name}"?`,
-        message: `Every recipe currently using "${item.name}" will use "${existing.name}" instead.`,
-        confirmText: 'Merge',
+        title: $_('manage_taxonomy_list_ui.merge_title', { values: { from: item.name, to: existing.name } }),
+        message: $_('manage_taxonomy_list_ui.merge_message', { values: { from: item.name, to: existing.name } }),
+        confirmText: $_('manage_taxonomy_list_ui.merge'),
       });
       if (!ok) return;
     }
@@ -104,9 +107,9 @@
 
   async function remove(item) {
     const ok = await confirmDialog({
-      title: `Delete "${item.name}"?`,
-      message: `This removes the value from ${item.count} recipe${item.count === 1 ? '' : 's'}. The recipes themselves stay.`,
-      confirmText: 'Delete',
+      title: $_('manage_ui.delete_title', { values: { name: item.name } }),
+      message: $_('manage_taxonomy_list_ui.delete_message', { values: { count: item.count ?? 0 } }),
+      confirmText: $_('common.delete'),
       dangerous: true,
     });
     if (!ok) return;
@@ -125,37 +128,37 @@
   </header>
 
   {#if loading}
-    <Spinner block label="Loading…" />
+    <Spinner block label={$_('common.loading')} />
   {:else}
     <div class="meta-row">
-      <span class="meta">{total} {total === 1 ? 'item' : 'items'}</span>
-      <span class="meta accent-meta">{usedTotal} {usedTotal === 1 ? 'use' : 'uses'} across recipes</span>
+      <span class="meta">{$_('manage_ui.items', { values: { count: total } })}</span>
+      <span class="meta accent-meta">{$_('manage_taxonomy_list_ui.uses_across', { values: { count: usedTotal } })}</span>
       {#if unusedCount > 0}
         <button type="button" class="unused-chip" class:active={unusedOnly}
           on:click={() => unusedOnly = !unusedOnly}
-          title={unusedOnly ? 'Show all items' : 'Show only items no recipe uses'}>
+          title={unusedOnly ? $_('manage_taxonomy_list_ui.show_all') : $_('manage_taxonomy_list_ui.show_unused')}>
           <span class="material-symbols-rounded">filter_alt</span>
-          {unusedCount} unused
+          {$_('manage_taxonomy_list_ui.unused_count', { values: { count: unusedCount } })}
         </button>
       {/if}
       {#if items.length > 1}
         <div class="sort-wrap">
-          <label class="sort-label" for="sort-{title}">Sort</label>
-          <select id="sort-{title}" class="sort-select" bind:value={sortMode}>
+          <label class="sort-label" for="sort-{_prefId}">{$_('manage_taxonomy_list_ui.sort')}</label>
+          <select id="sort-{_prefId}" class="sort-select" bind:value={sortMode}>
             <option value="name">A-Z</option>
-            <option value="most">Most used</option>
-            <option value="least">Least used</option>
+            <option value="most">{$_('manage_taxonomy_list_ui.most_used')}</option>
+            <option value="least">{$_('manage_taxonomy_list_ui.least_used')}</option>
           </select>
         </div>
       {/if}
     </div>
     {#if items.length > 0}
-      <input class="input filter" type="search" placeholder="Filter…" bind:value={filter} />
+      <input class="input filter" type="search" placeholder={$_('manage_ui.filter_ph')} bind:value={filter} />
     {/if}
     {#if items.length === 0}
-      <p class="empty">Nothing here yet — values appear once you add them to a recipe.</p>
+      <p class="empty">{$_('manage_taxonomy_list_ui.empty')}</p>
     {:else if filtered.length === 0}
-      <p class="empty">No items match "{filter}".</p>
+      <p class="empty">{$_('manage_ui.no_match', { values: { filter } })}</p>
     {:else}
       <ul class="row-list">
         {#each filtered as it (it.name)}
@@ -175,12 +178,12 @@
               </div>
             {:else}
               <span class="row-name">{it.name}</span>
-              <span class="row-count">{it.count} {it.count === 1 ? 'use' : 'uses'}</span>
+              <span class="row-count">{$_('manage_ui.uses', { values: { count: it.count ?? 0 } })}</span>
               <div class="row-actions">
-                <button class="btn-icon small" on:click={() => startEdit(it)} aria-label="Rename" title="Rename">
+                <button class="btn-icon small" on:click={() => startEdit(it)} aria-label={$_('history.rename')} title={$_('history.rename')}>
                   <span class="material-symbols-rounded">edit</span>
                 </button>
-                <button class="btn-icon small danger" on:click={() => remove(it)} aria-label="Delete" title="Delete">
+                <button class="btn-icon small danger" on:click={() => remove(it)} aria-label={$_('common.delete')} title={$_('common.delete')}>
                   <span class="material-symbols-rounded">delete</span>
                 </button>
               </div>

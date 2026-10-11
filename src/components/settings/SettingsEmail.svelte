@@ -180,19 +180,19 @@
   $: smtpBannerStatus = smtpTestStatus === 'testing' || smtpTestStatus === 'fail'
     ? smtpTestStatus
     : (smtpHost && smtpFrom ? 'ok' : '');
-  $: smtpBannerLabel   = smtpTestStatus === 'ok' ? 'Last Test Sent' : 'Configured';
+  $: smtpBannerLabel   = smtpTestStatus === 'ok' ? $_('settings_email_ui.last_test_sent') : $_('settings_email_ui.configured');
   $: smtpBannerSubtext = smtpTestStatus === 'ok'
     ? (smtpTestRecipient
-        ? `Sent to ${smtpTestRecipient}. Use Send Test again any time to re-verify.`
-        : 'Use Send Test again any time to re-verify')
-    : 'No test has been sent yet';
+        ? $_('settings_email_ui.sent_to', { values: { to: smtpTestRecipient } })
+        : $_('settings_email_ui.reverify_hint'))
+    : $_('settings_email_ui.no_test_yet');
 </script>
 
 <p class="sub-label" style="padding-bottom:4px">{$_('settings_email_ct.hint')}</p>
 {#if envLocks.smtp}
   <div class="env-lock-banner">
     <span class="material-symbols-rounded" style="font-size:16px">lock</span>
-    Configured via environment variables, changes are disabled.
+    {$_('settings_email_ui.env_locked')}
   </div>
 {/if}
 <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:12px">
@@ -200,14 +200,14 @@
     status={smtpBannerStatus}
     okLabel={smtpBannerLabel}
     subtext={smtpBannerSubtext}
-    error={smtpTestStatus === 'fail' ? 'Check host, credentials, and from address' : ''}
+    error={smtpTestStatus === 'fail' ? $_('settings_email_ui.test_failed_hint') : ''}
     onRetest={testSmtp}
     retestDisabled={smtpTestStatus === 'testing' || !smtpHost}
-    retestLabel="Send Test"
+    retestLabel={$_('settings_email_ui.send_test')}
   />
   <div class="form-group">
     <label class="form-label">{$_('settings_email_ct.smtp_host')}</label>
-    <input class="form-input" type="text" placeholder="e.g. smtp.example.com"
+    <input class="form-input" type="text" placeholder={$_('settings_email_ui.host_ph')}
       bind:value={smtpHost} disabled={envLocks.smtp} />
   </div>
   <div style="display:flex;gap:10px">
@@ -243,21 +243,21 @@
       {#if passIsStored}
         <button type="button" class="btn-icon-toggle change-btn"
           on:click={changeSmtpPass}
-          title="Change password"
-          aria-label="Change password">
-          Change
+          title={$_('settings_email_ui.change_password')}
+          aria-label={$_('settings_email_ui.change_password')}>
+          {$_('settings_email_ui.change')}
         </button>
       {:else}
         <button type="button" class="btn-icon-toggle"
           on:click={() => smtpShowPass = !smtpShowPass}
-          title={smtpShowPass ? 'Hide' : 'Show'}
-          aria-label={smtpShowPass ? 'Hide password' : 'Show password'}>
+          title={smtpShowPass ? $_('common.hide') : $_('settings_email_ui.show')}
+          aria-label={smtpShowPass ? $_('settings_email_ui.hide_password') : $_('settings_email_ui.show_password')}>
           <span class="material-symbols-rounded">{smtpShowPass ? 'visibility_off' : 'visibility'}</span>
         </button>
       {/if}
     </div>
     {#if passIsStored}
-      <p class="pass-hint">Password saved. Tap Change to replace it.</p>
+      <p class="pass-hint">{$_('settings_email_ui.pass_saved_hint')}</p>
     {/if}
   </div>
   <div class="form-group">
@@ -269,9 +269,9 @@
     <button class="btn btn-primary" style="height:36px;font-size:13px"
       on:click={saveSmtp} disabled={smtpSaving || envLocks.smtp}>
       {#if smtpSaved}
-        <span class="material-symbols-rounded" style="font-size:16px">check</span> Saved
+        <span class="material-symbols-rounded" style="font-size:16px">check</span> {$_('settings_email_ui.saved')}
       {:else}
-        {smtpSaving ? 'Saving…' : 'Save'}
+        {smtpSaving ? $_('common.saving') : $_('common.save')}
       {/if}
     </button>
   </div>
@@ -283,7 +283,7 @@
     <div class="test-dialog" role="dialog" aria-labelledby="test-dialog-title"
       on:click|stopPropagation>
       <h3 id="test-dialog-title">{$_('settings_email_ct.send_test_email')}</h3>
-      <p>Where should we send the test?</p>
+      <p>{$_('settings_email_ui.test_where')}</p>
       <input bind:this={testDialogInputEl} class="form-input" type="email"
         placeholder="you@example.com" bind:value={testRecipient}
         on:keydown={(e) => e.key === 'Enter' && confirmTestSmtp()} />

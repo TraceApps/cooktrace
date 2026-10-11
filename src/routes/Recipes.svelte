@@ -30,22 +30,22 @@
   import { cardAllergens, cleanHousehold, conflicts, avoids } from '../lib/allergens.js';
 
   let createSheetOpen = false;
-  // Measured page-header height — exposed as --header-h on page-shell so
+  // Measured page-header height: exposed as --header-h on page-shell so
   // sticky sub-bars can pin below it instead of sliding underneath.
   let headerH = 0;
   // The "Paste or upload" option opens a dialog that accepts BOTH a file
   // upload (.json, .html, Mealie/Tandoor/Paprika exports) AND a paste
-  // textarea — parser auto-detects JSON vs HTML/schema.org/Recipe.
+  // textarea: parser auto-detects JSON vs HTML/schema.org/Recipe.
   // "Import from File" handles images (Trace AI vision) plus PDF / RTF /
   // TXT / MD (server-side text extraction + heuristic parse + optional
   // AI fallback for low-confidence inputs). Always visible; AI-dependent
   // paths inside the dialog gate themselves on the runtime AI config.
   $: createActions = [
-    { label: 'Create Manually',          icon: 'edit_note',          value: 'manual' },
-    { label: 'Import from URL',          icon: 'link',               value: 'url' },
-    { label: 'Import from File', icon: 'upload_file', value: 'file' },
-    { label: 'Import Cookbook',  icon: 'menu_book',   value: 'cookbook' },
-    { label: 'Import from JSON/HTML',    icon: 'content_paste',      value: 'paste' },
+    { label: $_('recipes_ui.create_manually'), icon: 'edit_note',          value: 'manual' },
+    { label: $_('import_url_dialog.title'), icon: 'link',               value: 'url' },
+    { label: $_('file_import_dialog.title'), icon: 'upload_file', value: 'file' },
+    { label: $_('cookbook_import_dialog.title'), icon: 'menu_book',   value: 'cookbook' },
+    { label: $_('recipes_ui.import_json_html'), icon: 'content_paste',      value: 'paste' },
   ];
 
   // Track whether the AI provider is env-locked. Photo import is
@@ -156,26 +156,26 @@
 
   // ── Long-press card actions ────────────────────────────────────────────
   // Share Link / public-link entries need a server to mint and host
-  // the /r/<token> URL — hidden entirely in local-only Android mode.
+  // the /r/<token> URL: hidden entirely in local-only Android mode.
   let cardSheetOpen = false;
   let cardSheetTarget = null;
   $: _canShareLink = !isNative || !!getServerUrl();
   $: cardActions = cardSheetTarget ? [
-    { label: 'Open Recipe',    icon: 'open_in_new',   value: 'open' },
-    { label: cardSheetTarget.favorite ? 'Remove from Favorites' : 'Add to Favorites',
+    { label: $_('recipes_ui.open_recipe'), icon: 'open_in_new',   value: 'open' },
+    { label: cardSheetTarget.favorite ? $_('recipes_ui.remove_from_favorites') : $_('recipes_ui.add_to_favorites'),
       icon: cardSheetTarget.favorite ? 'heart_minus' : 'favorite_border',
       value: 'favorite' },
-    { label: 'Add to Cookbook', icon: 'auto_stories',  value: 'cookbook' },
+    { label: $_('recipes_page.add_to_cookbook'), icon: 'auto_stories',  value: 'cookbook' },
     ...(_canShareLink ? [{
-      label: cardSheetTarget.share_token ? 'Manage Share Link' : 'Create Share Link',
+      label: cardSheetTarget.share_token ? $_('recipes_ui.manage_share_link') : $_('recipes_ui.create_share_link'),
       icon: 'link', value: 'sharelink',
     }] : []),
-    { label: 'Plan a Cook',    icon: 'event_available', value: 'plan' },
-    { label: 'Add to Shopping List', icon: 'add_shopping_cart', value: 'shop' },
-    { label: 'Duplicate',      icon: 'content_copy',  value: 'duplicate' },
-    { label: 'Share Card',     icon: 'share',         value: 'share' },
-    { label: 'Select Multiple', icon: 'check_circle', value: 'select-multi' },
-    { label: 'Delete',         icon: 'delete',        value: 'delete', danger: true },
+    { label: $_('recipes_ui.plan_a_cook'), icon: 'event_available', value: 'plan' },
+    { label: $_('recipes_ui.add_to_shopping_list'), icon: 'add_shopping_cart', value: 'shop' },
+    { label: $_('recipes_ui.duplicate'), icon: 'content_copy',  value: 'duplicate' },
+    { label: $_('recipes_ui.share_card'), icon: 'share',         value: 'share' },
+    { label: $_('recipes_ui.select_multiple'), icon: 'check_circle', value: 'select-multi' },
+    { label: $_('common.delete'), icon: 'delete',        value: 'delete', danger: true },
   ] : [];
 
   // ── Multi-select / bulk delete ──────────────────────────────────────────
@@ -203,9 +203,9 @@
     const ids = [...selectedIds];
     if (ids.length === 0) return;
     const ok = await confirmDialog({
-      title: `Delete ${ids.length} ${ids.length === 1 ? 'recipe' : 'recipes'}?`,
-      message: 'This cannot be undone.',
-      confirmText: 'Delete',
+      title: $_('recipes_ui.bulk_delete_title', { values: { count: ids.length } }),
+      message: $_('recipes_ui.cannot_undo'),
+      confirmText: $_('common.delete'),
       dangerous: true,
     });
     if (!ok) return;
@@ -237,7 +237,7 @@
       const ids = new Set((inAlready || []).map(c => c.id));
       cookbookDialogPreexisting = ids;
       cookbookDialogSelected = new Set(ids);
-    } catch { /* non-fatal — dialog still works */ }
+    } catch { /* non-fatal: dialog still works */ }
   }
   function toggleCookbookSelected(id) {
     const next = new Set(cookbookDialogSelected);
@@ -247,7 +247,7 @@
 
   // ── Bulk: add the selected recipes to one or more cookbooks ───────
   // Distinct from the single-recipe dialog above. Pure-add (no remove
-  // path) — the user just ticks which cookbooks should receive the
+  // path): the user just ticks which cookbooks should receive the
   // batch. Pre-existing memberships stay; this is "Add to" not "Move
   // to" so users don't accidentally lose existing assignments.
   let bulkCookbookOpen = false;
@@ -294,10 +294,10 @@
   let shareDialogToken = null;
   let shareDialogBusy = false;
 
-  // Cookbook share dialog — analogous to the recipe share dialog but
+  // Cookbook share dialog: analogous to the recipe share dialog but
   // scoped to cookbooks. Two sections: Share with Users (per-user
   // grants) and Share with Kitchen (fan out to all members). No
-  // public-link section — cookbook sharing is member-scoped only.
+  // public-link section: cookbook sharing is member-scoped only.
   let cookbookShareDialogOpen = false;
   let cookbookShareTarget = null;         // the cookbook being shared
   let cookbookSharePeers = [];            // users I can share with
@@ -372,7 +372,7 @@
     shareKitchenBusyId = kitchen.id;
     try {
       const res = await NtApi.shareRecipeWithKitchen(kitchen.id, shareDialogRecipe.id);
-      // Bring per-user grants display in sync — kitchen-share fans out.
+      // Bring per-user grants display in sync: kitchen-share fans out.
       const fresh = await NtApi.getRecipeShares(shareDialogRecipe.id).catch(() => []);
       shareGrants = new Set((fresh || []).map(g => g.user_id));
       const added = res?.added ?? 0;
@@ -404,7 +404,7 @@
       shareKitchens = kitchens || [];
     });
     if (!shareDialogToken) {
-      // No token yet — don't auto-mint anymore. The dialog now has both
+      // No token yet: don't auto-mint anymore. The dialog now has both
       // a "Public Link" and a "Share with Users" section, so minting
       // happens on user action via createPublicLink().
     }
@@ -452,9 +452,9 @@
   async function revokeShareLink() {
     if (!shareDialogRecipe) return;
     const ok = await confirmDialog({
-      title: 'Revoke share link?',
-      message: 'The link will stop working immediately. You can always create a new one later.',
-      confirmText: 'Revoke',
+      title: $_('recipes_ui.revoke_title'),
+      message: $_('recipes_ui.revoke_message'),
+      confirmText: $_('recipes_ui.revoke'),
       dangerous: true,
     });
     if (!ok) return;
@@ -541,7 +541,7 @@
       try {
         const fresh = await NtApi.getRecipe(r.id);
         const { id: _id, created_at, updated_at, last_cooked_at, cook_count, created_by_username, ...rest } = fresh;
-        const dup = await NtApi.createRecipe({ ...rest, name: rest.name + ' (copy)', favorite: false, rating: null });
+        const dup = await NtApi.createRecipe({ ...rest, name: $_('recipes_ui.copy_suffix', { values: { name: rest.name } }), favorite: false, rating: null });
         recipes = [dup, ...recipes];
         showSuccess($_('recipes_page.toast.recipe_duplicated'));
       } catch (err) { showError(failed('fail.duplicate_recipe', err)); }
@@ -570,9 +570,9 @@
     }
     else if (v === 'delete') {
       const ok = await confirmDialog({
-        title: 'Delete recipe?',
-        message: `"${r.name}" will be removed.`,
-        confirmText: 'Delete',
+        title: $_('recipes_ui.delete_title'),
+        message: $_('recipes_ui.delete_message', { values: { name: r.name } }),
+        confirmText: $_('common.delete'),
         dangerous: true,
       });
       if (!ok) return;
@@ -597,13 +597,13 @@
   // at least one recipe shared with them.
   let viewMode = 'recipes';
 
-  // View-toggle pill geometry — measured from the active button's
+  // View-toggle pill geometry: measured from the active button's
   // actual layout so the pill sizes correctly even when buttons have
   // different widths (Recipes vs Cookbooks vs Shared have varying
   // text + count badges). Re-measured on viewMode change, on mount,
   // and on resize. CSS animates left/width via transitions.
   let vtContainer = null;
-  // Explicit refs — Shared is rendered conditionally between Recipes
+  // Explicit refs: Shared is rendered conditionally between Recipes
   // and Cookbooks so an integer-indexed array would shift depending
   // on whether sharedRecipes.length > 0. Named refs stay stable.
   let vtBtnRecipes = null;
@@ -622,7 +622,7 @@
     vtPillX = bRect.left - cRect.left;
     vtPillW = bRect.width;
   }
-  // Wait for the DOM update to flush — the toggle buttons are mounted
+  // Wait for the DOM update to flush: the toggle buttons are mounted
   // inside `{#if recipes.length || cookbooks.length || sharedRecipes.length}`
   // so on initial load the bind:this refs only populate after the
   // first reactive pass completes. tick() guarantees the bindings have
@@ -651,11 +651,11 @@
     for (const el of [vtContainer, vtBtnRecipes, vtBtnShared, vtBtnCookbooks]) if (el) vtResize.observe(el);
   }
 
-  // Category filter — driven by a clickable chip row OR a `?category=<slug>`
+  // Category filter: driven by a clickable chip row OR a `?category=<slug>`
   // hash-query param (RecipeView's category pill links here).
   let categories = [];
   let activeCategorySlug = '';
-  // Favorites toggle — first chip in the filter row. Independent of the
+  // Favorites toggle: first chip in the filter row. Independent of the
   // category filter (you can be filtering both Favorites + Dinner).
   let favoritesOnly = false;
   // "Safe for Everyone": only recipes no one in the household has to
@@ -771,7 +771,7 @@
   })();
 
   // Sort modes mirror NutriTrace's foods/meals/recipes sort. The
-  // default is fav-alpha — favorites float to the top, then everything
+  // default is fav-alpha: favorites float to the top, then everything
   // alphabetical. Pure alpha is available for users who want a flat list.
   function _applySort(arr, mode) {
     const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
@@ -838,7 +838,7 @@
       sharedCookbooks = sharedCbRes || [];
       activeCategorySlug = _readCategoryFromHash();
       viewMode = _readViewFromHash();
-      // Explicit re-measure after the toggle buttons render — the
+      // Explicit re-measure after the toggle buttons render: the
       // reactive measurement above can fire while buttons are still
       // mounting (the `{#if recipes.length || ...}` gate flips true
       // and bind:this hasn't populated vtBtns yet). One more pass
@@ -897,14 +897,14 @@
     class:select-mode={selectMode}
     bind:offsetHeight={headerH}>
     {#if selectMode}
-      <h1>{selectedIds.size} Selected</h1>
-      <button class="btn-icon header-action" on:click={bulkDeleteSelected} disabled={selectedIds.size === 0} aria-label="Delete selected" title="Delete selected">
+      <h1>{$_('recipes_ui.selected_count', { values: { count: selectedIds.size } })}</h1>
+      <button class="btn-icon header-action" on:click={bulkDeleteSelected} disabled={selectedIds.size === 0} aria-label={$_('recipes_ui.delete_selected')} title={$_('recipes_ui.delete_selected')}>
         <span class="material-symbols-rounded">delete</span>
       </button>
-      <button class="btn-icon header-action header-action-2" on:click={openBulkCookbookDialog} disabled={selectedIds.size === 0} aria-label="Add to Cookbook" title="Add to Cookbook">
+      <button class="btn-icon header-action header-action-2" on:click={openBulkCookbookDialog} disabled={selectedIds.size === 0} aria-label={$_('recipes_page.add_to_cookbook')} title={$_('recipes_page.add_to_cookbook')}>
         <span class="material-symbols-rounded">auto_stories</span>
       </button>
-      <button class="btn-icon header-action header-action-3" on:click={exitSelectMode} aria-label="Cancel selection" title="Cancel">
+      <button class="btn-icon header-action header-action-3" on:click={exitSelectMode} aria-label={$_('recipes_ui.cancel_selection')} title={$_('common.cancel')}>
         <span class="material-symbols-rounded">close</span>
       </button>
     {:else}
@@ -917,7 +917,7 @@
 
   <ActionSheet
     bind:open={createSheetOpen}
-    title="Add a Recipe"
+    title={$_('recipes_ui.add_a_recipe')}
     actions={createActions}
     on:select={onCreateAction}
   />
@@ -937,7 +937,7 @@
       <div class="cb-dialog share-dialog" on:click|stopPropagation>
         <header class="cb-dialog-head">
           <h3>{$_('recipes_page.share_recipe')}</h3>
-          <button class="btn-icon" on:click={() => shareDialogOpen = false} aria-label="Close">
+          <button class="btn-icon" on:click={() => shareDialogOpen = false} aria-label={$_('common.close')}>
             <span class="material-symbols-rounded">close</span>
           </button>
         </header>
@@ -948,9 +948,9 @@
           <section class="share-section">
             <h4 class="share-section-title">
               <span class="material-symbols-rounded">group</span>
-              Share with Users
+              {$_('recipes_ui.share_with_users')}
             </h4>
-            <p class="share-section-hint">Picks land in their "Shared" tab. Read-only.</p>
+            <p class="share-section-hint">{$_('recipes_ui.share_users_hint')}</p>
             <ul class="peer-list">
               {#each sharePeers as p (p.id)}
                 <label class="peer-row" class:on={shareGrants.has(p.id)}>
@@ -967,25 +967,25 @@
           </section>
         {/if}
 
-        <!-- Section 1.5: Share with a Kitchen — fans out per-user
+        <!-- Section 1.5: Share with a Kitchen: fans out per-user
              grants to every member in one click. -->
         {#if shareKitchens.length > 0}
           <section class="share-section">
             <h4 class="share-section-title">
               <span class="material-symbols-rounded">cooking</span>
-              Share with a Kitchen
+              {$_('recipes_ui.share_with_kitchen')}
             </h4>
-            <p class="share-section-hint">Sends this recipe to every member of the Kitchen at once.</p>
+            <p class="share-section-hint">{$_('recipes_ui.share_kitchen_hint')}</p>
             <ul class="peer-list">
               {#each shareKitchens as k (k.id)}
                 <li class="peer-row">
                   <span class="material-symbols-rounded" style="font-size:18px;color:var(--accent);">cooking</span>
                   <span class="peer-name">{k.name}</span>
-                  <span class="peer-handle">{k.member_count} {k.member_count === 1 ? 'member' : 'members'}</span>
+                  <span class="peer-handle">{$_('recipes_ui.member_count', { values: { count: k.member_count } })}</span>
                   <button class="btn btn-secondary" style="margin-left:auto;height:30px;font-size:12px"
                     on:click={() => shareWithKitchen(k)}
                     disabled={shareKitchenBusyId === k.id}>
-                    {shareKitchenBusyId === k.id ? 'Sharing…' : 'Share'}
+                    {shareKitchenBusyId === k.id ? $_('recipes_ui.sharing') : $_('recipes_page.share')}
                   </button>
                 </li>
               {/each}
@@ -997,15 +997,15 @@
         <section class="share-section">
           <h4 class="share-section-title">
             <span class="material-symbols-rounded">link</span>
-            Public Link
+            {$_('recipes_ui.public_link')}
           </h4>
           {#if !shareDialogToken}
-            <p class="share-section-hint">Anyone with the link can view (no account needed).</p>
+            <p class="share-section-hint">{$_('recipes_ui.public_link_hint')}</p>
             <button class="btn btn-primary" on:click={createPublicLink} disabled={shareDialogBusy}>
-              {shareDialogBusy ? 'Creating…' : 'Create Public Link'}
+              {shareDialogBusy ? $_('recipes_ui.creating') : $_('recipes_ui.create_public_link')}
             </button>
           {:else}
-            <p class="share-section-hint">Anyone with this link can view (read-only, no account needed).</p>
+            <p class="share-section-hint">{$_('recipes_ui.public_link_active_hint')}</p>
             <div class="link-row">
               <input
                 class="input link-input"
@@ -1015,15 +1015,15 @@
               />
               <button class="btn btn-primary" on:click={copyShareLink}>
                 <span class="material-symbols-rounded" style="font-size: 16px;">content_copy</span>
-                Copy
+                {$_('recipes_ui.copy')}
               </button>
             </div>
             <div class="link-actions">
               <button class="btn btn-secondary" on:click={rotateShareLink} disabled={shareDialogBusy}>
-                Rotate
+                {$_('recipes_ui.rotate')}
               </button>
               <button class="btn btn-secondary danger-text" on:click={revokeShareLink}>
-                Revoke
+                {$_('recipes_ui.revoke')}
               </button>
             </div>
           {/if}
@@ -1034,7 +1034,7 @@
 
   <!-- Cookbook share dialog. Modeled on the recipe share dialog above
        (Section 1: Share with Users; Section 1.5: Share with a Kitchen)
-       minus the public-link section — cookbook sharing is member-
+       minus the public-link section: cookbook sharing is member-
        scoped only. -->
   {#if cookbookShareDialogOpen && cookbookShareTarget}
     <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
@@ -1044,7 +1044,7 @@
           <span class="material-symbols-rounded">share</span>
           <h3>{$_('recipes_page.share_cookbook')}</h3>
           <button class="cb-close" on:click={closeCookbookShareDialog}
-            aria-label="Close">
+            aria-label={$_('common.close')}>
             <span class="material-symbols-rounded">close</span>
           </button>
         </header>
@@ -1053,11 +1053,11 @@
         <section class="share-section">
           <h4 class="share-section-title">
             <span class="material-symbols-rounded">person</span>
-            Share with Users
+            {$_('recipes_ui.share_with_users')}
           </h4>
-          <p class="share-section-hint">Grants read access. They can view and cook from the cookbook but can't edit it.</p>
+          <p class="share-section-hint">{$_('recipes_ui.cookbook_share_users_hint')}</p>
           {#if cookbookSharePeers.length === 0}
-            <p class="share-empty">No other users yet.</p>
+            <p class="share-empty">{$_('recipes_ui.no_other_users')}</p>
           {:else}
             <ul class="peer-list">
               {#each cookbookSharePeers as p (p.user_id)}
@@ -1081,19 +1081,19 @@
           <section class="share-section">
             <h4 class="share-section-title">
               <span class="material-symbols-rounded">cooking</span>
-              Share with a Kitchen
+              {$_('recipes_ui.share_with_kitchen')}
             </h4>
-            <p class="share-section-hint">Sends the cookbook to every member of the Kitchen at once.</p>
+            <p class="share-section-hint">{$_('recipes_ui.cookbook_share_kitchen_hint')}</p>
             <ul class="peer-list">
               {#each cookbookShareKitchens as k (k.id)}
                 <li class="peer-row">
                   <span class="material-symbols-rounded" style="font-size:18px;color:var(--accent);">cooking</span>
                   <span class="peer-name">{k.name}</span>
-                  <span class="peer-handle">{k.member_count} {k.member_count === 1 ? 'member' : 'members'}</span>
+                  <span class="peer-handle">{$_('recipes_ui.member_count', { values: { count: k.member_count } })}</span>
                   <button class="btn btn-secondary" style="margin-left:auto;height:30px;font-size:12px"
                     on:click={() => shareCookbookWithKitchen(k)}
                     disabled={cookbookShareKitchenBusyId === k.id}>
-                    {cookbookShareKitchenBusyId === k.id ? 'Sharing…' : 'Share'}
+                    {cookbookShareKitchenBusyId === k.id ? $_('recipes_ui.sharing') : $_('recipes_page.share')}
                   </button>
                 </li>
               {/each}
@@ -1110,16 +1110,16 @@
       <div class="cb-dialog" on:click|stopPropagation>
         <header class="cb-dialog-head">
           <h3>{$_('recipes_page.add_to_cookbook')}</h3>
-          <button class="btn-icon" on:click={() => bulkCookbookOpen = false} aria-label="Close" disabled={bulkCookbookBusy}>
+          <button class="btn-icon" on:click={() => bulkCookbookOpen = false} aria-label={$_('common.close')} disabled={bulkCookbookBusy}>
             <span class="material-symbols-rounded">close</span>
           </button>
         </header>
-        <p class="cb-dialog-sub">{selectedIds.size} {selectedIds.size === 1 ? 'recipe' : 'recipes'} selected</p>
+        <p class="cb-dialog-sub">{$_('recipes_ui.recipes_selected', { values: { count: selectedIds.size } })}</p>
         <div class="cb-dialog-list">
           {#if cookbooks.length === 0}
             <p class="cb-dialog-empty">
-              No cookbooks yet. Create one in
-              <a href="#/manage/cookbooks" on:click|preventDefault={() => { bulkCookbookOpen = false; push('/manage/cookbooks'); }}>Manage &rarr; Cookbooks</a>.
+              {$_('recipes_ui.no_cookbooks_prefix')}
+              <a href="#/manage/cookbooks" on:click|preventDefault={() => { bulkCookbookOpen = false; push('/manage/cookbooks'); }}>{$_('recipes_ui.manage_cookbooks_link')}</a>.
             </p>
           {:else}
             {#each cookbooks.filter(cb => !cb.is_smart) as cb (cb.id)}
@@ -1128,13 +1128,12 @@
                   checked={bulkCookbookSelected.has(cb.id)}
                   on:change={() => toggleBulkCookbookSelected(cb.id)} />
                 <span class="cb-dialog-name">{cb.name}</span>
-                <span class="cb-dialog-count">{cb.recipe_count} {cb.recipe_count === 1 ? 'recipe' : 'recipes'}</span>
+                <span class="cb-dialog-count">{$_('recipes_ui.recipe_count', { values: { count: cb.recipe_count } })}</span>
               </label>
             {/each}
             {#if cookbooks.every(cb => cb.is_smart)}
               <p class="cb-dialog-empty">
-                All your cookbooks are smart cookbooks (auto-filtered).
-                Recipes can't be added to a smart cookbook directly.
+                {$_('recipes_ui.all_smart')}
               </p>
             {/if}
           {/if}
@@ -1142,7 +1141,7 @@
         <footer class="cb-dialog-actions">
           <button class="btn btn-secondary" on:click={() => bulkCookbookOpen = false} disabled={bulkCookbookBusy}>{$_('recipes_page.cancel')}</button>
           <button class="btn btn-primary" on:click={confirmBulkCookbook} disabled={bulkCookbookBusy || bulkCookbookSelected.size === 0}>
-            {bulkCookbookBusy ? 'Adding…' : 'Add'}
+            {bulkCookbookBusy ? $_('recipes_ui.adding') : $_('recipes_ui.add')}
           </button>
         </footer>
       </div>
@@ -1154,7 +1153,7 @@
       <div class="cb-dialog" on:click|stopPropagation>
         <header class="cb-dialog-head">
           <h3>{$_('recipes_page.add_to_cookbook')}</h3>
-          <button class="btn-icon" on:click={() => cookbookDialogOpen = false} aria-label="Close">
+          <button class="btn-icon" on:click={() => cookbookDialogOpen = false} aria-label={$_('common.close')}>
             <span class="material-symbols-rounded">close</span>
           </button>
         </header>
@@ -1162,8 +1161,8 @@
         <div class="cb-dialog-list">
           {#if cookbooks.length === 0}
             <p class="cb-dialog-empty">
-              No cookbooks yet. Create one in
-              <a href="#/manage/cookbooks" on:click|preventDefault={() => { cookbookDialogOpen = false; push('/manage/cookbooks'); }}>Manage &rarr; Cookbooks</a>.
+              {$_('recipes_ui.no_cookbooks_prefix')}
+              <a href="#/manage/cookbooks" on:click|preventDefault={() => { cookbookDialogOpen = false; push('/manage/cookbooks'); }}>{$_('recipes_ui.manage_cookbooks_link')}</a>.
             </p>
           {:else}
             {#each cookbooks as cb (cb.id)}
@@ -1172,7 +1171,7 @@
                   checked={cookbookDialogSelected.has(cb.id)}
                   on:change={() => toggleCookbookSelected(cb.id)} />
                 <span class="cb-dialog-name">{cb.name}</span>
-                <span class="cb-dialog-count">{cb.recipe_count} {cb.recipe_count === 1 ? 'recipe' : 'recipes'}</span>
+                <span class="cb-dialog-count">{$_('recipes_ui.recipe_count', { values: { count: cb.recipe_count } })}</span>
               </label>
             {/each}
           {/if}
@@ -1188,7 +1187,7 @@
   <!-- URL import dialog (unified: 1 URL = direct save, N URLs = picker) -->
   <ImportUrlDialog bind:open={urlImportOpen} />
 
-  <!-- Paste / upload import dialog (Phase 7). Auto-detects format —
+  <!-- Paste / upload import dialog (Phase 7). Auto-detects format:
        schema.org JSON-LD, schema.org HTML, Mealie / Tandoor / CookTrace
        JSON exports, Paprika .paprikarecipes / .paprikarecipe archives. -->
   {#if pasteImportOpen}
@@ -1196,36 +1195,36 @@
     <div class="modal-backdrop" on:click|self={() => pasteImportOpen = false} use:closeOnBack={() => pasteImportOpen = false}>
       <div class="modal" on:click|stopPropagation>
         <header class="modal-header">
-          <h2>JSON / HTML Import</h2>
-          <button class="btn-icon" on:click={() => pasteImportOpen = false} aria-label="Close">
+          <h2>{$_('recipes_ui.json_html_import')}</h2>
+          <button class="btn-icon" on:click={() => pasteImportOpen = false} aria-label={$_('common.close')}>
             <span class="material-symbols-rounded">close</span>
           </button>
         </header>
         <div class="modal-body">
           <p class="modal-hint">
-            Paste a recipe (schema.org JSON-LD, the HTML of a recipe page, or a Mealie / Tandoor / CookTrace JSON export), or upload a file. Paprika <code>.paprikarecipes</code> archives import all included recipes at once.
+            {$_('recipes_ui.paste_hint_prefix')} <code>.paprikarecipes</code> {$_('recipes_ui.paste_hint_suffix')}
           </p>
           <textarea
             class="input"
             rows="8"
-            placeholder={'Paste JSON or HTML here…'}
+            placeholder={$_('recipes_ui.paste_placeholder')}
             bind:value={pasteText}
             disabled={!!pasteFile}
             style="font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 12px;"
           ></textarea>
-          <div class="paste-or">— or —</div>
+          <div class="paste-or">{$_('recipes_ui.or')}</div>
           {#if pasteFile}
             <div class="paste-file">
               <span class="material-symbols-rounded">attach_file</span>
               <span class="paste-file-name">{pasteFile.name}</span>
-              <button class="btn-icon" on:click={clearPasteFile} aria-label="Remove file">
+              <button class="btn-icon" on:click={clearPasteFile} aria-label={$_('recipes_ui.remove_file')}>
                 <span class="material-symbols-rounded">close</span>
               </button>
             </div>
           {:else}
             <button class="btn btn-secondary" on:click={() => pasteFileInput?.click()}>
               <span class="material-symbols-rounded">upload_file</span>
-              Choose a file
+              {$_('recipes_ui.choose_file')}
             </button>
             <input bind:this={pasteFileInput} type="file"
               accept=".json,.html,.htm,.paprikarecipes,.paprikarecipe,application/json,text/html"
@@ -1235,7 +1234,7 @@
             <input type="checkbox" bind:checked={pasteAddToPantry} />
             <span>
               <span class="opt-label">{$_('recipes_page.opt_link_pantry')}</span>
-              <span class="opt-desc">Matches imported names to your existing Pantry items (case-insensitive) and creates new rows for any that don't exist yet.</span>
+              <span class="opt-desc">{$_('recipes_ui.link_pantry_desc')}</span>
             </span>
           </label>
           <label class="opt-row">
@@ -1247,8 +1246,8 @@
           <label class="opt-row">
             <input type="checkbox" bind:checked={pasteImportCategories} />
             <span>
-              <span class="opt-label">Import the source's category</span>
-              <span class="opt-desc">Carries the category through and creates it in your catalog if it's new. Off = save uncategorized.</span>
+              <span class="opt-label">{$_('recipes_ui.import_source_category')}</span>
+              <span class="opt-desc">{$_('recipes_ui.import_category_desc')}</span>
             </span>
           </label>
         </div>
@@ -1256,7 +1255,7 @@
           <button class="btn btn-secondary" on:click={() => pasteImportOpen = false}>{$_('recipes_page.cancel')}</button>
           <button class="btn btn-primary" on:click={doPasteImport}
             disabled={pasteBusy || (!pasteFile && !pasteText.trim())}>
-            {pasteBusy ? 'Importing…' : 'Import'}
+            {pasteBusy ? $_('recipes_ui.importing') : $_('recipes_ui.import')}
           </button>
         </footer>
       </div>
@@ -1269,7 +1268,7 @@
          Shared segment only appears once at least one recipe has
          been shared with the user. -->
     {#if recipes.length > 0 || cookbooks.length > 0 || sharedRecipes.length > 0}
-      <div class="view-toggle" role="radiogroup" aria-label="View"
+      <div class="view-toggle" role="radiogroup" aria-label={$_('recipes_ui.view')}
         bind:this={vtContainer}
         style="--vt-pill-x:{vtPillX}px; --vt-pill-w:{vtPillW}px">
         <span class="vt-pill" aria-hidden="true"></span>
@@ -1278,11 +1277,11 @@
           on:click={() => setViewMode('recipes')}
           aria-pressed={viewMode === 'recipes'}>
           <span class="material-symbols-rounded">menu_book</span>
-          Recipes
+          {$_('routes.recipes.title')}
           <span class="vt-count">{recipes.length}</span>
         </button>
         {#if sharedRecipes.length > 0}
-          <!-- Shared sits between Recipes and Cookbooks — closer to
+          <!-- Shared sits between Recipes and Cookbooks: closer to
                "my recipes" mentally, since these are things I cook
                from. Cookbooks are curated collections, further right. -->
           <button class="vt-btn" class:active={viewMode === 'shared'}
@@ -1290,7 +1289,7 @@
             on:click={() => setViewMode('shared')}
             aria-pressed={viewMode === 'shared'}>
             <span class="material-symbols-rounded">group</span>
-            Shared
+            {$_('recipes_ui.shared')}
             <span class="vt-count">{sharedRecipes.length}</span>
           </button>
         {/if}
@@ -1299,7 +1298,7 @@
           on:click={() => setViewMode('cookbooks')}
           aria-pressed={viewMode === 'cookbooks'}>
           <span class="material-symbols-rounded">auto_stories</span>
-          Cookbooks
+          {$_('recipes_ui.cookbooks')}
           <span class="vt-count">{cookbooks.length}</span>
         </button>
       </div>
@@ -1318,14 +1317,14 @@
       </div>
       <div class="filter-row">
         {#if categories.length > 0 || hasAvoids}
-          <div class="cat-filter" role="radiogroup" aria-label="Filter recipes">
+          <div class="cat-filter" role="radiogroup" aria-label={$_('recipes_ui.filter_recipes')}>
             <button class="cat-chip fav-chip"
               class:active={favoritesOnly}
               on:click={() => favoritesOnly = !favoritesOnly}
               aria-pressed={favoritesOnly}
-              title="Show only favorites">
+              title={$_('recipes_ui.show_only_favorites')}>
               <span class="material-symbols-rounded">{favoritesOnly ? 'favorite' : 'favorite_border'}</span>
-              Favorites
+              {$_('recipes_ui.favorites')}
             </button>
             {#if hasAvoids}
               <button class="cat-chip fav-chip"
@@ -1341,7 +1340,7 @@
                 class:active={!activeCategorySlug}
                 on:click={() => setCategoryFilter('')}
                 aria-pressed={!activeCategorySlug}
-              >All</button>
+              >{$_('recipes_ui.all')}</button>
               {#each categories as c (c.id)}
                 {@const isActive = activeCategorySlug === c.slug}
                 <button class="cat-chip"
@@ -1354,7 +1353,7 @@
             {/if}
           </div>
         {/if}
-        <select class="sort-select" bind:value={$recipesSort} title="Sort recipes">
+        <select class="sort-select" bind:value={$recipesSort} title={$_('recipes_ui.sort_recipes')}>
           <option value="fav-alpha">★ + A→Z</option>
           <option value="alpha">A → Z</option>
           <option value="recent">{$_('recipes_page.sort_recent')}</option>
@@ -1369,8 +1368,8 @@
       <!-- Skeleton placeholders matching the recipe-card grid shape so
            the initial render doesn't pop a spinner-then-cards. Keeps
            layout stable while the fetch lands. -->
-      <div class="grid skeleton-grid" aria-busy="true" aria-label="Loading recipes">
-        {#each Array(12) as _}
+      <div class="grid skeleton-grid" aria-busy="true" aria-label={$_('recipes_ui.loading_recipes')}>
+        {#each Array(12) as _skel}
           <div class="skel skel-card">
             <div class="skel-img"></div>
             <div class="skel-body">
@@ -1393,7 +1392,7 @@
         <div class="state empty" in:fade={{ duration: 120 }}>
           <span class="material-symbols-rounded empty-icon">group</span>
           <h2>{$_('recipes_page.nothing_shared_yet')}</h2>
-          <p>When another user shares a recipe with you it lands here.</p>
+          <p>{$_('recipes_ui.shared_empty_desc')}</p>
         </div>
       {:else}
         <!-- Search + category chips + sort for the shared view. Same
@@ -1406,18 +1405,18 @@
             <input
               class="search"
               type="search"
-              placeholder="Search shared recipes…"
+              placeholder={$_('recipes_ui.search_shared')}
               bind:value={query}
             />
           </div>
           <div class="filter-row">
             {#if sharedCategories.length > 0}
-              <div class="cat-filter" role="radiogroup" aria-label="Filter shared recipes">
+              <div class="cat-filter" role="radiogroup" aria-label={$_('recipes_ui.filter_shared')}>
                 <button class="cat-chip"
                   class:active={!sharedCategorySlug}
                   on:click={() => sharedCategorySlug = ''}
                   aria-pressed={!sharedCategorySlug}
-                >All</button>
+                >{$_('recipes_ui.all')}</button>
                 {#each sharedCategories as c (c.slug)}
                   {@const isActive = sharedCategorySlug === c.slug}
                   <button class="cat-chip"
@@ -1429,7 +1428,7 @@
                 {/each}
               </div>
             {/if}
-            <select class="sort-select" bind:value={$recipesSort} title="Sort recipes">
+            <select class="sort-select" bind:value={$recipesSort} title={$_('recipes_ui.sort_recipes')}>
               <option value="fav-alpha">★ + A→Z</option>
               <option value="alpha">A → Z</option>
               <option value="recent">{$_('recipes_page.sort_recent')}</option>
@@ -1442,8 +1441,8 @@
         {#if filteredShared.length === 0}
           <div class="state empty" in:fade={{ duration: 120 }}>
             <span class="material-symbols-rounded empty-icon">search_off</span>
-            <h2>No shared recipes match</h2>
-            <p>Try clearing the search or picking a different category.</p>
+            <h2>{$_('recipes_ui.no_shared_match')}</h2>
+            <p>{$_('recipes_ui.no_shared_match_hint')}</p>
           </div>
         {:else}
         <div class="grid">
@@ -1456,12 +1455,12 @@
                 {:else}
                   <span class="material-symbols-rounded card-image-fallback">restaurant</span>
                 {/if}
-                <span class="shared-badge" title={r.shared_by ? `Shared by ${r.shared_by}` : 'Shared with you'}>
+                <span class="shared-badge" title={r.shared_by ? $_('recipes_ui.shared_by', { values: { name: r.shared_by } }) : $_('recipes_ui.shared_with_you')}>
                   <span class="material-symbols-rounded">group</span>
-                  {r.shared_by || 'Shared'}
+                  {r.shared_by || $_('recipes_ui.shared_badge')}
                 </span>
                 {#if r.via_kitchen_name}
-                  <span class="via-kitchen-badge" title={`Shared via ${r.via_kitchen_name}`}>
+                  <span class="via-kitchen-badge" title={$_('recipes_ui.shared_via', { values: { name: r.via_kitchen_name } })}>
                     <span class="material-symbols-rounded">cooking</span>
                     {r.via_kitchen_name}
                   </span>
@@ -1504,7 +1503,7 @@
         <div class="state empty" in:fade={{ duration: 120 }}>
           <span class="material-symbols-rounded empty-icon">auto_stories</span>
           <h2>{$_('recipes_page.no_cookbooks_yet')}</h2>
-          <p>Group your favorite recipes into cookbooks. Create one in <a href="#/manage/cookbooks" on:click|preventDefault={() => push('/manage/cookbooks')}>Manage &rarr; Cookbooks</a>.</p>
+          <p>{$_('recipes_ui.cookbooks_empty_prefix')} <a href="#/manage/cookbooks" on:click|preventDefault={() => push('/manage/cookbooks')}>{$_('recipes_ui.manage_cookbooks_link')}</a>.</p>
           <button class="btn btn-primary" on:click={() => push('/manage/cookbooks')}>{$_('recipes_page.create_cookbook')}</button>
         </div>
       {:else}
@@ -1523,8 +1522,8 @@
                      navigating into the cookbook. -->
                 <span class="cb-share-btn material-symbols-rounded"
                   role="button" tabindex="0"
-                  title="Share cookbook"
-                  aria-label="Share cookbook"
+                  title={$_('recipes_page.share_cookbook')}
+                  aria-label={$_('recipes_page.share_cookbook')}
                   on:click|stopPropagation={() => openCookbookShareDialog(cb)}
                   on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCookbookShareDialog(cb); } }}>share</span>
               </div>
@@ -1532,7 +1531,7 @@
                 <h3 class="cb-card-name">{cb.name}</h3>
                 {#if cb.description}<p class="cb-card-desc">{cb.description}</p>{/if}
                 <span class="cb-card-count">
-                  {cb.recipe_count} {cb.recipe_count === 1 ? 'recipe' : 'recipes'}
+                  {$_('recipes_ui.recipe_count', { values: { count: cb.recipe_count } })}
                 </span>
               </div>
             </button>
@@ -1546,12 +1545,12 @@
                 {:else}
                   <span class="material-symbols-rounded">auto_stories</span>
                 {/if}
-                <span class="shared-badge" title={cb.shared_by ? `Shared by ${cb.shared_by}` : 'Shared with you'}>
+                <span class="shared-badge" title={cb.shared_by ? $_('recipes_ui.cb_shared_by', { values: { name: cb.shared_by } }) : $_('recipes_ui.cb_shared_with_you')}>
                   <span class="material-symbols-rounded">group</span>
-                  {cb.shared_by || 'Shared'}
+                  {cb.shared_by || $_('recipes_ui.cb_shared_badge')}
                 </span>
                 {#if cb.via_kitchen_name}
-                  <span class="via-kitchen-badge" title={`Shared via ${cb.via_kitchen_name}`}>
+                  <span class="via-kitchen-badge" title={$_('recipes_ui.cb_shared_via', { values: { name: cb.via_kitchen_name } })}>
                     <span class="material-symbols-rounded">cooking</span>
                     {cb.via_kitchen_name}
                   </span>
@@ -1561,7 +1560,7 @@
                 <h3 class="cb-card-name">{cb.name}</h3>
                 {#if cb.description}<p class="cb-card-desc">{cb.description}</p>{/if}
                 <span class="cb-card-count">
-                  {cb.recipe_count} {cb.recipe_count === 1 ? 'recipe' : 'recipes'}
+                  {$_('recipes_ui.recipe_count', { values: { count: cb.recipe_count } })}
                 </span>
               </div>
             </button>
@@ -1603,19 +1602,19 @@
                 <span class="material-symbols-rounded card-image-fallback">restaurant</span>
               {/if}
               {#if r.favorite}
-                <span class="card-fav material-symbols-rounded" title="Favorite">favorite</span>
+                <span class="card-fav material-symbols-rounded" title={$_('recipes_ui.favorite')}>favorite</span>
               {/if}
               <!-- When "Show Shared Recipes in My Main List" is on, the
                    mixed-in cards keep their identity chips so ownership
                    is still obvious at a glance. Only renders when the
                    recipe was surfaced from /shared-with-me. -->
               {#if r.shared_with_me}
-                <span class="shared-badge" title={r.shared_by ? `Shared by ${r.shared_by}` : 'Shared with you'}>
+                <span class="shared-badge" title={r.shared_by ? $_('recipes_ui.shared_by', { values: { name: r.shared_by } }) : $_('recipes_ui.shared_with_you')}>
                   <span class="material-symbols-rounded">group</span>
-                  {r.shared_by || 'Shared'}
+                  {r.shared_by || $_('recipes_ui.shared_badge')}
                 </span>
                 {#if r.via_kitchen_name}
-                  <span class="via-kitchen-badge" title={`Shared via ${r.via_kitchen_name}`}>
+                  <span class="via-kitchen-badge" title={$_('recipes_ui.shared_via', { values: { name: r.via_kitchen_name } })}>
                     <span class="material-symbols-rounded">cooking</span>
                     {r.via_kitchen_name}
                   </span>
@@ -1631,7 +1630,7 @@
               {/if}
               <h3 class="card-name">{r.name}</h3>
               {#if r.rating}
-                <div class="card-rating" aria-label={`Rated ${r.rating} of 5`}>
+                <div class="card-rating" aria-label={$_('recipes_ui.rated', { values: { rating: r.rating } })}>
                   {#each [1,2,3,4,5] as n}
                     <span class="material-symbols-rounded star" class:filled={n <= r.rating}>{n <= r.rating ? 'star' : 'star_border'}</span>
                   {/each}
@@ -1712,14 +1711,14 @@
   .header-action:disabled { opacity: 0.35; cursor: not-allowed; }
   .header-action.header-action-2 { right: 60px; }
   .header-action.header-action-3 { right: 108px; }
-  /* Same select-mode header treatment used by Pantry — kill the banner
+  /* Same select-mode header treatment used by Pantry: kill the banner
      shimmer while multi-select is on so the mode reads as focused. */
   .page-header.select-mode {
     background: var(--surface-1);
     border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
   }
 
-  /* Sticky list controls — search + filters + sort/select stay
+  /* Sticky list controls: search + filters + sort/select stay
      pinned at the top of the scroll container so the user doesn't
      have to scroll back up after exploring a long recipe list.
      A backdrop-blur + faded surface fill keeps the cards underneath
@@ -1764,7 +1763,7 @@
   .search:focus { outline: 2px solid var(--accent-dim); border-color: var(--accent); }
 
   /* Segmented control: Recipes / Cookbooks / Shared tabs at the top of
-     the page. The .vt-pill slides between buttons on selection — same
+     the page. The .vt-pill slides between buttons on selection: same
      visual language as the bottom nav and (now) the diary toggle. */
   .view-toggle {
     position: relative;
@@ -1870,7 +1869,7 @@
   .cookbook-card:hover .cb-share-btn,
   .cookbook-card:focus-within .cb-share-btn { opacity: 1; }
   .cb-share-btn:hover { background: var(--accent); color: var(--accent-text, #0A0B0F); }
-  /* Touch devices don't have :hover — keep the share icon visible so
+  /* Touch devices don't have :hover: keep the share icon visible so
      it's actually reachable on mobile. */
   @media (hover: none) { .cb-share-btn { opacity: 0.85; } }
   .cb-card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 4px; }
@@ -1885,7 +1884,7 @@
     margin-top: 2px;
   }
 
-  /* Category filter chips — horizontal scroll on overflow so the row
+  /* Category filter chips: horizontal scroll on overflow so the row
      never breaks mid-name. Active chip gets the category's own color. */
   .cat-filter {
     display: flex;
@@ -1916,7 +1915,7 @@
     border-color: color-mix(in srgb, var(--cat-color, var(--accent)) 55%, transparent);
     color: var(--cat-color, var(--accent));
   }
-  /* Favorites chip — red instead of accent so it reads as a different
+  /* Favorites chip: red instead of accent so it reads as a different
      axis from category, even when both are toggled at once. */
   .cat-chip.fav-chip {
     display: inline-flex; align-items: center; gap: 4px;
@@ -2002,7 +2001,7 @@
     }
   }
   .recipe-card:active { transform: scale(0.99); }
-  /* Subtle category-color stripe along the left edge — carries the
+  /* Subtle category-color stripe along the left edge: carries the
      recipe's category color into the card body without overwhelming
      the imagery. Only applied when the recipe actually has a category
      with a color set; uncategorized cards stay neutral. */
@@ -2016,7 +2015,7 @@
     }
   }
 
-  /* Skeleton loader — neutral placeholder cards that match the
+  /* Skeleton loader: neutral placeholder cards that match the
      recipe-card aspect ratio + body padding. Subtle shimmer keeps
      the page feeling alive while the fetch is in flight. */
   .skeleton-grid { pointer-events: none; }
@@ -2198,7 +2197,7 @@
     border: 1px solid var(--border);
   }
 
-  /* URL import modal — same shape as other modals in the app */
+  /* URL import modal: same shape as other modals in the app */
   .modal-backdrop {
     position: fixed; inset: 0;
     background: var(--overlay, rgba(0, 0, 0, 0.55));
@@ -2384,7 +2383,7 @@
     text-transform: uppercase;
   }
   .shared-badge .material-symbols-rounded { font-size: 12px; }
-  /* "via [Kitchen]" chip — mint accent to distinguish from the neutral
+  /* "via [Kitchen]" chip: mint accent to distinguish from the neutral
      shared-by badge above it. Sits directly under so both are readable
      at a glance without visual conflict. */
   .via-kitchen-badge {

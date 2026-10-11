@@ -122,9 +122,9 @@
   async function handOver(kitchenId, member) {
     const name = member.full_name || member.username;
     const ok = await confirmDialog({
-      title: `Make ${name} the Head Chef?`,
-      message: `${name} will own this Kitchen: inviting, removing and setting roles, and deleting it. You stay in the Kitchen as a Sous Chef, so you can still edit the recipes shared into it. Only ${name} can hand it back.`,
-      confirmText: 'Hand Over',
+      title: $_('settings_kitchens_ui.hand_over_title', { values: { name } }),
+      message: $_('settings_kitchens_ui.hand_over_message', { values: { name } }),
+      confirmText: $_('settings_kitchens_ui.hand_over'),
       dangerous: true,
     });
     if (!ok) return;
@@ -176,11 +176,11 @@
   async function removeMember(kitchenId, member) {
     const isSelf = member.user_id === $currentUser?.id;
     const ok = await confirmDialog({
-      title: isSelf ? 'Leave this Kitchen?' : `Remove ${member.username}?`,
+      title: isSelf ? $_('settings_kitchens_ui.leave_title') : $_('settings_kitchens_ui.remove_title', { values: { name: member.username } }),
       message: isSelf
-        ? `You'll lose access to every recipe others shared with the Kitchen. Recipes you contributed to the Kitchen stay accessible to the remaining members.`
-        : `${member.username} will lose access to every recipe others shared with the Kitchen. Recipes they contributed stay accessible to the rest of the Kitchen.`,
-      confirmText: isSelf ? 'Leave' : 'Remove',
+        ? $_('settings_kitchens_ui.leave_message')
+        : $_('settings_kitchens_ui.remove_message', { values: { name: member.username } }),
+      confirmText: isSelf ? $_('settings_kitchens_ct.leave') : $_('settings_kitchens_ct.remove'),
       dangerous: true,
     });
     if (!ok) return;
@@ -208,11 +208,11 @@
     if (enabling) {
       const otherMembers = Math.max(0, (k.member_count || 1) - 1);
       const ok = await confirmDialog({
-        title: `Auto-Share Your Recipes with ${k.name}?`,
+        title: $_('settings_kitchens_ui.auto_share_title', { values: { name: k.name } }),
         message: otherMembers === 0
-          ? `You're the only member so far. Once you add others, every recipe you own now (or create later) will be shared with them automatically.`
-          : `Every recipe you own now, and every recipe you create later, will be shared with the ${otherMembers} other ${otherMembers === 1 ? 'member' : 'members'} of this Kitchen. They'll see your full library.`,
-        confirmText: 'Turn On',
+          ? $_('settings_kitchens_ui.auto_share_only_you')
+          : $_('settings_kitchens_ui.auto_share_message', { values: { count: otherMembers } }),
+        confirmText: $_('settings_kitchens_ui.turn_on'),
       });
       if (!ok) return;
     }
@@ -233,9 +233,9 @@
 
   async function deleteKitchen(k) {
     const ok = await confirmDialog({
-      title: `Delete Kitchen "${k.name}"?`,
-      message: `The Kitchen goes away. Recipes shared through it stay accessible to the people they were shared with — this just ends the Kitchen structure.`,
-      confirmText: 'Delete',
+      title: $_('settings_kitchens_ui.delete_title', { values: { name: k.name } }),
+      message: $_('settings_kitchens_ui.delete_message'),
+      confirmText: $_('common.delete'),
       dangerous: true,
     });
     if (!ok) return;
@@ -294,30 +294,30 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_kitchens_ct.um_required')}</span>
-        <span class="setting-desc">Kitchens are a multi-user feature. Enable User Management in Settings → Users to create one.</span>
+        <span class="setting-desc">{$_('settings_kitchens_ui.um_required_desc')}</span>
       </div>
     </div>
   {:else}
     <!-- Create -->
     <div class="setting-row stack">
       <span class="setting-label">{$_('settings_kitchens_ct.create_new_kitchen')}</span>
-      <span class="setting-desc">A Kitchen is a household or shared group of users. Sharing a recipe with the Kitchen sends it to every member at once.</span>
+      <span class="setting-desc">{$_('settings_kitchens_ui.create_desc')}</span>
       <div class="create-row">
         <input class="input" type="text" placeholder={$_('settings_kitchens_ct.new_name_ph')} bind:value={newName}
           on:keydown={(e) => { if (e.key === 'Enter') createKitchen(); }} />
         <button class="btn btn-primary" on:click={createKitchen} disabled={creating || !newName.trim()}>
-          {creating ? 'Creating…' : 'Create'}
+          {creating ? $_('settings_kitchens_ui.creating') : $_('settings_kitchens_ui.create')}
         </button>
       </div>
     </div>
 
     <!-- List -->
     {#if loading}
-      <div class="setting-row"><Spinner label="Loading…" /></div>
+      <div class="setting-row"><Spinner label={$_('common.loading')} /></div>
     {:else if kitchens.length === 0}
       <div class="setting-divider"></div>
       <div class="setting-row">
-        <span class="setting-desc">No Kitchens yet. Create one above to start sharing recipes with a group.</span>
+        <span class="setting-desc">{$_('settings_kitchens_ui.empty')}</span>
       </div>
     {:else}
       {#each kitchens as k (k.id)}
@@ -328,7 +328,7 @@
             <span class="kitchen-info">
               <span class="kitchen-name">{k.name}</span>
               <span class="kitchen-meta">
-                {k.member_count} {k.member_count === 1 ? 'member' : 'members'}
+                {$_('settings_kitchens_ui.member_count', { values: { count: k.member_count } })}
                 {#if isOwner(k)}<span class="badge">{$_('settings_kitchens_ct.owner_badge')}</span>{/if}
               </span>
             </span>
@@ -342,12 +342,12 @@
                    leaves prior grants in place. -->
               <div class="auto-share-row" class:on={k.auto_share}>
                 <div class="auto-share-copy">
-                  <span class="auto-share-title">Auto-Share My Recipes</span>
+                  <span class="auto-share-title">{$_('settings_kitchens_ui.auto_share_my_recipes')}</span>
                   <span class="auto-share-hint">
                     {#if k.auto_share}
-                      Every recipe you create is shared with this Kitchen. {k.auto_shared_count || 0} recipe{(k.auto_shared_count || 0) === 1 ? '' : 's'} shared so far.
+                      {$_('settings_kitchens_ui.auto_share_on_hint', { values: { count: k.auto_shared_count || 0 } })}
                     {:else}
-                      Turn on to share your full recipe library with everyone in this Kitchen, now and going forward.
+                      {$_('settings_kitchens_ui.auto_share_off_hint')}
                     {/if}
                   </span>
                 </div>
@@ -355,7 +355,7 @@
                   disabled={autoShareBusyId === k.id}
                   on:click={() => toggleAutoShare(k)}
                   aria-pressed={k.auto_share}
-                  aria-label="Toggle auto-share">
+                  aria-label={$_('settings_kitchens_ui.toggle_auto_share')}>
                   <span class="switch-knob"></span>
                 </button>
               </div>
@@ -387,7 +387,7 @@
                     <span class="member-name">
                       {m.full_name || m.username}
                       {#if m.role === 'owner'}<span class="badge">{$_('settings_kitchens_ct.owner_badge')}</span>{/if}
-                      {#if m.user_id === $currentUser?.id}<span class="muted">(you)</span>{/if}
+                      {#if m.user_id === $currentUser?.id}<span class="muted">{$_('settings_kitchens_ui.you')}</span>{/if}
                     </span>
                     {#if isOwner(k) && m.role !== 'owner'}
                       <!-- Head Chef sits with the other roles because that is
@@ -428,10 +428,10 @@
                       bind:typed={inviteTyped}
                       options={peers}
                       placeholder={peers.length > 0
-                        ? 'Type a name or username…'
+                        ? $_('settings_kitchens_ui.invite_ph')
                         : $_('settings_kitchens_ct.invite_username_ph')}
                       creatable={true}
-                      createLabel="Add"
+                      createLabel={$_('settings_kitchens_ui.add')}
                       maxResults={20}
                       on:create={() => invite(k.id)}
                     />
@@ -445,7 +445,7 @@
                   </button>
                   <button class="btn btn-secondary" on:click={() => invite(k.id)}
                     disabled={inviteBusy || (!inviteName.trim() && !inviteTyped.trim())}>
-                    {inviteBusy ? 'Adding…' : 'Add'}
+                    {inviteBusy ? $_('settings_kitchens_ui.adding') : $_('settings_kitchens_ui.add')}
                   </button>
                 </div>
                 <div class="kitchen-actions">

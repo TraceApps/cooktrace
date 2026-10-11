@@ -36,7 +36,7 @@
   import {
     NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS,
     dvPercent, isDerived,
-    displayEnergy, energyLabel, energyUnitSuffix,
+    displayEnergy, energyUnitSuffix,
   } from '../../lib/nutriments.js';
   import { visibleNutriments, energyUnit } from '../../stores/settings.js';
 
@@ -81,7 +81,12 @@
   $: caloriesValDisplay = caloriesNut
     ? displayEnergy(nutrition[caloriesNut.id], $energyUnit) : null;
   $: caloriesUnitLabel = energyUnitSuffix($energyUnit);
-  $: caloriesRowLabel = energyLabel($energyUnit);
+  $: caloriesRowLabel = $energyUnit === 'kJ'
+    ? $_('nutrition_facts_box_ui.energy')
+    : $_('nutriments.calories');
+  // Nutrient row labels by id, reactive to the locale; the English label
+  // is the fallback for any id without a key.
+  $: nutLabel = (nut) => $_(`nutriments.${nut.id}`, { default: nut.label });
   $: bodyRows = rows.filter(r => r.id !== 'calories');
 
   // FDA panel layout: fdaBlock='macros' renders above the thick rule
@@ -124,13 +129,13 @@
   <div class="title">{$_('nutrition_facts.title')}</div>
 
   {#if servingsPerContainer}
-    <div class="serving-line">{servingsPerContainer} servings per container</div>
+    <div class="serving-line">{$_('nutrition_facts_box_ui.servings_per_container', { values: { count: servingsPerContainer } })}</div>
   {:else if !servingDescription && servings}
     <!-- Recipe context: mirror the packaged-food "Servings per
          container: N" line with the recipe-flavored equivalent so the
          label still answers both questions ("how big is this whole
          thing?" + "what does one portion equal?"). -->
-    <div class="serving-line">Servings Per Recipe: {servings}</div>
+    <div class="serving-line">{$_('nutrition_facts_box_ui.servings_per_recipe', { values: { count: servings } })}</div>
   {/if}
   <div class="serving-line">
     <strong>{$_('nutrition_facts.serving_size')}</strong>
@@ -140,9 +145,9 @@
       {:else if recipeMassG}
         ~{recipeMassG}g
       {:else if servings}
-        1 of {servings}
+        {$_('nutrition_facts_box_ui.one_of', { values: { count: servings } })}
       {:else}
-        Per serving
+        {$_('nutrition_facts_box_ui.per_serving')}
       {/if}
     </span>
   </div>
@@ -160,7 +165,7 @@
     <div class="rule mid"></div>
   {/if}
 
-  <div class="dv-header">% Daily Value*</div>
+  <div class="dv-header">{$_('nutrition_facts_box_ui.daily_value_header')}</div>
 
   {#each macroRows as nut (nut.id)}
     {@const v = nutrition[nut.id]}
@@ -173,14 +178,14 @@
         {#if nut.id === 'added-sugars'}
           <!-- FDA format: "Includes <qty> Added Sugars". Qty is
                embedded between "Includes" and the label. -->
-          <span class="row-name">Includes {fmt(v, nut.unit)} {nut.label}</span>
+          <span class="row-name">{$_('nutrition_facts_box_ui.includes_added_sugars', { values: { amount: fmt(v, nut.unit) } })}</span>
         {:else}
-          <span class="row-name">{nut.label}</span>
+          <span class="row-name">{nutLabel(nut)}</span>
           <span class="row-value">{fmt(v, nut.unit)}</span>
         {/if}
         {#if derived}
           <span class="derived material-symbols-rounded"
-            title="Derived from {nut.id === 'sodium' ? 'salt' : 'sodium'}">calculate</span>
+            title={nut.id === 'sodium' ? $_('nutrition_facts_box_ui.derived_from_salt') : $_('nutrition_facts_box_ui.derived_from_sodium')}>calculate</span>
         {/if}
       </span>
       <span class="row-dv">{dv != null ? `${dv}%` : ''}</span>
@@ -194,7 +199,7 @@
       {@const dv = dvPercent(nut, v)}
       <div class="row vmin" class:no-bottom={i === vitMinRows.length - 1}>
         <span class="row-label">
-          <span class="row-name">{nut.label}</span>
+          <span class="row-name">{nutLabel(nut)}</span>
           <span class="row-value">{fmt(v, nut.unit)}</span>
         </span>
         <span class="row-dv">{dv != null ? `${dv}%` : ''}</span>
@@ -204,9 +209,7 @@
 
   <div class="rule thick"></div>
   <p class="footnote">
-    * The % Daily Value (DV) tells you how much a nutrient in a serving
-    of food contributes to a daily diet. 2,000 calories a day is used
-    for general nutrition advice.
+    {$_('nutrition_facts_box_ui.footnote')}
   </p>
 </div>
 {/if}

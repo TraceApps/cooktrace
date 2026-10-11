@@ -601,9 +601,9 @@
 
   async function remove() {
     const ok = await confirmDialog({
-      title: 'Delete recipe?',
-      message: `"${recipe.name}" will be removed.`,
-      confirmText: 'Delete',
+      title: $_('recipe_view_ui.delete_recipe_title'),
+      message: $_('recipe_view_ui.delete_recipe_message', { values: { name: recipe.name } }),
+      confirmText: $_('common.delete'),
       dangerous: true,
     });
     if (!ok) return;
@@ -628,9 +628,9 @@
   // so the user doesn't see something that immediately errors.
   $: _canShareLink = !isNative || !!getServerUrl();
   $: shareActions = recipe ? [
-    { label: 'Share Card', icon: 'image', value: 'card' },
+    { label: $_('recipe_view_ui.share_card'), icon: 'image', value: 'card' },
     ...(_canShareLink ? [{
-      label: recipe.share_token ? 'Copy Share Link' : 'Create Share Link',
+      label: recipe.share_token ? $_('recipe_view_ui.copy_share_link') : $_('recipe_view_ui.create_share_link'),
       icon: recipe.share_token ? 'link' : 'add_link',
       value: 'link',
     }] : []),
@@ -896,9 +896,9 @@
 
   async function deleteCook(cookId) {
     const ok = await confirmDialog({
-      title: 'Delete cook entry?',
-      message: 'This removes the entry from your cook history. The recipe stays.',
-      confirmText: 'Delete',
+      title: $_('recipe_view_ui.delete_cook_title'),
+      message: $_('recipe_view_ui.delete_cook_message'),
+      confirmText: $_('common.delete'),
       dangerous: true,
     });
     if (!ok) return;
@@ -1082,13 +1082,13 @@
        Delete / Close are hidden because they don't fit the focused
        cooking task. -->
   <header class="editor-header" class:cook-mode={cookMode} bind:offsetHeight={editorHeaderH}>
-    <h2 class="editor-title">{recipe?.name || 'Recipe'}</h2>
+    <h2 class="editor-title">{recipe?.name || $_('recipe_view_ui.recipe_fallback')}</h2>
     {#if cookMode}
       <span class="cook-mode-tag" aria-hidden="true">
         <span class="material-symbols-rounded cook-mode-icon">soup_kitchen</span>
         <span class="cook-mode-label">{$_('recipe.cook_mode')}</span>
       </span>
-      <button class="btn-icon close-btn" on:click={endCookMode} aria-label="Exit Cook Mode" title="Exit Cook Mode">
+      <button class="btn-icon close-btn" on:click={endCookMode} aria-label={$_('recipe_view_ui.exit_cook_mode')} title={$_('recipe_view_ui.exit_cook_mode')}>
         <span class="material-symbols-rounded">close</span>
       </button>
     {:else}
@@ -1097,24 +1097,24 @@
           <!-- Small lock chip so the reader knows the recipe is
                read-only for them and who owns it. Byline appears in
                the header body below. -->
-          <span class="shared-chip" title="Shared with you — read only">
+          <span class="shared-chip" title={$_('recipe_view_ui.shared_read_only')}>
             <span class="material-symbols-rounded">lock</span>
             <span class="shared-chip-label">{$_('recipe_view_ct.shared_chip')}</span>
           </span>
         {/if}
-        <button class="btn-icon" on:click={openShareSheet} aria-label="Share" title="Share">
+        <button class="btn-icon" on:click={openShareSheet} aria-label={$_('recipe_view_ui.share')} title={$_('recipe_view_ui.share')}>
           <span class="material-symbols-rounded">share</span>
         </button>
         {#if canEdit}
-          <button class="btn-icon" on:click={() => push(`/recipes/edit/${recipe.id}`)} aria-label="Edit" title="Edit">
+          <button class="btn-icon" on:click={() => push(`/recipes/edit/${recipe.id}`)} aria-label={$_('common.edit')} title={$_('common.edit')}>
             <span class="material-symbols-rounded">edit</span>
           </button>
-          <button class="btn-icon danger" on:click={remove} aria-label="Delete" title="Delete">
+          <button class="btn-icon danger" on:click={remove} aria-label={$_('common.delete')} title={$_('common.delete')}>
             <span class="material-symbols-rounded">delete</span>
           </button>
         {/if}
       {/if}
-      <button class="btn-icon close-btn" on:click={_closeRecipe} aria-label="Close" title="Close">
+      <button class="btn-icon close-btn" on:click={_closeRecipe} aria-label={$_('common.close')} title={$_('common.close')}>
         <span class="material-symbols-rounded">close</span>
       </button>
     {/if}
@@ -1160,7 +1160,7 @@
           <button class="category-pill"
             style={recipe.category.color ? `--cat-color:${recipe.category.color}` : ''}
             on:click={() => push(`/recipes?category=${recipe.category.slug}`)}
-            title={`Filter recipes by ${recipe.category.name}`}>
+            title={$_('recipe_view_ui.filter_by_category', { values: { name: recipe.category.name } })}>
             {recipe.category.name}
           </button>
         {/if}
@@ -1185,7 +1185,7 @@
                     {creatorDisplay.charAt(0).toUpperCase()}
                   {/if}
                 </span>
-                Added by <strong>{creatorDisplay}</strong>
+                {$_('recipe_view_ui.added_by')} <strong>{creatorDisplay}</strong>
               </span>
             {/if}
             {#if recipe.created_at}
@@ -1195,7 +1195,7 @@
             {#if recipe.source_url && domainFromUrl(recipe.source_url)}
               <span class="dot">·</span>
               <span class="byline-source">
-                From <a href={recipe.source_url} target="_blank" rel="noopener noreferrer">
+                {$_('recipe_view_ui.from')} <a href={recipe.source_url} target="_blank" rel="noopener noreferrer">
                   {domainFromUrl(recipe.source_url)}
                 </a>
               </span>
@@ -1209,12 +1209,12 @@
             {#if recipe.last_cooked_at}
               <span class="dot">·</span>
               <span title={relativeTime(recipe.last_cooked_at)}>
-                Last Cooked {formatDate(recipe.last_cooked_at, $dateFormat)}
+                {$_('recipe_view_ui.last_cooked', { values: { date: formatDate(recipe.last_cooked_at, $dateFormat) } })}
               </span>
             {/if}
             {#if recipe.cook_count > 0}
               <span class="dot">·</span>
-              <span>Cooked {recipe.cook_count} {recipe.cook_count === 1 ? 'Time' : 'Times'}</span>
+              <span>{$_('recipe_view_ui.cooked_times', { values: { count: recipe.cook_count } })}</span>
             {/if}
             <!-- With the rest of the recipe's history rather than a fifth
                  header icon: they're rare, and the header has no room. -->
@@ -1240,8 +1240,8 @@
               class:popping={favPopping}
               on:click={toggleFavorite}
               on:animationend={() => favPopping = false}
-              aria-label={recipe.favorite ? 'Remove from favorites' : 'Add to favorites'}
-              title={recipe.favorite ? 'Favorited' : 'Favorite'}
+              aria-label={recipe.favorite ? $_('recipe_view_ui.remove_favorite') : $_('recipe_view_ui.add_favorite')}
+              title={recipe.favorite ? $_('recipe_view_ui.favorited') : $_('recipe_view_ui.favorite')}
             >
               <span class="material-symbols-rounded">{recipe.favorite ? 'favorite' : 'favorite_border'}</span>
             </button>
@@ -1249,11 +1249,11 @@
           <div class="cook-actions-row">
             <button class="btn btn-secondary cook-btn" on:click={cookMode ? endCookMode : startCookMode}>
               <span class="material-symbols-rounded">{cookMode ? 'visibility_off' : 'soup_kitchen'}</span>
-              {cookMode ? 'End Cook Mode' : 'Start Cooking'}
+              {cookMode ? $_('recipe_view_ui.end_cook_mode') : $_('recipe_view_ui.start_cooking')}
             </button>
             <button class="btn btn-secondary cook-btn" on:click={() => openCookLog()} disabled={cookBusy}>
               <span class="material-symbols-rounded">restaurant</span>
-              {cookBusy ? 'Logging…' : 'I Cooked This'}
+              {cookBusy ? $_('recipe_view_ui.logging') : $_('recipe_view_ui.i_cooked_this')}
             </button>
           </div>
         </div>
@@ -1330,7 +1330,7 @@
             <span class="section-title-text">{$_('recipe.ingredients')}</span>
             {#if recipe.servings}
               <span class="section-hint">
-                {scaledServings} {scaledServings === 1 ? 'Serving' : 'Servings'}
+                {$_('recipe_view_ui.servings_count', { values: { count: scaledServings } })}
               </span>
             {/if}
           </h2>
@@ -1339,7 +1339,7 @@
                to scale against (otherwise the math has no anchor). -->
           {#if recipe.servings}
             <div class="scale-row">
-              <div class="scale-chips" role="radiogroup" aria-label="Scale"
+              <div class="scale-chips" role="radiogroup" aria-label={$_('recipe_view_ui.scale')}
                 bind:this={scaleChipsEl}
                 style="--scale-pill-x:{scalePillX}px; --scale-pill-w:{scalePillW}px">
                 {#if scalePillReady}<span class="scale-pill" aria-hidden="true"></span>{/if}
@@ -1382,7 +1382,7 @@
                     <button
                       class="check-btn"
                       on:click={() => toggleIng(key)}
-                      aria-label={ingChecks.has(key) ? 'Mark as not gathered' : 'Mark as gathered'}
+                      aria-label={ingChecks.has(key) ? $_('recipe_view_ui.mark_not_gathered') : $_('recipe_view_ui.mark_gathered')}
                     >
                       <span class="material-symbols-rounded">{ingChecks.has(key) ? 'check_box' : 'check_box_outline_blank'}</span>
                     </button>
@@ -1406,7 +1406,7 @@
                           on:click={_convertible ? () => openConvertMenu(key) : undefined}
                           aria-haspopup={_convertible ? 'menu' : undefined}
                           aria-expanded={_convertible ? openMenuKey === key : undefined}
-                          title={_convertible ? 'Tap to convert units' : undefined}>
+                          title={_convertible ? $_('recipe_view_ui.tap_to_convert') : undefined}>
                           {#if _qp.whole}<span class="qty-whole">{_qp.whole}</span>{/if}
                           {#if _qp.whole && _qp.fraction}{' '}{/if}
                           {#if _qp.fraction}<span class="qty-fraction">{_qp.fraction}</span>{/if}
@@ -1417,7 +1417,7 @@
                             <button class="convert-menu-item"
                               class:on={!_target}
                               on:click={() => pickTarget(key, null)}>
-                              Original ({ing.unit || '—'})
+                              {$_('recipe_view_ui.original_unit', { values: { unit: ing.unit || '–' } })}
                             </button>
                             {#each targetOptionsFor(ing, pantryById) as opt}
                               <button class="convert-menu-item"
@@ -1445,7 +1445,7 @@
               </ul>
             {/each}
           {:else}
-            <p class="empty-line">No ingredients listed.</p>
+            <p class="empty-line">{$_('recipe_view_ui.no_ingredients')}</p>
           {/if}
         </section>
 
@@ -1490,8 +1490,8 @@
                     class:done={stepChecks.has(i)}
                     on:click|stopPropagation={() => toggleStep(i)}
                     aria-pressed={stepChecks.has(i)}
-                    aria-label={stepChecks.has(i) ? `Step ${i + 1} done — tap to undo` : `Mark step ${i + 1} done`}
-                    title={stepChecks.has(i) ? 'Done — tap to undo' : 'Mark done'}
+                    aria-label={stepChecks.has(i) ? $_('recipe_view_ui.step_done_aria', { values: { n: i + 1 } }) : $_('recipe_view_ui.mark_step_done', { values: { n: i + 1 } })}
+                    title={stepChecks.has(i) ? $_('recipe_view_ui.done_tap_undo') : $_('recipe_view_ui.mark_done')}
                   >
                     {#if stepChecks.has(i)}
                       <span class="material-symbols-rounded badge-check">check</span>
@@ -1515,7 +1515,7 @@
                            Tap in cook mode toggles the SAME check state
                            as the top ingredients list — check off "1 cup
                            rice" here and it strikes through up top too. -->
-                      <ul class="step-ings" aria-label={`Ingredients for step ${i + 1}`}>
+                      <ul class="step-ings" aria-label={$_('recipe_view_ui.ingredients_for_step', { values: { n: i + 1 } })}>
                         {#each stepIngs as ing (ing.id)}
                           {@const _checked = ingChecks.has(ing.checkKey)}
                           <li class="step-ing" class:checked={_checked} class:tappable={cookMode}>
@@ -1523,7 +1523,7 @@
                               <button type="button" class="step-ing-btn"
                                 on:click|stopPropagation={() => toggleIng(ing.checkKey)}
                                 aria-pressed={_checked}
-                                title={_checked ? 'Uncheck ingredient' : 'Mark ingredient used'}>
+                                title={_checked ? $_('recipe_view_ui.uncheck_ingredient') : $_('recipe_view_ui.mark_ingredient_used')}>
                                 <span class="step-ing-check material-symbols-rounded">
                                   {_checked ? 'check_box' : 'check_box_outline_blank'}
                                 </span>
@@ -1545,7 +1545,7 @@
                       </ul>
                     {/if}
                     {#if stepImg}
-                      <img class="step-image" src={resolveAssetUrl(stepImg)} alt={`Step ${i + 1}`} loading="lazy" />
+                      <img class="step-image" src={resolveAssetUrl(stepImg)} alt={$_('recipe_view_ui.step_n', { values: { n: i + 1 } })} loading="lazy" />
                     {/if}
                     {#if text}
                       <span class="step-text">
@@ -1553,13 +1553,13 @@
                           {#if p.type === 'text'}{@html scaledAmountHtml(formatStepText(p.value))}{:else}<button
                             class="time-chip"
                             on:click={() => startTimer({
-                              label: title || `Step ${i + 1}`,
+                              label: title || $_('recipe_view_ui.step_n', { values: { n: i + 1 } }),
                               durationSec: p.durationSec,
                               recipeId: recipe.id,
                               recipeName: recipe.name,
                               stepIndex: i,
                             })}
-                            title={`Start ${formatRemaining(p.durationSec * 1000)} timer`}
+                            title={$_('recipe_view_ui.start_timer', { values: { time: formatRemaining(p.durationSec * 1000) } })}
                           ><span class="material-symbols-rounded">play_arrow</span>{p.value}</button>{/if}
                         {/each}
                       </span>
@@ -1569,7 +1569,7 @@
               {/each}
             </ol>
           {:else}
-            <p class="empty-line">No steps yet.</p>
+            <p class="empty-line">{$_('recipe_view_ui.no_steps')}</p>
           {/if}
         </section>
 
@@ -1585,7 +1585,7 @@
             </h2>
             {#if v.kind === 'iframe'}
               <div class="video-frame">
-                <iframe src={v.src} title="Video instructions"
+                <iframe src={v.src} title={$_('recipe.video_instructions')}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowfullscreen loading="lazy"></iframe>
               </div>
@@ -1594,7 +1594,7 @@
             {:else}
               <a class="video-fallback" href={recipe.video_url} target="_blank" rel="noopener noreferrer">
                 <span class="material-symbols-rounded">play_circle</span>
-                Watch the video
+                {$_('recipe_view_ui.watch_video')}
               </a>
             {/if}
           </section>
@@ -1630,9 +1630,9 @@
             {#if !recomputeResult}
               <button class="btn btn-secondary recompute-btn" on:click={runRecompute} disabled={recomputeBusy}>
                 <span class="material-symbols-rounded">calculate</span>
-                {recomputeBusy ? 'Computing…' : 'Recompute from Pantry'}
+                {recomputeBusy ? $_('recipe_view_ui.computing') : $_('recipe_view_ui.recompute')}
               </button>
-              <p class="recompute-hint">Walks each ingredient against your pantry's nutrition data.</p>
+              <p class="recompute-hint">{$_('recipe_view_ui.recompute_hint')}</p>
             {:else}
               <div class="recompute-summary">
                 <span class="material-symbols-rounded
@@ -1640,8 +1640,12 @@
                   {recomputeResult.used === recomputeResult.total ? 'check_circle' : 'info'}
                 </span>
                 <span>
-                  Computed from <strong>{recomputeResult.used}</strong> of <strong>{recomputeResult.total}</strong>
-                  {recomputeResult.total === 1 ? 'ingredient' : 'ingredients'}
+                  <!-- Numbers only go in as markup; the message itself is plain text. -->
+                  {@html $_('recipe_view_ui.computed_from', { values: {
+                    used: `<strong>${Number(recomputeResult.used) || 0}</strong>`,
+                    total: `<strong>${Number(recomputeResult.total) || 0}</strong>`,
+                    count: Number(recomputeResult.total) || 0,
+                  } })}
                 </span>
               </div>
               {#if recomputeResult.skipped && recomputeResult.skipped.length > 0}
@@ -1652,8 +1656,8 @@
                       <span class="skip-reason">{row.reason}</span>
                       {#if row.pantry_id && row.suggested_density}
                         <button class="btn btn-secondary tiny" on:click={() => fixDensityForSkip(row)}
-                          title={`Set ${row.suggested_density} g/cup`}>
-                          Set {row.suggested_density} g/cup
+                          title={$_('recipe_view_ui.set_density', { values: { density: row.suggested_density } })}>
+                          {$_('recipe_view_ui.set_density', { values: { density: row.suggested_density } })}
                         </button>
                       {/if}
                     </li>
@@ -1664,7 +1668,7 @@
                 <button class="btn btn-secondary tiny" on:click={() => recomputeResult = null}>{$_('recipe_view_ct.cancel')}</button>
                 <button class="btn btn-primary tiny" on:click={applyRecompute}>
                   <span class="material-symbols-rounded">save</span>
-                  Save This Calculation
+                  {$_('recipe_view_ui.save_calculation')}
                 </button>
               </div>
             {/if}
@@ -1690,7 +1694,7 @@
                   {#if photoList.length > 0}
                     <div class="cook-photos">
                       {#each photoList as p, pi}
-                        <button type="button" class="cook-photo-btn" on:click={() => { lightboxPhotos = photoList; lightboxIndex = pi; }} aria-label="View photo">
+                        <button type="button" class="cook-photo-btn" on:click={() => { lightboxPhotos = photoList; lightboxIndex = pi; }} aria-label={$_('recipe_view_ui.view_photo')}>
                           <img class="cook-photo" src={resolveAssetUrl(p)} alt="" loading="lazy" />
                         </button>
                       {/each}
@@ -1702,7 +1706,7 @@
                       <span class="cook-rel">{relativeTime(c.date)}</span>
                     </div>
                     {#if c.cooked_by_full_name || c.cooked_by_username}
-                      <p class="cook-by">by {c.cooked_by_full_name || c.cooked_by_username}</p>
+                      <p class="cook-by">{$_('history.by', { values: { name: c.cooked_by_full_name || c.cooked_by_username } })}</p>
                     {/if}
                     {#if c.notes}<p class="cook-notes">{c.notes}</p>{/if}
                     <!-- A planned cook isn't made from a version yet. -->
@@ -1718,10 +1722,10 @@
                     {/if}
                   </div>
                   <div class="cook-actions">
-                    <button class="btn-icon small" on:click={() => openCookLog(c)} aria-label="Edit" title="Edit">
+                    <button class="btn-icon small" on:click={() => openCookLog(c)} aria-label={$_('common.edit')} title={$_('common.edit')}>
                       <span class="material-symbols-rounded">edit</span>
                     </button>
-                    <button class="btn-icon small danger" on:click={() => deleteCook(c.id)} aria-label="Delete" title="Delete">
+                    <button class="btn-icon small danger" on:click={() => deleteCook(c.id)} aria-label={$_('common.delete')} title={$_('common.delete')}>
                       <span class="material-symbols-rounded">delete</span>
                     </button>
                   </div>
@@ -1740,7 +1744,7 @@
              the byline / Cook History / Comments sections. -->
         {#if recipe.updated_at && recipe.updated_at !== recipe.created_at}
           <p class="last-updated" title={recipe.updated_at}>
-            Last Updated {formatUpdated(recipe.updated_at, $dateFormat)}
+            {$_('recipe_view_ui.last_updated', { values: { date: formatUpdated(recipe.updated_at, $dateFormat) } })}
           </p>
         {/if}
       </div>
@@ -1835,7 +1839,7 @@
 
 <ActionSheet
   bind:open={shareSheetOpen}
-  title="Share Recipe"
+  title={$_('recipe_view_ui.share_recipe')}
   actions={shareActions}
   on:select={onShareSelect}
 />
@@ -1847,16 +1851,16 @@
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
   <div use:portal class="lb-backdrop" on:click={closeLightbox} use:closeOnBack={closeLightbox}
     in:fade={{ duration: 160 }} out:fade={{ duration: 120 }}>
-    <button class="lb-close" on:click|stopPropagation={closeLightbox} aria-label="Close" title="Close (Esc)">
+    <button class="lb-close" on:click|stopPropagation={closeLightbox} aria-label={$_('common.close')} title={$_('recipe_view_ui.close_esc')}>
       <span class="material-symbols-rounded">close</span>
     </button>
     {#if lightboxPhotos.length > 1}
       <button class="lb-nav lb-prev" on:click|stopPropagation={lightboxPrev}
-        disabled={lightboxIndex === 0} aria-label="Previous">
+        disabled={lightboxIndex === 0} aria-label={$_('recipe_view_ui.previous')}>
         <span class="material-symbols-rounded">chevron_left</span>
       </button>
       <button class="lb-nav lb-next" on:click|stopPropagation={lightboxNext}
-        disabled={lightboxIndex === lightboxPhotos.length - 1} aria-label="Next">
+        disabled={lightboxIndex === lightboxPhotos.length - 1} aria-label={$_('recipe_view_ui.next')}>
         <span class="material-symbols-rounded">chevron_right</span>
       </button>
       <div class="lb-counter">{lightboxIndex + 1} / {lightboxPhotos.length}</div>

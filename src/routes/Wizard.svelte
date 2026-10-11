@@ -183,11 +183,11 @@
          LiftTrace byte-for-byte so the cross-app onboarding feel matches. -->
     <div class="wizard-done">
       <div class="wizard-confetti" aria-hidden="true">
-        {#each Array(14) as _, i}<span class="conf c{i % 7}" style:--i={i}></span>{/each}
+        {#each Array(14) as _c, i}<span class="conf c{i % 7}" style:--i={i}></span>{/each}
       </div>
       <span class="material-symbols-rounded wizard-done-icon">emoji_events</span>
-      <h2 class="wizard-done-title">You're All Set!</h2>
-      <p class="wizard-done-sub">Welcome to CookTrace. Loading your recipes…</p>
+      <h2 class="wizard-done-title">{$_('wizard_ui.all_set')}</h2>
+      <p class="wizard-done-sub">{$_('wizard_ui.done_loading')}</p>
     </div>
   {:else}
   <div class="progress">
@@ -202,10 +202,7 @@
         <div class="step-hero">
           <div class="logo-icon">🍳</div>
           <h1 class="step-title">{$_('wizard_ct.welcome')}</h1>
-          <p class="step-desc">
-            Trace Every Recipe — From Pantry to Plate.
-            Self-hosted recipes, pantry, and cook diary.
-          </p>
+          <p class="step-desc">{$_('wizard_ui.welcome_desc')}</p>
         </div>
         <div class="step-actions center">
           <button class="btn-primary" on:click={next}>{$_('wizard_ct.get_started')}</button>
@@ -213,8 +210,8 @@
 
       <!-- Name (native local) -->
       {:else if STEPS[step] === 'name'}
-        <h1 class="step-title">What should Trace call you?</h1>
-        <p class="step-desc">Used in Trace assistant greetings and the sidebar header.</p>
+        <h1 class="step-title">{$_('wizard_ui.name_title')}</h1>
+        <p class="step-desc">{$_('wizard_ui.name_desc')}</p>
         <input class="input" bind:value={displayName} placeholder={$_('wizard_ct.name_ph')} />
         <div class="step-actions">
           <button class="btn-secondary" on:click={back}>{$_('wizard_ct.back')}</button>
@@ -227,19 +224,19 @@
           <div class="step-hero compact">
             <span class="material-symbols-rounded hero-icon">person_add</span>
             <h1 class="step-title">{$_('wizard_ct.create_admin')}</h1>
-            <p class="step-desc">Set up an admin account to secure your CookTrace instance. You can invite household members later.</p>
+            <p class="step-desc">{$_('wizard_ui.create_admin_desc')}</p>
           </div>
         {:else}
           <div class="step-hero compact">
             <span class="material-symbols-rounded hero-icon">group</span>
-            <h1 class="step-title">Multi-user setup</h1>
-            <p class="step-desc">CookTrace can run in single-user mode (default) or multi-user mode with separate logins. You can always enable this later in Settings.</p>
+            <h1 class="step-title">{$_('wizard_ui.multi_user_title')}</h1>
+            <p class="step-desc">{$_('wizard_ui.multi_user_desc')}</p>
           </div>
 
           <div class="toggle-row">
             <div>
               <div class="toggle-label">{$_('wizard_ct.enable_user_accounts')}</div>
-              <div class="toggle-hint">Each user gets their own recipes, pantry, settings, and profile</div>
+              <div class="toggle-hint">{$_('wizard_ui.user_accounts_hint')}</div>
             </div>
             <Toggle checked={enableUserMgmt} on:change={e => enableUserMgmt = e.detail} />
           </div>
@@ -254,7 +251,7 @@
 
             <div class="form-row-2">
               <label class="field">
-                <span class="field-label">Username *</span>
+                <span class="field-label">{$_('login.username')} *</span>
                 <input class="input" type="text" bind:value={umUsername} placeholder="admin" autocomplete="username" />
               </label>
               <label class="field">
@@ -271,24 +268,24 @@
             <label class="field">
               <span class="field-label">{$_('wizard_ct.email')}</span>
               <input class="input" type="email" bind:value={umEmail}
-                placeholder="Used for password resets (optional)" autocomplete="email" />
+                placeholder={$_('wizard_ui.email_ph')} autocomplete="email" />
             </label>
 
             <div class="form-row-2">
               <label class="field">
-                <span class="field-label">Password *</span>
+                <span class="field-label">{$_('login.password')} *</span>
                 <div class="pw-wrap">
                   {#if umShowPass}
-                    <input class="input pw-input" type="text" bind:value={umPassword} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" placeholder="8+ chars, upper, lower, number, symbol" />
+                    <input class="input pw-input" type="text" bind:value={umPassword} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" placeholder={$_('wizard_ui.password_ph')} />
                   {:else}
-                    <input class="input pw-input" type="password" bind:value={umPassword} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" placeholder="8+ chars, upper, lower, number, symbol" />
+                    <input class="input pw-input" type="password" bind:value={umPassword} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" placeholder={$_('wizard_ui.password_ph')} />
                   {/if}
                   <button
                     type="button"
                     class="pw-toggle"
                     on:click={() => umShowPass = !umShowPass}
-                    aria-label={umShowPass ? 'Hide password' : 'Show password'}
-                    title={umShowPass ? 'Hide password' : 'Show password'}
+                    aria-label={umShowPass ? $_('wizard_ui.hide_password') : $_('wizard_ui.show_password')}
+                    title={umShowPass ? $_('wizard_ui.hide_password') : $_('wizard_ui.show_password')}
                   >
                     <span class="material-symbols-rounded">{umShowPass ? 'visibility_off' : 'visibility'}</span>
                   </button>
@@ -301,10 +298,10 @@
                 {/if}
               </label>
               <label class="field">
-                <span class="field-label">Confirm *</span>
+                <span class="field-label">{$_('wizard_ui.confirm')} *</span>
                 <input class="input" type="password" bind:value={umConfirm} autocomplete="new-password" passwordrules="minlength: 8; required: upper; required: lower; required: digit; required: special;" />
                 {#if umConfirm && umPassword !== umConfirm}
-                  <span class="pw-mismatch">Passwords don't match</span>
+                  <span class="pw-mismatch">{$_('reset_password.errors.mismatch')}</span>
                 {/if}
               </label>
             </div>
@@ -316,7 +313,7 @@
         <div class="step-actions">
           {#if enableUserMgmt}
             <button class="btn-primary" on:click={submitAccount} disabled={umBusy}>
-              {umBusy ? 'Creating…' : 'Create Account'}
+              {umBusy ? $_('settings.users.creating') : $_('accept_invite.submit')}
             </button>
           {:else}
             <button class="btn-primary" on:click={next}>{$_('wizard_ct.continue')}</button>
@@ -326,7 +323,7 @@
       <!-- Cooking preferences -->
       {:else if STEPS[step] === 'prefs'}
         <h1 class="step-title">{$_('wizard_ct.cooking_preferences')}</h1>
-        <p class="step-desc">These shape how recipes display and what shopping units use.</p>
+        <p class="step-desc">{$_('wizard_ui.prefs_desc')}</p>
 
         <label class="field">
           <span>{$_('wizard_ct.measurement_system')}</span>
@@ -335,7 +332,7 @@
               <button
                 class="seg" class:active={measurementSystem === opt}
                 on:click={() => measurementSystem = opt}
-              >{opt}</button>
+              >{opt === 'metric' ? $_('settings_page.regional.metric') : $_('settings_page.regional.imperial')}</button>
             {/each}
           </div>
         </label>
@@ -382,8 +379,8 @@
         </div>
 
       {:else if STEPS[step] === 'done'}
-        <h1 class="step-title">You're all set</h1>
-        <p class="step-desc">CookTrace is ready. Start by browsing or importing your first recipe.</p>
+        <h1 class="step-title">{$_('wizard_ui.all_set')}</h1>
+        <p class="step-desc">{$_('wizard_ui.done_desc')}</p>
         <div class="step-actions">
           <button class="btn-primary" on:click={finish}>{$_('wizard_ct.open_cooktrace')}</button>
         </div>

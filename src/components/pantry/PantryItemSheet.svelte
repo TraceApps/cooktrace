@@ -32,7 +32,7 @@
    */
   import { createEventDispatcher } from 'svelte';
   import { fade } from 'svelte/transition';
-  import { _ } from 'svelte-i18n';
+  import { _, locale } from 'svelte-i18n';
   import Sheet from '../ui/Sheet.svelte';
   import Dialog from '../ui/Dialog.svelte';
   import DateInput from '../ui/DateInput.svelte';
@@ -193,7 +193,7 @@
       const row = await NtApi.getPantryItem(id);
       item = row;
       if (asEdit) _startEdit();
-    } catch (e) { loadError = e.message || 'Could not load item'; }
+    } catch (e) { loadError = e.message || $_('fail.load_item'); }
     finally { loading = false; }
     _loadPantryCategories();
     _loadVariantContext();
@@ -327,11 +327,11 @@
   }
 
   async function _detachVariant() {
-    const parent = variantContext.parentName || 'parent';
+    const parent = variantContext.parentName || $_('pantry_item_sheet_ui.parent_fallback');
     const ok = await confirmDialog({
-      title: 'Detach from ' + parent + '?',
-      body: 'This variant becomes a standalone pantry item. Recipes that link to ' + parent + ' will no longer see this item as one of its variants.',
-      confirm: 'Detach',
+      title: $_('pantry_item_sheet_ui.detach_title', { values: { parent } }),
+      message: $_('pantry_item_sheet_ui.detach_message', { values: { parent } }),
+      confirmText: $_('pantry_item_sheet_ui.detach'),
     });
     if (!ok) return;
     await _setGenericParent(null);
@@ -405,14 +405,15 @@
     if (diff <= _EXPIRY_WARN_DAYS) return 'warn';
     return 'ok';
   }
-  function _formatExpiry(dateStr) {
+  // Reactive so dates follow a language switch.
+  $: _formatExpiry = (dateStr) => {
     if (!dateStr) return '';
     try {
       const d = new Date(dateStr + 'T00:00:00');
       if (Number.isNaN(d.getTime())) return dateStr;
-      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+      return d.toLocaleDateString($locale || undefined, { year: 'numeric', month: 'short', day: 'numeric' });
     } catch { return dateStr; }
-  }
+  };
 
   // Earliest expiring variant on a generic. Returns the worst-case
   // status (past > warn > ok) plus the corresponding child row so the
@@ -811,9 +812,9 @@
       return;
     }
     const ok = await confirmDialog({
-      title: 'Remove from pantry?',
-      message: `"${item.name}" will be removed. Recipes referencing it stay; this just drops it from your library.`,
-      confirmText: 'Remove', dangerous: true,
+      title: $_('pantry_item_sheet_ui.remove_title'),
+      message: $_('pantry_item_sheet_ui.remove_message', { values: { name: item.name } }),
+      confirmText: $_('pantry_item_sheet_ui.remove'), dangerous: true,
     });
     if (!ok) return;
     await _performDelete(false);
@@ -855,8 +856,8 @@
   $: hasNutrition = !!(item && item.nutrition && Object.keys(item.nutrition).filter(k => k !== '_derived').length > 0);
 
   $: sheetTitle = !item
-    ? 'Pantry Item'
-    : (itemId == null ? 'Add Pantry Item' : (editing ? 'Edit Pantry Item' : (item.name || 'Pantry Item')));
+    ? $_('pantry_item_sheet_ui.title_fallback')
+    : (itemId == null ? $_('pantry_editor.title_add') : (editing ? $_('pantry_editor.title_edit') : (item.name || $_('pantry_item_sheet_ui.title_fallback'))));
 </script>
 
 <Sheet bind:open title={sheetTitle} height="auto">
@@ -868,18 +869,18 @@
     {#if item && !loading && !loadError}
       {#if editing}
         <button class="btn-icon danger" on:click={cancelEdit} disabled={saving}
-          aria-label="Cancel" title="Cancel">
+          aria-label={$_('common.cancel')} title={$_('common.cancel')}>
           <span class="material-symbols-rounded">undo</span>
         </button>
         <button class="btn-icon success" on:click={saveEdit} disabled={saving || imgUploading}
-          aria-label={saving ? 'Saving' : 'Save'} title={saving ? 'Saving…' : 'Save'}>
+          aria-label={saving ? $_('common.saving') : $_('common.save')} title={saving ? $_('common.saving') : $_('common.save')}>
           <span class="material-symbols-rounded">{saving ? 'progress_activity' : 'check'}</span>
         </button>
       {:else}
-        <button class="btn-icon" on:click={_startEdit} aria-label="Edit" title="Edit">
+        <button class="btn-icon" on:click={_startEdit} aria-label={$_('common.edit')} title={$_('common.edit')}>
           <span class="material-symbols-rounded">edit</span>
         </button>
-        <button class="btn-icon danger" on:click={deleteItem} aria-label="Delete" title="Delete">
+        <button class="btn-icon danger" on:click={deleteItem} aria-label={$_('common.delete')} title={$_('common.delete')}>
           <span class="material-symbols-rounded">delete</span>
         </button>
       {/if}
@@ -953,9 +954,9 @@
                   mode="single"
                   value={categoryName}
                   options={pantryCategories.map(c => ({ name: c.name, icon: c.icon, color: c.color }))}
-                  placeholder="Pick or create…"
+                  placeholder={$_('pantry_item_sheet_ui.category_placeholder')}
                   creatable={true}
-                  createLabel="Create category"
+                  createLabel={$_('pantry_item_sheet_ui.create_category')}
                   on:select={onPantryCategorySelect}
                   on:create={openNewPantryCategoryDialog}
                   on:change={(e) => {
@@ -967,8 +968,8 @@
                 <span class="field-label">{$_('pantry_sheet.barcode')}</span>
                 <div class="barcode-wrap">
                   <input class="input barcode-input" type="text" inputmode="numeric"
-                    bind:value={draft.barcode} placeholder="optional" />
-                  <button type="button" class="barcode-scan-inline" aria-label="Scan barcode" title="Scan barcode"
+                    bind:value={draft.barcode} placeholder={$_('pantry_editor_ct.optional_ph')} />
+                  <button type="button" class="barcode-scan-inline" aria-label={$_('pantry.scan_barcode')} title={$_('pantry.scan_barcode')}
                     on:click={() => editorScannerOpen = true}>
                     <span class="material-symbols-rounded">barcode_scanner</span>
                   </button>
@@ -978,17 +979,17 @@
                 <div class="off-actions">
                   <button type="button" class="btn btn-secondary off-btn"
                     on:click={shareOrViewOnOFF} disabled={contributing}
-                    title={offProductExists ? 'Open this product on Open Food Facts' : !draft.name ? 'Name required' : 'Submit this item to OFF (requires OFF account in Settings)'}>
+                    title={offProductExists ? $_('pantry_item_sheet_ui.off_open_title') : !draft.name ? $_('pantry_item_sheet_ui.off_name_required') : $_('pantry_item_sheet_ui.off_submit_title')}>
                     <span class="material-symbols-rounded off-btn-ico">
                       {offProductExists ? 'open_in_new' : 'upload'}
                     </span>
-                    {contributing ? 'Uploading…' : offSuccess ? 'Submitted!' : offProductExists ? 'View on OFF' : 'Share to OFF'}
+                    {contributing ? $_('pantry_editor.actions.uploading') : offSuccess ? $_('pantry_item_sheet_ui.off_submitted') : offProductExists ? $_('pantry_item_sheet_ui.off_view') : $_('pantry_editor.actions.share_to_off')}
                   </button>
                   <button type="button" class="btn btn-secondary off-btn"
                     on:click={downloadFromOFF} disabled={downloading}
-                    title="Pull data from Open Food Facts">
+                    title={$_('pantry_item_sheet_ui.off_pull_title')}>
                     <span class="material-symbols-rounded off-btn-ico">download</span>
-                    {downloading ? 'Loading…' : downloadSuccess ? 'Updated!' : 'Refresh from OFF'}
+                    {downloading ? $_('common.loading') : downloadSuccess ? $_('pantry_item_sheet_ui.off_updated') : $_('pantry_editor.actions.refresh_off')}
                   </button>
                 </div>
                 {#if offSuccess}
@@ -996,17 +997,17 @@
                     {#if offVerified === null}
                       <span class="off-verify-checking">
                         <span class="material-symbols-rounded off-verify-ico">hourglass_top</span>
-                        Verifying on Open Food Facts…
+                        {$_('pantry_item_sheet_ui.off_verifying')}
                       </span>
                     {:else if offVerified}
                       <span class="off-verify-ok">
                         <span class="material-symbols-rounded off-verify-ico">check_circle</span>
-                        Confirmed live on Open Food Facts
+                        {$_('pantry_item_sheet_ui.off_confirmed')}
                       </span>
                     {:else}
                       <span class="off-verify-pending">
                         <span class="material-symbols-rounded off-verify-ico">schedule</span>
-                        Submitted, may take a few minutes to appear
+                        {$_('pantry_item_sheet_ui.off_pending')}
                       </span>
                     {/if}
                   </div>
@@ -1029,7 +1030,7 @@
                 {/if}
                 <span class="pill" class:in={isInStock} class:out={!isInStock}>
                   <span class="material-symbols-rounded">{isInStock ? 'check_circle' : 'remove_shopping_cart'}</span>
-                  {isInStock ? 'In Stock' : 'Out of Stock'}
+                  {isInStock ? $_('pantry.filters.in_stock') : $_('pantry_item_sheet_ui.out_of_stock_label')}
                 </span>
               </div>
             {/if}
@@ -1083,8 +1084,8 @@
                        layout so users switching between the two apps
                        find the affordance in the same place. -->
                   <button type="button" class="btn-icon link-btn" class:linked
-                    title={linked ? 'All fields scale proportionally' : 'Fields are independent'}
-                    aria-label="Toggle proportional scaling"
+                    title={linked ? $_('pantry_item_sheet_ui.linked') : $_('pantry_item_sheet_ui.unlinked')}
+                    aria-label={$_('pantry_item_sheet_ui.toggle_scaling')}
                     on:click={() => linked = !linked}>
                     <span class="material-symbols-rounded">{linked ? 'link' : 'link_off'}</span>
                   </button>
@@ -1118,12 +1119,12 @@
                          and copy so users switching between the two apps
                          see the identical control. -->
                     <button class="scan-label-btn" on:click={scanLabel} disabled={scanningLabel}
-                      title="Take a photo of the nutrition label to fill these fields"
-                      aria-label="Scan nutrition label">
+                      title={$_('pantry_item_sheet_ui.scan_label_title')}
+                      aria-label={$_('pantry_item_sheet_ui.scan_label_aria')}>
                       <span class="material-symbols-rounded scan-icon" class:spin={scanningLabel}>
                         {scanningLabel ? 'progress_activity' : 'document_scanner'}
                       </span>
-                      <span>{scanningLabel ? 'Scanning…' : 'Scan Label'}</span>
+                      <span>{scanningLabel ? $_('pantry_item_sheet_ui.scanning') : $_('pantry_item_sheet_ui.scan_label')}</span>
                     </button>
                   {/if}
                 </div>
@@ -1141,7 +1142,7 @@
                       {n.label}
                       {#if derived}
                         <span class="material-symbols-rounded derived-badge"
-                          title={n.id === 'sodium' ? 'Auto-calculated from salt' : 'Auto-calculated from sodium'}>calculate</span>
+                          title={n.id === 'sodium' ? $_('pantry_item_sheet_ui.derived_sodium') : $_('pantry_item_sheet_ui.derived_salt')}>calculate</span>
                       {/if}
                     </span>
                     <span class="nutrient-input">
@@ -1161,7 +1162,7 @@
                    rather than NT's inline "Show all / Show less". -->
               <button class="btn btn-ghost all-nutrients-btn"
                 on:click={() => allNutrientsOpen = true}>
-                Edit All Nutrients
+                {$_('pantry_item_sheet_ui.edit_all_nutrients')}
               </button>
             </div>
           {/if}
@@ -1177,13 +1178,13 @@
         {:else}
           <div class="field full expires-hint-row">
             <span class="material-symbols-rounded">event</span>
-            <span>Expiry is tracked per variant. Open any variant to set its date.</span>
+            <span>{$_('pantry_item_sheet_ui.expiry_per_variant')}</span>
           </div>
         {/if}
         <label class="field full">
           <span class="field-label">{$_('recipe.notes')}</span>
           <textarea class="input" rows="3" bind:value={draft.notes}
-            placeholder="Where you bought it, what works well, etc."></textarea>
+            placeholder={$_('pantry_item_sheet_ui.notes_placeholder')}></textarea>
         </label>
       {:else}
         {#if isGeneric}
@@ -1192,7 +1193,7 @@
             <div class="expires-row" class:warn={earliest.status === 'warn'} class:past={earliest.status === 'past'}>
               <span class="material-symbols-rounded">{earliest.status === 'past' ? 'event_busy' : 'event'}</span>
               <span class="expires-label">
-                Earliest variant: {_displayVariantName(earliest.kid, item, { nested: false })} on {_formatExpiry(earliest.kid.expires_on)}{earliest.status === 'past' ? ' (already expired)' : ''}
+                {$_(earliest.status === 'past' ? 'pantry_item_sheet_ui.earliest_variant_past' : 'pantry_item_sheet_ui.earliest_variant', { values: { name: _displayVariantName(earliest.kid, item, { nested: false }), date: _formatExpiry(earliest.kid.expires_on) } })}
               </span>
             </div>
           {/if}
@@ -1200,7 +1201,7 @@
           {@const expiryStatus = _expiryStatus(item.expires_on)}
           <div class="expires-row" class:warn={expiryStatus === 'warn'} class:past={expiryStatus === 'past'}>
             <span class="material-symbols-rounded">{expiryStatus === 'past' ? 'event_busy' : 'event'}</span>
-            <span class="expires-label">Expires {_formatExpiry(item.expires_on)}{expiryStatus === 'past' ? ' (already expired)' : ''}</span>
+            <span class="expires-label">{$_(expiryStatus === 'past' ? 'pantry_item_sheet_ui.expires_on_past' : 'pantry_item_sheet_ui.expires_on', { values: { date: _formatExpiry(item.expires_on) } })}</span>
           </div>
         {/if}
         {#if item.notes}
@@ -1236,18 +1237,18 @@
 
           {#if isVariant}
             <p class="variants-note">
-              This item is a variant of <strong>{variantContext.parentName || 'a generic pantry item'}</strong>. Recipes that link to the generic see this item as one of its variants.
+              {$_('pantry_item_sheet_ui.variant_of_prefix')} <strong>{variantContext.parentName || $_('pantry_item_sheet_ui.generic_fallback')}</strong>{$_('pantry_item_sheet_ui.variant_of_suffix')}
             </p>
             <div class="variants-actions">
               <button class="btn btn-secondary" on:click={_detachVariant}>
                 <span class="material-symbols-rounded">link_off</span>
-                Detach from {variantContext.parentName || 'Parent'}
+                {$_('pantry_item_sheet_ui.detach_from', { values: { parent: variantContext.parentName || $_('pantry_item_sheet_ui.parent_label') } })}
               </button>
             </div>
 
           {:else if isGeneric}
             <p class="variants-note">
-              This is a generic item with {variantContext.children.length} variant{variantContext.children.length === 1 ? '' : 's'}. Each variant is its own pantry row (own barcode, photo, stock) but recipes can link to the generic to match any of them.
+              {$_('pantry_item_sheet_ui.generic_note', { values: { n: variantContext.children.length } })}
             </p>
             <ul class="variant-list">
               {#each variantContext.children as v (v.id)}
@@ -1256,13 +1257,13 @@
                   <span class="material-symbols-rounded variant-row-icon">label</span>
                   <span class="variant-row-name">{_displayVariantName(v, item, { nested: true })}</span>
                   {#if !v.in_stock}
-                    <span class="variant-row-chip variant-row-chip-out" title="Out of stock">Out</span>
+                    <span class="variant-row-chip variant-row-chip-out" title={$_('pantry_item_sheet_ui.out_of_stock')}>{$_('pantry.filters.out')}</span>
                   {/if}
                   {#if v.expires_on}
                     <span class="variant-row-chip"
                       class:variant-row-chip-warn={vExpStatus === 'warn'}
                       class:variant-row-chip-past={vExpStatus === 'past'}
-                      title={`Expires ${_formatExpiry(v.expires_on)}`}>
+                      title={$_('pantry_item_sheet_ui.expires_on', { values: { date: _formatExpiry(v.expires_on) } })}>
                       <span class="material-symbols-rounded variant-row-chip-icon">{vExpStatus === 'past' ? 'event_busy' : 'schedule'}</span>
                       {_formatExpiry(v.expires_on)}
                     </span>
@@ -1275,14 +1276,14 @@
               <div class="nutrition-source">
                 <div class="nutrition-source-head">{$_('pantry_sheet_extra.recipe_nutrition_source')}</div>
                 <p class="nutrition-source-hint">
-                  Which numbers should recipes use when an ingredient links to this generic? Variants still keep their own nutrition for their own detail view; this just picks which one feeds the recipe math.
+                  {$_('pantry_item_sheet_ui.nutrition_source_hint')}
                 </p>
                 <label class="nutrition-source-row">
                   <input type="radio" name="nutrition-source"
                     checked={item.nutrition_source_variant_id == null}
                     on:change={() => _setNutritionSource(null)} />
                   <span class="nutrition-source-label">
-                    <span class="nutrition-source-title">Manual (this item's own nutrition)</span>
+                    <span class="nutrition-source-title">{$_('pantry_item_sheet_ui.nutrition_source_manual')}</span>
                   </span>
                 </label>
                 {#each variantContext.children as v (v.id)}
@@ -1291,7 +1292,7 @@
                       checked={item.nutrition_source_variant_id === v.id}
                       on:change={() => _setNutritionSource(v.id)} />
                     <span class="nutrition-source-label">
-                      <span class="nutrition-source-title">Pull from {_displayVariantName(v, item, { nested: false })}</span>
+                      <span class="nutrition-source-title">{$_('pantry_item_sheet_ui.nutrition_source_from', { values: { name: _displayVariantName(v, item, { nested: false }) } })}</span>
                     </span>
                   </label>
                 {/each}
@@ -1301,10 +1302,10 @@
               <div class="variant-add-card">
                 <div class="variant-add-head">{$_('pantry_sheet_extra.add_a_variant')}</div>
                 <p class="variant-add-hint">
-                  Type a brand or store. If you already have a matching pantry item, you'll be able to attach it directly. Otherwise a brand-new variant gets created.
+                  {$_('pantry_item_sheet_ui.add_variant_hint')}
                 </p>
                 <div class="variant-add">
-                  <input class="input" type="text" placeholder="Brand or store (e.g. Greenwise)"
+                  <input class="input" type="text" placeholder={$_('pantry_item_sheet_ui.brand_or_store_placeholder')}
                     bind:value={newVariantBrand}
                     on:keydown={e => { if (e.key === 'Enter') _addNewVariant(); }} />
                   {#if addVariantSuggestions.length}
@@ -1320,23 +1321,23 @@
                       {/each}
                     </ul>
                   {:else if newVariantBrand.trim()}
-                    <p class="variant-add-empty">No matching pantry items, this will create a new variant.</p>
+                    <p class="variant-add-empty">{$_('pantry_item_sheet_ui.no_match_new_variant')}</p>
                   {/if}
                   {#if newVariantNameOverride}
                     <input class="input variant-add-name" type="text"
-                      placeholder="Override name (e.g. 2% Milk)"
+                      placeholder={$_('pantry_item_sheet_ui.override_name_placeholder')}
                       bind:value={newVariantName}
                       on:keydown={e => { if (e.key === 'Enter') _addNewVariant(); }} />
                   {/if}
                   <div class="variant-add-actions">
                     {#if !newVariantNameOverride}
                       <button class="btn-link variant-name-toggle" on:click={() => { newVariantNameOverride = true; }}>
-                        Use a different name
+                        {$_('pantry_item_sheet_ui.use_different_name')}
                       </button>
                     {/if}
                     <span class="variant-add-spacer"></span>
                     <button class="btn btn-secondary" on:click={() => { addingVariantRow = false; newVariantBrand = ''; newVariantName = ''; newVariantNameOverride = false; }}>{$_('pantry_sheet_extra.cancel')}</button>
-                    <button class="btn btn-primary" on:click={_addNewVariant} disabled={!newVariantBrand.trim() && !(newVariantNameOverride && newVariantName.trim())}>{#if newVariantBrand.trim()}Create "{newVariantBrand.trim()}"{:else if newVariantNameOverride && newVariantName.trim()}Create "{newVariantName.trim()}"{:else}Create Variant{/if}</button>
+                    <button class="btn btn-primary" on:click={_addNewVariant} disabled={!newVariantBrand.trim() && !(newVariantNameOverride && newVariantName.trim())}>{#if newVariantBrand.trim()}{$_('pantry_item_sheet_ui.create_named', { values: { name: newVariantBrand.trim() } })}{:else if newVariantNameOverride && newVariantName.trim()}{$_('pantry_item_sheet_ui.create_named', { values: { name: newVariantName.trim() } })}{:else}{$_('pantry_item_sheet_ui.create_variant')}{/if}</button>
                   </div>
                 </div>
               </div>
@@ -1344,23 +1345,23 @@
               <div class="variants-actions">
                 <button class="btn btn-primary" on:click={() => { addingVariantRow = true; newVariantBrand = ''; newVariantName = ''; newVariantNameOverride = false; }}>
                   <span class="material-symbols-rounded">add</span>
-                  Add Variant
+                  {$_('pantry_item_sheet_ui.add_variant')}
                 </button>
               </div>
             {/if}
 
           {:else}
             <p class="variants-note">
-              Flat pantry item. Add a variant under this entry (different brands of milk all share the recipe match), or move this item under an existing generic.
+              {$_('pantry_item_sheet_ui.flat_note')}
             </p>
             {#if addingVariantRow}
               <div class="variant-add-card">
                 <div class="variant-add-head">{$_('pantry_sheet_extra.add_a_variant')}</div>
                 <p class="variant-add-hint">
-                  Type a brand or store. If you already have a matching pantry item, you'll be able to attach it directly. Otherwise a brand-new variant gets created.
+                  {$_('pantry_item_sheet_ui.add_variant_hint')}
                 </p>
                 <div class="variant-add">
-                  <input class="input" type="text" placeholder="Brand or store (e.g. Greenwise)"
+                  <input class="input" type="text" placeholder={$_('pantry_item_sheet_ui.brand_or_store_placeholder')}
                     bind:value={newVariantBrand}
                     on:keydown={e => { if (e.key === 'Enter') _addNewVariant(); }} />
                   {#if addVariantSuggestions.length}
@@ -1376,40 +1377,40 @@
                       {/each}
                     </ul>
                   {:else if newVariantBrand.trim()}
-                    <p class="variant-add-empty">No matching pantry items, this will create a new variant.</p>
+                    <p class="variant-add-empty">{$_('pantry_item_sheet_ui.no_match_new_variant')}</p>
                   {/if}
                   {#if newVariantNameOverride}
                     <input class="input variant-add-name" type="text"
-                      placeholder="Override name (e.g. 2% Milk)"
+                      placeholder={$_('pantry_item_sheet_ui.override_name_placeholder')}
                       bind:value={newVariantName}
                       on:keydown={e => { if (e.key === 'Enter') _addNewVariant(); }} />
                   {/if}
                   <div class="variant-add-actions">
                     {#if !newVariantNameOverride}
                       <button class="btn-link variant-name-toggle" on:click={() => { newVariantNameOverride = true; }}>
-                        Use a different name
+                        {$_('pantry_item_sheet_ui.use_different_name')}
                       </button>
                     {/if}
                     <span class="variant-add-spacer"></span>
                     <button class="btn btn-secondary" on:click={() => { addingVariantRow = false; newVariantBrand = ''; newVariantName = ''; newVariantNameOverride = false; }}>{$_('pantry_sheet_extra.cancel')}</button>
-                    <button class="btn btn-primary" on:click={_addNewVariant} disabled={!newVariantBrand.trim() && !(newVariantNameOverride && newVariantName.trim())}>{#if newVariantBrand.trim()}Create "{newVariantBrand.trim()}"{:else if newVariantNameOverride && newVariantName.trim()}Create "{newVariantName.trim()}"{:else}Create Variant{/if}</button>
+                    <button class="btn btn-primary" on:click={_addNewVariant} disabled={!newVariantBrand.trim() && !(newVariantNameOverride && newVariantName.trim())}>{#if newVariantBrand.trim()}{$_('pantry_item_sheet_ui.create_named', { values: { name: newVariantBrand.trim() } })}{:else if newVariantNameOverride && newVariantName.trim()}{$_('pantry_item_sheet_ui.create_named', { values: { name: newVariantName.trim() } })}{:else}{$_('pantry_item_sheet_ui.create_variant')}{/if}</button>
                   </div>
                 </div>
               </div>
               {#if item.expires_on}
                 <p class="variants-note variants-hint">
-                  Promoting this to a generic will move the existing expiry date ({_formatExpiry(item.expires_on)}) to the new variant, where it belongs to the actual product.
+                  {$_('pantry_item_sheet_ui.promote_expiry_hint', { values: { date: _formatExpiry(item.expires_on) } })}
                 </p>
               {/if}
             {:else}
               <div class="variants-actions">
                 <button class="btn btn-primary" on:click={() => { addingVariantRow = true; newVariantBrand = ''; newVariantName = ''; newVariantNameOverride = false; }}>
                   <span class="material-symbols-rounded">add</span>
-                  Add Variant
+                  {$_('pantry_item_sheet_ui.add_variant')}
                 </button>
                 <button class="btn btn-secondary" on:click={() => _openPicker('set-parent')}>
                   <span class="material-symbols-rounded">subdirectory_arrow_right</span>
-                  Make a Variant of...
+                  {$_('pantry_item_sheet_ui.make_variant_of')}
                 </button>
               </div>
             {/if}
@@ -1426,9 +1427,9 @@
 
 <!-- Full-nutrient sub-sheet (stacked on top of the main sheet). -->
 {#if editing && draft}
-  <Sheet bind:open={allNutrientsOpen} title="All Nutrients" height="full">
+  <Sheet bind:open={allNutrientsOpen} title={$_('pantry_item_sheet_ui.all_nutrients')} height="full">
     <p class="all-nutrients-hint">
-      Enter values for any nutrient. Your global "visible nutriments" setting (in Settings → Nutrition) is unchanged, these are stored just for this pantry item. Leave a field blank to skip it.
+      {$_('pantry_item_sheet_ui.all_nutrients_hint')}
     </p>
     <div class="all-nutrients-grid">
       {#each NUTRIMENTS as n}
@@ -1454,11 +1455,11 @@
 {/if}
 
 <!-- New-category dialog (stacked over the sheet). -->
-<Sheet bind:open={categoryNewOpen} title="New Pantry Category" height="auto">
+<Sheet bind:open={categoryNewOpen} title={$_('pantry_item_sheet_ui.new_category_title')} height="auto">
   <div class="newcat-body">
     <label class="field-label">{$_('pantry_sheet_extra.name')}</label>
     <input class="input" type="text" bind:value={categoryNewName} placeholder={$_('pantry_sheet_extra.cat_new_name_ph')} />
-    <label class="field-label" style="margin-top:10px">Icon (Material Symbols name)</label>
+    <label class="field-label" style="margin-top:10px">{$_('pantry_item_sheet_ui.icon_label')}</label>
     <input class="input" type="text" bind:value={categoryNewIcon} placeholder="kitchen" />
     <p class="field-hint">{@html $_('pantry_sheet_extra.cat_field_hint_html')}</p>
     <div class="newcat-actions">
@@ -1471,14 +1472,14 @@
 <!-- Variant picker (Issue #4). Stacked over the main sheet. Reused for
      both "Make this a variant of..." (set-parent) and the generic's
      "Link an Existing Item" (add-existing-child) flow. -->
-<Sheet bind:open={variantPickerOpen} title={variantPickerMode === 'set-parent' ? 'Make a Variant of...' : 'Link an Existing Item'} height="auto">
+<Sheet bind:open={variantPickerOpen} title={variantPickerMode === 'set-parent' ? $_('pantry_item_sheet_ui.make_variant_of') : $_('pantry_item_sheet_ui.link_existing')} height="auto">
   <div class="variant-picker-body">
     <p class="field-hint">
       {variantPickerMode === 'set-parent'
-        ? 'Pick the generic pantry item this should become a variant of. Only items that are not already a variant of something else are listed.'
-        : 'Pick a pantry item to attach as a variant of this generic. The picked item keeps its own data (barcode, photo, stock).'}
+        ? $_('pantry_item_sheet_ui.picker_hint_parent')
+        : $_('pantry_item_sheet_ui.picker_hint_child')}
     </p>
-    <input class="input" type="search" placeholder="Search pantry..."
+    <input class="input" type="search" placeholder={$_('pantry.search_placeholder')}
       bind:value={variantPickerQuery} autofocus />
     <ul class="variant-picker-list">
       {#each variantPickerResults as r (r.id)}
@@ -1489,7 +1490,7 @@
           </button>
         </li>
       {:else}
-        <li class="variant-picker-empty">No matching pantry items.</li>
+        <li class="variant-picker-empty">{$_('pantry_item_sheet_ui.no_matching_items')}</li>
       {/each}
     </ul>
     <div class="variant-picker-actions">
@@ -1507,15 +1508,15 @@
 {#if item && isGeneric}
   <Dialog
     bind:open={deleteWithVariantsOpen}
-    title={`Remove "${item.name}"?`}
-    confirmText="Remove"
-    cancelText="Cancel"
+    title={$_('pantry_item_sheet_ui.remove_named_title', { values: { name: item.name } })}
+    confirmText={$_('pantry_item_sheet_ui.remove')}
+    cancelText={$_('common.cancel')}
     dangerous={true}
     on:confirm={_confirmVariantDelete}
     on:cancel={() => deleteWithVariantsOpen = false}
   >
     <p class="variant-delete-msg">
-      This item has {variantContext.children.length} variant{variantContext.children.length === 1 ? '' : 's'}. What should happen to {variantContext.children.length === 1 ? 'it' : 'them'}?
+      {$_('pantry_item_sheet_ui.variant_delete_msg', { values: { n: variantContext.children.length } })}
     </p>
     <label class="variant-delete-row">
       <input type="radio" name="variant-delete-mode"
@@ -1523,7 +1524,7 @@
         on:change={() => deleteCascade = false} />
       <span class="variant-delete-label">
         <span class="variant-delete-title">{$_('pantry_sheet_extra.keep_standalone')}</span>
-        <span class="variant-delete-hint">The variants stay in your pantry as their own rows. Recommended.</span>
+        <span class="variant-delete-hint">{$_('pantry_item_sheet_ui.keep_standalone_hint')}</span>
       </span>
     </label>
     <label class="variant-delete-row">
@@ -1532,7 +1533,7 @@
         on:change={() => deleteCascade = true} />
       <span class="variant-delete-label">
         <span class="variant-delete-title">{$_('pantry_sheet_extra.remove_variants_too')}</span>
-        <span class="variant-delete-hint">All {variantContext.children.length} variant{variantContext.children.length === 1 ? '' : 's'} get removed alongside this item.</span>
+        <span class="variant-delete-hint">{$_('pantry_item_sheet_ui.remove_variants_hint', { values: { n: variantContext.children.length } })}</span>
       </span>
     </label>
   </Dialog>

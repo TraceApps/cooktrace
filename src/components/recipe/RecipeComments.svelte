@@ -1,4 +1,5 @@
 <script>
+  import { fade } from 'svelte/transition';
   import { failed } from '../../lib/messages.js';
   /**
    * RecipeComments — threaded comment list for a recipe.
@@ -151,9 +152,9 @@
 
   async function remove(c) {
     const ok = await confirmDialog({
-      title: 'Delete comment?',
-      message: 'This cannot be undone.',
-      confirmText: 'Delete',
+      title: $_('recipe_comments_ui.delete_title'),
+      message: $_('recipe_comments_ui.delete_message'),
+      confirmText: $_('common.delete'),
       dangerous: true,
     });
     if (!ok) return;
@@ -174,7 +175,7 @@
     // Match the cook-byline + recipe-author convention: prefer the
     // user's full name, fall back to the username (which is the
     // email in most installs).
-    return c.created_by_full_name || c.created_by_username || 'Anonymous';
+    return c.created_by_full_name || c.created_by_username || $_('recipe_comments_ui.anonymous');
   }
   function initial(name) {
     const s = (name || '?').trim();
@@ -198,11 +199,11 @@
     </div>
   {:else}
     {#if comments.length === 0}
-      <p class="empty">No comments yet. {canPost ? 'Be the first.' : 'Sign in to leave one.'}</p>
+      <p class="empty">{canPost ? $_('recipe_comments_ui.empty_can_post') : $_('recipe_comments_ui.empty_sign_in')}</p>
     {:else}
       {#if !showAll && threads.length > COLLAPSED_LIMIT}
         <button class="show-more" on:click={() => showAll = true}>
-          Show all {threads.length} threads
+          {$_('recipe_comments_ui.show_all_threads', { values: { count: threads.length } })}
         </button>
       {/if}
 
@@ -222,11 +223,11 @@
                 <span class="dot">·</span>
                 <span class="when" title={c.created_at}>{relativeTime(c.created_at)}</span>
                 {#if c.updated_at && c.updated_at !== c.created_at}
-                  <span class="edited" title={`Last edited ${c.updated_at}`}>(edited)</span>
+                  <span class="edited" title={$_('recipe_comments_ui.last_edited', { values: { date: c.updated_at } })}>{$_('recipe_comments_ui.edited')}</span>
                 {/if}
               </div>
               {#if editingId === c.id}
-                <RichTextEditor bind:value={editDraft} placeholder="Edit your comment…" rows={3} />
+                <RichTextEditor bind:value={editDraft} placeholder={$_('recipe_comments_ui.edit_comment_placeholder')} rows={3} />
                 <div class="edit-actions">
                   <button class="btn btn-secondary tiny" on:click={cancelEdit}>{$_('recipe_comments.cancel')}</button>
                   <button class="btn btn-primary tiny" on:click={() => saveEdit(c)}
@@ -237,14 +238,14 @@
                 <div class="row-actions">
                   {#if canPost}
                     <button class="btn-link" on:click={() => { replyingTo = c.id; replyDraft = ''; }}>
-                      Reply
+                      {$_('recipe_comments_ui.reply')}
                     </button>
                   {/if}
                   {#if canEdit(c)}
-                    <button class="btn-icon small" on:click={() => startEdit(c)} aria-label="Edit" title="Edit">
+                    <button class="btn-icon small" on:click={() => startEdit(c)} aria-label={$_('common.edit')} title={$_('common.edit')}>
                       <span class="material-symbols-rounded">edit</span>
                     </button>
-                    <button class="btn-icon small danger" on:click={() => remove(c)} aria-label="Delete" title="Delete">
+                    <button class="btn-icon small danger" on:click={() => remove(c)} aria-label={$_('common.delete')} title={$_('common.delete')}>
                       <span class="material-symbols-rounded">delete</span>
                     </button>
                   {/if}
@@ -268,11 +269,11 @@
                           <span class="dot">·</span>
                           <span class="when" title={r.created_at}>{relativeTime(r.created_at)}</span>
                           {#if r.updated_at && r.updated_at !== r.created_at}
-                            <span class="edited">(edited)</span>
+                            <span class="edited">{$_('recipe_comments_ui.edited')}</span>
                           {/if}
                         </div>
                         {#if editingId === r.id}
-                          <RichTextEditor bind:value={editDraft} placeholder="Edit reply…" rows={2} />
+                          <RichTextEditor bind:value={editDraft} placeholder={$_('recipe_comments_ui.edit_reply_placeholder')} rows={2} />
                           <div class="edit-actions">
                             <button class="btn btn-secondary tiny" on:click={cancelEdit}>{$_('recipe_comments.cancel')}</button>
                             <button class="btn btn-primary tiny" on:click={() => saveEdit(r)}
@@ -282,10 +283,10 @@
                           <div class="text">{@html sanitizeRichText(r.body)}</div>
                           {#if canEdit(r)}
                             <div class="row-actions">
-                              <button class="btn-icon small" on:click={() => startEdit(r)} aria-label="Edit" title="Edit">
+                              <button class="btn-icon small" on:click={() => startEdit(r)} aria-label={$_('common.edit')} title={$_('common.edit')}>
                                 <span class="material-symbols-rounded">edit</span>
                               </button>
-                              <button class="btn-icon small danger" on:click={() => remove(r)} aria-label="Delete" title="Delete">
+                              <button class="btn-icon small danger" on:click={() => remove(r)} aria-label={$_('common.delete')} title={$_('common.delete')}>
                                 <span class="material-symbols-rounded">delete</span>
                               </button>
                             </div>
@@ -300,12 +301,12 @@
               {#if replyingTo === c.id}
                 <div class="reply-composer">
                   <RichTextEditor bind:value={replyDraft}
-                    placeholder={`Reply to ${displayName(c)}…`} rows={2} />
+                    placeholder={$_('recipe_comments_ui.reply_to_placeholder', { values: { name: displayName(c) } })} rows={2} />
                   <div class="edit-actions">
                     <button class="btn btn-secondary tiny" on:click={() => { replyingTo = null; replyDraft = ''; }}>{$_('recipe_comments.cancel')}</button>
                     <button class="btn btn-primary tiny" on:click={() => submitReply(c.id)}
                       disabled={posting || !replyDraft.trim()}>
-                      {posting ? 'Posting…' : 'Post reply'}
+                      {posting ? $_('recipe_comments_ui.posting') : $_('recipe_comments_ui.post_reply')}
                     </button>
                   </div>
                 </div>
@@ -318,17 +319,17 @@
 
     {#if canPost}
       <div class="composer">
-        <RichTextEditor bind:value={draft} placeholder="Add a comment…" rows={3} />
+        <RichTextEditor bind:value={draft} placeholder={$_('recipe_comments_ui.add_comment_placeholder')} rows={3} />
         <div class="composer-actions">
-          <span class="hint">Supports bold / italic / lists</span>
+          <span class="hint">{$_('recipe_comments_ui.format_hint')}</span>
           <button class="btn btn-primary" on:click={submit}
             disabled={posting || !draft.trim()}>
-            {posting ? 'Posting…' : 'Post Comment'}
+            {posting ? $_('recipe_comments_ui.posting') : $_('recipe_comments_ui.post_comment')}
           </button>
         </div>
       </div>
     {:else}
-      <p class="signin-prompt">Sign in to leave a comment.</p>
+      <p class="signin-prompt">{$_('recipe_comments_ui.sign_in_prompt')}</p>
     {/if}
   {/if}
 </div>

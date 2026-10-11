@@ -155,7 +155,7 @@
         {#if t.done}
           <button type="button" class="ring-wrap no-drag ring-tap"
                   on:click|stopPropagation={() => dismissTimer(t.id)}
-                  aria-label="Dismiss timer">
+                  aria-label={$_('top_timer_pill_ui.dismiss_timer')}>
             <svg class="ring" viewBox="0 0 36 36" aria-hidden="true">
               <circle class="ring-track" cx="18" cy="18" r="15.5"/>
               <circle class="ring-arc"   cx="18" cy="18" r="15.5"
@@ -182,13 +182,13 @@
           class="pill-text drag-handle"
           class:linked={Number.isFinite(t.stepIndex)}
           on:click={() => jumpToStep(t.stepIndex)}
-          title={Number.isFinite(t.stepIndex) ? 'Jump to this step' : t.label}>
+          title={Number.isFinite(t.stepIndex) ? $_('top_timer_pill_ui.jump_to_step') : t.label}>
           {#if t.recipeName}
             <span class="pill-recipe">{t.recipeName}</span>
           {/if}
           <span class="pill-step-row">
             {#if Number.isFinite(t.stepIndex)}
-              <span class="pill-step-badge">Step {t.stepIndex + 1}</span>
+              <span class="pill-step-badge">{$_('top_timer_pill_ui.step_n', { values: { n: t.stepIndex + 1 } })}</span>
             {/if}
             <span class="pill-step">{t.label}</span>
           </span>
@@ -196,11 +196,11 @@
 
         <div class="pill-actions no-drag">
           <button class="t-btn" on:click|stopPropagation={() => addOneMinute(t.id)}
-            title={t.done ? 'Snooze 1 min' : 'Add 1 min'}>
+            title={t.done ? $_('top_timer_pill_ui.snooze_one_min') : $_('top_timer_pill_ui.add_one_min')}>
             +1
           </button>
           <button class="t-btn close" on:click|stopPropagation={() => dismissTimer(t.id)}
-            aria-label="Dismiss timer" title="Dismiss">
+            aria-label={$_('top_timer_pill_ui.dismiss_timer')} title={$_('top_timer_pill_ui.dismiss')}>
             <span class="material-symbols-rounded">close</span>
           </button>
         </div>

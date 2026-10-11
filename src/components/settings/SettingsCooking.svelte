@@ -22,7 +22,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_page.cooking.default_servings')}</span>
-        <div class="setting-desc">Used when a new recipe doesn't specify how many it makes.</div>
+        <div class="setting-desc">{$_('settings_cooking_ui.servings_desc')}</div>
       </div>
       <input type="number" min="1" max="20" class="input num" value={$defaultServings}
         on:change={(e) => defaultServings.set(parseInt(e.target.value, 10) || 2)} />
@@ -31,8 +31,8 @@
     <div class="setting-divider"></div>
     <div class="setting-row">
       <div>
-        <span class="setting-label">Auto-Add Ingredients to Pantry</span>
-        <div class="setting-desc">When saving a recipe, automatically create Pantry rows for ingredient names that aren't linked yet. Off by default; turn on if you want your Pantry catalog to grow as you add or edit recipes. Manual links via the Pantry Link picker always work regardless.</div>
+        <span class="setting-label">{$_('settings_cooking_ui.auto_add')}</span>
+        <div class="setting-desc">{$_('settings_cooking_ui.auto_add_desc')}</div>
       </div>
       <input type="checkbox" class="toggle-cb" checked={$autoCreatePantryFromRecipes}
         on:change={e => autoCreatePantryFromRecipes.set(e.target.checked)} />
@@ -42,7 +42,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_page.cooking.show_shared')}</span>
-        <div class="setting-desc">When on, recipes shared with you (via a Kitchen or a direct grant) appear alongside your own on the Recipes tab. Each shared card keeps a "Shared by" badge plus a mint Kitchen chip so you can tell what's yours at a glance. Off by default; the Shared segment stays available either way.</div>
+        <div class="setting-desc">{$_('settings_cooking_ui.show_shared_desc')}</div>
       </div>
       <input type="checkbox" class="toggle-cb" checked={$mixSharedIntoRecipes}
         on:change={e => mixSharedIntoRecipes.set(e.target.checked)} />
@@ -104,7 +104,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_page.cooking.default_grouping')}</span>
-        <div class="setting-desc">How the shopping list is grouped when it opens. By Aisle uses the per-item aisle (auto-populated from the linked pantry item's category); By Recipe keeps items with the recipe that added them; Flat is one uninterrupted list.</div>
+        <div class="setting-desc">{$_('settings_cooking_ui.grouping_desc')}</div>
       </div>
       <div class="select-wrap" style="width:170px">
         <select class="select sel-sm" value={$shoppingGroupBy || 'aisle'}
@@ -120,7 +120,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_page.cooking.checked_items')}</span>
-        <div class="setting-desc">What happens to items after you check them off. Sink to bottom keeps them visible so you can uncheck by mistake; Hide removes them from view with a one-tap "Show Checked" toggle if you need them back.</div>
+        <div class="setting-desc">{$_('settings_cooking_ui.checked_desc')}</div>
       </div>
       <div class="select-wrap" style="width:170px">
         <select class="select sel-sm" value={$shoppingCheckedBehavior || 'bottom'}

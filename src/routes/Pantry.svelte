@@ -67,19 +67,20 @@
     if (diff <= EXPIRY_WARN_DAYS) return 'warn';
     return 'ok';
   }
-  function _expiryShortLabel(dateStr) {
+  // Reactive so the labels follow a language switch.
+  $: _expiryShortLabel = (dateStr) => {
     const status = _expiryStatus(dateStr);
-    if (status === 'past') return 'Expired';
+    if (status === 'past') return $_('pantry_ui.expired');
     if (status === 'warn') {
       const d = new Date(dateStr + 'T00:00:00');
       const now = new Date(); now.setHours(0, 0, 0, 0);
       const days = Math.round((d - now) / (1000 * 60 * 60 * 24));
-      if (days === 0) return 'Expires today';
-      if (days === 1) return 'Expires tomorrow';
-      return `Expires in ${days}d`;
+      if (days === 0) return $_('pantry_ui.expires_today');
+      if (days === 1) return $_('pantry_ui.expires_tomorrow');
+      return $_('pantry_ui.expires_in_days', { values: { n: days } });
     }
     return '';
-  }
+  };
 
   // Effective expiry for the list-card pill. A generic doesn't have
   // its own expiry; it aggregates from children, surfacing the worst
@@ -136,13 +137,13 @@
   // otherwise it's not meaningfully different from just picking that one
   // source. Mirrors NutriTrace's availableSources shape.
   $: _perSourceOptions = [
-    { value: 'local', label: 'Pantry' },
+    { value: 'local', label: $_('pantry.external.sources.local') },
     ...($offEnabled  ? [{ value: 'off',  label: 'OFF'  }] : []),
     ...($usdaEnabled && $usdaApiKey ? [{ value: 'usda', label: 'USDA' }] : []),
     ...($ntFederationEnabled ? [{ value: 'nt', label: 'NutriTrace' }] : []),
   ];
   $: availableSources = _perSourceOptions.length >= 2
-    ? [{ value: 'all', label: 'All' }, ..._perSourceOptions]
+    ? [{ value: 'all', label: $_('pantry.filters.all') }, ..._perSourceOptions]
     : _perSourceOptions;
 
   // Re-run external search whenever the query or the source changes. In
@@ -401,9 +402,9 @@
     if (selectedIds.size === 0) return;
     const n = selectedIds.size;
     const ok = await confirmDialog({
-      title: `Delete ${n} pantry item${n === 1 ? '' : 's'}?`,
-      message: 'Recipes referencing them stay; this just drops them from your pantry.',
-      confirmText: `Delete ${n}`,
+      title: $_('pantry_ui.bulk_delete_title', { values: { n } }),
+      message: $_('pantry.bulk.confirm_message'),
+      confirmText: $_('pantry_ui.bulk_delete_confirm', { values: { n } }),
       dangerous: true,
     });
     if (!ok) return;
@@ -604,7 +605,7 @@
     const days = Math.round((then - now) / 86400000);
     return days;
   }
-  function _expiryLabel(dateStr) {
+  $: _expiryLabel = (dateStr) => {
     const d = _daysUntil(dateStr);
     if (d == null) return '';
     // Matches _expiryShortLabel's wording for the past case (was its
@@ -613,11 +614,10 @@
     // Soon" heading). Kept as its own function rather than merged into
     // _expiryShortLabel because the warn-case wording here is shorter,
     // meant for this compact spotlight tile rather than a meta-pill.
-    if (d < 0)  return 'Expired';
-    if (d === 0) return 'today';
-    if (d === 1) return '1d left';
-    return `${d}d left`;
-  }
+    if (d < 0)  return $_('pantry_ui.expired');
+    if (d === 0) return $_('pantry_ui.today');
+    return $_('pantry_ui.days_left', { values: { n: d } });
+  };
 
   // Grouping: when "All categories" is selected AND no search query,
   // bucket the filtered items by category so each renders under its
@@ -670,7 +670,7 @@
     if (unc.length || orphaned.length) {
       ordered.push({
         key: '__uncategorized__',
-        label: 'Uncategorized',
+        label: $_('pantry.filters.uncategorized'),
         icon: 'help',
         items: [...unc, ...orphaned],
       });
@@ -681,11 +681,11 @@
   // Slug -> label / icon helpers for the card pills + filter chips.
   // Falls back to the legacy hardcoded helpers when the API list is
   // still loading (avoids flashing raw slugs).
-  function _catNameBySlug(slug) {
-    if (!slug) return 'Uncategorized';
+  $: _catNameBySlug = (slug) => {
+    if (!slug) return $_('pantry.filters.uncategorized');
     const c = pantryCategories.find(x => x.slug === slug);
     return c?.name || categoryLabel(slug);
-  }
+  };
   function _catIconBySlug(slug) {
     if (!slug) return 'help';
     const c = pantryCategories.find(x => x.slug === slug);
@@ -856,11 +856,11 @@
     actionSheetOpen = true;
   }
   $: rowActions = actionSheetItem ? [
-    { label: 'Edit',                                                        icon: 'edit',         value: 'edit'   },
-    { label: actionSheetItem.in_stock ? 'Mark as Out of Stock' : 'Mark as in Stock',
+    { label: $_('pantry.actions.edit'),                                     icon: 'edit',         value: 'edit'   },
+    { label: actionSheetItem.in_stock ? $_('pantry.actions.mark_out_stock') : $_('pantry.actions.mark_in_stock'),
       icon: actionSheetItem.in_stock ? 'check_box_outline_blank' : 'check_box', value: 'stock'  },
-    { label: 'Select Multiple',                                             icon: 'checklist',    value: 'select' },
-    { label: 'Delete',                                                      icon: 'delete',       value: 'delete', danger: true },
+    { label: $_('pantry.actions.select_multiple'),                          icon: 'checklist',    value: 'select' },
+    { label: $_('pantry.actions.delete'),                                   icon: 'delete',       value: 'delete', danger: true },
   ] : [];
   async function onRowAction(e) {
     const v = e.detail?.value;
@@ -901,9 +901,9 @@
 
   async function remove(it) {
     const ok = await confirmDialog({
-      title: 'Remove from pantry?',
-      message: `"${it.name}" will be removed. Recipes referencing it stay; this just drops it from your library.`,
-      confirmText: 'Remove',
+      title: $_('pantry_ui.remove_title'),
+      message: $_('pantry_ui.remove_message', { values: { name: it.name } }),
+      confirmText: $_('pantry_ui.remove'),
       dangerous: true,
     });
     if (!ok) return;
@@ -924,16 +924,16 @@
     class:select-mode={selectMode}
     bind:offsetHeight={headerH}>
     {#if selectMode}
-      <h1>{selectedIds.size} Selected</h1>
-      <button class="btn-icon header-action" on:click={bulkDelete} disabled={selectedIds.size === 0} aria-label="Delete selected" title="Delete selected">
+      <h1>{$_('pantry_ui.selected_count', { values: { n: selectedIds.size } })}</h1>
+      <button class="btn-icon header-action" on:click={bulkDelete} disabled={selectedIds.size === 0} aria-label={$_('pantry_ui.delete_selected')} title={$_('pantry_ui.delete_selected')}>
         <span class="material-symbols-rounded">delete</span>
       </button>
-      <button class="btn-icon header-action header-action-2" on:click={exitSelectMode} aria-label="Cancel selection" title="Cancel">
+      <button class="btn-icon header-action header-action-2" on:click={exitSelectMode} aria-label={$_('pantry_ui.cancel_selection')} title={$_('common.cancel')}>
         <span class="material-symbols-rounded">close</span>
       </button>
     {:else}
       <h1>{$_('routes.pantry.title')}</h1>
-      <button class="btn-icon header-action" on:click={startCreate} aria-label="Add item" title="Add item">
+      <button class="btn-icon header-action" on:click={startCreate} aria-label={$_('pantry.add_item')} title={$_('pantry.add_item')}>
         <span class="material-symbols-rounded">add</span>
       </button>
     {/if}
@@ -946,10 +946,10 @@
         <div class="variant-banner-body">
           <div class="variant-banner-title">{$_('pantry_page.variant_banner_title')}</div>
           <p class="variant-banner-desc">
-            Group different brands of the same ingredient under one pantry entry. Open any item, scroll to Variants, and add a brand or store. Recipes that link to the generic match any of the variants. Your existing pantry works exactly as before until you opt in per item.
+            {$_('pantry_ui.variant_banner_desc')}
           </p>
         </div>
-        <button class="variant-banner-close" on:click={_dismissVariantBanner} aria-label="Dismiss">
+        <button class="variant-banner-close" on:click={_dismissVariantBanner} aria-label={$_('pantry_ui.dismiss')}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </div>
@@ -959,7 +959,7 @@
         <div class="search-row">
           <span class="material-symbols-rounded search-icon">search</span>
           <input class="search" type="search" placeholder={$_('routes.pantry.search_placeholder')} bind:value={query} />
-          <button class="search-scan" on:click={() => scannerOpen = true} aria-label="Scan barcode" title="Scan barcode">
+          <button class="search-scan" on:click={() => scannerOpen = true} aria-label={$_('pantry.scan_barcode')} title={$_('pantry.scan_barcode')}>
             <span class="material-symbols-rounded">barcode_scanner</span>
           </button>
         </div>
@@ -981,14 +981,14 @@
                             on:touchend={_cancelChipLongPress}
                             on:touchcancel={_cancelChipLongPress}>
                       {src.label}
-                      {#if offTiersFiltered}<span class="tier-active-dot" title="OFF tier filter active"></span>{/if}
+                      {#if offTiersFiltered}<span class="tier-active-dot" title={$_('pantry_ui.off_tier_active')}></span>{/if}
                     </button>
                     <button class="source-chip-caret"
                             class:active={activeChips.off}
                             class:open={offDropdownOpen}
                             bind:this={offCaretEl}
                             on:click={openOffDropdown}
-                            aria-label="Filter OFF results by quality tier"
+                            aria-label={$_('pantry_ui.off_tier_filter')}
                             aria-expanded={offDropdownOpen}>
                       <span class="material-symbols-rounded">expand_more</span>
                     </button>
@@ -1004,14 +1004,14 @@
                             on:touchend={_cancelChipLongPress}
                             on:touchcancel={_cancelChipLongPress}>
                       {src.label}
-                      {#if usdaTiersFiltered}<span class="tier-active-dot" title="USDA tier filter active"></span>{/if}
+                      {#if usdaTiersFiltered}<span class="tier-active-dot" title={$_('pantry_ui.usda_tier_active')}></span>{/if}
                     </button>
                     <button class="source-chip-caret"
                             class:active={activeChips.usda}
                             class:open={usdaDropdownOpen}
                             bind:this={usdaCaretEl}
                             on:click={openUsdaDropdown}
-                            aria-label="Filter USDA results by data type"
+                            aria-label={$_('pantry_ui.usda_tier_filter')}
                             aria-expanded={usdaDropdownOpen}>
                       <span class="material-symbols-rounded">expand_more</span>
                     </button>
@@ -1043,7 +1043,7 @@
             <span class="filter-divider" aria-hidden="true"></span>
           {/if}
           <div class="filter-chips">
-            {#each [['all','All'], ['in','In Stock'], ['out','Out'], ['expiring','Expiring Soon']] as [v, label]}
+            {#each [['all', $_('pantry.filters.all')], ['in', $_('pantry.filters.in_stock')], ['out', $_('pantry.filters.out')], ['expiring', $_('pantry_ui.expiring_soon')]] as [v, label]}
               <button class="seg" class:active={stockFilter === v} on:click={() => stockFilter = v}>
                 {label}
                 {#if v === 'in'}<span class="seg-count">{stockedCount}</span>{/if}
@@ -1056,7 +1056,7 @@
           <span class="filter-divider" aria-hidden="true"></span>
           <div class="filter-chips category-chips">
             <button class="seg" class:active={categoryFilter === 'all'} on:click={() => categoryFilter = 'all'}>
-              All
+              {$_('pantry.filters.all')}
             </button>
             {#each pantryCategories as cat (cat.id)}
               {#if categoryCounts[cat.slug] > 0}
@@ -1069,7 +1069,7 @@
             {/each}
             {#if categoryCounts.uncategorized > 0}
               <button class="seg" class:active={categoryFilter === 'uncategorized'} on:click={() => categoryFilter = 'uncategorized'}>
-                Uncategorized
+                {$_('pantry.filters.uncategorized')}
                 <span class="seg-count">{categoryCounts.uncategorized}</span>
               </button>
             {/if}
@@ -1077,7 +1077,7 @@
           <!-- Sort menu. Lives in the toolbar next to the view toggle
                so users can quickly switch from "categorised grocery
                aisles" to "what's about to expire". -->
-          <label class="sort-menu ml-auto" title="Sort items">
+          <label class="sort-menu ml-auto" title={$_('pantry_ui.sort_items')}>
             <span class="material-symbols-rounded">sort</span>
             <select class="sort-select" bind:value={sortKey}>
               <option value="name">A → Z</option>
@@ -1091,13 +1091,13 @@
                it when the pantry list itself is hidden (source != local
                with an active query). -->
           {#if searchSource === 'local' || !query.trim()}
-            <div class="view-toggle" role="group" aria-label="View mode">
+            <div class="view-toggle" role="group" aria-label={$_('pantry_ui.view_mode')}>
               <button class="seg seg-icon" class:active={$pantryView === 'grid'}
-                on:click={() => pantryView.set('grid')} title="Grid view" aria-pressed={$pantryView === 'grid'}>
+                on:click={() => pantryView.set('grid')} title={$_('pantry_ui.grid_view')} aria-pressed={$pantryView === 'grid'}>
                 <span class="material-symbols-rounded" style="font-size:16px">grid_view</span>
               </button>
               <button class="seg seg-icon" class:active={$pantryView === 'list'}
-                on:click={() => pantryView.set('list')} title="List view" aria-pressed={$pantryView === 'list'}>
+                on:click={() => pantryView.set('list')} title={$_('pantry_ui.list_view')} aria-pressed={$pantryView === 'list'}>
                 <span class="material-symbols-rounded" style="font-size:16px">view_list</span>
               </button>
             </div>
@@ -1114,13 +1114,13 @@
          tile opens the item; clicking the "See All" tail jumps to the
          Expiring Soon filter. -->
     {#if expiringSoonItems.length > 0}
-      <div class="expiring-spotlight" role="region" aria-label="Expiring & Expired">
+      <div class="expiring-spotlight" role="region" aria-label={$_('pantry_ui.expiring_expired')}>
         <div class="spotlight-head">
           <span class="material-symbols-rounded">schedule</span>
-          <span class="spotlight-title">Expiring & Expired</span>
+          <span class="spotlight-title">{$_('pantry_ui.expiring_expired')}</span>
           <span class="spotlight-count">{expiringSoonCount}</span>
           <button class="spotlight-all" on:click={() => { stockFilter = 'expiring'; }}>
-            See All
+            {$_('pantry_ui.see_all')}
             <span class="material-symbols-rounded" style="font-size:14px">chevron_right</span>
           </button>
         </div>
@@ -1153,8 +1153,8 @@
            grid. Picks the right skeleton flavor for the active view
            mode so the layout stays stable. -->
       <div class="card-grid skeleton-grid" class:list={$pantryView === 'list'}
-        aria-busy="true" aria-label="Loading pantry">
-        {#each Array($pantryView === 'list' ? 8 : 12) as _}
+        aria-busy="true" aria-label={$_('pantry_ui.loading_pantry')}>
+        {#each Array($pantryView === 'list' ? 8 : 12) as _skel}
           <div class="skel skel-pcard">
             <div class="skel-photo"></div>
             <div class="skel-body">
@@ -1240,15 +1240,15 @@
                   <button class="photo-stock"
                     class:on={isSelected}
                     on:click|stopPropagation={() => toggleSelected(it.id)}
-                    aria-label={isSelected ? 'Deselect' : 'Select'}>
+                    aria-label={isSelected ? $_('pantry_ui.deselect') : $_('pantry_ui.select')}>
                     <span class="material-symbols-rounded">{isSelected ? 'check' : 'add'}</span>
                   </button>
                 {:else if !isGen}
                   <button class="photo-stock"
                     class:on={inStockDisplay}
                     on:click|stopPropagation={() => quickToggle(it)}
-                    aria-label={inStockDisplay ? 'Mark as out of stock' : 'Mark as in stock'}
-                    title={inStockDisplay ? 'In stock' : 'Out of stock'}>
+                    aria-label={inStockDisplay ? $_('pantry.actions.mark_out_stock') : $_('pantry.actions.mark_in_stock')}
+                    title={inStockDisplay ? $_('pantry_ui.in_stock') : $_('pantry_ui.out_of_stock')}>
                     <span class="material-symbols-rounded">{inStockDisplay ? 'check' : 'add'}</span>
                   </button>
                 {/if}
@@ -1260,11 +1260,11 @@
                   <div class="pcard-brand">{it.brand}</div>
                 {/if}
                 {#if it._standaloneVariantParent}
-                  <div class="pcard-variant-of">Variant of {it._standaloneVariantParent.name}</div>
+                  <div class="pcard-variant-of">{$_('pantry_ui.variant_of', { values: { name: it._standaloneVariantParent.name } })}</div>
                 {/if}
                 <div class="pcard-meta">
                   {#if isGen}
-                    <span class="pcard-pill variants-pill" title={`${stockAgg.stocked} of ${stockAgg.total} variants in stock`}>
+                    <span class="pcard-pill variants-pill" title={$_('pantry_ui.variants_in_stock', { values: { stocked: stockAgg.stocked, total: stockAgg.total } })}>
                       <span class="material-symbols-rounded">category</span>
                       {stockAgg.stocked} / {stockAgg.total}
                     </span>
@@ -1275,7 +1275,7 @@
                   {/if}
                   <!-- Recipe-usage pill, only when actually used. -->
                   {#if it.recipe_count > 0}
-                    <span class="pcard-pill usage-pill" title={`Used in ${it.recipe_count} recipe${it.recipe_count === 1 ? '' : 's'}`}>
+                    <span class="pcard-pill usage-pill" title={$_('pantry_ui.used_in_recipes', { values: { n: it.recipe_count } })}>
                       <span class="material-symbols-rounded">restaurant</span>
                       {it.recipe_count}
                     </span>
@@ -1287,7 +1287,7 @@
                   {#if effExp}
                     {@const expStatus = _expiryStatus(effExp)}
                     {#if expStatus === 'warn' || expStatus === 'past'}
-                      <span class="pcard-pill expiry-pill" class:past={expStatus === 'past'} title={`Expires ${effExp}`}>
+                      <span class="pcard-pill expiry-pill" class:past={expStatus === 'past'} title={$_('pantry_ui.expires_on', { values: { date: effExp } })}>
                         <span class="material-symbols-rounded">{expStatus === 'past' ? 'event_busy' : 'schedule'}</span>
                         {_expiryShortLabel(effExp)}
                       </span>
@@ -1308,8 +1308,8 @@
                 <button class="pcard-expand"
                   class:open={expanded}
                   on:click|stopPropagation={() => toggleExpand(it.id)}
-                  aria-label={expanded ? 'Collapse variants' : 'Expand variants'}
-                  title={expanded ? 'Collapse variants' : 'Expand variants'}>
+                  aria-label={expanded ? $_('pantry_ui.collapse_variants') : $_('pantry_ui.expand_variants')}
+                  title={expanded ? $_('pantry_ui.collapse_variants') : $_('pantry_ui.expand_variants')}>
                   <span class="material-symbols-rounded chevron-icon" class:up={expanded}>expand_more</span>
                 </button>
               {/if}
@@ -1338,8 +1338,8 @@
                       <button class="photo-stock"
                         class:on={v.in_stock}
                         on:click|stopPropagation={() => quickToggle(v)}
-                        aria-label={v.in_stock ? 'Mark as out of stock' : 'Mark as in stock'}
-                        title={v.in_stock ? 'In stock' : 'Out of stock'}>
+                        aria-label={v.in_stock ? $_('pantry.actions.mark_out_stock') : $_('pantry.actions.mark_in_stock')}
+                        title={v.in_stock ? $_('pantry_ui.in_stock') : $_('pantry_ui.out_of_stock')}>
                         <span class="material-symbols-rounded">{v.in_stock ? 'check' : 'add'}</span>
                       </button>
                     {/if}
@@ -1369,7 +1369,7 @@
         {#if externalLoading}
           <div class="loading-row">
             <span class="material-symbols-rounded spin">refresh</span>
-            <span class="loading-text">Searching all sources…</span>
+            <span class="loading-text">{$_('pantry_ui.searching_all')}</span>
           </div>
         {:else if _allModeItems.length === 0}
           <div class="state empty">
@@ -1392,22 +1392,22 @@
                 {/if}
                 <div class="item-body">
                   <div class="item-name">
-                    <span class="src-badge src-{r._source}">{r._source === 'off' ? 'OFF' : r._source === 'usda' ? 'USDA' : r._source === 'nt' ? 'NT' : 'Pantry'}</span>
+                    <span class="src-badge src-{r._source}">{r._source === 'off' ? 'OFF' : r._source === 'usda' ? 'USDA' : r._source === 'nt' ? 'NT' : $_('pantry.external.sources.local')}</span>
                     {r.name}
                     {#if r._source === 'off' && r.completeness != null}
                       <span class="completeness-dot" class:high={r.completeness >= 0.85}
                             class:mid={r.completeness >= 0.6 && r.completeness < 0.85}
                             class:low={r.completeness < 0.6}
-                            title="OFF completeness: {Math.round(r.completeness * 100)}%"></span>
+                            title={$_('pantry_ui.off_completeness', { values: { pct: Math.round(r.completeness * 100) } })}></span>
                     {/if}
                     {#if r._source === 'off' && r.originTag}
                       {@const _flag = offCountryTagToFlag(r.originTag)}
                       {#if _flag}
-                        <span class="origin-flag" title="Origin: {offCountryTagToName(r.originTag)}">{_flag}</span>
+                        <span class="origin-flag" title={$_('pantry_ui.origin', { values: { country: offCountryTagToName(r.originTag) } })}>{_flag}</span>
                       {/if}
                     {/if}
                     {#if r._source === 'usda' && r.dataType}
-                      <span class="usda-type-badge" title="USDA data type: {r.dataType}">{r.dataType}</span>
+                      <span class="usda-type-badge" title={$_('pantry_ui.usda_data_type', { values: { type: r.dataType } })}>{r.dataType}</span>
                     {/if}
                   </div>
                   {#if r.brand}<div class="item-notes">{r.brand}</div>{/if}
@@ -1427,17 +1427,17 @@
         {#if externalLoading}
           <div class="loading-row">
             <span class="material-symbols-rounded spin">refresh</span>
-            <span class="loading-text">Searching in {_srcLabel}…</span>
+            <span class="loading-text">{$_('pantry.external.searching_in', { values: { source: _srcLabel } })}</span>
           </div>
         {:else if externalResults.length === 0}
           <div class="state empty">
             <span class="material-symbols-rounded empty-icon">search_off</span>
-            <p>No results in {_srcLabel}</p>
+            <p>{$_('pantry.external.no_results_in', { values: { source: _srcLabel } })}</p>
           </div>
         {:else if _visibleResults.length === 0}
           <div class="state empty">
             <span class="material-symbols-rounded empty-icon">filter_alt_off</span>
-            <p>All {_srcLabel} results hidden by tier filter</p>
+            <p>{$_('pantry_ui.all_hidden_by_tier', { values: { source: _srcLabel } })}</p>
             <button class="btn secondary" style="margin-top:8px" on:click={() => searchSource === 'off' ? resetOffTiers() : resetUsdaTiers()}>{$_('pantry_page.reset_filter')}</button>
           </div>
         {:else}
@@ -1459,16 +1459,16 @@
                       <span class="completeness-dot" class:high={r.completeness >= 0.85}
                             class:mid={r.completeness >= 0.6 && r.completeness < 0.85}
                             class:low={r.completeness < 0.6}
-                            title="OFF completeness: {Math.round(r.completeness * 100)}%"></span>
+                            title={$_('pantry_ui.off_completeness', { values: { pct: Math.round(r.completeness * 100) } })}></span>
                     {/if}
                     {#if searchSource === 'off' && r.originTag}
                       {@const _flag = offCountryTagToFlag(r.originTag)}
                       {#if _flag}
-                        <span class="origin-flag" title="Origin: {offCountryTagToName(r.originTag)}">{_flag}</span>
+                        <span class="origin-flag" title={$_('pantry_ui.origin', { values: { country: offCountryTagToName(r.originTag) } })}>{_flag}</span>
                       {/if}
                     {/if}
                     {#if searchSource === 'usda' && r.dataType}
-                      <span class="usda-type-badge" title="USDA data type: {r.dataType}">{r.dataType}</span>
+                      <span class="usda-type-badge" title={$_('pantry_ui.usda_data_type', { values: { type: r.dataType } })}>{r.dataType}</span>
                     {/if}
                   </div>
                   {#if r.brand}<div class="item-notes">{r.brand}</div>{/if}
@@ -1527,7 +1527,7 @@
       {/if}
     </div>
     <div class="tier-dropdown-options">
-      {#each [['hi','Complete (85%+)','high'], ['mid','Partial (60-85%)','mid'], ['lo','Sparse (<60%)','low'], ['unknown','Unknown','low']] as [key, label, swatch] (key)}
+      {#each [['hi', $_('pantry_ui.tier_complete'), 'high'], ['mid', $_('pantry_ui.tier_partial'), 'mid'], ['lo', $_('pantry_ui.tier_sparse'), 'low'], ['unknown', $_('pantry_ui.tier_unknown'), 'low']] as [key, label, swatch] (key)}
         <label class="tier-option">
           <input type="checkbox" checked={offTiersActive.has(key)} on:change={() => toggleOffTier(key)} />
           <span class="tier-swatch tier-{swatch}"></span>
@@ -1554,7 +1554,7 @@
       {#each _USDA_TIERS as tier (tier)}
         <label class="tier-option">
           <input type="checkbox" checked={usdaTiersActive.has(tier)} on:change={() => toggleUsdaTier(tier)} />
-          <span class="tier-label">{tier}</span>
+          <span class="tier-label">{tier === 'unknown' ? $_('pantry_ui.tier_unknown') : tier}</span>
         </label>
       {/each}
     </div>

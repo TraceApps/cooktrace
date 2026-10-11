@@ -25,14 +25,14 @@
 
   // Group for the UI.
   const CATEGORY_LABELS = {
-    energy:  'Energy',
-    macro:   'Macros',
-    mineral: 'Minerals',
-    vitamin: 'Vitamins',
-    other:   'Other',
+    energy:  'settings_page.regional.energy',
+    macro:   'settings_nutrition_ui.cat_macro',
+    mineral: 'settings_nutrition_ui.cat_mineral',
+    vitamin: 'settings_nutrition_ui.cat_vitamin',
+    other:   'settings_nutrition_ui.cat_other',
   };
-  $: groups = Object.entries(CATEGORY_LABELS).map(([cat, label]) => ({
-    label,
+  $: groups = Object.entries(CATEGORY_LABELS).map(([cat, key]) => ({
+    label: $_(key),
     items: NUTRIMENTS.filter(n => n.category === cat),
   })).filter(g => g.items.length > 0);
 </script>
@@ -41,7 +41,7 @@
   <div class="setting-row stack">
     <div>
       <span class="setting-label">{$_('settings_nutrition_ct.visibility')}</span>
-      <span class="setting-desc">Pick which nutrients show up in the Nutrition Facts box on every recipe. Hidden nutrients can still be entered in the editor but won't display.</span>
+      <span class="setting-desc">{$_('settings_nutrition_ui.visibility_desc')}</span>
     </div>
     <div class="actions-row">
       <button class="seg" on:click={resetToDefaults}>{$_('settings_nutrition_ct.defaults')}</button>

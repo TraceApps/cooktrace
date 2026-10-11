@@ -743,7 +743,7 @@ When you write to the user's data, summarise what you did briefly and concretely
       return;
     }
     input = '';
-    const userMsg = { role: 'user', content: text || '(image attached)', time: _fmtTime() };
+    const userMsg = { role: 'user', content: text || $_('trace_ui.image_attached'), time: _fmtTime() };
     if (smartLog) userMsg.smartLog = true; // visual hint badge in bubble
     if (attachedImage) userMsg.preview = attachedImage.preview;
     messages = [...messages, userMsg];
@@ -782,16 +782,16 @@ When you write to the user's data, summarise what you did briefly and concretely
             messages: apiMessages,
             systemPrompt: _systemPrompt(smartLog),
             tools: TOOLS,
-            onToolCall: (toolName) => { toolStatus = `Calling ${toolName.replace(/_/g, ' ')}…`; },
+            onToolCall: (toolName) => { toolStatus = $_('trace_ui.calling_tool', { values: { tool: toolName.replace(/_/g, ' ') } }); },
             onToolsUnsupported,
           });
-      const reply2 = reply || '(no response)';
+      const reply2 = reply || $_('trace_ui.no_response');
       messages = [...messages, { role: 'assistant', content: reply2, time: _fmtTime() }];
       if (toolsNote) messages = toolsNotice.add(messages, $_(toolsNote));
       NtApi.post('/api/ai/history', { role: 'assistant', content: reply2 })
         .catch(e => console.warn('[Trace] history save (assistant) failed:', e?.message || e));
     } catch (e) {
-      messages = [...messages, { role: 'assistant', content: `⚠ ${e.message || 'AI request failed'}`, time: _fmtTime() }];
+      messages = [...messages, { role: 'assistant', content: `⚠ ${e.message || $_('trace_ui.request_failed')}`, time: _fmtTime() }];
     } finally {
       busy = false;
       toolStatus = '';
@@ -1062,8 +1062,8 @@ When you write to the user's data, summarise what you did briefly and concretely
     on:keydown={e => e.key === 'Enter' && onFabClick()}
     role="button"
     tabindex="0"
-    aria-label={_fabRecording ? 'Recording — release to send' : (panelOpen ? `Close ${assistantName}` : `Open ${assistantName}`)}
-    title={_fabRecording ? 'Recording…' : (panelOpen ? `Hide ${assistantName}` : `Hold to Smart Log, tap to chat`)}
+    aria-label={_fabRecording ? $_('trace_ui.fab_recording_label') : (panelOpen ? $_('trace_ui.fab_close', { values: { name: assistantName } }) : $_('trace_ui.fab_open', { values: { name: assistantName } }))}
+    title={_fabRecording ? $_('trace_ui.fab_recording') : (panelOpen ? $_('trace_ui.fab_hide', { values: { name: assistantName } }) : $_('trace_ui.fab_hint'))}
   >
     {#if _fabRecording}
       <span class="material-symbols-rounded fab-mic">mic</span>
@@ -1086,9 +1086,9 @@ When you write to the user's data, summarise what you did briefly and concretely
       style={fabPos ? `left:${fabPos.x + 32}px; top:${fabPos.y - 44}px; right:auto; transform:translateX(-50%);` : ''}
     >
       {#if _fabCancelPreview}
-        ✕ Release to Cancel
+        ✕ {$_('trace_ui.release_to_cancel')}
       {:else}
-        ● Listening… Release to Send
+        ● {$_('trace_ui.listening_release')}
       {/if}
     </div>
   {/if}
@@ -1104,7 +1104,7 @@ When you write to the user's data, summarise what you did briefly and concretely
       on:keydown={() => {}}
       role="button"
       tabindex="-1"
-      aria-label="Close chat"
+      aria-label={$_('trace_ui.close_chat')}
     ></div>
 
     <div class="panel" use:portal
@@ -1125,10 +1125,10 @@ When you write to the user's data, summarise what you did briefly and concretely
           <!-- Clear chat is always visible (NT parity). Tapping with
                no messages is a no-op; the consistent affordance is
                worth the small footprint. -->
-          <button class="btn-icon" on:click={clearChat} aria-label="Clear Chat" title="Clear Chat">
+          <button class="btn-icon" on:click={clearChat} aria-label={$_('trace_ui.clear_chat')} title={$_('trace_ui.clear_chat')}>
             <span class="material-symbols-rounded">delete_sweep</span>
           </button>
-          <button class="btn-icon" on:click={() => panelOpen = false} aria-label="Close" title="Close">
+          <button class="btn-icon" on:click={() => panelOpen = false} aria-label={$_('common.close')} title={$_('common.close')}>
             <span class="material-symbols-rounded">close</span>
           </button>
         </div>
@@ -1200,7 +1200,7 @@ When you write to the user's data, summarise what you did briefly and concretely
       {#if attachedImage}
         <div class="image-preview">
           <img src={attachedImage.preview} alt="" />
-          <button class="image-clear" on:click={_clearImage} aria-label="Remove image">
+          <button class="image-clear" on:click={_clearImage} aria-label={$_('image_picker_ui.remove_image')}>
             <span class="material-symbols-rounded">close</span>
           </button>
         </div>
@@ -1224,7 +1224,7 @@ When you write to the user's data, summarise what you did briefly and concretely
         ></textarea>
         <button class="send-btn" on:click={send}
           disabled={busy || (!input.trim() && !attachedImage)}
-          aria-label="Send">
+          aria-label={$_('settings_email_ct.send')}>
           <span class="material-symbols-rounded">arrow_upward</span>
         </button>
       </footer>

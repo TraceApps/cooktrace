@@ -4,7 +4,8 @@
   import { fold } from '../../lib/fold.js';
   import { placeAnchoredMenu } from '../../lib/fold-core.js';
   import { fade } from 'svelte/transition';
-  import { unitGroupsMerged } from '../../lib/units.js';
+  import { _ } from 'svelte-i18n';
+  import { unitGroupsMerged, UNIT_GROUPS } from '../../lib/units.js';
   import { measurementSystem } from '../../stores/settings.js';
   import { unitsOverlay, refreshUnitsOverlay } from '../../stores/unitsOverlay.js';
   import { portal } from '../../lib/portal.js';
@@ -13,7 +14,23 @@
 
   /** Stored abbreviation (e.g. "tsp"). Free text is also allowed. */
   export let value = '';
-  export let placeholder = 'unit';
+  export let placeholder = '';
+  $: shownPlaceholder = placeholder || $_('unit_picker_ui.placeholder');
+
+  // Group labels are also the stored category values, so only the shown
+  // text is translated. Keys follow UNIT_GROUPS order.
+  const GROUP_KEYS = [
+    'unit_picker_ui.group_volume_us',
+    'unit_picker_ui.group_volume_metric',
+    'unit_picker_ui.group_weight_us',
+    'unit_picker_ui.group_weight_metric',
+    'unit_picker_ui.group_count',
+  ];
+  function groupName(label, t) {
+    if (label === 'Custom') return t('manage_units.custom_group');
+    const i = UNIT_GROUPS.findIndex(g => g.label === label);
+    return i >= 0 && GROUP_KEYS[i] ? t(GROUP_KEYS[i]) : label;
+  }
 
   const dispatch = createEventDispatcher();
 
@@ -150,7 +167,7 @@
     bind:this={inputEl}
     class="input unit-input"
     type="text"
-    {placeholder}
+    placeholder={shownPlaceholder}
     value={value || ''}
     on:input={onInput}
     on:focus={onFocus}
@@ -169,10 +186,10 @@
   <div use:portal class="popover" bind:this={popoverEl} role="listbox"
     style={popStyle} transition:fade={{ duration: 80 }}>
     {#if filteredGroups.length === 0}
-      <p class="empty-line">No matches — your text will be saved as-is</p>
+      <p class="empty-line">{$_('unit_picker_ui.no_matches')}</p>
     {:else}
       {#each filteredGroups as group}
-        <p class="group-label">{group.label}</p>
+        <p class="group-label">{groupName(group.label, $_)}</p>
         {#each group.units as u}
           {@const idx = flatList.findIndex(f => f.abbr === u.abbr && f.groupLabel === group.label)}
           <button

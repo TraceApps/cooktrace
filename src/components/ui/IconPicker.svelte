@@ -18,7 +18,8 @@
   import Sheet from './Sheet.svelte';
 
   export let value = '';
-  export let placeholder = 'Pick an icon';
+  export let placeholder = undefined;
+  $: shownPlaceholder = placeholder ?? $_('icon_picker_ui.pick_icon_ph');
 
   const dispatch = createEventDispatcher();
 
@@ -133,17 +134,17 @@
 
 <button type="button" class="picker-trigger" on:click={() => { open = true; query = ''; }}>
   <span class="material-symbols-rounded preview">{value || 'category'}</span>
-  <span class="label">{value || placeholder}</span>
+  <span class="label">{value || shownPlaceholder}</span>
   <span class="material-symbols-rounded chev">arrow_drop_down</span>
 </button>
 
 {#if open}
-  <Sheet bind:open title="Pick an Icon">
+  <Sheet bind:open title={$_('icon_picker_ui.title')}>
     <div class="picker-body">
-      <input class="input" type="search" placeholder="Search icons…" bind:value={query} autofocus />
+      <input class="input" type="search" placeholder={$_('icon_picker_ui.search_ph')} bind:value={query} autofocus />
 
       {#if filtered.length === 0}
-        <p class="empty">No matches in the curated list.</p>
+        <p class="empty">{$_('icon_picker_ui.no_matches')}</p>
       {:else}
         <div class="grid">
           {#each filtered as i (i.name)}
@@ -163,16 +164,16 @@
       <details class="custom">
         <summary>{$_('icon_picker_ct.summary')}</summary>
         <div class="custom-row">
-          <input class="input" type="text" placeholder="e.g. dining"
+          <input class="input" type="text" placeholder={$_('icon_picker_ui.custom_ph')}
             bind:value={customName}
             on:keydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyCustom(); } }} />
           {#if customName.trim()}
             <span class="material-symbols-rounded preview-custom">{customName.trim()}</span>
           {/if}
-          <button class="btn btn-secondary tiny" type="button" on:click={applyCustom} disabled={!customName.trim()}>Use</button>
+          <button class="btn btn-secondary tiny" type="button" on:click={applyCustom} disabled={!customName.trim()}>{$_('image_picker_ui.use')}</button>
         </div>
         <p class="hint">
-          Browse the full set at <a href="https://fonts.google.com/icons" target="_blank" rel="noopener noreferrer">fonts.google.com/icons</a>.
+          {$_('icon_picker_ui.browse_full_set')} <a href="https://fonts.google.com/icons" target="_blank" rel="noopener noreferrer">fonts.google.com/icons</a>.
         </p>
       </details>
 

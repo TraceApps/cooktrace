@@ -40,7 +40,7 @@
   async function onBiometricToggle(e) {
     const want = e.detail;
     if (want) {
-      const ok = await biometric.authenticate('Enable biometric sign-in');
+      const ok = await biometric.authenticate($_('profile_ui.biometric_enable_reason'));
       if (!ok) {
         biometricLoginEnabled.set(false);
         showError($_('profile_ct.toast.biometric_cancelled'));
@@ -105,7 +105,13 @@
 
   $: pwScore = passwordStrength(new_password);
 
-  const GENDERS = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
+  // Stored values stay English; only the shown labels are translated.
+  const GENDERS = [
+    { value: 'Male',              labelKey: 'profile_ui.gender_male' },
+    { value: 'Female',            labelKey: 'profile_ui.gender_female' },
+    { value: 'Non-binary',        labelKey: 'profile_ui.gender_non_binary' },
+    { value: 'Prefer not to say', labelKey: 'profile.gender_unset' },
+  ];
 
   let full_name  = '';
   let nickname   = '';
@@ -234,7 +240,7 @@
     window.location.href = apiUrl(`/api/auth/oidc/login/${providerId}?link=1&return=${ret}`);
   }
   async function unlink(linkId) {
-    if (!confirm('Unlink this provider? You won\'t be able to sign in with it again until you re-link.')) return;
+    if (!confirm($_('profile_ui.unlink_confirm'))) return;
     unlinking = linkId;
     try {
       const csrf = localStorage.getItem('ct:csrf');
@@ -314,7 +320,7 @@
     <div class="avatar-section">
       <button class="avatar-btn" on:click={pickAvatar} disabled={uploading} title={$_('profile.change_photo')}>
         {#if avatar_url}
-          <img class="avatar-img" src={resolveAssetUrl(avatar_url)} alt="avatar" />
+          <img class="avatar-img" src={resolveAssetUrl(avatar_url)} alt={$_('profile_ui.avatar_alt')} />
         {:else}
           <span class="material-symbols-rounded avatar-placeholder">person</span>
         {/if}
@@ -359,7 +365,7 @@
         <div class="select-wrap">
           <select class="select" bind:value={gender}>
             <option value="">{$_('profile.gender_unset')}</option>
-            {#each GENDERS as g}<option value={g}>{g}</option>{/each}
+            {#each GENDERS as g}<option value={g.value}>{$_(g.labelKey)}</option>{/each}
           </select>
         </div>
       </div>
@@ -380,7 +386,7 @@
                 <div class="oidc-link-info">
                   <span class="oidc-link-name">{l.display_name || 'OIDC'}</span>
                   {#if l.last_login_at}
-                    <span class="oidc-link-meta text-3 text-sm">last sign-in {new Date(l.last_login_at).toLocaleDateString()}</span>
+                    <span class="oidc-link-meta text-3 text-sm">{$_('profile_ui.last_sign_in', { values: { date: new Date(l.last_login_at).toLocaleDateString() } })}</span>
                   {/if}
                 </div>
                 <button class="btn btn-ghost btn-sm" on:click={() => unlink(l.id)} disabled={unlinking === l.id}>
@@ -468,9 +474,9 @@
           <span class="security-label">{$_('profile_ct.biometric_signin')}</span>
           <div class="security-desc">
             {#if _biometricSupported}
-              Use fingerprint or face unlock instead of typing your password each time. Your password is still required on the first sign-in. Sign-in sessions stay valid for up to a year by default — admins can change this in <strong>Settings → Users → Session Duration</strong>.
+              {$_('profile_ui.biometric_desc')} <strong>{$_('nav.settings')} &gt; {$_('settings.users.section')} &gt; {$_('settings.users.session_duration')}</strong>.
             {:else}
-              Set up a fingerprint or face unlock in <strong>Android Settings → Security</strong> first, then come back here.
+              {$_('profile_ui.biometric_setup_prefix')} <strong>{$_('profile_ui.android_security_path')}</strong> {$_('profile_ui.biometric_setup_suffix')}
             {/if}
           </div>
         </div>

@@ -30,6 +30,7 @@
 import { CapacitorHttp } from '@capacitor/core';
 import { NtApi } from './api.js';
 import { isNative } from './platform.js';
+import { tr } from './messages.js';
 
 /**
  * Count local rows that would be uploaded. Fast — pulls from the local
@@ -268,7 +269,7 @@ export async function uploadLocalToServer({ serverUrl, authToken, onProgress } =
       const { id, user_id, sync_status, server_id, created_at, updated_at, deleted_at, ...rest } = d;
       const remappedRecipeId = d.recipe_id != null ? (recipeIdMap.get(d.recipe_id) ?? null) : null;
       if (d.recipe_id != null && remappedRecipeId == null) {
-        summary.errors.push({ stage: 'diary', name: d.date || `diary #${d.id}`, message: 'recipe not uploaded — skipping' });
+        summary.errors.push({ stage: 'diary', name: d.date || `diary #${d.id}`, message: tr('migrate.no_recipe', "Its recipe wasn't uploaded, so it was skipped.") });
         continue;
       }
       const created = await _post(`${serverUrl}/api/cook-diary`, headers, {

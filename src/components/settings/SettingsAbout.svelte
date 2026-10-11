@@ -21,25 +21,22 @@
     </div>
     <div class="setting-divider"></div>
     <div class="about-desc">
-      Trace Every Recipe — From Pantry to Plate. CookTrace keeps your
-      recipes, pantry, cook diary, and shopping list together in one place,
-      with optional federation to NutriTrace for nutrition tracking. Your data
-      lives on your server, not in the cloud.
+      {$_('settings_about_ui.desc')}
     </div>
     <div class="setting-divider"></div>
     <div class="about-row">
       <span class="material-symbols-rounded about-feat-icon">database</span>
-      <span>Self-hosted — your data, your server</span>
+      <span>{$_('settings_about_ui.feat_self_hosted')}</span>
     </div>
     <div class="setting-divider"></div>
     <div class="about-row">
       <span class="material-symbols-rounded about-feat-icon">phone_android</span>
-      <span>Native Android app with offline support, plus a PWA for any browser</span>
+      <span>{$_('settings_about_ui.feat_android')}</span>
     </div>
     <div class="setting-divider"></div>
     <div class="about-row">
       <span class="material-symbols-rounded about-feat-icon">lock</span>
-      <span>No tracking, no ads, no third-party analytics</span>
+      <span>{$_('settings_about_ui.feat_privacy')}</span>
     </div>
     <div class="setting-divider"></div>
     <div class="about-row">
@@ -53,10 +50,7 @@
     </div>
     <div class="setting-divider"></div>
     <div class="about-desc" style="font-size:11px;color:var(--text-3);line-height:1.5">
-      CookTrace is not medical or dietary software. Recipe nutrition values are
-      estimates based on user-entered data and may contain inaccuracies. Always
-      consult a healthcare professional for medical or dietary advice. Use at
-      your own discretion.
+      {$_('settings_about_ui.disclaimer')}
     </div>
   </div>
 </div>

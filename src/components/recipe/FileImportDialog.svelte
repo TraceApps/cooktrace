@@ -1,7 +1,7 @@
 <script>
   import { closeOnBack } from '../../lib/back-stack.js';
   /**
-   * FileImportDialog — "Import from File" entry on the Recipes page.
+   * FileImportDialog: "Import from File" entry on the Recipes page.
    *
    * Accepts an image (photo of a recipe page), or a recipe file in
    * PDF, RTF, TXT, or MD. Image inputs go through the AI vision path
@@ -182,7 +182,7 @@ Rules:
 
   async function _runAi({ userMsg, label }) {
     phase = 'busy';
-    progressLine = label || 'Trace is reading the recipe…';
+    progressLine = label || $_('file_import_dialog_ui.reading_recipe');
     createdRecipe = null;
 
     const provider = $aiProvider;
@@ -199,7 +199,7 @@ Rules:
         // Saving the recipe is a tool call: no tools, no import (TraceApps/nutritrace#259).
         toolsRequired: true,
         onToolsUnsupported: () => { toolsUnsupported = true; },
-        onToolCall:   (name) => { progressLine = `Calling ${name.replace(/_/g, ' ')}…`; },
+        onToolCall:   (name) => { progressLine = $_('file_import_dialog_ui.calling_tool', { values: { name: name.replace(/_/g, ' ') } }); },
         onToolResult: (name, result) => {
           if (name === 'create_recipe' && result && result.ok && result.recipe) {
             createdRecipe = result.recipe;
@@ -211,18 +211,18 @@ Rules:
         progressLine = '';
       } else {
         phase = 'error';
-        errorMessage = 'Trace finished but did not save a recipe. Try a clearer source or import via chat.';
+        errorMessage = $_('file_import_dialog_ui.no_recipe_saved');
       }
     } catch (e) {
       phase = 'error';
-      errorMessage = toolsUnsupported ? $_('trace_ai_ct.tools_unsupported_import') : (e.message || 'AI import failed.');
+      errorMessage = toolsUnsupported ? $_('trace_ai_ct.tools_unsupported_import') : (e.message || $_('file_import_dialog_ui.ai_failed'));
     }
   }
 
   async function importImage() {
     if (!rawImage) return;
     const userMsg = _buildImageMessage($aiProvider, 'Please import this recipe.', rawImage);
-    await _runAi({ userMsg, label: 'Trace is reading the photo…' });
+    await _runAi({ userMsg, label: $_('file_import_dialog_ui.reading_photo') });
   }
 
   // ── Text path (server-side heuristic, optional AI fallback) ──────────────
@@ -230,7 +230,7 @@ Rules:
   async function importTextFile() {
     if (!textFile?.file) return;
     phase = 'busy';
-    progressLine = 'Extracting text…';
+    progressLine = $_('file_import_dialog_ui.extracting');
     errorMessage = '';
     parseResult = null;
 
@@ -246,7 +246,7 @@ Rules:
       const data = await res.json();
       if (!res.ok) {
         phase = 'error';
-        errorMessage = data?.error || `Extraction failed (HTTP ${res.status})`;
+        errorMessage = data?.error || $_('file_import_dialog_ui.extraction_failed_http', { values: { status: res.status } });
         return;
       }
       if (data.empty) {
@@ -261,7 +261,7 @@ Rules:
           return;
         }
         phase = 'error';
-        errorMessage = data.hint || 'No text could be extracted from this file.';
+        errorMessage = data.hint || $_('file_import_dialog_ui.no_text');
         return;
       }
       parseResult = data;
@@ -270,7 +270,7 @@ Rules:
       phase = 'review';
     } catch (e) {
       phase = 'error';
-      errorMessage = e.message || 'Extract failed.';
+      errorMessage = e.message || $_('file_import_dialog_ui.extract_failed');
     }
   }
 
@@ -283,7 +283,7 @@ Rules:
         const dataUrl = String(reader.result);
         resolve(dataUrl.split(',')[1] || '');
       };
-      reader.onerror = () => reject(new Error('Could not read file'));
+      reader.onerror = () => reject(new Error($_('file_import_dialog_ui.read_failed')));
       reader.readAsDataURL(file);
     });
   }
@@ -310,7 +310,7 @@ Rules:
     const MAX_BYTES = 20 * 1024 * 1024;
     if (scannedPdfFile.size > MAX_BYTES) {
       phase = 'error';
-      errorMessage = `PDF is too large for inline AI vision (${(scannedPdfFile.size / 1024 / 1024).toFixed(1)} MB, cap 20 MB). Try splitting the PDF or using Photo Import per page.`;
+      errorMessage = $_('file_import_dialog_ui.pdf_too_large', { values: { size: (scannedPdfFile.size / 1024 / 1024).toFixed(1) } });
       return;
     }
     let base64;
@@ -319,16 +319,16 @@ Rules:
     const userMsg = _buildPdfMessage(provider, 'Please import this recipe from the attached PDF.', base64);
     if (!userMsg) {
       phase = 'error';
-      errorMessage = 'AI Vision PDF needs the Claude or Gemini provider. Switch in Settings → Trace Assistant.';
+      errorMessage = $_('file_import_dialog_ui.pdf_needs_provider');
       return;
     }
-    await _runAi({ userMsg, label: 'Trace is reading the PDF…' });
+    await _runAi({ userMsg, label: $_('file_import_dialog_ui.reading_pdf') });
   }
 
   async function saveHeuristic() {
     if (!textFile?.file) return;
     phase = 'busy';
-    progressLine = 'Saving recipe…';
+    progressLine = $_('file_import_dialog_ui.saving');
 
     const form = new FormData();
     form.append('file', textFile.file, textFile.name);
@@ -343,14 +343,14 @@ Rules:
       const data = await res.json();
       if (!res.ok) {
         phase = 'error';
-        errorMessage = data?.error || `Save failed (HTTP ${res.status})`;
+        errorMessage = data?.error || $_('file_import_dialog_ui.save_failed_http', { values: { status: res.status } });
         return;
       }
       createdRecipe = data.recipe;
       phase = 'done';
     } catch (e) {
       phase = 'error';
-      errorMessage = e.message || 'Save failed.';
+      errorMessage = e.message || $_('file_import_dialog_ui.save_failed');
     }
   }
 
@@ -366,7 +366,7 @@ ${parseResult.text}
 ----- END RECIPE TEXT -----`,
     };
     // Gemini takes a flat string here; Claude / OpenAI accept the same shape.
-    await _runAi({ userMsg, label: 'Trace is reading the recipe…' });
+    await _runAi({ userMsg, label: $_('file_import_dialog_ui.reading_recipe') });
   }
 
   // ── Confirmation actions ─────────────────────────────────────────────────
@@ -385,9 +385,9 @@ ${parseResult.text}
 
   $: confidencePct = Math.round(confidence * 100);
   $: confidenceLabel =
-    confidence >= confidenceThreshold ? 'Clean parse' :
-    confidence >= 0.4                  ? 'Partial parse' :
-                                         'Best effort';
+    confidence >= confidenceThreshold ? $_('file_import_dialog_ui.clean_parse') :
+    confidence >= 0.4                  ? $_('file_import_dialog_ui.partial_parse') :
+                                         $_('file_import_dialog_ui.best_effort');
   $: confidenceClass =
     confidence >= confidenceThreshold ? 'high' :
     confidence >= 0.4                  ? 'mid'  :
@@ -401,21 +401,17 @@ ${parseResult.text}
     <div class="modal" on:click|stopPropagation>
       <header class="head">
         <h3>{$_('file_import_dialog.title')}</h3>
-        <button class="btn-icon" on:click={close} aria-label="Close" title="Close">
+        <button class="btn-icon" on:click={close} aria-label={$_('common.close')} title={$_('common.close')}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </header>
 
       {#if phase === 'pick'}
-        <p class="hint">
-          Pick an image of a recipe page, or a PDF, RTF, TXT, or MD file.
-          Photos go straight to Trace AI. Text-based files run through a
-          built-in parser first, with AI as a fallback for tricky inputs.
-        </p>
+        <p class="hint">{$_('file_import_dialog_ui.pick_hint')}</p>
         {#if preview}
           <div class="preview-wrap">
             <img class="preview" src={preview} alt="" />
-            <button class="preview-clear" on:click={_clearPick} aria-label="Pick a different file">
+            <button class="preview-clear" on:click={_clearPick} aria-label={$_('file_import_dialog_ui.pick_different')}>
               <span class="material-symbols-rounded">close</span>
             </button>
           </div>
@@ -426,7 +422,7 @@ ${parseResult.text}
               <div class="file-name">{textFile.name}</div>
               <div class="file-size">{Math.round(textFile.size / 1024)} KB</div>
             </div>
-            <button class="btn-icon" on:click={_clearPick} aria-label="Pick a different file">
+            <button class="btn-icon" on:click={_clearPick} aria-label={$_('file_import_dialog_ui.pick_different')}>
               <span class="material-symbols-rounded">close</span>
             </button>
           </div>
@@ -435,7 +431,7 @@ ${parseResult.text}
             <button class="picker" on:click={_pickFile}>
               <span class="material-symbols-rounded">upload_file</span>
               <span>{$_('file_import_dialog.pick_a_file')}</span>
-              <span class="picker-sub">Image, PDF, RTF, TXT, or MD</span>
+              <span class="picker-sub">{$_('file_import_dialog_ui.picker_sub')}</span>
             </button>
             <button class="picker picker-camera" on:click={_openCamera}>
               <span class="material-symbols-rounded">photo_camera</span>
@@ -453,7 +449,7 @@ ${parseResult.text}
           <button class="btn btn-secondary" on:click={close}>{$_('file_import_dialog.cancel')}</button>
           <button class="btn btn-primary" on:click={importIt} disabled={!rawImage && !textFile}>
             <span class="material-symbols-rounded">auto_awesome</span>
-            Import
+            {$_('file_import_dialog_ui.import')}
           </button>
         </footer>
 
@@ -461,24 +457,19 @@ ${parseResult.text}
         <div class="state busy">
           {#if preview}<img class="preview busy" src={preview} alt="" />{/if}
           <span class="material-symbols-rounded spin">progress_activity</span>
-          <p class="progress">{progressLine || 'Working…'}</p>
+          <p class="progress">{progressLine || $_('file_import_dialog_ui.working')}</p>
         </div>
 
       {:else if phase === 'scanned-pdf'}
         <div class="state info">
           <span class="material-symbols-rounded">picture_as_pdf</span>
-          <p>
-            This PDF has no text layer (it's a scan or image-only PDF).
-            Trace AI can read the page images directly using your
-            configured {$aiProvider === 'claude' ? 'Claude' : 'Gemini'}
-            provider. This uses more AI tokens than text PDFs.
-          </p>
+          <p>{$_('file_import_dialog_ui.scanned_desc', { values: { provider: $aiProvider === 'claude' ? 'Claude' : 'Gemini' } })}</p>
         </div>
         <footer class="actions">
           <button class="btn btn-secondary" on:click={close}>{$_('file_import_dialog.cancel')}</button>
           <button class="btn btn-primary" on:click={importScannedPdf}>
             <span class="material-symbols-rounded">auto_awesome</span>
-            Read with AI Vision
+            {$_('file_import_dialog_ui.read_with_vision')}
           </button>
         </footer>
 
@@ -489,26 +480,24 @@ ${parseResult.text}
               {confidenceLabel} ({confidencePct}%)
             </span>
             {#if parseResult?.pages}
-              <span class="pages-meta">{parseResult.pages} page{parseResult.pages === 1 ? '' : 's'}</span>
+              <span class="pages-meta">{$_('file_import_dialog_ui.pages', { values: { count: parseResult.pages } })}</span>
             {/if}
           </div>
-          <h4 class="parsed-title">{parsedRecipe?.name || 'Untitled'}</h4>
+          <h4 class="parsed-title">{parsedRecipe?.name || $_('file_import_dialog_ui.untitled')}</h4>
           <div class="parsed-meta">
-            {#if parsedRecipe?.servings}<span>Serves {parsedRecipe.servings}</span>{/if}
-            {#if parsedRecipe?.prep_minutes}<span>Prep {formatDuration(parsedRecipe.prep_minutes)}</span>{/if}
-            {#if parsedRecipe?.cook_minutes}<span>Cook {formatDuration(parsedRecipe.cook_minutes)}</span>{/if}
-            {#if parsedRecipe?.rest_minutes}<span>Rest {formatDuration(parsedRecipe.rest_minutes)}</span>{/if}
+            {#if parsedRecipe?.servings}<span>{$_('file_import_dialog_ui.serves', { values: { count: parsedRecipe.servings } })}</span>{/if}
+            {#if parsedRecipe?.prep_minutes}<span>{$_('file_import_dialog_ui.prep', { values: { time: formatDuration(parsedRecipe.prep_minutes) } })}</span>{/if}
+            {#if parsedRecipe?.cook_minutes}<span>{$_('file_import_dialog_ui.cook', { values: { time: formatDuration(parsedRecipe.cook_minutes) } })}</span>{/if}
+            {#if parsedRecipe?.rest_minutes}<span>{$_('file_import_dialog_ui.rest', { values: { time: formatDuration(parsedRecipe.rest_minutes) } })}</span>{/if}
           </div>
           <div class="parsed-summary">
-            <span>{parsedRecipe?.ingredients?.length || 0} ingredient{(parsedRecipe?.ingredients?.length || 0) === 1 ? '' : 's'}</span>
+            <span>{$_('file_import_dialog_ui.ingredients', { values: { count: parsedRecipe?.ingredients?.length || 0 } })}</span>
             <span>&middot;</span>
-            <span>{parsedRecipe?.steps?.length || 0} step{(parsedRecipe?.steps?.length || 0) === 1 ? '' : 's'}</span>
+            <span>{$_('file_import_dialog_ui.steps', { values: { count: parsedRecipe?.steps?.length || 0 } })}</span>
           </div>
           {#if confidence < confidenceThreshold}
             <p class="hint review-hint">
-              The built-in parser wasn't sure about the structure. You can
-              save the best-effort result and clean it up in the editor, or
-              {#if $aiEnabled && !envLocked}try Trace AI for a cleaner parse.{:else}enable Trace AI in Settings for a smarter fallback.{/if}
+              {$aiEnabled && !envLocked ? $_('file_import_dialog_ui.review_hint_ai') : $_('file_import_dialog_ui.review_hint_no_ai')}
             </p>
           {/if}
         </div>
@@ -517,26 +506,26 @@ ${parseResult.text}
           {#if confidence < confidenceThreshold && $aiEnabled && !envLocked}
             <button class="btn btn-secondary" on:click={retryWithAi}>
               <span class="material-symbols-rounded">smart_toy</span>
-              Try with AI
+              {$_('file_import_dialog_ui.try_with_ai')}
             </button>
           {/if}
           <button class="btn btn-primary" on:click={saveHeuristic}>
             <span class="material-symbols-rounded">save</span>
-            {confidence >= confidenceThreshold ? 'Save Recipe' : 'Save Anyway'}
+            {confidence >= confidenceThreshold ? $_('file_import_dialog_ui.save_recipe') : $_('file_import_dialog_ui.save_anyway')}
           </button>
         </footer>
 
       {:else if phase === 'done'}
         <div class="state done">
           <span class="material-symbols-rounded done-icon">check_circle</span>
-          <h4>Imported "{createdRecipe?.name || 'Recipe'}"</h4>
-          <p>Saved to your library. Open it to review and edit.</p>
+          <h4>{$_('file_import_dialog_ui.imported_title', { values: { name: createdRecipe?.name || $_('file_import_dialog_ui.recipe') } })}</h4>
+          <p>{$_('file_import_dialog_ui.saved_hint')}</p>
         </div>
         <footer class="actions">
           <button class="btn btn-secondary" on:click={close}>{$_('file_import_dialog.done')}</button>
           <button class="btn btn-primary" on:click={openCreated}>
             <span class="material-symbols-rounded">open_in_new</span>
-            Open Recipe
+            {$_('file_import_dialog_ui.open_recipe')}
           </button>
         </footer>
 

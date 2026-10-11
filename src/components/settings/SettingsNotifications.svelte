@@ -104,7 +104,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_notifications.enable_on_device')}</span>
-        <span class="setting-desc">Use this browser / phone's notification system for reminders. Works alongside the push service below.</span>
+        <span class="setting-desc">{$_('settings_notifications_ui.device_desc')}</span>
       </div>
       <input type="checkbox" class="toggle-cb" checked={$notifLocalEnabled}
         on:change={e => notifLocalEnabled.set(e.target.checked)} />
@@ -114,10 +114,10 @@
       <div class="setting-row">
         <div>
           <span class="setting-label">{$_('settings_notifications.browser_permission')}</span>
-          <span class="setting-desc">Most browsers require explicit permission before fired notifications appear.</span>
+          <span class="setting-desc">{$_('settings_notifications_ui.permission_desc')}</span>
         </div>
         <button class="btn btn-secondary" on:click={requestDevicePermission}>
-          Request permission
+          {$_('settings_notifications_ui.request_permission')}
         </button>
       </div>
     {/if}
@@ -128,7 +128,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_notifications.service')}</span>
-        <span class="setting-desc">External delivery via Apprise, Gotify, or ntfy. Secrets stay on your server.</span>
+        <span class="setting-desc">{$_('settings_notifications_ui.service_desc')}</span>
       </div>
       <div class="select-wrap">
         <select class="select sel-sm" value={$notifPushService}
@@ -147,8 +147,8 @@
         <label class="form-label">{$_('settings_notifications.apprise_url')}</label>
         <input class="input" type="url" placeholder="https://apprise.example.com"
           value={$appriseUrl} on:change={e => appriseUrl.set(e.target.value)} />
-        <label class="form-label">Tag (Optional)</label>
-        <input class="input" type="text" placeholder="phone, all, etc."
+        <label class="form-label">{$_('settings_notifications_ui.tag_optional')}</label>
+        <input class="input" type="text" placeholder={$_('settings_notifications_ui.tag_ph')}
           value={$appriseTag} on:change={e => appriseTag.set(e.target.value)} />
       </div>
     {:else if $notifPushService === 'gotify'}
@@ -164,13 +164,13 @@
     {:else if $notifPushService === 'ntfy'}
       <div class="setting-divider"></div>
       <div class="form-block">
-        <label class="form-label">ntfy Server</label>
+        <label class="form-label">{$_('settings_notifications_ui.ntfy_server')}</label>
         <input class="input" type="url" placeholder="https://ntfy.sh"
           value={$ntfyUrl} on:change={e => ntfyUrl.set(e.target.value)} />
         <label class="form-label">{$_('settings_notifications.topic')}</label>
         <input class="input" type="text" placeholder="cooktrace-myhome"
           value={$ntfyTopic} on:change={e => ntfyTopic.set(e.target.value)} />
-        <label class="form-label">Bearer Token (Optional)</label>
+        <label class="form-label">{$_('settings_notifications_ui.bearer_optional')}</label>
         <input class="input" type="text"
           value={$ntfyToken} on:change={e => ntfyToken.set(e.target.value)} />
       </div>
@@ -181,15 +181,15 @@
       <div class="setting-row">
         <div>
           <span class="setting-label">{$_('settings_notifications.send_test')}</span>
-          <span class="setting-desc">Verifies the server can reach your service.</span>
+          <span class="setting-desc">{$_('settings_notifications_ui.send_test_desc')}</span>
         </div>
         <button class="btn btn-primary" on:click={sendTestPush} disabled={testing}>
           {#if testStatus === 'ok'}
-            <span class="material-symbols-rounded">check</span> Sent
+            <span class="material-symbols-rounded">check</span> {$_('settings_notifications_ui.sent')}
           {:else if testStatus === 'fail'}
-            <span class="material-symbols-rounded">error</span> Failed
+            <span class="material-symbols-rounded">error</span> {$_('settings_notifications_ui.failed')}
           {:else}
-            {testing ? 'Sending…' : 'Send Test'}
+            {testing ? $_('forgot_password.sending') : $_('settings_notifications.send_test')}
           {/if}
         </button>
       </div>
@@ -200,8 +200,8 @@
   <div class="card settings-card">
     <div class="setting-row">
       <div>
-        <span class="setting-label">Cook-Day Reminder</span>
-        <span class="setting-desc">Planned cooks for today nudge you in the morning.</span>
+        <span class="setting-label">{$_('settings_notifications_ui.cook_day')}</span>
+        <span class="setting-desc">{$_('settings_notifications_ui.cook_day_desc')}</span>
       </div>
       <input type="checkbox" class="toggle-cb" checked={notifCookDayReminder}
         on:change={e => { notifCookDayReminder = e.target.checked; toggleReminder('notifCookDayReminder', e.target.checked); }} />
@@ -210,7 +210,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_notifications.thaw_alert')}</span>
-        <span class="setting-desc">Recipes planned for tomorrow ping the day before so the meat / dough has time to come up.</span>
+        <span class="setting-desc">{$_('settings_notifications_ui.thaw_desc')}</span>
       </div>
       <input type="checkbox" class="toggle-cb" checked={notifThawAlert}
         on:change={e => { notifThawAlert = e.target.checked; toggleReminder('notifThawAlert', e.target.checked); }} />
@@ -219,7 +219,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_notifications.shopping_nudge')}</span>
-        <span class="setting-desc">Unchecked shopping list lingers more than 3 days → gentle reminder.</span>
+        <span class="setting-desc">{$_('settings_notifications_ui.shopping_nudge_desc')}</span>
       </div>
       <input type="checkbox" class="toggle-cb" checked={notifShoppingNudge}
         on:change={e => { notifShoppingNudge = e.target.checked; toggleReminder('notifShoppingNudge', e.target.checked); }} />
@@ -227,7 +227,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_notifications.comment_replies')}</span>
-        <span class="setting-desc">When someone else comments on a recipe you own.</span>
+        <span class="setting-desc">{$_('settings_notifications_ui.comment_replies_desc')}</span>
       </div>
       <input type="checkbox" class="toggle-cb" checked={notifRecipeComments}
         on:change={e => { notifRecipeComments = e.target.checked; toggleReminder('notifRecipeComments', e.target.checked); }} />
@@ -236,7 +236,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_notifications.expiration_digest')}</span>
-        <span class="setting-desc">One roll-up per day covering everything in your pantry expiring within the window below. Delivered through the same channels above (device + configured push service). No message when nothing's expiring.</span>
+        <span class="setting-desc">{$_('settings_notifications_ui.expiry_desc')}</span>
       </div>
       <input type="checkbox" class="toggle-cb" checked={$notifExpiryEnabled}
         on:change={e => notifExpiryEnabled.set(e.target.checked)} />
@@ -245,23 +245,23 @@
       <div class="setting-row">
         <div>
           <span class="setting-label">{$_('settings_notifications.warn_days_ahead')}</span>
-          <span class="setting-desc">The digest lists every item whose expiration date falls within the next N days. Past-expiry items always surface.</span>
+          <span class="setting-desc">{$_('settings_notifications_ui.warn_days_desc')}</span>
         </div>
         <div class="select-wrap">
           <select class="select sel-sm" value={$notifExpiryDaysBefore}
             on:change={e => notifExpiryDaysBefore.set(parseInt(e.target.value, 10))}>
-            <option value={1}>1 day</option>
-            <option value={3}>3 days</option>
-            <option value={5}>5 days</option>
-            <option value={7}>1 week</option>
-            <option value={14}>2 weeks</option>
+            <option value={1}>{$_('settings_notifications_ui.days', { values: { count: 1 } })}</option>
+            <option value={3}>{$_('settings_notifications_ui.days', { values: { count: 3 } })}</option>
+            <option value={5}>{$_('settings_notifications_ui.days', { values: { count: 5 } })}</option>
+            <option value={7}>{$_('settings_notifications_ui.weeks', { values: { count: 1 } })}</option>
+            <option value={14}>{$_('settings_notifications_ui.weeks', { values: { count: 2 } })}</option>
           </select>
         </div>
       </div>
       <div class="setting-row">
         <div>
           <span class="setting-label">{$_('settings_notifications.delivery_time')}</span>
-          <span class="setting-desc">The digest fires once per day at this time (server-local). Default 9:00 am so it lands before your first grocery run.</span>
+          <span class="setting-desc">{$_('settings_notifications_ui.delivery_time_desc')}</span>
         </div>
         <TimePicker value={$notifExpiryTime} on:change={e => notifExpiryTime.set(e.detail)} />
       </div>
@@ -270,7 +270,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_notifications.weekly_summary_email')}</span>
-        <span class="setting-desc">Sundays at 8am: cooks logged, all-time favorite, what's planned, pantry + shopping snapshot. Requires SMTP and an email address on your account.</span>
+        <span class="setting-desc">{$_('settings_notifications_ui.weekly_desc')}</span>
       </div>
       <input type="checkbox" class="toggle-cb" checked={notifWeeklySummary}
         on:change={e => { notifWeeklySummary = e.target.checked; toggleReminder('notifWeeklySummary', e.target.checked); }} />
@@ -281,13 +281,7 @@
   <div class="card settings-card">
     <div class="setting-row">
       <div>
-        <span class="setting-desc">
-          The push channels are wired and the test button proves
-          delivery. Scheduled reminder firings (cook-day mornings, thaw
-          alerts at 24h, shopping nudge after 3 days) attach in a
-          follow-up — toggle them on now and they'll start firing as
-          soon as the scheduler ships.
-        </span>
+        <span class="setting-desc">{$_('settings_notifications_ui.note_body')}</span>
       </div>
     </div>
   </div>

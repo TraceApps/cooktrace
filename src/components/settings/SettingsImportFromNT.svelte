@@ -154,25 +154,25 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_import_nt.federation_disabled')}</span>
-        <span class="setting-desc">Configure your NutriTrace URL + access token in the Federation section above and toggle it on, then come back here.</span>
+        <span class="setting-desc">{$_('settings_import_from_nt_ui.disabled_desc')}</span>
       </div>
     </div>
   {:else}
     <div class="setting-row stack">
       <span class="setting-label">{$_('settings_import_nt.import_from_nt')}</span>
       <span class="setting-desc">
-        Search your NutriTrace foods library and pick the ones you want to bring into your CookTrace pantry. Imports include name, brand, barcode, serving size, full nutrition, and image. Active duplicates are skipped; previously deleted items are restored with the latest data.
+        {$_('settings_import_from_nt_ui.intro')}
       </span>
       <div class="search-row">
         <input
           class="input"
           type="search"
-          placeholder="Search NutriTrace foods…"
+          placeholder={$_('settings_import_from_nt_ui.search_ph')}
           bind:value={query}
           on:keydown={onKey}
         />
         <button class="btn btn-primary" on:click={search} disabled={searching || !query.trim()}>
-          {searching ? 'Searching…' : 'Search'}
+          {searching ? $_('settings_import_from_nt_ui.searching') : $_('settings_import_from_nt_ui.search')}
         </button>
       </div>
     </div>
@@ -180,9 +180,9 @@
     {#if results.length > 0 && !summary}
       <div class="picker">
         <div class="picker-head">
-          <span class="picker-count">{results.length} results</span>
+          <span class="picker-count">{$_('settings_import_from_nt_ui.results_count', { values: { count: results.length } })}</span>
           <span class="picker-bulk">
-            <strong>{selected.size}</strong> selected
+            <strong>{selected.size}</strong> {$_('settings_import_from_nt_ui.selected')}
             <span class="dot">·</span>
             <button class="btn-link" on:click={selectAll}>{$_('settings_import_nt.select_all')}</button>
             <span class="dot">·</span>
@@ -218,19 +218,19 @@
             <input type="radio" bind:group={variantMode} value="flat" />
             <span class="variant-mode-label">
               <span class="variant-mode-title">{$_('settings_import_nt.mode_flat')}</span>
-              <span class="variant-mode-desc">Each picked food becomes its own pantry item. Default behavior.</span>
+              <span class="variant-mode-desc">{$_('settings_import_from_nt_ui.mode_flat_desc')}</span>
             </span>
           </label>
           <label class="variant-mode-row">
             <input type="radio" bind:group={variantMode} value="variant-of-existing" />
             <span class="variant-mode-label">
               <span class="variant-mode-title">{$_('settings_import_nt.mode_variants_existing')}</span>
-              <span class="variant-mode-desc">Attach all picked foods as branded variants of a generic you already have.</span>
+              <span class="variant-mode-desc">{$_('settings_import_from_nt_ui.mode_existing_desc')}</span>
               {#if variantMode === 'variant-of-existing'}
                 <select class="select variant-mode-select" bind:value={existingGenericId}>
-                  <option value={null}>Pick a pantry item…</option>
+                  <option value={null}>{$_('settings_import_from_nt_ui.pick_pantry_item')}</option>
                   {#each pantryGenerics as g (g.id)}
-                    <option value={g.id}>{g.name}{g.isGeneric ? ' (generic)' : ''}</option>
+                    <option value={g.id}>{g.name}{g.isGeneric ? ' ' + $_('settings_import_from_nt_ui.generic_suffix') : ''}</option>
                   {/each}
                 </select>
               {/if}
@@ -240,10 +240,10 @@
             <input type="radio" bind:group={variantMode} value="variant-of-new" />
             <span class="variant-mode-label">
               <span class="variant-mode-title">{$_('settings_import_nt.mode_variants_new')}</span>
-              <span class="variant-mode-desc">Create a new generic (e.g. "Milk"), then drop all picked foods in as its variants.</span>
+              <span class="variant-mode-desc">{$_('settings_import_from_nt_ui.mode_new_desc')}</span>
               {#if variantMode === 'variant-of-new'}
                 <input class="input variant-mode-input" type="text"
-                  placeholder="New generic name (e.g. Milk)"
+                  placeholder={$_('settings_import_from_nt_ui.new_generic_ph')}
                   bind:value={newGenericName} />
               {/if}
             </span>
@@ -256,7 +256,7 @@
         <div class="actions">
           <button class="btn btn-secondary" on:click={reset} disabled={importing}>{$_('settings_import_nt.cancel')}</button>
           <button class="btn btn-primary" on:click={commit} disabled={importing || selected.size === 0}>
-            {#if importing}Importing…{:else}Import {selected.size} {selected.size === 1 ? 'Item' : 'Items'}{/if}
+            {#if importing}{$_('settings_import_from_nt_ui.importing')}{:else}{$_('settings_import_from_nt_ui.import_n_items', { values: { count: selected.size } })}{/if}
           </button>
         </div>
       </div>
@@ -267,11 +267,11 @@
         <div class="summary-head">
           <span class="material-symbols-rounded summary-icon">check_circle</span>
           <div>
-            <div class="summary-title">Imported {summary.count} {summary.count === 1 ? 'item' : 'items'}</div>
+            <div class="summary-title">{$_('settings_import_from_nt_ui.imported_n_items', { values: { count: summary.count } })}</div>
             {#if Array.isArray(summary.skipped) && summary.skipped.length > 0}
-              <div class="summary-sub">{summary.skipped.length} {summary.skipped.length === 1 ? 'item was' : 'items were'} skipped</div>
+              <div class="summary-sub">{$_('settings_import_from_nt_ui.skipped_n_items', { values: { count: summary.skipped.length } })}</div>
             {:else}
-              <div class="summary-sub">All set. Find them on the Pantry tab.</div>
+              <div class="summary-sub">{$_('settings_import_from_nt_ui.all_set')}</div>
             {/if}
           </div>
         </div>
@@ -280,8 +280,8 @@
           <ul class="skip-list">
             {#each summary.skipped as s}
               <li class="skip-row">
-                <span class="skip-name">{s.name || '(unnamed)'}</span>
-                <span class="skip-reason">{s.reason || 'skipped'}</span>
+                <span class="skip-name">{s.name || $_('settings_import_from_nt_ui.unnamed')}</span>
+                <span class="skip-reason">{s.reason || $_('settings_import_from_nt_ui.skipped')}</span>
               </li>
             {/each}
           </ul>

@@ -102,9 +102,9 @@
     const ms = Date.now() - new Date(iso).getTime();
     if (!Number.isFinite(ms) || ms < 0) return null;
     const hours = ms / 3_600_000;
-    if (hours < 1)   return `${Math.max(1, Math.round(ms / 60_000))} Min Ago`;
-    if (hours < 36)  return `${Math.round(hours)} Hr Ago`;
-    return `${Math.round(hours / 24)} Days Ago`;
+    if (hours < 1)   return $_('settings_backup_ui.min_ago', { values: { count: Math.max(1, Math.round(ms / 60_000)) } });
+    if (hours < 36)  return $_('settings_backup_ui.hr_ago', { values: { count: Math.round(hours) } });
+    return $_('settings_backup_ui.days_ago', { values: { count: Math.round(hours / 24) } });
   }
   function _nextDueLabel(cfg) {
     if (!cfg || cfg.schedule === 'off') return null;
@@ -175,7 +175,7 @@
 
   async function createFullBackup() {
     fullBackupBusy = true;
-    restoreStatus = { label: 'Creating backup…', percent: 25 };
+    restoreStatus = { label: $_('settings_backup_ui.creating_backup'), percent: 25 };
     try {
       const res = await fetch(apiUrl('/api/full-backup'), {
         method: 'POST', ..._fetchOpts({ 'Content-Type': 'application/json' }),
@@ -203,9 +203,9 @@
 
   async function deleteFullBackup(filename) {
     const ok = await confirmDialog({
-      title: 'Delete backup?',
-      message: `"${filename}" will be removed from the server. This cannot be undone.`,
-      confirmText: 'Delete', dangerous: true,
+      title: $_('settings_backup_ui.delete_title'),
+      message: $_('settings_backup_ui.delete_message', { values: { filename } }),
+      confirmText: $_('common.delete'), dangerous: true,
     });
     if (!ok) return;
     try {
@@ -222,19 +222,19 @@
 
   async function restoreFullBackup(filename) {
     const ok = await confirmDialog({
-      title: 'Restore from this backup?',
-      message: 'All current CookTrace data will be REPLACED. Make sure you have a fresh backup before continuing.',
-      confirmText: 'Restore', dangerous: true,
+      title: $_('settings_backup_ui.restore_title'),
+      message: $_('settings_backup_ui.restore_message'),
+      confirmText: $_('settings_backup_ui.restore'), dangerous: true,
     });
     if (!ok) return;
     fullBackupBusy = true;
-    restoreStatus = { label: 'Restoring backup…', percent: 50 };
+    restoreStatus = { label: $_('settings_backup_ui.restoring_backup'), percent: 50 };
     try {
       const res = await fetch(apiUrl(`/api/full-backup/${encodeURIComponent(filename)}/restore`), {
         method: 'POST', ..._fetchOpts({ 'Content-Type': 'application/json' }),
       });
       if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
-      restoreStatus = { label: 'Reloading…', percent: 100 };
+      restoreStatus = { label: $_('settings_backup_ui.reloading'), percent: 100 };
       showSuccess($_('backup_page.toast.restored_reloading'));
       setTimeout(() => window.location.reload(), 800);
     } catch (e) {
@@ -251,16 +251,16 @@
     const file = e.target.files?.[0];
     if (!file) return;
     const ok = await confirmDialog({
-      title: 'Restore from upload?',
-      message: 'All current CookTrace data will be REPLACED with the contents of the uploaded ZIP.',
-      confirmText: 'Restore', dangerous: true,
+      title: $_('settings_backup_ui.restore_upload_title'),
+      message: $_('settings_backup_ui.restore_upload_message'),
+      confirmText: $_('settings_backup_ui.restore'), dangerous: true,
     });
     if (!ok) {
       if (uploadInput) uploadInput.value = '';
       return;
     }
     fullBackupBusy = true;
-    restoreStatus = { label: 'Uploading + restoring…', percent: 50 };
+    restoreStatus = { label: $_('settings_backup_ui.uploading_restoring'), percent: 50 };
     try {
       const form = new FormData();
       form.append('backup', file);
@@ -269,7 +269,7 @@
         method: 'POST', body: form, ...opts,
       });
       if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
-      restoreStatus = { label: 'Reloading…', percent: 100 };
+      restoreStatus = { label: $_('settings_backup_ui.reloading'), percent: 100 };
       showSuccess($_('backup_page.toast.restored_reloading'));
       setTimeout(() => window.location.reload(), 800);
     } catch (e) {
@@ -325,18 +325,18 @@
 
   async function _confirmClearAllData() {
     const ok = await confirmDialog({
-      title: 'Clear all data?',
-      message: 'This will permanently delete all recipes, pantry items, cook diary entries, and shopping lists. Settings and credentials are kept. This cannot be undone.',
-      confirmText: 'Delete All Data',
+      title: $_('settings_backup_ui.clear_data_title'),
+      message: $_('settings_backup_ui.clear_data_message'),
+      confirmText: $_('settings_backup_ui.delete_all_data'),
       dangerous: true,
     });
     if (ok) await clearAllData();
   }
   async function _confirmClearAllSettings() {
     const ok = await confirmDialog({
-      title: 'Clear all settings?',
-      message: 'This will reset all preferences, credentials, and API keys to defaults. Recipes, pantry, and other data are kept. This cannot be undone.',
-      confirmText: 'Clear All Settings',
+      title: $_('settings_backup_ui.clear_settings_title'),
+      message: $_('settings_backup_ui.clear_settings_message'),
+      confirmText: $_('backup_page.clear_all_settings'),
       dangerous: true,
     });
     if (ok) await clearAllSettings();
@@ -375,7 +375,7 @@
           });
           await Filesystem.writeFile({ path: `exports/${fileName}`, data: b64, directory: Directory.Cache, recursive: true });
           const { uri } = await Filesystem.getUri({ path: `exports/${fileName}`, directory: Directory.Cache });
-          await Share.share({ title: 'CookTrace Backup', url: uri, dialogTitle: 'Save backup' });
+          await Share.share({ title: $_('settings_backup_ui.share_title'), url: uri, dialogTitle: $_('settings_backup_ui.share_dialog_title') });
           showSuccess($_('backup_page.toast.exported'));
           return;
         } catch (e) {
@@ -409,7 +409,7 @@
       const blob = await exportLocalZip();
       const fileName = `cooktrace-backup-${new Date().toISOString().slice(0,10)}.zip`;
       const { shareBlob } = await import('../../lib/shopping-card.js');
-      const res = await shareBlob(blob, fileName, 'CookTrace Backup');
+      const res = await shareBlob(blob, fileName, $_('settings_backup_ui.share_title'));
       if (res.downloaded) showSuccess($_('backup_page.toast.backup_saved'));
     } catch (e) {
       showError(failed('fail.create_backup', e));
@@ -472,7 +472,7 @@
     <div class="card settings-card">
       <div style="padding:12px 16px 4px">
         <p class="setting-desc" style="margin:0 0 12px">
-          A complete snapshot of everything: recipes, pantry, cook diary, shopping list, settings, and uploaded images. Saved on the server and available to download or restore at any time.
+          {$_('settings_backup_ui.full_backup_desc')}
         </p>
 
         <!-- Auto Backup — admin schedules nightly / weekly / monthly
@@ -493,7 +493,7 @@
                   bind:value={scheduleCfg.schedule}
                   disabled={scheduleCfg.envLocked || scheduleBusy}
                   on:change={() => saveSchedule({ schedule: scheduleCfg.schedule })}>
-                  <option value="off">Off</option>
+                  <option value="off">{$_('settings_backup_ui.off')}</option>
                   <option value="daily">{$_('backup_page.daily')}</option>
                   <option value="weekly">{$_('backup_page.weekly')}</option>
                   <option value="monthly">{$_('backup_page.monthly')}</option>
@@ -520,24 +520,24 @@
                 {#if scheduleCfg.lastAutoError}
                   <div class="auto-bk-status-row error">
                     <span class="material-symbols-rounded" style="font-size:16px">error</span>
-                    <span>Last auto-backup failed: {scheduleCfg.lastAutoError}</span>
+                    <span>{$_('settings_backup_ui.last_auto_failed', { values: { error: scheduleCfg.lastAutoError } })}</span>
                   </div>
                 {/if}
                 {#if scheduleCfg.lastAutoRun}
                   <div class="auto-bk-status-row">
                     <span class="material-symbols-rounded" style="font-size:16px">check_circle</span>
-                    <span>Last auto-backup: {_formatRelative(scheduleCfg.lastAutoRun)}</span>
+                    <span>{$_('settings_backup_ui.last_auto', { values: { when: _formatRelative(scheduleCfg.lastAutoRun) } })}</span>
                   </div>
                 {/if}
                 {#if _nextDueLabel(scheduleCfg)}
                   <div class="auto-bk-status-row">
                     <span class="material-symbols-rounded" style="font-size:16px">schedule</span>
-                    <span>Next: {_nextDueLabel(scheduleCfg)}</span>
+                    <span>{$_('settings_backup_ui.next', { values: { when: _nextDueLabel(scheduleCfg) } })}</span>
                   </div>
                 {/if}
                 {#if scheduleCfg.retention}
                   <div class="auto-bk-status-row subtle">
-                    Keeps the {scheduleCfg.retention} newest backup{scheduleCfg.retention === 1 ? '' : 's'}; older archives prune automatically after each run.
+                    {$_('settings_backup_ui.retention_server', { values: { count: scheduleCfg.retention } })}
                   </div>
                 {/if}
               </div>
@@ -550,14 +550,14 @@
           <button class="btn btn-primary" style="height:36px;font-size:13px"
             on:click={createFullBackup} disabled={fullBackupBusy}>
             {#if fullBackupBusy}
-              <span class="material-symbols-rounded spin" style="font-size:16px">autorenew</span> Working…
+              <span class="material-symbols-rounded spin" style="font-size:16px">autorenew</span> {$_('settings_backup_ui.working')}
             {:else}
-              <span class="material-symbols-rounded" style="font-size:16px">add_circle</span> Create Backup
+              <span class="material-symbols-rounded" style="font-size:16px">add_circle</span> {$_('settings_backup_ui.create_backup')}
             {/if}
           </button>
           <button class="btn btn-secondary" style="height:36px;font-size:13px"
             on:click={pickUploadRestore} disabled={fullBackupBusy}>
-            <span class="material-symbols-rounded" style="font-size:16px">upload</span> Upload &amp; Restore
+            <span class="material-symbols-rounded" style="font-size:16px">upload</span> {$_('settings_backup_ui.upload_restore')}
           </button>
         </div>
         {#if restoreStatus}
@@ -591,14 +591,14 @@
             <span class="backup-col-size">{fmtBytes(bk.size)}</span>
             <div class="backup-actions">
               <button class="btn btn-secondary backup-action-btn" on:click={() => downloadFullBackup(bk.filename)}>
-                <span class="material-symbols-rounded" style="font-size:15px">download</span> Download
+                <span class="material-symbols-rounded" style="font-size:15px">download</span> {$_('settings_backup_ui.download')}
               </button>
               <button class="btn btn-secondary backup-action-btn"
                 on:click={() => restoreFullBackup(bk.filename)} disabled={fullBackupBusy}>
-                <span class="material-symbols-rounded" style="font-size:15px">restore</span> Restore
+                <span class="material-symbols-rounded" style="font-size:15px">restore</span> {$_('settings_backup_ui.restore')}
               </button>
               <button class="btn-icon" style="color:var(--danger);padding:0 4px"
-                on:click={() => deleteFullBackup(bk.filename)} title="Delete backup" aria-label="Delete backup">
+                on:click={() => deleteFullBackup(bk.filename)} title={$_('settings_backup_ui.delete_backup')} aria-label={$_('settings_backup_ui.delete_backup')}>
                 <span class="material-symbols-rounded" style="font-size:20px">delete</span>
               </button>
             </div>
@@ -607,7 +607,7 @@
       {:else}
         <div class="setting-divider"></div>
         <p style="padding:12px 16px;font-size:13px;color:var(--text-3);margin:0">
-          No backups yet — click Create Backup to get started.
+          {$_('settings_backup_ui.empty')}
         </p>
       {/if}
     </div>
@@ -619,7 +619,7 @@
        + every image file zipped into one archive, shared via the
        Android share sheet. -->
   {#if isNative && !serverEnabled}
-    <p class="sub-label">Full Backup (Local)</p>
+    <p class="sub-label">{$_('settings_backup_ui.full_backup_local')}</p>
     <div class="card settings-card">
       <!-- Auto Backup (local mode). JS-side tick fires while the app is
            open; saves to Documents/cooktrace-backups/. Retention only
@@ -637,7 +637,7 @@
               <select class="select sel-sm"
                 value={localScheduleCfg.schedule}
                 on:change={(e) => saveLocalSchedule({ schedule: e.target.value })}>
-                <option value="off">Off</option>
+                <option value="off">{$_('settings_backup_ui.off')}</option>
                 <option value="daily">{$_('backup_page.daily')}</option>
                 <option value="weekly">{$_('backup_page.weekly')}</option>
                 <option value="monthly">{$_('backup_page.monthly')}</option>
@@ -662,23 +662,23 @@
               {#if localScheduleCfg.lastAutoError}
                 <div class="auto-bk-status-row error">
                   <span class="material-symbols-rounded" style="font-size:16px">error</span>
-                  <span>Last auto-backup failed: {localScheduleCfg.lastAutoError}</span>
+                  <span>{$_('settings_backup_ui.last_auto_failed', { values: { error: localScheduleCfg.lastAutoError } })}</span>
                 </div>
               {/if}
               {#if localScheduleCfg.lastAutoRun}
                 <div class="auto-bk-status-row">
                   <span class="material-symbols-rounded" style="font-size:16px">check_circle</span>
-                  <span>Last auto-backup: {_formatRelative(localScheduleCfg.lastAutoRun)}</span>
+                  <span>{$_('settings_backup_ui.last_auto', { values: { when: _formatRelative(localScheduleCfg.lastAutoRun) } })}</span>
                 </div>
               {/if}
               {#if _nextDueLabel(localScheduleCfg)}
                 <div class="auto-bk-status-row">
                   <span class="material-symbols-rounded" style="font-size:16px">schedule</span>
-                  <span>Next: {_nextDueLabel(localScheduleCfg)} (fires when app is open)</span>
+                  <span>{$_('settings_backup_ui.next_local', { values: { when: _nextDueLabel(localScheduleCfg) } })}</span>
                 </div>
               {/if}
               <div class="auto-bk-status-row subtle">
-                Keeps the {localScheduleCfg.retention} newest auto-backup{localScheduleCfg.retention === 1 ? '' : 's'}; manual exports are never pruned.
+                {$_('settings_backup_ui.retention_local', { values: { count: localScheduleCfg.retention } })}
               </div>
             </div>
           {/if}
@@ -688,8 +688,8 @@
       <button class="setting-row setting-action" on:click={exportLocalZipBackup} disabled={localBackupBusy}>
         <span class="material-symbols-rounded si" style="color:var(--accent)">{localBackupBusy ? 'progress_activity' : 'archive'}</span>
         <div>
-          <span class="setting-label">{localBackupBusy ? 'Preparing…' : 'Export Backup ZIP'}</span>
-          <div class="setting-desc">A single .zip file with every recipe, pantry item, diary entry, shopping list row, settings, and every uploaded image. Saved via the Android share sheet — pick Drive, Files, email, etc.</div>
+          <span class="setting-label">{localBackupBusy ? $_('settings_backup_ui.preparing') : $_('settings_backup_ui.export_zip')}</span>
+          <div class="setting-desc">{$_('settings_backup_ui.export_zip_desc')}</div>
         </div>
         <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
       </button>
@@ -698,7 +698,7 @@
         <span class="material-symbols-rounded si" style="color:var(--accent)">unarchive</span>
         <div>
           <span class="setting-label">{$_('backup_page.restore_from_zip')}</span>
-          <div class="setting-desc">Restores from a previously exported .zip. Replaces every table with the snapshot's data and re-writes images to the app's storage.</div>
+          <div class="setting-desc">{$_('settings_backup_ui.restore_zip_desc')}</div>
         </div>
         <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
       </button>
@@ -713,7 +713,7 @@
       <span class="material-symbols-rounded si" style="color:var(--accent)">download</span>
       <div>
         <span class="setting-label">{$_('backup_page.export_json')}</span>
-        <div class="setting-desc">Lighter format — JSON only, no images. Useful for sharing data between accounts or quick text-based exports.</div>
+        <div class="setting-desc">{$_('settings_backup_ui.export_json_desc')}</div>
       </div>
       <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
     </button>
@@ -722,7 +722,7 @@
       <span class="material-symbols-rounded si" style="color:var(--accent)">upload</span>
       <div>
         <span class="setting-label">{$_('backup_page.import_json')}</span>
-        <div class="setting-desc">Restores from a previously exported JSON file. Merges with existing data — does not erase what's already here.</div>
+        <div class="setting-desc">{$_('settings_backup_ui.import_json_desc')}</div>
       </div>
       <span class="material-symbols-rounded text-3" style="font-size:18px;flex-shrink:0">chevron_right</span>
     </button>
@@ -736,7 +736,7 @@
       <span class="material-symbols-rounded si" style="color:var(--danger);background:color-mix(in srgb,var(--danger) 14%,transparent)">delete_forever</span>
       <div>
         <span class="setting-label" style="color:var(--danger)">{$_('backup_page.clear_all_data')}</span>
-        <div class="setting-desc">Permanently deletes all recipes, pantry items, cook diary entries, and shopping lists. Settings and credentials are kept.</div>
+        <div class="setting-desc">{$_('settings_backup_ui.clear_data_desc')}</div>
       </div>
       <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger);flex-shrink:0">chevron_right</span>
     </button>
@@ -745,7 +745,7 @@
       <span class="material-symbols-rounded si" style="color:var(--danger);background:color-mix(in srgb,var(--danger) 14%,transparent)">manage_history</span>
       <div>
         <span class="setting-label" style="color:var(--danger)">{$_('backup_page.clear_all_settings')}</span>
-        <div class="setting-desc">Resets all preferences, credentials, and API keys to defaults. Recipes, pantry, and other data are kept.</div>
+        <div class="setting-desc">{$_('settings_backup_ui.clear_settings_desc')}</div>
       </div>
       <span class="material-symbols-rounded" style="font-size:18px;color:var(--danger);flex-shrink:0">chevron_right</span>
     </button>

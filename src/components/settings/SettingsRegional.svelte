@@ -14,7 +14,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_page.regional.language')}</span>
-        <div class="setting-desc">UI language. A translation may lag one or two releases behind English; missing strings fall back to English.</div>
+        <div class="setting-desc">{$_('settings_page.regional.language_desc')}</div>
       </div>
       <div class="select-wrap" style="width:160px">
         <select class="select sel-sm" value={$language} on:change={e => language.set(e.target.value)}>
@@ -29,9 +29,9 @@
       <span class="setting-label">{$_('settings_page.regional.date_format')}</span>
       <div class="select-wrap" style="width:160px">
         <select class="select sel-sm" value={$dateFormat} on:change={e => dateFormat.set(e.target.value)}>
-          <option value="ISO">YYYY-MM-DD</option>
-          <option value="US">MM/DD/YYYY</option>
-          <option value="EU">DD/MM/YYYY</option>
+          <option value="ISO">{$_('settings_regional_ui.date_iso')}</option>
+          <option value="US">{$_('settings_regional_ui.date_us')}</option>
+          <option value="EU">{$_('settings_regional_ui.date_eu')}</option>
           <option value="natural">{$_('settings_page.regional.date_natural')}</option>
         </select>
       </div>
@@ -41,8 +41,8 @@
       <span class="setting-label">{$_('settings_page.regional.time_format')}</span>
       <div class="select-wrap" style="width:160px">
         <select class="select sel-sm" value={$timeFormat} on:change={e => timeFormat.set(e.target.value)}>
-          <option value="12h">12-hour (AM/PM)</option>
-          <option value="24h">24-hour</option>
+          <option value="12h">{$_('settings_regional_ui.time_12h')}</option>
+          <option value="24h">{$_('settings_regional_ui.time_24h')}</option>
         </select>
       </div>
     </div>
@@ -50,7 +50,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_page.regional.measurement_system')}</span>
-        <div class="setting-desc">Imperial uses cups, oz, lb, °F. Metric uses ml, g, kg, °C.</div>
+        <div class="setting-desc">{$_('settings_regional_ui.measurement_desc')}</div>
       </div>
       <div class="select-wrap" style="width:130px">
         <select class="select sel-sm" value={$measurementSystem} on:change={e => measurementSystem.set(e.target.value)}>
@@ -63,12 +63,12 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_page.regional.energy')}</span>
-        <div class="setting-desc">Most countries (US / UK / EU / Canada) use kilocalories; Australia and New Zealand use kilojoules. Independent from your measurement-system choice.</div>
+        <div class="setting-desc">{$_('settings_regional_ui.energy_desc')}</div>
       </div>
       <div class="select-wrap" style="width:160px">
         <select class="select sel-sm" value={$energyUnit} on:change={e => energyUnit.set(e.target.value)}>
-          <option value="kcal">Calories (kcal)</option>
-          <option value="kJ">Kilojoules (kJ)</option>
+          <option value="kcal">{$_('settings_regional_ui.energy_kcal')}</option>
+          <option value="kJ">{$_('settings_regional_ui.energy_kj')}</option>
         </select>
       </div>
     </div>

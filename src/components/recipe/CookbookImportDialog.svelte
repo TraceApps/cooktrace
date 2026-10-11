@@ -1,7 +1,7 @@
 <script>
   import { closeOnBack } from '../../lib/back-stack.js';
   /**
-   * CookbookImportDialog — Issue #2 Phase 3.
+   * CookbookImportDialog: Issue #2 Phase 3.
    *
    * Single PDF containing many recipes. Server extracts the text; client
    * sends it to Trace AI with a multi-recipe extraction prompt. The AI
@@ -84,7 +84,7 @@
   async function prepare() {
     if (!pdfFile) return;
     phase = 'preparing';
-    progressLine = 'Extracting text from the PDF…';
+    progressLine = $_('cookbook_import_dialog_ui.extracting_pdf');
     errorMessage = '';
 
     const form = new FormData();
@@ -99,7 +99,7 @@
       const data = await res.json();
       if (!res.ok) {
         phase = 'error';
-        errorMessage = data?.error || `Extraction failed (HTTP ${res.status})`;
+        errorMessage = data?.error || $_('cookbook_import_dialog_ui.extraction_failed_http', { values: { status: res.status } });
         return;
       }
       if (data.empty) {
@@ -114,14 +114,14 @@
         }
         phase = 'error';
         errorMessage = data.hint
-          || 'This PDF has no text layer (scanned). The Claude or Gemini provider is required to read scanned PDFs directly.';
+          || $_('cookbook_import_dialog_ui.scanned_no_provider');
         return;
       }
       preview = { text: data.text, pages: data.pages, scanned: false };
       phase = 'ready';
     } catch (e) {
       phase = 'error';
-      errorMessage = e.message || 'Extraction failed.';
+      errorMessage = e.message || $_('cookbook_import_dialog_ui.extraction_failed');
     }
   }
 
@@ -132,7 +132,7 @@
         const dataUrl = String(reader.result);
         resolve(dataUrl.split(',')[1] || '');
       };
-      reader.onerror = () => reject(new Error('Could not read file'));
+      reader.onerror = () => reject(new Error($_('cookbook_import_dialog_ui.read_failed')));
       reader.readAsDataURL(file);
     });
   }
@@ -158,8 +158,8 @@ ${text}
     phase = 'extracting';
     createdRecipes = [];
     progressLine = preview.scanned
-      ? 'Trace is reading the cookbook PDF…'
-      : 'Trace is reading the cookbook…';
+      ? $_('cookbook_import_dialog_ui.reading_scanned')
+      : $_('cookbook_import_dialog_ui.reading');
 
     const provider = $aiProvider;
     const apiKey   = $aiApiKey;
@@ -185,7 +185,7 @@ Rules:
       const MAX_BYTES = 20 * 1024 * 1024;
       if (pdfFile.size > MAX_BYTES) {
         phase = 'error';
-        errorMessage = `PDF is too large for inline AI vision (${(pdfFile.size / 1024 / 1024).toFixed(1)} MB, cap 20 MB).`;
+        errorMessage = $_('cookbook_import_dialog_ui.pdf_too_large', { values: { size: (pdfFile.size / 1024 / 1024).toFixed(1) } });
         return;
       }
       let base64;
@@ -204,7 +204,7 @@ Rules:
         };
       } else {
         phase = 'error';
-        errorMessage = 'Scanned cookbook import needs the Claude or Gemini provider.';
+        errorMessage = $_('cookbook_import_dialog_ui.scanned_needs_provider');
         return;
       }
     } else {
@@ -223,20 +223,20 @@ Rules:
         onToolsUnsupported: () => { toolsUnsupported = true; },
         onToolCall: (name) => {
           if (name === 'create_recipe') {
-            progressLine = `Saving recipe ${createdRecipes.length + 1}…`;
+            progressLine = $_('cookbook_import_dialog_ui.saving_n', { values: { n: createdRecipes.length + 1 } });
           }
         },
         onToolResult: (name, result) => {
           if (name === 'create_recipe' && result && result.ok && result.recipe) {
             createdRecipes = [...createdRecipes, result.recipe];
-            progressLine = `Found ${createdRecipes.length} recipe${createdRecipes.length === 1 ? '' : 's'}…`;
+            progressLine = $_('cookbook_import_dialog_ui.found_n', { values: { count: createdRecipes.length } });
           }
         },
       });
       phase = 'done';
       progressLine = '';
       if (createdRecipes.length === 0) {
-        errorMessage = 'Trace did not identify any recipes in this document. Try Bulk Import with the PDF split into smaller files, or verify the document actually contains recipes.';
+        errorMessage = $_('cookbook_import_dialog_ui.none_found');
         phase = 'error';
       } else {
         showSuccess($_('done.cookbook_imported', { values: { count: createdRecipes.length } }));
@@ -246,10 +246,10 @@ Rules:
       if (createdRecipes.length > 0) {
         phase = 'done';
         progressLine = '';
-        errorMessage = `Trace stopped after ${createdRecipes.length} recipe${createdRecipes.length === 1 ? '' : 's'}: ${e.message || 'AI error'}`;
+        errorMessage = $_('cookbook_import_dialog_ui.stopped_after', { values: { count: createdRecipes.length, error: e.message || $_('cookbook_import_dialog_ui.ai_error') } });
       } else {
         phase = 'error';
-        errorMessage = toolsUnsupported ? $_('trace_ai_ct.tools_unsupported_import') : (e.message || 'Cookbook extraction failed.');
+        errorMessage = toolsUnsupported ? $_('trace_ai_ct.tools_unsupported_import') : (e.message || $_('cookbook_import_dialog_ui.cookbook_extraction_failed'));
       }
     }
   }
@@ -269,7 +269,7 @@ Rules:
     <div class="modal" on:click|stopPropagation>
       <header class="head">
         <h3>{$_('cookbook_import_dialog.title')}</h3>
-        <button class="btn-icon" on:click={close} aria-label="Close" title="Close">
+        <button class="btn-icon" on:click={close} aria-label={$_('common.close')} title={$_('common.close')}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </header>
@@ -278,9 +278,9 @@ Rules:
         <div class="state info">
           <span class="material-symbols-rounded">{envLocked ? 'lock' : 'smart_toy'}</span>
           {#if envLocked}
-            <p>Cookbook import isn't available when the AI provider is configured via environment variables — the server proxy doesn't relay tool calls. Ask the admin to switch to the user-key flow.</p>
+            <p>{$_('cookbook_import_dialog_ui.env_locked')}</p>
           {:else}
-            <p>Cookbook import needs Trace AI. Enable it in <a href="#/settings/ai" on:click|preventDefault={() => { close(); push('/settings/ai'); }}>Settings → Trace Assistant</a> first, or use Bulk Import for already-split recipe files.</p>
+            <p>{$_('cookbook_import_dialog_ui.needs_ai_prefix')} <a href="#/settings/ai" on:click|preventDefault={() => { close(); push('/settings/ai'); }}>{$_('cookbook_import_dialog_ui.settings_link')}</a> {$_('cookbook_import_dialog_ui.needs_ai_suffix')}</p>
           {/if}
         </div>
         <footer class="actions">
@@ -288,13 +288,7 @@ Rules:
         </footer>
 
       {:else if phase === 'pick'}
-        <p class="hint">
-          Drop a PDF cookbook here. Trace AI will read the whole document and
-          identify each recipe in it, saving one entry per recipe to your
-          library. This is the right path for digital cookbooks (multi-recipe
-          PDFs). For a single-recipe file or a folder of files use
-          Import from File or Bulk Import instead.
-        </p>
+        <p class="hint">{$_('cookbook_import_dialog_ui.pick_hint')}</p>
         {#if pdfFile}
           <div class="text-file-card">
             <span class="material-symbols-rounded file-icon">menu_book</span>
@@ -302,7 +296,7 @@ Rules:
               <div class="file-name">{pdfFile.name}</div>
               <div class="file-size">{Math.round(pdfFile.size / 1024)} KB</div>
             </div>
-            <button class="btn-icon" on:click={_clearPick} aria-label="Pick a different file">
+            <button class="btn-icon" on:click={_clearPick} aria-label={$_('cookbook_import_dialog_ui.pick_different')}>
               <span class="material-symbols-rounded">close</span>
             </button>
           </div>
@@ -310,7 +304,7 @@ Rules:
           <button class="picker" on:click={_pickFile}>
             <span class="material-symbols-rounded">menu_book</span>
             <span>{$_('cookbook_import_dialog.pick_cookbook_pdf')}</span>
-            <span class="picker-sub">Multi-recipe PDF document</span>
+            <span class="picker-sub">{$_('cookbook_import_dialog_ui.picker_sub')}</span>
           </button>
         {/if}
         <input type="file" accept="application/pdf,.pdf"
@@ -319,49 +313,45 @@ Rules:
           <button class="btn btn-secondary" on:click={close}>{$_('cookbook_import_dialog.cancel')}</button>
           <button class="btn btn-primary" on:click={prepare} disabled={!pdfFile}>
             <span class="material-symbols-rounded">arrow_forward</span>
-            Next
+            {$_('cookbook_import_dialog_ui.next')}
           </button>
         </footer>
 
       {:else if phase === 'preparing' || phase === 'extracting'}
         <div class="state busy">
           <span class="material-symbols-rounded spin">progress_activity</span>
-          <p class="progress">{progressLine || 'Working…'}</p>
+          <p class="progress">{progressLine || $_('cookbook_import_dialog_ui.working')}</p>
           {#if phase === 'extracting' && createdRecipes.length > 0}
-            <p class="muted">{createdRecipes.length} recipe{createdRecipes.length === 1 ? '' : 's'} saved so far. Don't close the dialog.</p>
+            <p class="muted">{$_('cookbook_import_dialog_ui.saved_so_far', { values: { count: createdRecipes.length } })}</p>
           {/if}
         </div>
 
       {:else if phase === 'ready'}
         {#if preview.scanned}
           <p class="hint">
-            This is a scanned cookbook (no text layer). Trace AI will read
-            the page images directly using your configured {$aiProvider === 'claude' ? 'Claude' : 'Gemini'}
-            provider{#if preview.pages}, across {preview.pages} page{preview.pages === 1 ? '' : 's'}{/if}.
-            Scanned PDFs use significantly more AI tokens than text PDFs and
-            may take several minutes for large books.
+            {preview.pages
+              ? $_('cookbook_import_dialog_ui.scanned_hint_pages', { values: { provider: $aiProvider === 'claude' ? 'Claude' : 'Gemini', pages: preview.pages } })
+              : $_('cookbook_import_dialog_ui.scanned_hint', { values: { provider: $aiProvider === 'claude' ? 'Claude' : 'Gemini' } })}
           </p>
         {:else}
           <p class="hint">
-            Extracted {(preview.text.length / 1024).toFixed(1)} KB of text
-            {#if preview.pages} from {preview.pages} page{preview.pages === 1 ? '' : 's'}{/if}.
-            Trace will read this and try to identify every recipe. Long
-            documents may take a minute or two and use a corresponding
-            chunk of your AI provider's budget.
+            {preview.pages
+              ? $_('cookbook_import_dialog_ui.text_hint_pages', { values: { size: (preview.text.length / 1024).toFixed(1), pages: preview.pages } })
+              : $_('cookbook_import_dialog_ui.text_hint', { values: { size: (preview.text.length / 1024).toFixed(1) } })}
           </p>
         {/if}
         <footer class="actions">
           <button class="btn btn-secondary" on:click={close}>{$_('cookbook_import_dialog.cancel')}</button>
           <button class="btn btn-primary" on:click={extractRecipes}>
             <span class="material-symbols-rounded">auto_awesome</span>
-            Extract Recipes
+            {$_('cookbook_import_dialog_ui.extract_recipes')}
           </button>
         </footer>
 
       {:else if phase === 'done'}
         <div class="state done">
           <span class="material-symbols-rounded done-icon">check_circle</span>
-          <h4>Imported {createdRecipes.length} recipe{createdRecipes.length === 1 ? '' : 's'}</h4>
+          <h4>{$_('cookbook_import_dialog_ui.imported_n', { values: { count: createdRecipes.length } })}</h4>
           {#if errorMessage}
             <p class="muted">{errorMessage}</p>
           {/if}
@@ -378,7 +368,7 @@ Rules:
         <footer class="actions">
           <button class="btn btn-primary" on:click={() => { open = false; dispatch('close'); push('/recipes'); }}>
             <span class="material-symbols-rounded">open_in_new</span>
-            Open Recipes
+            {$_('cookbook_import_dialog_ui.open_recipes')}
           </button>
         </footer>
 

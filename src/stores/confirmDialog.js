@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { tr } from '../lib/messages.js';
 
 /** Global confirm-dialog store.
  *
@@ -13,10 +14,10 @@ import { writable } from 'svelte/store';
 export const confirmRequest = writable(null);
 
 export function confirmDialog({
-  title = 'Are you sure?',
+  title = tr('confirm.title', 'Are You Sure?'),
   message = '',
-  confirmText = 'OK',
-  cancelText = 'Cancel',
+  confirmText = tr('confirm.ok', 'OK'),
+  cancelText = tr('common.cancel', 'Cancel'),
   dangerous = false,
 } = {}) {
   return new Promise(resolve => {

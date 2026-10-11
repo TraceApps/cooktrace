@@ -152,7 +152,7 @@
         if (!map.has(key)) {
           map.set(key, {
             key, recipeId: it.recipe_id ?? null, aisle: null,
-            title: it.recipe_id != null ? (it.recipe_name || 'Recipe') : $_('routes.shopping.other'),
+            title: it.recipe_id != null ? (it.recipe_name || $_('shopping_item.recipe')) : $_('routes.shopping.other'),
             rows: [], sortable: true,
           });
         }
@@ -329,9 +329,11 @@
     const n = g.rows.length;
     if (n === 0) return;
     const ok = await confirmDialog({
-      title: `Remove ${n} ${n === 1 ? 'item' : 'items'}${g.title ? ` from ${g.title}` : ''}?`,
-      message: 'They\'ll be removed from your shopping list.',
-      confirmText: 'Remove',
+      title: g.title
+        ? $_('shopping_ui.clear_group_title_from', { values: { n, group: g.title } })
+        : $_('shopping_ui.clear_group_title', { values: { n } }),
+      message: $_('shopping_ui.clear_group_message'),
+      confirmText: $_('shopping_ui.remove'),
       dangerous: true,
     });
     if (!ok) return;
@@ -496,7 +498,7 @@
   let rowActionOpen = false;
   let rowActionItem = null;
   $: ROW_ACTIONS = [
-    { label: 'Edit',                             icon: 'edit',     value: 'edit' },
+    { label: $_('common.edit'),                  icon: 'edit',     value: 'edit' },
     { label: $_('routes.shopping.change_aisle'), icon: 'category', value: 'aisle' },
     { label: $_('routes.shopping.delete'),       icon: 'delete',   value: 'delete', dangerous: true },
   ];
@@ -701,9 +703,9 @@
 
   // ── Share list ───────────────────────────────────────────────
   let shareSheetOpen = false;
-  const SHARE_ACTIONS = [
-    { label: 'Share as Image',     icon: 'image',    value: 'image' },
-    { label: 'Share as Text',      icon: 'text_snippet', value: 'text'  },
+  $: SHARE_ACTIONS = [
+    { label: $_('shopping_ui.share_image'), icon: 'image',    value: 'image' },
+    { label: $_('shopping_ui.share_text'),  icon: 'text_snippet', value: 'text'  },
   ];
   function openShareSheet() {
     if (items.length === 0) {
@@ -723,7 +725,7 @@
       const { svg, width, height } = buildShoppingCardSvg(_mergeRows(items, true));
       const blob = await svgToPngBlob(svg, width, height);
       const fname = `shopping-list-${new Date().toISOString().slice(0,10)}.png`;
-      const res = await shareBlob(blob, fname, 'Shopping List');
+      const res = await shareBlob(blob, fname, $_('shopping_ui.shopping_list'));
       if (res.downloaded) showSuccess($_('shopping_page.toast.saved_image'));
       else if (res.canceled) { /* silent */ }
     } catch (e) {
@@ -733,7 +735,7 @@
   async function shareAsText() {
     try {
       const text = buildShoppingText(_mergeRows(items, true));
-      const res = await shareText(text, 'Shopping List');
+      const res = await shareText(text, $_('shopping_ui.shopping_list'));
       if (res.copied) showSuccess($_('shopping_page.toast.copied'));
     } catch (e) {
       showError(failed('fail.share_list', e));
@@ -747,8 +749,8 @@
   // way unlabeled header icons never could.
   let addSourceOpen = false;
   $: ADD_SOURCE_ACTIONS = [
-    { label: 'Add from Recipe',        icon: 'menu_book',       value: 'recipe' },
-    { label: 'Add from Planned Cooks', icon: 'event_available', value: 'plan'   },
+    { label: $_('shopping_page.add_from_recipe'),  icon: 'menu_book',       value: 'recipe' },
+    { label: $_('shopping_page.add_from_planned'), icon: 'event_available', value: 'plan'   },
   ];
   function onAddSourceSelect(ev) {
     const v = ev.detail?.value;
@@ -825,10 +827,10 @@
 <div class="page-shell">
   <header class="page-header" class:banner-gradient={$bannerStyle === 'gradient'} class:banner-animated={$bannerStyle === 'animated'}>
     <h1>{$_('routes.shopping.title')}</h1>
-    <button class="btn-icon header-action header-action-2" on:click={openShareSheet} aria-label="Share List" title="Share List">
+    <button class="btn-icon header-action header-action-2" on:click={openShareSheet} aria-label={$_('shopping_ui.share_list')} title={$_('shopping_ui.share_list')}>
       <span class="material-symbols-rounded">share</span>
     </button>
-    <button class="btn-icon header-action" on:click={() => addSourceOpen = true} aria-label="Add from Recipe or Planned Cooks" title="Add from Recipe or Planned Cooks">
+    <button class="btn-icon header-action" on:click={() => addSourceOpen = true} aria-label={$_('shopping_ui.add_from_source')} title={$_('shopping_ui.add_from_source')}>
       <span class="material-symbols-rounded">add</span>
     </button>
   </header>
@@ -868,7 +870,7 @@
           maxResults={50}
           placeholder={$_('routes.shopping.add_placeholder')}
           creatable={true}
-          createLabel="Add"
+          createLabel={$_('shopping_ui.add')}
           on:create={() => quickAdd()}
         />
       </div>
@@ -877,20 +879,20 @@
         type="text"
         autocomplete="off"
         bind:value={addQty}
-        placeholder="qty"
-        aria-label="Quantity (optional)"
+        placeholder={$_('shopping_ui.qty_placeholder')}
+        aria-label={$_('shopping_ui.qty_aria')}
       />
       <button class="btn btn-primary qa-add" on:click={quickAdd} disabled={addBusy || !effectiveName}>
         <span class="material-symbols-rounded">add</span>
-        <span>Add</span>
+        <span>{$_('shopping_ui.add')}</span>
       </button>
     </div>
 
     {#if items.length > 0}
       <div class="status-row">
         <span class="status-text">
-          <strong>{uncheckedCount}</strong> remaining
-          {#if checkedCount > 0}· {checkedCount} checked{/if}
+          {@html $_('shopping_ui.remaining_html', { values: { n: `<strong>${Number(uncheckedCount)}</strong>` } })}
+          {#if checkedCount > 0}{$_('shopping_ui.checked_count', { values: { n: checkedCount } })}{/if}
         </span>
         <div class="status-actions">
           {#if $shoppingCheckedBehavior === 'hide' && checkedCount > 0}
@@ -902,7 +904,7 @@
           {#if checkedCount > 0}
             <button class="btn btn-secondary tiny" on:click={clearChecked}>
               <span class="material-symbols-rounded">delete_sweep</span>
-              Clear Checked
+              {$_('shopping_ui.clear_checked')}
             </button>
           {/if}
         </div>
@@ -912,7 +914,7 @@
            viewport, satisfying and always in view. -->
       <div class="shopping-progress" role="progressbar"
         aria-valuemin="0" aria-valuemax={displayRows.length} aria-valuenow={checkedCount}
-        aria-label="Shopping progress">
+        aria-label={$_('shopping_ui.progress')}>
         <div class="shopping-progress-fill"
           style="width: {displayRows.length > 0 ? (checkedCount / displayRows.length) * 100 : 0}%"></div>
       </div>
@@ -956,7 +958,7 @@
               <button class="group-toggle" type="button"
                 on:click={() => toggleCollapsed(g.key, allChecked)}
                 aria-expanded={!isCollapsed}
-                title={isCollapsed ? 'Expand section' : 'Collapse section'}>
+                title={isCollapsed ? $_('shopping_ui.expand_section') : $_('shopping_ui.collapse_section')}>
                 <span class="material-symbols-rounded chev" class:rotated={!isCollapsed}>chevron_right</span>
                 <span class="group-title-stack">
                   {#if g.recipeId != null}
@@ -973,21 +975,21 @@
               {#if g.recipeId != null}
                 <button class="group-link" type="button"
                   on:click|stopPropagation={() => push(`/recipes/${g.recipeId}`)}
-                  title="Open recipe" aria-label="Open recipe">
+                  title={$_('shopping_ui.open_recipe')} aria-label={$_('shopping_ui.open_recipe')}>
                   <span class="material-symbols-rounded">open_in_new</span>
                 </button>
               {/if}
               <button class="group-action" type="button"
                 on:click|stopPropagation={() => toggleGroupChecked(g, !allChecked)}
-                title={allChecked ? 'Uncheck all in this group' : 'Check all in this group'}
-                aria-label={allChecked ? 'Uncheck all in this group' : 'Check all in this group'}>
+                title={allChecked ? $_('shopping_ui.uncheck_group') : $_('shopping_ui.check_group')}
+                aria-label={allChecked ? $_('shopping_ui.uncheck_group') : $_('shopping_ui.check_group')}>
                 <span class="material-symbols-rounded">{allChecked ? 'check_box' : 'select_all'}</span>
-                <span class="ga-label">{allChecked ? 'Uncheck All' : 'Check All'}</span>
+                <span class="ga-label">{allChecked ? $_('shopping_ui.uncheck_all') : $_('shopping_ui.check_all')}</span>
               </button>
               <button class="group-action danger" type="button"
                 on:click|stopPropagation={() => clearGroup(g)}
-                title="Remove all items in this group"
-                aria-label="Remove all items in this group">
+                title={$_('shopping_ui.remove_group')}
+                aria-label={$_('shopping_ui.remove_group')}>
                 <span class="material-symbols-rounded">delete</span>
               </button>
             </header>
@@ -1009,10 +1011,10 @@
                   <li class="row row-shadow" aria-hidden="true">&nbsp;</li>
                 {:else}
                 <li class="row" class:done={it.checked} use:longpress on:longpress={() => onRowLongPress(it)}>
-                  <span class="drag-handle" use:dragHandle aria-label="Drag to reorder" title="Drag to reorder">
+                  <span class="drag-handle" use:dragHandle aria-label={$_('shopping_ui.drag_reorder')} title={$_('shopping_ui.drag_reorder')}>
                     <span class="material-symbols-rounded">drag_indicator</span>
                   </span>
-                  <button class="check" on:click={() => toggleCheck(it)} aria-label={it.checked ? 'Uncheck' : 'Check'}>
+                  <button class="check" on:click={() => toggleCheck(it)} aria-label={it.checked ? $_('shopping_ui.uncheck') : $_('shopping_ui.check')}>
                     <span class="material-symbols-rounded">{it.checked ? 'check_box' : 'check_box_outline_blank'}</span>
                   </button>
                   <button class="row-body" on:click={() => openItem(it)}>
@@ -1021,11 +1023,11 @@
                       <span class="row-qty">{displayQty(it.quantity, it.unit)}{it.quantity != null && it.unit ? ' ' : ''}{it.unit ?? ''}</span>
                     {/if}
                     {#if $shoppingGroupBy !== 'aisle' && it.aisle}
-                      <span class="row-aisle-pill" title="Aisle">{it.aisle}</span>
+                      <span class="row-aisle-pill" title={$_('shopping_ui.aisle')}>{it.aisle}</span>
                     {/if}
                     {#if $shoppingGroupBy === 'aisle'}
                       {#each (it.recipe_names || (it.recipe_name ? [it.recipe_name] : [])) as rn}
-                        <span class="row-recipe-pill" title="Recipe">
+                        <span class="row-recipe-pill" title={$_('shopping_item.recipe')}>
                           <span class="material-symbols-rounded">menu_book</span>{rn}
                         </span>
                       {/each}
@@ -1039,7 +1041,7 @@
                           title={$_('routes.shopping.change_aisle')}>
                     <span class="material-symbols-rounded">category</span>
                   </button>
-                  <button class="btn-icon small danger" on:click={() => remove(it)} aria-label="Remove"><span class="material-symbols-rounded">close</span></button>
+                  <button class="btn-icon small danger" on:click={() => remove(it)} aria-label={$_('shopping_ui.remove')}><span class="material-symbols-rounded">close</span></button>
                 </li>
                 {/if}
               {/each}
@@ -1064,7 +1066,7 @@
 <!-- Share action sheet — image or plain text. -->
 <ActionSheet
   bind:open={shareSheetOpen}
-  title="Share Shopping List"
+  title={$_('shopping_ui.share_title')}
   actions={SHARE_ACTIONS}
   on:select={onShareSelect}
 />
@@ -1131,7 +1133,7 @@
 <!-- Header + button action sheet — pick a bulk-add source. -->
 <ActionSheet
   bind:open={addSourceOpen}
-  title="Add to Shopping List"
+  title={$_('shopping_ui.add_to_list_title')}
   actions={ADD_SOURCE_ACTIONS}
   on:select={onAddSourceSelect}
 />
@@ -1144,7 +1146,7 @@
     <div class="modal modal-edit" on:click|stopPropagation>
       <header class="modal-header">
         <h2>{$_('shopping_page.edit_item')}</h2>
-        <button class="btn-icon" on:click={() => { editSheetOpen = false; editTarget = null; }} aria-label="Close"><span class="material-symbols-rounded">close</span></button>
+        <button class="btn-icon" on:click={() => { editSheetOpen = false; editTarget = null; }} aria-label={$_('common.close')}><span class="material-symbols-rounded">close</span></button>
       </header>
       <div class="modal-body">
         <label class="field">
@@ -1162,7 +1164,7 @@
           </label>
           <label class="field field-unit">
             <span class="field-label">{$_('shopping_page.unit')}</span>
-            <UnitPicker bind:value={editUnit} placeholder="unit" />
+            <UnitPicker bind:value={editUnit} placeholder={$_('shopping_ui.unit_placeholder')} />
           </label>
         </div>
       </div>
@@ -1181,7 +1183,7 @@
     <div class="modal modal-aisle" on:click|stopPropagation>
       <header class="modal-header">
         <h2>{$_('routes.shopping.change_aisle')}</h2>
-        <button class="btn-icon" on:click={() => { aisleSheetOpen = false; aisleTarget = null; }} aria-label="Close"><span class="material-symbols-rounded">close</span></button>
+        <button class="btn-icon" on:click={() => { aisleSheetOpen = false; aisleTarget = null; }} aria-label={$_('common.close')}><span class="material-symbols-rounded">close</span></button>
       </header>
       <div class="modal-body">
         <p class="aisle-help">{$_('routes.shopping.aisle_help')}</p>
@@ -1216,13 +1218,13 @@
     <div class="modal" on:click|stopPropagation>
       <header class="modal-header">
         <h2>{$_('shopping_page.add_from_recipe')}</h2>
-        <button class="btn-icon" on:click={() => pickerOpen = false} aria-label="Close"><span class="material-symbols-rounded">close</span></button>
+        <button class="btn-icon" on:click={() => pickerOpen = false} aria-label={$_('common.close')}><span class="material-symbols-rounded">close</span></button>
       </header>
       <div class="modal-body">
-        <input class="input" type="search" placeholder="Search recipes…" bind:value={pickerSearch} />
+        <input class="input" type="search" placeholder={$_('routes.recipes.search_placeholder')} bind:value={pickerSearch} />
         <label class="check-row">
           <input type="checkbox" bind:checked={pickerOnlyMissing} />
-          <span>Only add items I don't have in pantry</span>
+          <span>{$_('shopping_ui.only_missing')}</span>
         </label>
         <div class="recipe-picker">
           {#each filteredPickerRecipes as r (r.id)}
@@ -1235,13 +1237,13 @@
               <div class="recipe-meta">
                 <span class="recipe-name">{r.name}</span>
                 {#if r.pantry_match}
-                  <span class="recipe-match">{r.pantry_match.have}/{r.pantry_match.need} in pantry</span>
+                  <span class="recipe-match">{$_('shopping_ui.pantry_match', { values: { have: r.pantry_match.have, need: r.pantry_match.need } })}</span>
                 {/if}
               </div>
               <span class="material-symbols-rounded chev">add</span>
             </button>
           {:else}
-            <p class="empty-line">No recipes match.</p>
+            <p class="empty-line">{$_('shopping_ui.no_recipes_match')}</p>
           {/each}
         </div>
       </div>
@@ -1256,29 +1258,29 @@
     <div class="modal modal-plan" on:click|stopPropagation>
       <header class="modal-header">
         <h2>{$_('shopping_page.add_from_planned')}</h2>
-        <button class="btn-icon" on:click={() => planImportOpen = false} aria-label="Close"><span class="material-symbols-rounded">close</span></button>
+        <button class="btn-icon" on:click={() => planImportOpen = false} aria-label={$_('common.close')}><span class="material-symbols-rounded">close</span></button>
       </header>
       <div class="modal-body">
-        <p class="plan-help">Pull ingredients from every planned cook in this window and dedupe them into one list.</p>
+        <p class="plan-help">{$_('shopping_ui.plan_help')}</p>
         <div class="plan-dates">
           <label class="field">
             <span class="field-label">{$_('shopping_page.from')}</span>
             <DateInput bind:value={planFrom} max={planTo} />
           </label>
           <label class="field">
-            <span class="field-label">To</span>
+            <span class="field-label">{$_('shopping_ui.to')}</span>
             <DateInput bind:value={planTo} min={planFrom} />
           </label>
         </div>
         <label class="check-row">
           <input type="checkbox" bind:checked={planOnlyMissing} />
-          <span>Only add items I don't have in pantry</span>
+          <span>{$_('shopping_ui.only_missing')}</span>
         </label>
       </div>
       <footer class="modal-footer">
         <button class="btn btn-secondary" on:click={() => planImportOpen = false} disabled={planBusy}>{$_('shopping_page.cancel')}</button>
         <button class="btn btn-primary" on:click={runPlanImport} disabled={planBusy || !planFrom || !planTo}>
-          {planBusy ? 'Adding…' : 'Add to List'}
+          {planBusy ? $_('shopping_ui.adding') : $_('shopping_ui.add_to_list')}
         </button>
       </footer>
     </div>
@@ -1383,7 +1385,8 @@
   }
   .status-actions { display: flex; gap: 6px; flex-wrap: wrap; }
   .status-text { font-size: 13px; color: var(--text-2); }
-  .status-text strong { color: var(--text-1); }
+  /* strong comes from {@html} (shopping_ui.remaining_html). */
+  .status-text :global(strong) { color: var(--text-1); }
   .btn.tiny { padding: 6px 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
   .btn.tiny .material-symbols-rounded { font-size: 16px; }
 

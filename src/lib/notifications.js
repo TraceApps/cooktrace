@@ -9,6 +9,7 @@
  * pings) lands when those features ship.
  */
 import { isNative } from './platform.js';
+import { tr } from './messages.js';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
 const _dlog = import.meta.env.DEV
@@ -107,8 +108,8 @@ export async function showUpdateNotification(latest) {
       notifications: [{
         id: UPDATE_NOTIFICATION_ID,
         channelId: 'cooktrace-updates',
-        title: 'CookTrace update available',
-        body: `${latest.version} is ready. Tap to install.`,
+        title: tr('notify.update_title', 'CookTrace update available'),
+        body: tr('notify.update_body', `${latest.version} is ready. Tap to install.`, { version: latest.version }),
         extra: { version: latest.version, notesUrl: latest.notesUrl || '' },
       }],
     });

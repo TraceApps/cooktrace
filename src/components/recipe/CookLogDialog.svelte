@@ -94,10 +94,10 @@
   }
 
   const MEAL_TYPES = [
-    { id: 'breakfast', label: 'Breakfast', icon: 'free_breakfast' },
-    { id: 'lunch',     label: 'Lunch',     icon: 'lunch_dining'   },
-    { id: 'dinner',    label: 'Dinner',    icon: 'restaurant'     },
-    { id: 'snack',     label: 'Snack',     icon: 'cookie'         },
+    { id: 'breakfast', labelKey: 'cook_log_dialog_ui.meal_breakfast', icon: 'free_breakfast' },
+    { id: 'lunch',     labelKey: 'cook_log_dialog_ui.meal_lunch',     icon: 'lunch_dining'   },
+    { id: 'dinner',    labelKey: 'cook_log_dialog_ui.meal_dinner',    icon: 'restaurant'     },
+    { id: 'snack',     labelKey: 'cook_log_dialog_ui.meal_snack',     icon: 'cookie'         },
   ];
 
   function removePhoto(i) {
@@ -236,10 +236,10 @@
     >
       <header class="cl-header">
         <h2 class="cl-title">
-          {editing ? 'Edit Diary Entry' : 'Add to Diary'}
+          {editing ? $_('cook_log_dialog_ui.title_edit') : $_('cook_log_dialog_ui.add_to_diary')}
           {#if recipeName}<span class="cl-subtitle">{recipeName}</span>{/if}
         </h2>
-        <button class="icon-btn" on:click={cancel} aria-label="Close">
+        <button class="icon-btn" on:click={cancel} aria-label={$_('common.close')}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </header>
@@ -252,33 +252,33 @@
 
         <div class="cl-field">
           <span class="cl-label">{$_('cook_log_dialog.meal')} <span class="cl-hint">{$_('cook_log_dialog.optional')}</span></span>
-          <div class="meal-chips" role="radiogroup" aria-label="Meal type">
+          <div class="meal-chips" role="radiogroup" aria-label={$_('cook_log_dialog_ui.meal_type')}>
             {#each MEAL_TYPES as m}
               <button type="button"
                 class="meal-chip" class:active={mealType === m.id}
                 aria-pressed={mealType === m.id}
                 on:click={() => mealType = (mealType === m.id ? null : m.id)}>
                 <span class="material-symbols-rounded">{m.icon}</span>
-                {m.label}
+                {$_(m.labelKey)}
               </button>
             {/each}
           </div>
         </div>
 
         <div class="cl-field">
-          <span class="cl-label">How was it? <span class="cl-hint">(this cook only)</span></span>
-          <div class="rating-row" role="radiogroup" aria-label="Rating">
+          <span class="cl-label">{$_('cook_log_dialog_ui.how_was_it')} <span class="cl-hint">{$_('cook_log_dialog_ui.this_cook_only')}</span></span>
+          <div class="rating-row" role="radiogroup" aria-label={$_('editor.rating')}>
             {#each [1, 2, 3, 4, 5] as n}
               <button type="button"
                 class="rating-star" class:on={rating >= n}
-                aria-label={`${n} star${n === 1 ? '' : 's'}`}
+                aria-label={$_('cook_log_dialog_ui.n_stars', { values: { count: n } })}
                 on:click={() => rating = (rating === n ? 0 : n)}>
                 <span class="material-symbols-rounded">{rating >= n ? 'star' : 'star_outline'}</span>
               </button>
             {/each}
             {#if rating > 0}
               <button type="button" class="rating-clear" on:click={() => rating = 0}
-                title="Clear rating" aria-label="Clear rating">
+                title={$_('cook_log_dialog_ui.clear_rating')} aria-label={$_('cook_log_dialog_ui.clear_rating')}>
                 <span class="material-symbols-rounded">close</span>
               </button>
             {/if}
@@ -306,13 +306,13 @@
             class="input"
             rows="3"
             bind:value={notes}
-            placeholder="Doubled the garlic. Used buttermilk instead of milk. Took 5 min less than expected."
+            placeholder={$_('cook_log_dialog_ui.notes_placeholder')}
           ></textarea>
         </label>
 
         <div class="cl-field">
           <span class="cl-label">
-            Photos <span class="cl-hint">(optional — add as many as you want)</span>
+            {$_('cook_log_dialog_ui.photos')} <span class="cl-hint">{$_('cook_log_dialog_ui.photos_hint')}</span>
           </span>
 
           <!-- Same 3-button row as the standard ImagePicker (Camera /
@@ -320,11 +320,11 @@
                with the recipe editor + pantry editor. -->
           <div class="picker-actions">
             <button type="button" class="action-btn" on:click={openCamera} disabled={photoUploading}>
-              <span class="material-symbols-rounded">photo_camera</span> Camera
+              <span class="material-symbols-rounded">photo_camera</span> {$_('cook_log_dialog_ui.camera')}
             </button>
             <button type="button" class="action-btn" on:click={() => fileInput?.click()} disabled={photoUploading}>
               <span class="material-symbols-rounded">photo_library</span>
-              {photoUploading ? 'Uploading…' : 'Upload'}
+              {photoUploading ? $_('cook_log_dialog_ui.uploading') : $_('cook_log_dialog_ui.upload')}
             </button>
             <button type="button" class="action-btn" on:click={openUrlEntry} disabled={photoUploading}>
               <span class="material-symbols-rounded">link</span> URL
@@ -336,7 +336,7 @@
                 bind:value={urlEntry}
                 on:keydown={e => e.key === 'Enter' && applyUrlEntry()}
                 autofocus />
-              <button type="button" class="btn btn-primary" on:click={applyUrlEntry}>Add</button>
+              <button type="button" class="btn btn-primary" on:click={applyUrlEntry}>{$_('cook_log_dialog_ui.add')}</button>
               <button type="button" class="btn btn-secondary" on:click={() => { urlEntryOpen = false; urlEntry = ''; }}>{$_('cook_log_dialog.cancel')}</button>
             </div>
           {/if}
@@ -344,13 +344,13 @@
           {#if photos.length > 0}
             <div class="photo-strip">
               {#each photos as p, i (p + i)}
-                <button type="button" class="photo-thumb" on:click={() => openLightbox(i)} aria-label="View photo {i + 1}">
+                <button type="button" class="photo-thumb" on:click={() => openLightbox(i)} aria-label={$_('cook_log_dialog_ui.view_photo_n', { values: { n: i + 1 } })}>
                   <img src={resolveAssetUrl(p)} alt="" />
                   <span class="photo-remove"
                     on:click|stopPropagation={() => removePhoto(i)}
                     role="button" tabindex="0"
                     on:keydown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); removePhoto(i); } }}
-                    aria-label="Remove photo" title="Remove">
+                    aria-label={$_('cook_log_dialog_ui.remove_photo')} title={$_('cook_log_dialog_ui.remove')}>
                     <span class="material-symbols-rounded">close</span>
                   </span>
                 </button>
@@ -367,7 +367,7 @@
         <button class="btn btn-secondary" on:click={cancel} disabled={busy}>{$_('cook_log_dialog.cancel')}</button>
         <button class="btn btn-primary" on:click={save} disabled={busy || photoUploading}>
           <span class="material-symbols-rounded">restaurant</span>
-          {photoUploading ? 'Uploading photo…' : busy ? 'Saving…' : (editing ? 'Save changes' : 'Add to Diary')}
+          {photoUploading ? $_('cook_log_dialog_ui.uploading_photo') : busy ? $_('common.saving') : (editing ? $_('cook_log_dialog_ui.save_changes') : $_('cook_log_dialog_ui.add_to_diary'))}
         </button>
       </footer>
     </div>
@@ -381,16 +381,16 @@
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
   <div use:portal class="lb-backdrop" on:click={closeLightbox} use:closeOnBack={closeLightbox}
     in:fade={{ duration: 160 }} out:fade={{ duration: 120 }}>
-    <button class="lb-close" on:click|stopPropagation={closeLightbox} aria-label="Close" title="Close (Esc)">
+    <button class="lb-close" on:click|stopPropagation={closeLightbox} aria-label={$_('common.close')} title={$_('cook_log_dialog_ui.close_esc')}>
       <span class="material-symbols-rounded">close</span>
     </button>
     {#if photos.length > 1}
       <button class="lb-nav lb-prev" on:click|stopPropagation={lightboxPrev}
-        disabled={lightboxIndex === 0} aria-label="Previous photo">
+        disabled={lightboxIndex === 0} aria-label={$_('cook_log_dialog_ui.previous_photo')}>
         <span class="material-symbols-rounded">chevron_left</span>
       </button>
       <button class="lb-nav lb-next" on:click|stopPropagation={lightboxNext}
-        disabled={lightboxIndex === photos.length - 1} aria-label="Next photo">
+        disabled={lightboxIndex === photos.length - 1} aria-label={$_('cook_log_dialog_ui.next_photo')}>
         <span class="material-symbols-rounded">chevron_right</span>
       </button>
       <div class="lb-counter">{lightboxIndex + 1} / {photos.length}</div>

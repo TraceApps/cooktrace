@@ -11,7 +11,13 @@
   so the bundle hit only happens when a user actually starts typing a password.
 -->
 <script>
-  import { estimate, STRENGTH_LABELS, STRENGTH_COLORS } from '../../lib/password-strength.js';
+  import { _ } from 'svelte-i18n';
+  import { estimate, STRENGTH_COLORS } from '../../lib/password-strength.js';
+
+  const STRENGTH_KEYS = [
+    'password.strength_0', 'password.strength_1', 'password.strength_2',
+    'password.strength_3', 'password.strength_4',
+  ];
 
   export let password = '';
   export let userInputs = [];
@@ -35,7 +41,7 @@
   }
 
   $: _score    = _result?.score ?? 0;
-  $: _label    = password ? STRENGTH_LABELS[_score] : '';
+  $: _label    = password ? $_(STRENGTH_KEYS[_score]) : '';
   $: _color    = STRENGTH_COLORS[_score];
   $: _belowMin = password && _score < minScore;
   $: _warning  = _result?.feedback?.warning || '';
@@ -45,14 +51,14 @@
 {#if password}
   <div class="strength-wrap">
     <div class="strength-track" aria-hidden="true">
-      {#each Array(4) as _, i}
+      {#each Array(4) as _bar, i}
         <div class="strength-bar" style="background:{i < _score ? _color : 'var(--surface-2)'}"></div>
       {/each}
     </div>
     <div class="strength-row">
       <span class="strength-label" style="color:{_color}">{_label}</span>
       {#if _belowMin}
-        <span class="strength-min">· below required strength</span>
+        <span class="strength-min">· {$_('password_strength_meter_ui.below_required')}</span>
       {/if}
     </div>
     {#if _warning || _suggest.length > 0}

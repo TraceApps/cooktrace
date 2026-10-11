@@ -105,7 +105,7 @@
     _invalidate();
   }
   function _modelLabel(m) {
-    return m === AI_MODEL_CUSTOM ? 'Custom…' : m;
+    return m === AI_MODEL_CUSTOM ? $_('settings_trace_ui.model_custom') : m;
   }
   // Required fields the user must fill in for a meaningful test.
   $: canTest = !envLocks.ai
@@ -199,7 +199,7 @@
 <div class="card settings-card">
   {#if _displayedAiEnabled}
     {@const _provider = AI_PROVIDERS.find(p => p.id === $aiProvider)}
-    {@const _label = envLocks.ai ? 'Environment-locked' :
+    {@const _label = envLocks.ai ? $_('settings_trace_ui.env_locked') :
       (_provider ? _provider.label : ($aiProvider || ''))}
     <ConnectionStatus
       status={testing ? 'testing' : ($aiKeyVerified || testStatus === 'ok' || (envLocks.ai && envLocks.ai_enabled) ? 'ok' : (testStatus === 'fail' ? 'fail' : ''))}
@@ -286,10 +286,10 @@
       <div style="padding:8px 16px 12px;display:flex;gap:8px;align-items:flex-start">
         <span class="material-symbols-rounded" style="font-size:16px;color:var(--muted);flex-shrink:0;margin-top:2px">info</span>
         <div class="setting-desc" style="margin:0;line-height:1.5">
-          Enter the exact model ID from the vendor (e.g.
-          {#if $aiProvider === 'gemini'}<a href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener" class="about-link">Google's model list</a>
-          {:else if $aiProvider === 'claude'}<a href="https://docs.anthropic.com/en/docs/about-claude/models/overview" target="_blank" rel="noopener" class="about-link">Anthropic's model list</a>
-          {:else}<a href="https://platform.openai.com/docs/models" target="_blank" rel="noopener" class="about-link">OpenAI's model list</a>{/if}). Use this if the preset dropdown doesn't have the model you want.
+          {$_('settings_trace_ui.model_hint_prefix')}
+          {#if $aiProvider === 'gemini'}<a href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener" class="about-link">{$_('settings_trace_ui.model_list_google')}</a>
+          {:else if $aiProvider === 'claude'}<a href="https://docs.anthropic.com/en/docs/about-claude/models/overview" target="_blank" rel="noopener" class="about-link">{$_('settings_trace_ui.model_list_anthropic')}</a>
+          {:else}<a href="https://platform.openai.com/docs/models" target="_blank" rel="noopener" class="about-link">{$_('settings_trace_ui.model_list_openai')}</a>{/if}{$_('settings_trace_ui.model_hint_suffix')}
         </div>
       </div>
     {/if}
@@ -297,17 +297,17 @@
     {#if !envLocks.ai}
     <div class="setting-divider"></div>
     <div class="setting-row stack">
-      <span class="setting-label">API Key</span>
+      <span class="setting-label">{$_('settings_page.usda.api_key')}</span>
       <div class="key-row">
         <!-- One input whose type flips, so showing or hiding the key
              mid-edit keeps focus and still saves on blur. -->
-        <input aria-label="API Key" class="input" type={showKey ? 'text' : 'password'}
+        <input aria-label={$_('settings_page.usda.api_key')} class="input" type={showKey ? 'text' : 'password'}
           value={aiApiKeyDraft} on:input={e => { aiApiKeyDraft = e.currentTarget.value; _invalidate(); }}
           placeholder="sk-…"
           on:blur={saveAiKey}
           on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
         <button class="key-toggle" on:mousedown|preventDefault on:click={() => showKey = !showKey}
-          aria-label={showKey ? 'Hide' : 'Show'}>
+          aria-label={showKey ? $_('common.hide') : $_('settings_trace_ui.show')}>
           <span class="material-symbols-rounded">{showKey ? 'visibility_off' : 'visibility'}</span>
         </button>
       </div>
@@ -326,7 +326,7 @@
       <div>
         <span class="setting-label">{$_('settings_trace_ct.chef_hat')}</span>
         <span class="setting-desc">
-          A small flourish for CookTrace — same Trace face, with a chef hat on top everywhere it appears.
+          {$_('settings_trace_ui.chef_hat_desc')}
         </span>
       </div>
       <input type="checkbox" class="toggle-cb"
@@ -343,7 +343,7 @@
       <div>
         <span class="setting-label">{$_('settings_trace_ct.smart_log')}</span>
         <span class="setting-desc">
-          Hold the Trace button, speak what you cooked / bought / need, and let Trace add it for you. Examples: "I cooked the lasagna," "Add bananas to my shopping list," "I'm out of eggs," "Plan tacos for Friday." Tap-to-dictate (transcript only) still works when Smart Log is off.
+          {$_('settings_trace_ui.smart_log_desc')}
         </span>
       </div>
       <input type="checkbox" class="toggle-cb"

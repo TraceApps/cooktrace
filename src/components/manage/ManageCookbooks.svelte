@@ -214,9 +214,9 @@
 
   async function remove(cb) {
     const ok = await confirmDialog({
-      title: `Delete "${cb.name}"?`,
-      message: `Removes the cookbook (${cb.recipe_count} recipe${cb.recipe_count === 1 ? '' : 's'} stay in your library).`,
-      confirmText: 'Delete',
+      title: $_('manage_ui.delete_title', { values: { name: cb.name } }),
+      message: $_('manage_cookbooks_ui.delete_message', { values: { count: cb.recipe_count ?? 0 } }),
+      confirmText: $_('common.delete'),
       dangerous: true,
     });
     if (!ok) return;
@@ -232,18 +232,18 @@
 <div class="mgr">
   <header class="mgr-head">
     <h2>{$_('manage_cookbooks.title')}</h2>
-    <p class="mgr-desc">User-curated collections of recipes. A recipe can live in multiple cookbooks. Click a cookbook to edit its contents.</p>
+    <p class="mgr-desc">{$_('manage_cookbooks_ui.desc')}</p>
   </header>
 
   {#if loading}
-    <Spinner block label="Loading…" />
+    <Spinner block label={$_('common.loading')} />
   {:else}
     {#if cookbooks.length === 0}
-      <p class="empty">No cookbooks yet. Create one below.</p>
+      <p class="empty">{$_('manage_cookbooks_ui.empty')}</p>
     {:else}
-      <input class="input filter" type="search" placeholder="Filter…" bind:value={filter} />
+      <input class="input filter" type="search" placeholder={$_('manage_ui.filter_ph')} bind:value={filter} />
       {#if filteredEmpty}
-        <p class="empty">No items match "{filter}".</p>
+        <p class="empty">{$_('manage_ui.no_match', { values: { filter } })}</p>
       {:else}
       <ul class="row-list">
         {#each filtered as cb (cb.id)}
@@ -258,7 +258,7 @@
             on:dragend={_onDragEnd}>
             {#if editingId === cb.id}
               <button class="cover edit-cover" on:click={() => _coverInputs[cb.id]?.click()}
-                title="Upload cover image">
+                title={$_('manage_cookbooks_ui.upload_cover')}>
                 {#if editCover}
                   <img src={resolveAssetUrl(editCover)} alt="" />
                 {:else}
@@ -270,21 +270,21 @@
               </button>
               <div class="edit-form">
                 <input class="input edit-name" bind:value={editName} placeholder={$_('manage_cookbooks.name_ph')} />
-                <input class="input edit-desc" bind:value={editDesc} placeholder="Description (optional)" />
+                <input class="input edit-desc" bind:value={editDesc} placeholder={$_('manage_ui.desc_optional_ph')} />
                 <div class="row-actions">
                   {#if editCover}
-                    <button class="btn-icon small" on:click={() => editCover = ''} aria-label="Remove cover" title="Remove cover">
+                    <button class="btn-icon small" on:click={() => editCover = ''} aria-label={$_('manage_cookbooks_ui.remove_cover')} title={$_('manage_cookbooks_ui.remove_cover')}>
                       <span class="material-symbols-rounded">image_not_supported</span>
                     </button>
                   {/if}
                   <button class="btn btn-secondary tiny" on:click={cancelEdit}>{$_('manage_cookbooks.cancel')}</button>
                   <button class="btn btn-primary tiny" on:click={() => saveEdit(cb)} disabled={!editName.trim() || coverUploading}>
-                    {coverUploading ? 'Uploading…' : 'Save'}
+                    {coverUploading ? $_('pantry_editor.actions.uploading') : $_('common.save')}
                   </button>
                 </div>
               </div>
             {:else}
-              <button class="cover" on:click={() => open(cb)} aria-label={`Open ${cb.name}`} title={`Open ${cb.name}`}>
+              <button class="cover" on:click={() => open(cb)} aria-label={$_('manage_cookbooks_ui.open_name', { values: { name: cb.name } })} title={$_('manage_cookbooks_ui.open_name', { values: { name: cb.name } })}>
                 {#if cb.cover_image_url}
                   <img src={resolveAssetUrl(cb.cover_image_url)} alt="" />
                 {:else}
@@ -294,28 +294,28 @@
               <div class="meta">
                 <div class="title-row">
                   <button class="title-btn" on:click={() => open(cb)}>{cb.name}</button>
-                  {#if cb.is_smart}<span class="smart-badge" title="Smart cookbook — auto-populated from a filter">{$_('manage_cookbooks.smart_badge')}</span>{/if}
+                  {#if cb.is_smart}<span class="smart-badge" title={$_('manage_cookbooks_ui.smart_title')}>{$_('manage_cookbooks.smart_badge')}</span>{/if}
                 </div>
                 {#if cb.description}<p class="desc">{cb.description}</p>{/if}
-                <span class="count">{cb.recipe_count} {cb.recipe_count === 1 ? 'recipe' : 'recipes'}</span>
+                <span class="count">{$_('manage_ui.recipe_count', { values: { count: cb.recipe_count ?? 0 } })}</span>
               </div>
               <div class="row-actions">
                 <div class="reorder">
                   <button class="btn-icon small" on:click={() => moveCookbook(cb, 'up')}
-                    aria-label="Move up" title="Move up"
+                    aria-label={$_('manage_ui.move_up')} title={$_('manage_ui.move_up')}
                     disabled={cookbooks[0]?.id === cb.id}>
                     <span class="material-symbols-rounded">keyboard_arrow_up</span>
                   </button>
                   <button class="btn-icon small" on:click={() => moveCookbook(cb, 'down')}
-                    aria-label="Move down" title="Move down"
+                    aria-label={$_('manage_ui.move_down')} title={$_('manage_ui.move_down')}
                     disabled={cookbooks[cookbooks.length - 1]?.id === cb.id}>
                     <span class="material-symbols-rounded">keyboard_arrow_down</span>
                   </button>
                 </div>
-                <button class="btn-icon small" on:click={() => startEdit(cb)} aria-label="Edit" title="Edit">
+                <button class="btn-icon small" on:click={() => startEdit(cb)} aria-label={$_('common.edit')} title={$_('common.edit')}>
                   <span class="material-symbols-rounded">edit</span>
                 </button>
-                <button class="btn-icon small danger" on:click={() => remove(cb)} aria-label="Delete" title="Delete">
+                <button class="btn-icon small danger" on:click={() => remove(cb)} aria-label={$_('common.delete')} title={$_('common.delete')}>
                   <span class="material-symbols-rounded">delete</span>
                 </button>
               </div>
@@ -327,39 +327,39 @@
     {/if}
 
     <div class="add-row">
-      <input class="input add-name" placeholder="New cookbook name…" bind:value={newName}
+      <input class="input add-name" placeholder={$_('manage_cookbooks_ui.new_name_ph')} bind:value={newName}
         on:keydown={(e) => { if (e.key === 'Enter') create(); }} />
-      <input class="input add-desc" placeholder="Description (optional)" bind:value={newDesc} />
-      <label class="smart-toggle" title="Auto-populate from a filter instead of hand-picking recipes">
+      <input class="input add-desc" placeholder={$_('manage_ui.desc_optional_ph')} bind:value={newDesc} />
+      <label class="smart-toggle" title={$_('manage_cookbooks_ui.smart_toggle_title')}>
         <input type="checkbox" bind:checked={newSmart} />
         <span>{$_('manage_cookbooks.smart')}</span>
       </label>
       <button class="btn btn-primary" on:click={create} disabled={creating || !newName.trim()}>
-        {creating ? 'Adding…' : 'Add'}
+        {creating ? $_('foods.adding') : $_('manage_ui.add')}
       </button>
     </div>
 
     {#if newSmart}
       <div class="smart-filter">
-        <p class="smart-help">Filter is re-evaluated every time someone opens the cookbook, so it stays in sync with your library.</p>
+        <p class="smart-help">{$_('manage_cookbooks_ui.smart_help')}</p>
         <div class="filter-row">
           <span class="filter-label">{$_('manage_cookbooks.category')}</span>
           <select class="input" bind:value={newSmartCategory}>
-            <option value="">— Any —</option>
+            <option value="">{$_('manage_cookbooks_ui.any')}</option>
             {#each categories as c (c.id)}
               <option value={String(c.id)}>{c.name}</option>
             {/each}
           </select>
         </div>
         <div class="filter-row">
-          <span class="filter-label">Tags (all required)</span>
+          <span class="filter-label">{$_('manage_cookbooks_ui.tags_all_required')}</span>
           <Combobox
             mode="chips"
             bind:value={newSmartTags}
             options={tagOptions}
-            placeholder="vegan, weeknight…"
+            placeholder={$_('manage_cookbooks_ui.tags_ph')}
             creatable={true}
-            createLabel="Add tag"
+            createLabel={$_('manage_cookbooks_ui.add_tag')}
           />
         </div>
         <label class="filter-row check-row">

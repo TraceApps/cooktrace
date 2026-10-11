@@ -27,7 +27,7 @@
   let _hasCrashReport = false;
 
   function _openLogsSheet() {
-    _logsText = getLogBufferText() || '(no log lines captured yet)';
+    _logsText = getLogBufferText() || $_('settings_diagnostics_ui.no_lines');
     _logsCopied = false;
     _hasCrashReport = hasCrashReport();
     _logsSheet = true;
@@ -46,12 +46,12 @@
       if (isNative) {
         const { Share } = await import('@capacitor/share');
         await Share.share({
-          title: 'CookTrace diagnostic logs',
+          title: $_('settings_diagnostics_ui.share_logs_title'),
           text: _logsText,
-          dialogTitle: 'Share CookTrace logs',
+          dialogTitle: $_('settings_diagnostics_ui.share_logs_dialog'),
         });
       } else if (typeof navigator !== 'undefined' && navigator.share) {
-        await navigator.share({ title: 'CookTrace diagnostic logs', text: _logsText });
+        await navigator.share({ title: $_('settings_diagnostics_ui.share_logs_title'), text: _logsText });
       } else {
         await _copyLogs();
       }
@@ -84,9 +84,9 @@
       await _shareFileViaCache({
         srcPath: f.path,
         cacheBasename: 'cooktrace-log',
-        title: 'CookTrace diagnostic logs',
-        text: 'CookTrace log file',
-        dialogTitle: 'Share CookTrace log file',
+        title: $_('settings_diagnostics_ui.share_logs_title'),
+        text: $_('settings_diagnostics_ui.log_file_text'),
+        dialogTitle: $_('settings_diagnostics_ui.share_log_file_dialog'),
       });
     } catch { /* user cancelled */ }
   }
@@ -97,9 +97,9 @@
       await _shareFileViaCache({
         srcPath: f.path,
         cacheBasename: 'cooktrace-crash',
-        title: 'CookTrace crash report',
-        text: 'CookTrace crash report',
-        dialogTitle: 'Share CookTrace crash report',
+        title: $_('settings_diagnostics_ui.crash_report_title'),
+        text: $_('settings_diagnostics_ui.crash_report_title'),
+        dialogTitle: $_('settings_diagnostics_ui.share_crash_dialog'),
       });
     } catch { /* user cancelled */ }
   }
@@ -109,7 +109,7 @@
   }
   function _clearLogs() {
     clearLogBuffer();
-    _logsText = '(cleared)';
+    _logsText = $_('settings_diagnostics_ui.cleared');
   }
   function _toggleVerbose(on) {
     _verboseLogging = on;
@@ -124,14 +124,14 @@
          first thing to look at: a phone says "not a foldable", an opened one
          says "opened flat", and only a half-open one reports a crease. -->
     <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:4px">
-      <span class="setting-label">Foldable</span>
+      <span class="setting-label">{$_('settings_diagnostics_ui.foldable')}</span>
       <div class="setting-desc">
         {#if $fold && $fold.posture === 'flat'}
-          Open flat. Hinge at {$fold.start}-{$fold.end}px, so columns can line up with it.
+          {$_('settings_diagnostics_ui.fold_flat', { values: { start: $fold.start, end: $fold.end } })}
         {:else if $fold}
-          Half open, {$fold.posture === 'book' ? 'like a book' : 'like a laptop'}. Crease at {$fold.start}-{$fold.end}px.
+          {$_($fold.posture === 'book' ? 'settings_diagnostics_ui.fold_half_book' : 'settings_diagnostics_ui.fold_half_laptop', { values: { start: $fold.start, end: $fold.end } })}
         {:else}
-          No hinge reported: not a foldable, or the system does not report one here.
+          {$_('settings_diagnostics_ui.fold_none')}
         {/if}
       </div>
     </div>
@@ -139,7 +139,7 @@
     <div class="setting-row">
       <div>
         <span class="setting-label">{$_('settings_page.diag.mode')}</span>
-        <div class="setting-desc">Enables detailed app-internal logs (sync, settings, notifications){isNative ? ' and writes them to a daily log file on disk so they survive crashes and reloads.' : ' and verbose console output.'} Off by default; turn on while reproducing a bug, then export below.</div>
+        <div class="setting-desc">{isNative ? $_('settings_diagnostics_ui.mode_desc_native') : $_('settings_diagnostics_ui.mode_desc_web')}</div>
       </div>
       <Toggle checked={_verboseLogging} on:change={e => _toggleVerbose(e.detail)} />
     </div>
@@ -151,7 +151,7 @@
       </p>
       <button class="btn btn-secondary" style="height:40px;font-size:13px" on:click={_openLogsSheet}>
         <span class="material-symbols-rounded" style="font-size:16px">terminal</span>
-        View logs{hasCrashReport() ? ' · crash report available' : ''}
+        {hasCrashReport() ? $_('settings_diagnostics_ui.view_logs_crash') : $_('settings_diagnostics_ui.view_logs')}
       </button>
     </div>
   </div>
@@ -159,35 +159,35 @@
 
 <!-- Diagnostic logs viewer — mounted here (paired with the openers /
      state) instead of at the shell so the section is self-contained. -->
-<Sheet bind:open={_logsSheet} title="Diagnostic Logs">
+<Sheet bind:open={_logsSheet} title={$_('settings_diagnostics_ui.logs_title')}>
   <div style="padding:0 4px 8px">
     <p class="setting-desc" style="line-height:1.5;margin-bottom:10px">
-      Recent log lines (capped at 500 normally, 1000 in verbose mode). Header shows app version + platform so the recipient knows what they're looking at.
+      {$_('settings_diagnostics_ui.logs_sheet_desc')}
     </p>
     <textarea readonly style="width:100%;height:280px;font-family:monospace;font-size:11px;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm,6px);background:var(--surface-2);color:var(--text-1);resize:vertical;white-space:pre">{_logsText}</textarea>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
       <button class="btn btn-primary" style="flex:1;min-width:120px;height:40px;font-size:13px" on:click={_copyLogs}>
         {#if _logsCopied}
-          <span class="material-symbols-rounded" style="font-size:16px">check</span> Copied
+          <span class="material-symbols-rounded" style="font-size:16px">check</span> {$_('updates.server.copied')}
         {:else}
-          <span class="material-symbols-rounded" style="font-size:16px">content_copy</span> Copy
+          <span class="material-symbols-rounded" style="font-size:16px">content_copy</span> {$_('settings.users.copy')}
         {/if}
       </button>
       <button class="btn btn-secondary" style="flex:1;min-width:120px;height:40px;font-size:13px" on:click={_shareLogs}>
-        <span class="material-symbols-rounded" style="font-size:16px">share</span> Share Text
+        <span class="material-symbols-rounded" style="font-size:16px">share</span> {$_('settings_diagnostics_ui.share_text')}
       </button>
       <button class="btn btn-secondary" style="flex:1;min-width:120px;height:40px;font-size:13px" on:click={_clearLogs}>
-        <span class="material-symbols-rounded" style="font-size:16px">delete</span> Clear
+        <span class="material-symbols-rounded" style="font-size:16px">delete</span> {$_('common.clear')}
       </button>
     </div>
     {#if isNative && _verboseLogging}
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn btn-secondary" style="flex:1;height:40px;font-size:13px" on:click={_shareLogFile}>
-          <span class="material-symbols-rounded" style="font-size:16px">description</span> Share Log File
+          <span class="material-symbols-rounded" style="font-size:16px">description</span> {$_('settings_diagnostics_ui.share_log_file')}
         </button>
       </div>
       <p class="setting-desc" style="margin-top:6px;font-size:11px">
-        Today's persisted log on disk (rotates daily, last 7 days kept). Better for long sessions or after a crash; the in-memory buffer above resets every reload.
+        {$_('settings_diagnostics_ui.log_file_desc')}
       </p>
     {/if}
     {#if isNative && _hasCrashReport}
@@ -197,14 +197,14 @@
           <strong style="color:var(--danger);font-size:14px">{$_('settings_page.diag.crash_available')}</strong>
         </div>
         <p class="setting-desc" style="margin:0 0 8px;font-size:12px">
-          The app captured an uncaught error. Share the report to help track it down, then dismiss it.
+          {$_('settings_diagnostics_ui.crash_desc')}
         </p>
         <div style="display:flex;gap:8px">
           <button class="btn btn-secondary" style="flex:1;height:36px;font-size:12px" on:click={_shareCrashReport}>
-            <span class="material-symbols-rounded" style="font-size:14px">share</span> Share Crash Report
+            <span class="material-symbols-rounded" style="font-size:14px">share</span> {$_('settings_diagnostics_ui.share_crash')}
           </button>
           <button class="btn btn-secondary" style="flex:1;height:36px;font-size:12px" on:click={_clearCrashReport}>
-            Dismiss
+            {$_('recipe_view_ct.versions.dismiss')}
           </button>
         </div>
       </div>

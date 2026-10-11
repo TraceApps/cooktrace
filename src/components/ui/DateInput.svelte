@@ -10,6 +10,7 @@
     placeholder      — input placeholder; defaults to format hint
 -->
 <script>
+  import { _ } from 'svelte-i18n';
   import Sheet from './Sheet.svelte';
   import DatePicker from './DatePicker.svelte';
   import { dateFormat } from '../../stores/settings.js';
@@ -63,10 +64,9 @@
     }
   }
 
-  function _placeholder() {
-    if (placeholder) return placeholder;
-    return $dateFormat === 'US' ? 'MM/DD/YYYY' : $dateFormat === 'EU' ? 'DD/MM/YYYY' : 'YYYY-MM-DD';
-  }
+  $: shownPlaceholder = placeholder || ($dateFormat === 'US' ? $_('date_input_ui.format_us')
+    : $dateFormat === 'EU' ? $_('date_input_ui.format_eu')
+    : $_('date_input_ui.format_iso'));
 
   function onPickerSelect(e) {
     value = e.detail;
@@ -99,19 +99,19 @@
   <input class="input date-input-text" type="text"
     inputmode="numeric"
     bind:value={textValue}
-    placeholder={_placeholder()}
+    placeholder={shownPlaceholder}
     on:input={onTextInput}
     on:blur={applyText}
     on:keydown={e => { if (e.key === 'Enter') { e.preventDefault(); applyText(); e.target.blur(); } }} />
   <button type="button" class="btn-icon date-input-calendar"
     on:click={() => showPicker = true}
-    aria-label="Open calendar">
+    aria-label={$_('date_input_ui.open_calendar')}>
     <span class="material-symbols-rounded">calendar_month</span>
   </button>
 </div>
 
 {#if showPicker}
-  <Sheet bind:open={showPicker} title="Pick a Date">
+  <Sheet bind:open={showPicker} title={$_('date_input_ui.pick_date')}>
     <div class="date-input-sheet-body">
       <DatePicker bind:value {min} {max} on:select={onPickerSelect} />
     </div>

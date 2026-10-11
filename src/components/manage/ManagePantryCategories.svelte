@@ -69,9 +69,9 @@
 
   async function remove(c) {
     const ok = await confirmDialog({
-      title: `Delete "${c.name}"?`,
-      message: 'Pantry items in this category lose their category label but stay in your pantry.',
-      confirmText: 'Delete',
+      title: $_('manage_ui.delete_title', { values: { name: c.name } }),
+      message: $_('manage_pantry_categories_ui.delete_message'),
+      confirmText: $_('common.delete'),
       dangerous: true,
     });
     if (!ok) return;
@@ -143,17 +143,17 @@
 <div class="mgr">
   <header class="mgr-head">
     <h2>{$_('manage_pantry_cats.title')}</h2>
-    <p class="mgr-desc">Used to group your pantry items into sections (Spices, Produce, etc.) and to filter the Pantry list. The optional Default Aisle labels items added to the shopping list from this category — leave blank to use the category name.</p>
+    <p class="mgr-desc">{$_('manage_pantry_categories_ui.desc')}</p>
   </header>
 
   {#if loading}
-    <Spinner block label="Loading…" />
+    <Spinner block label={$_('common.loading')} />
   {:else if categories.length === 0}
-    <p class="empty">No categories yet. Add one below.</p>
+    <p class="empty">{$_('manage_ui.empty_categories')}</p>
   {:else}
-    <input class="input filter" type="search" placeholder="Filter…" bind:value={filter} />
+    <input class="input filter" type="search" placeholder={$_('manage_ui.filter_ph')} bind:value={filter} />
     {#if filteredEmpty}
-      <p class="empty">No items match "{filter}".</p>
+      <p class="empty">{$_('manage_ui.no_match', { values: { filter } })}</p>
     {:else}
     <ul class="row-list">
       {#each filtered as c (c.id)}
@@ -167,7 +167,7 @@
           on:drop={(e) => _onDrop(c, e)}
           on:dragend={_onDragEnd}>
           {#if editingId === null}
-            <span class="grip" title="Drag to reorder" aria-hidden="true">
+            <span class="grip" title={$_('manage_ui.drag_reorder')} aria-hidden="true">
               <span class="material-symbols-rounded">drag_indicator</span>
             </span>
           {/if}
@@ -175,7 +175,7 @@
             <div class="edit-form">
               <input class="input name-input" bind:value={editName} placeholder={$_('manage_pantry_cats.name_ph')} />
               <IconPicker bind:value={editIcon} placeholder={$_('manage_pantry_cats.icon_ph')} />
-              <input class="input aisle-input" bind:value={editDefaultAisle} placeholder="Default Aisle (optional)" maxlength="40" />
+              <input class="input aisle-input" bind:value={editDefaultAisle} placeholder={$_('manage_pantry_categories_ui.aisle_ph')} maxlength="40" />
               <div class="row-actions">
                 <button class="btn btn-secondary tiny" on:click={cancelEdit}>{$_('manage_pantry_cats.cancel')}</button>
                 <button class="btn btn-primary tiny" on:click={() => saveEdit(c)} disabled={!editName.trim()}>{$_('manage_pantry_cats.save')}</button>
@@ -185,22 +185,22 @@
             <span class="material-symbols-rounded row-icon">{c.icon || 'kitchen'}</span>
             <span class="row-name">{c.name}</span>
             {#if c.default_aisle}
-              <span class="aisle-pill" title="Default shopping list aisle">
+              <span class="aisle-pill" title={$_('manage_pantry_categories_ui.aisle_title')}>
                 <span class="material-symbols-rounded">category</span>{c.default_aisle}
               </span>
             {/if}
             {#if Number.isFinite(c.pantry_count)}
               <span class="usage-pill" class:zero={c.pantry_count === 0}
-                title={c.pantry_count === 0 ? 'No pantry items use this category' : `${c.pantry_count} pantry item${c.pantry_count === 1 ? '' : 's'}`}>
-                {c.pantry_count} {c.pantry_count === 1 ? 'item' : 'items'}
+                title={c.pantry_count === 0 ? $_('manage_pantry_categories_ui.unused') : $_('manage_pantry_categories_ui.pantry_items', { values: { count: c.pantry_count } })}>
+                {$_('manage_ui.items', { values: { count: c.pantry_count } })}
               </span>
             {/if}
             <span class="row-meta">/{c.slug}</span>
             <div class="row-actions">
-              <button class="btn-icon small" on:click={() => startEdit(c)} aria-label="Edit" title="Edit">
+              <button class="btn-icon small" on:click={() => startEdit(c)} aria-label={$_('common.edit')} title={$_('common.edit')}>
                 <span class="material-symbols-rounded">edit</span>
               </button>
-              <button class="btn-icon small danger" on:click={() => remove(c)} aria-label="Delete" title="Delete">
+              <button class="btn-icon small danger" on:click={() => remove(c)} aria-label={$_('common.delete')} title={$_('common.delete')}>
                 <span class="material-symbols-rounded">delete</span>
               </button>
             </div>
@@ -212,12 +212,12 @@
   {/if}
 
   <div class="add-row">
-    <input class="input name-input" placeholder="New category name…" bind:value={newName}
+    <input class="input name-input" placeholder={$_('manage_ui.new_category_ph')} bind:value={newName}
       on:keydown={(e) => { if (e.key === 'Enter') create(); }} />
     <IconPicker bind:value={newIcon} placeholder={$_('manage_pantry_cats.icon_ph')} />
-    <input class="input aisle-input" bind:value={newDefaultAisle} placeholder="Default Aisle (optional)" maxlength="40" />
+    <input class="input aisle-input" bind:value={newDefaultAisle} placeholder={$_('manage_pantry_categories_ui.aisle_ph')} maxlength="40" />
     <button class="btn btn-primary" on:click={create} disabled={creating || !newName.trim()}>
-      {creating ? 'Adding…' : 'Add'}
+      {creating ? $_('foods.adding') : $_('manage_ui.add')}
     </button>
   </div>
 </div>

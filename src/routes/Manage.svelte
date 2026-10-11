@@ -25,18 +25,18 @@
 
   // Section catalog. Order matches the rail.
   const SECTIONS = [
-    { id: 'recipe-categories', label: 'Recipe Categories', icon: 'label',
-      desc: 'One-of badges that appear above each recipe title.' },
-    { id: 'tags',              label: 'Tags',              icon: 'sell',
-      desc: 'Free-form descriptors. Many per recipe.' },
-    { id: 'kitchen-gear',      label: 'Kitchen Gear',      icon: 'blender',
-      desc: 'Tools used in recipes — pots, pans, spatulas, parchment, anything you reach for.' },
-    { id: 'pantry-categories', label: 'Pantry Categories', icon: 'kitchen',
-      desc: 'Sections for grouping the pantry list.' },
-    { id: 'units',             label: 'Units',             icon: 'straighten',
-      desc: 'Cooking units. Disable built-ins or add custom ones.' },
-    { id: 'cookbooks',         label: 'Cookbooks',         icon: 'auto_stories',
-      desc: 'User-curated collections of recipes.' },
+    { id: 'recipe-categories', labelKey: 'manage_recipe_cats.title', icon: 'label',
+      descKey: 'manage_ui.desc_recipe_categories' },
+    { id: 'tags',              labelKey: 'recipe.tags',              icon: 'sell',
+      descKey: 'manage_ui.desc_tags' },
+    { id: 'kitchen-gear',      labelKey: 'manage_ui.kitchen_gear',   icon: 'blender',
+      descKey: 'manage_ui.desc_kitchen_gear' },
+    { id: 'pantry-categories', labelKey: 'manage_pantry_cats.title', icon: 'kitchen',
+      descKey: 'manage_ui.desc_pantry_categories' },
+    { id: 'units',             labelKey: 'manage_units.title',       icon: 'straighten',
+      descKey: 'manage_ui.desc_units' },
+    { id: 'cookbooks',         labelKey: 'manage_cookbooks.title',   icon: 'auto_stories',
+      descKey: 'manage_ui.desc_cookbooks' },
   ];
 
   // Default to the first section if no param. URL stays in sync as the
@@ -98,7 +98,7 @@
   </header>
 
   <div class="manage-body">
-    <nav class="rail" aria-label="Manage sections" bind:this={railEl}
+    <nav class="rail" aria-label={$_('manage_ui.sections_label')} bind:this={railEl}
       style="--rail-x:{railX}px; --rail-y:{railY}px; --rail-w:{railW}px; --rail-h:{railH}px">
       {#if railReady}<span class="rail-pill" aria-hidden="true"></span>{/if}
       {#each SECTIONS as s (s.id)}
@@ -111,8 +111,8 @@
         >
           <span class="material-symbols-rounded">{s.icon}</span>
           <span class="rail-text">
-            <span class="rail-label">{s.label}</span>
-            <span class="rail-desc">{s.desc}</span>
+            <span class="rail-label">{$_(s.labelKey)}</span>
+            <span class="rail-desc">{$_(s.descKey)}</span>
           </span>
         </button>
       {/each}
@@ -131,16 +131,18 @@
             <ManagePantryCategories />
           {:else if activeId === 'tags'}
             <ManageTaxonomyList
-              title="Tags"
-              description="Free-form descriptors users add to recipes (vegan, italian, weeknight). Renaming or deleting cascades through every recipe that uses it."
+              storageId="Tags"
+              title={$_('recipe.tags')}
+              description={$_('manage_ui.tags_list_desc')}
               loadFn={() => NtApi.getRecipeTags()}
               renameFn={(o, n) => NtApi.renameRecipeTag(o, n)}
               deleteFn={(name) => NtApi.deleteRecipeTag(name)}
             />
           {:else if activeId === 'kitchen-gear'}
             <ManageTaxonomyList
-              title="Kitchen Gear"
-              description="Tools users list on recipes — pans, spatulas, mixers, parchment paper, sheet trays, anything they reach for. Renaming or deleting cascades through every recipe."
+              storageId="Kitchen Gear"
+              title={$_('manage_ui.kitchen_gear')}
+              description={$_('manage_ui.gear_list_desc')}
               loadFn={() => NtApi.getRecipeTools()}
               renameFn={(o, n) => NtApi.renameRecipeTool(o, n)}
               deleteFn={(name) => NtApi.deleteRecipeTool(name)}

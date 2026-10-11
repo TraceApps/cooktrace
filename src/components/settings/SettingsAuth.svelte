@@ -48,7 +48,7 @@
         logo_url: 'https://cdn.simpleicons.org/auth0/EB5424',
       },
       issuer_hint: 'https://<your-tenant>.auth0.com/',
-      help: 'Auth0 adds custom claims under a namespaced URL like "https://cooktrace.app/roles" — leave the admin claim blank for now and contact your tenant admin to set up a rule that exposes role membership.',
+      helpKey: 'settings_auth_ui.help_auth0',
       hides: [],
     },
     {
@@ -63,7 +63,7 @@
         logo_url: 'https://cdn.simpleicons.org/authelia/000000',
       },
       issuer_hint: 'https://auth.example.com',
-      help: 'Authelia\'s issuer URL is the root URL where Authelia is served — no path suffix.',
+      helpKey: 'settings_auth_ui.help_authelia',
       hides: [],
     },
     {
@@ -78,7 +78,7 @@
         logo_url: '/icons/sso/authentik.svg',
       },
       issuer_hint: 'https://auth.example.com/application/o/<your-app-slug>/',
-      help: 'Issuer URL is the "OpenID Configuration Issuer" shown on the Provider page in Authentik. Make sure your Application uses an OAuth2/OIDC Provider and you\'ve added the redirect URI shown above to its allowed list.',
+      helpKey: 'settings_auth_ui.help_authentik',
       hides: [],
     },
     {
@@ -94,7 +94,7 @@
         logo_url: 'https://cdn.simpleicons.org/google/4285F4',
       },
       issuer_hint: 'https://accounts.google.com',
-      help: 'Google\'s issuer URL is fixed. Group/role claims are not available with standard scopes — admin role mapping is hidden for this provider; promote Google users manually after first login.',
+      helpKey: 'settings_auth_ui.help_google',
       hides: ['admin_group_claim', 'admin_group_value'],
     },
     {
@@ -109,7 +109,7 @@
         logo_url: 'https://cdn.simpleicons.org/keycloak/4D4D4D',
       },
       issuer_hint: 'https://auth.example.com/realms/<your-realm>',
-      help: 'Add a "groups" mapper to your client\'s default scope so the groups claim is included in the ID token.',
+      helpKey: 'settings_auth_ui.help_keycloak',
       hides: [],
     },
     {
@@ -124,12 +124,13 @@
         logo_url: '/icons/sso/pocket-id.svg',
       },
       issuer_hint: 'https://id.example.com',
-      help: 'Pocket ID uses passkeys for primary auth — your users won\'t need a password at the IdP either. Add the redirect URI shown above to the OIDC client in Pocket ID admin.',
+      helpKey: 'settings_auth_ui.help_pocket_id',
       hides: [],
     },
     {
       id: 'custom',
       name: 'Custom / Generic OIDC',
+      nameKey: 'settings_auth_ui.preset_custom',
       icon: 'badge',
       defaults: {
         scope: 'openid profile email',
@@ -139,7 +140,7 @@
         logo_url: '',
       },
       issuer_hint: 'https://your-idp.example.com',
-      help: 'Any OpenID Connect 1.0 compliant provider that supports Authorization Code Flow + PKCE + Discovery should work here.',
+      helpKey: 'settings_auth_ui.help_custom',
       hides: [],
     },
   ];
@@ -288,12 +289,12 @@
       });
       oidcTestResult = await r.json();
     } catch (e) {
-      oidcTestResult = { ok: false, error: 'Could not reach server' };
+      oidcTestResult = { ok: false, error: $_('settings_auth_extra.toast.cant_reach_server') };
     } finally { oidcBusy = false; }
   }
 
   async function deleteProvider(p) {
-    if (!confirm(`Delete provider "${p.display_name || p.issuer_url}"? Linked users will lose this sign-in option.`)) return;
+    if (!confirm($_('settings_auth_ui.confirm_delete_provider', { values: { name: p.display_name || p.issuer_url } }))) return;
     oidcBusy = true;
     try {
       const r = await fetch(apiUrl(`/api/admin/oidc/providers/${p.id}`), {
@@ -315,7 +316,7 @@
       showError($_('settings_auth_extra.toast.need_active_provider'));
       return;
     }
-    if (!next && !confirm('Disable password login? Users without an OIDC link will not be able to sign in until you re-enable it. RECOVERY_TOKEN will still work.')) return;
+    if (!next && !confirm($_('settings_auth_ui.confirm_disable_password'))) return;
     try {
       const r = await fetch(apiUrl('/api/admin/oidc/password-login'), {
         method: 'PUT', credentials: 'include', headers: _csrfHeaders(),
@@ -344,7 +345,7 @@
       <div class="setting-row">
         <div>
           <span class="setting-label">{$_('settings_auth_extra.user_mgmt_required')}</span>
-          <div class="setting-desc">Single Sign-On is scoped to user accounts, so User Management has to be enabled first. Set it up in <strong>Settings → User Management</strong>, then come back here.</div>
+          <div class="setting-desc">{@html $_('settings_auth_ui.um_required_desc_html')}</div>
         </div>
       </div>
     </div>
@@ -353,7 +354,7 @@
       <div class="setting-row">
         <div>
           <span class="setting-label">{$_('settings_auth_extra.admin_only')}</span>
-          <div class="setting-desc">Only admins can configure identity providers. If you need this access, ask the admin of this CookTrace instance to promote your account.</div>
+          <div class="setting-desc">{$_('settings_auth_ui.admin_only_desc')}</div>
         </div>
       </div>
     </div>
@@ -362,11 +363,11 @@
       <div class="setting-row" style="display:flex;flex-direction:column;align-items:stretch;gap:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <div>
-            <span class="setting-label">OIDC Providers (Single Sign-On)</span>
-            <div class="setting-desc">Authentik, Keycloak, Pocket ID, Authelia, Auth0, Google, etc. Users sign in with their existing identity provider.</div>
+            <span class="setting-label">{$_('settings_auth_ui.providers_title')}</span>
+            <div class="setting-desc">{$_('settings_auth_ui.providers_desc')}</div>
           </div>
           <button class="btn btn-secondary" style="height:32px;font-size:12px;padding:0 12px;white-space:nowrap" on:click={startCreateProvider}>
-            + Add Provider
+            {$_('settings_auth_ui.add_provider')}
           </button>
         </div>
 
@@ -377,27 +378,27 @@
               <span class="oidc-name">
                 {p.display_name || p.issuer_url}
                 {#if p.env_locked}
-                  <span class="env-lock-badge" title="Configured via environment variables — edit your .env / docker-compose to change">
+                  <span class="env-lock-badge" title={$_('settings_auth_ui.env_badge_title')}>
                     <span class="material-symbols-rounded" style="font-size:12px">lock</span>
                     env
                   </span>
                 {/if}
               </span>
-              <span class="text-3 text-sm">{p.issuer_url} · link {p.auto_link_verified_email ? 'on' : 'off'} · register {p.auto_register_new_users ? 'on' : 'off'}{!p.is_active ? ' · disabled' : ''}</span>
+              <span class="text-3 text-sm">{p.issuer_url} · {p.auto_link_verified_email ? $_('settings_auth_ui.meta_link_on') : $_('settings_auth_ui.meta_link_off')} · {p.auto_register_new_users ? $_('settings_auth_ui.meta_register_on') : $_('settings_auth_ui.meta_register_off')}{!p.is_active ? ' · ' + $_('settings_auth_ui.meta_disabled') : ''}</span>
             </div>
             <div class="oidc-actions">
-              <button class="btn-icon" title="Test discovery" on:click={() => testProvider(p.id)} disabled={oidcBusy}>
+              <button class="btn-icon" title={$_('settings_auth_ui.test_discovery')} on:click={() => testProvider(p.id)} disabled={oidcBusy}>
                 <span class="material-symbols-rounded">network_check</span>
               </button>
               {#if p.env_locked}
-                <button class="btn-icon" title="Configured via environment — read-only" disabled>
+                <button class="btn-icon" title={$_('settings_auth_ui.env_read_only')} disabled>
                   <span class="material-symbols-rounded" style="opacity:0.4">lock</span>
                 </button>
               {:else}
-                <button class="btn-icon" title="Edit" on:click={() => startEditProvider(p)} disabled={oidcBusy}>
+                <button class="btn-icon" title={$_('common.edit')} on:click={() => startEditProvider(p)} disabled={oidcBusy}>
                   <span class="material-symbols-rounded">edit</span>
                 </button>
-                <button class="btn-icon" title="Delete" on:click={() => deleteProvider(p)} disabled={oidcBusy}>
+                <button class="btn-icon" title={$_('common.delete')} on:click={() => deleteProvider(p)} disabled={oidcBusy}>
                   <span class="material-symbols-rounded" style="color:var(--danger)">delete</span>
                 </button>
               {/if}
@@ -406,7 +407,7 @@
         {/each}
 
         {#if !oidcProviders.length}
-          <p class="text-3 text-sm" style="margin:0">No providers configured yet. Click <strong>+ Add provider</strong> to set one up, or define them in your <code>.env</code> using the <code>OIDC_*</code> variables (see README).</p>
+          <p class="text-3 text-sm" style="margin:0">{@html $_('settings_auth_ui.empty_html')}</p>
         {/if}
 
         {#if oidcTestResult}
@@ -436,21 +437,21 @@
                       class="oidc-preset-card"
                       class:selected={oidcSelectedPreset === preset.id}
                       on:click={() => oidcSelectedPreset = preset.id}
-                      title={preset.name}
+                      title={preset.nameKey ? $_(preset.nameKey) : preset.name}
                     >
                       {#if preset.defaults.logo_url}
                         <img src={resolveAssetUrl(preset.defaults.logo_url)} alt="" class="oidc-preset-logo" />
                       {:else}
                         <span class="material-symbols-rounded oidc-preset-icon">{preset.icon}</span>
                       {/if}
-                      <span class="oidc-preset-name">{preset.name}</span>
+                      <span class="oidc-preset-name">{preset.nameKey ? $_(preset.nameKey) : preset.name}</span>
                     </button>
                   {/each}
                 </div>
-                {#if oidcPreset.help}
+                {#if oidcPreset.helpKey}
                   <div class="text-3 text-sm" style="margin-top:8px;line-height:1.4">
                     <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">info</span>
-                    {oidcPreset.help}
+                    {$_(oidcPreset.helpKey)}
                   </div>
                 {/if}
               </div>
@@ -460,29 +461,29 @@
               <input class="input" bind:value={oidcEditing.display_name} placeholder={oidcPreset.defaults.display_name || 'Authentik / Pocket ID / Google'} />
             </div>
             <div class="form-group">
-              <label class="form-label">Issuer URL *</label>
+              <label class="form-label">{$_('settings_auth_ui.issuer_url')}</label>
               <input class="input" bind:value={oidcEditing.issuer_url} placeholder={oidcPreset.issuer_hint} autocomplete="url" />
             </div>
             <div class="form-group">
-              <label class="form-label">Client ID *</label>
+              <label class="form-label">{$_('settings_auth_ui.client_id')}</label>
               <input class="input" bind:value={oidcEditing.client_id} autocomplete="off" />
             </div>
             <div class="form-group">
-              <label class="form-label">Client Secret {oidcEditing.id ? '(leave blank to keep existing)' : '*'}</label>
+              <label class="form-label">{oidcEditing.id ? $_('settings_auth_ui.client_secret_keep') : $_('settings_auth_ui.client_secret_required')}</label>
               <input class="input" type="password" bind:value={oidcEditing.client_secret} autocomplete="off" />
             </div>
             <div class="form-group">
-              <label class="form-label">Redirect URIs *</label>
+              <label class="form-label">{$_('settings_auth_ui.redirect_uris')}</label>
               {#each oidcEditing.redirect_uris as uri, i}
                 <div style="display:flex;gap:6px;margin-bottom:4px">
                   <input class="input" style="flex:1" bind:value={oidcEditing.redirect_uris[i]} placeholder="https://cooktrace.app/api/auth/oidc/callback/{oidcEditing.id || ':providerId'}" />
                   {#if oidcEditing.redirect_uris.length > 1}
-                    <button class="btn-icon" on:click={() => removeRedirectUri(i)} title="Remove"><span class="material-symbols-rounded">close</span></button>
+                    <button class="btn-icon" on:click={() => removeRedirectUri(i)} title={$_('settings_auth_ui.remove')}><span class="material-symbols-rounded">close</span></button>
                   {/if}
                 </div>
               {/each}
-              <button class="btn btn-ghost btn-sm" type="button" on:click={addRedirectUri}>+ Add Redirect URI</button>
-              <div class="text-3 text-sm" style="margin-top:4px">Must match exactly what your IdP has configured. The path is <code>/api/auth/oidc/callback/&lt;provider-id&gt;</code> under your CookTrace base URL.</div>
+              <button class="btn btn-ghost btn-sm" type="button" on:click={addRedirectUri}>{$_('settings_auth_ui.add_redirect_uri')}</button>
+              <div class="text-3 text-sm" style="margin-top:4px">{@html $_('settings_auth_ui.redirect_hint_html')}</div>
             </div>
             <div class="form-group">
               <label class="form-label">{$_('settings_auth_extra.scope')}</label>
@@ -491,54 +492,54 @@
             <div class="form-group">
               <label class="form-label">{$_('settings_auth_extra.token_endpoint_auth_method')}</label>
               <select class="select" bind:value={oidcEditing.token_endpoint_auth_method}>
-                <option value="client_secret_post">client_secret_post (default)</option>
+                <option value="client_secret_post">{$_('settings_auth_ui.method_default', { values: { method: 'client_secret_post' } })}</option>
                 <option value="client_secret_basic">client_secret_basic</option>
-                <option value="none">none (PKCE-only public client)</option>
+                <option value="none">{$_('settings_auth_ui.method_none')}</option>
               </select>
             </div>
             <div class="setting-row" style="padding:0">
               <div>
-                <span class="setting-label">Auto-Link Existing Users (Verified Email)</span>
+                <span class="setting-label">{$_('settings_auth_ui.auto_link')}</span>
                 <div class="setting-desc">{@html $_('settings_auth_extra.auto_link_desc_html')}</div>
               </div>
               <Toggle checked={!!oidcEditing.auto_link_verified_email} on:change={e => oidcEditing.auto_link_verified_email = e.detail ? 1 : 0} />
             </div>
             <div class="setting-row" style="padding:0">
               <div>
-                <span class="setting-label">Auto-Register New Users</span>
-                <div class="setting-desc">Allow anyone with an account at this IdP to create a brand-new CookTrace account on first sign-in. OFF = admin must invite first. Leave OFF for shared IdPs (Google, work SSO) unless you actually want blanket onboarding.</div>
+                <span class="setting-label">{$_('settings_auth_ui.auto_register')}</span>
+                <div class="setting-desc">{$_('settings_auth_ui.auto_register_desc')}</div>
               </div>
               <Toggle checked={!!oidcEditing.auto_register_new_users} on:change={e => oidcEditing.auto_register_new_users = e.detail ? 1 : 0} />
             </div>
             <div class="setting-row" style="padding:0">
               <div>
                 <span class="setting-label">{$_('settings_auth_extra.provider_active')}</span>
-                <div class="setting-desc">Inactive providers won't show on the Login page.</div>
+                <div class="setting-desc">{$_('settings_auth_ui.inactive_hint')}</div>
               </div>
               <Toggle checked={!!oidcEditing.is_active} on:change={e => oidcEditing.is_active = e.detail ? 1 : 0} />
             </div>
             {#if !oidcPreset.hides?.includes('admin_group_claim')}
               <div class="form-group">
-                <label class="form-label">Admin Group Claim (Optional)</label>
+                <label class="form-label">{$_('settings_auth_ui.admin_group_claim')}</label>
                 <input class="input" bind:value={oidcEditing.admin_group_claim} placeholder="groups" />
-                <div class="text-3 text-sm">Name of the claim that lists user groups. Common: <code>groups</code>.</div>
+                <div class="text-3 text-sm">{@html $_('settings_auth_ui.admin_group_claim_hint_html')}</div>
               </div>
             {/if}
             {#if !oidcPreset.hides?.includes('admin_group_value')}
               <div class="form-group">
-                <label class="form-label">Admin Group Value (Optional)</label>
+                <label class="form-label">{$_('settings_auth_ui.admin_group_value')}</label>
                 <input class="input" bind:value={oidcEditing.admin_group_value} placeholder={$_('settings_auth_extra.admin_group_value_ph')} />
-                <div class="text-3 text-sm">If a user's groups claim contains this value, they're set to admin on each login.</div>
+                <div class="text-3 text-sm">{$_('settings_auth_ui.admin_group_value_hint')}</div>
               </div>
             {/if}
             <div class="form-group">
-              <label class="form-label">Logo URL (Optional)</label>
+              <label class="form-label">{$_('settings_auth_ui.logo_url')}</label>
               <input class="input" bind:value={oidcEditing.logo_url} placeholder="https://…/authentik.png" />
             </div>
             <div style="display:flex;gap:8px;margin-top:8px">
               <button class="btn btn-ghost" style="flex:1" on:click={cancelProviderEdit}>{$_('settings_auth_extra.cancel')}</button>
               <button class="btn btn-primary" style="flex:1" on:click={saveProvider} disabled={oidcBusy}>
-                {oidcBusy ? 'Saving…' : (oidcEditing.id ? 'Save Changes' : 'Create Provider')}
+                {oidcBusy ? $_('common.saving') : (oidcEditing.id ? $_('settings_auth_ui.save_changes') : $_('settings_auth_ui.create_provider'))}
               </button>
             </div>
           </div>
@@ -550,7 +551,7 @@
         <div>
           <span class="setting-label">{$_('settings_auth_extra.allow_password_login')}</span>
           <div class="setting-desc">
-            When off, users sign in only via OIDC. Recovery still works via the <code>RECOVERY_TOKEN</code> env var.
+            {@html $_('settings_auth_ui.password_login_desc_html')}
             {#if passwordLoginEnvLocked}
               {@html $_('settings_auth_extra.env_locked_html')}
             {/if}

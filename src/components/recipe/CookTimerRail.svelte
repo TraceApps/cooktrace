@@ -39,19 +39,19 @@
         {#if t.done}
           <button type="button" class="timer-time pulse done-tap"
                   on:click={() => dismissTimer(t.id)}
-                  aria-label="Dismiss timer">
-            Done
+                  aria-label={$_('cook_timer_rail_ui.dismiss_timer')}>
+            {$_('common.done')}
           </button>
         {:else}
           <div class="timer-time">{formatRemaining(remaining)}</div>
         {/if}
         <div class="timer-actions">
           {#if !t.done}
-            <button class="t-btn" on:click={() => addOneMinute(t.id)} title="+1 min">+1</button>
+            <button class="t-btn" on:click={() => addOneMinute(t.id)} title={$_('cook_timer_rail_ui.add_one_min')}>+1</button>
           {:else}
-            <button class="t-btn" on:click={() => addOneMinute(t.id)} title="Snooze 1 min">{$_('cook_timer_rail.snooze')}</button>
+            <button class="t-btn" on:click={() => addOneMinute(t.id)} title={$_('cook_timer_rail_ui.snooze_one_min')}>{$_('cook_timer_rail.snooze')}</button>
           {/if}
-          <button class="t-btn close" on:click={() => dismissTimer(t.id)} aria-label="Dismiss" title="Dismiss">
+          <button class="t-btn close" on:click={() => dismissTimer(t.id)} aria-label={$_('cook_timer_rail_ui.dismiss')} title={$_('cook_timer_rail_ui.dismiss')}>
             <span class="material-symbols-rounded">close</span>
           </button>
         </div>

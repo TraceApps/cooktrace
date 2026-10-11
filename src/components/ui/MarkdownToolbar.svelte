@@ -13,6 +13,8 @@
    * synchronous reactive update (the toolbar mutates the textarea
    * directly, then dispatches an `input` event so `bind:value` wakes).
    */
+  import { _ } from 'svelte-i18n';
+
   export let textarea = null;
   export let onChange = null;
 
@@ -83,25 +85,25 @@
   function numbered()   { _prefixLines('', true); }
 </script>
 
-<div class="md-toolbar" role="toolbar" aria-label="Formatting">
-  <button type="button" class="md-btn" on:click={bold} title="Bold (**text**)" aria-label="Bold"
+<div class="md-toolbar" role="toolbar" aria-label={$_('rich_text_editor_ui.formatting')}>
+  <button type="button" class="md-btn" on:click={bold} title={$_('markdown_toolbar_ui.bold_hint')} aria-label={$_('rich_text_editor_ui.bold')}
     on:mousedown|preventDefault>
     <strong>B</strong>
   </button>
-  <button type="button" class="md-btn" on:click={italic} title="Italic (*text*)" aria-label="Italic"
+  <button type="button" class="md-btn" on:click={italic} title={$_('markdown_toolbar_ui.italic_hint')} aria-label={$_('rich_text_editor_ui.italic')}
     on:mousedown|preventDefault>
     <em>I</em>
   </button>
-  <button type="button" class="md-btn" on:click={underline} title="Underline (__text__)" aria-label="Underline"
+  <button type="button" class="md-btn" on:click={underline} title={$_('markdown_toolbar_ui.underline_hint')} aria-label={$_('rich_text_editor_ui.underline')}
     on:mousedown|preventDefault>
     <span style="text-decoration: underline">U</span>
   </button>
   <span class="md-sep" aria-hidden="true"></span>
-  <button type="button" class="md-btn" on:click={bullet} title="Bullet List" aria-label="Bullet list"
+  <button type="button" class="md-btn" on:click={bullet} title={$_('rich_text_editor_ui.bullet_list')} aria-label={$_('rich_text_editor_ui.bullet_list')}
     on:mousedown|preventDefault>
     <span class="material-symbols-rounded">format_list_bulleted</span>
   </button>
-  <button type="button" class="md-btn" on:click={numbered} title="Numbered List" aria-label="Numbered list"
+  <button type="button" class="md-btn" on:click={numbered} title={$_('rich_text_editor_ui.numbered_list')} aria-label={$_('rich_text_editor_ui.numbered_list')}
     on:mousedown|preventDefault>
     <span class="material-symbols-rounded">format_list_numbered</span>
   </button>

@@ -208,7 +208,7 @@
       paprika: 'Paprika',
       cooktrace: 'CookTrace',
       'schema.org': 'schema.org',
-    })[s] || 'Recipe';
+    })[s] || $_('settings_import_ui.source_recipe');
   }
 </script>
 
@@ -225,10 +225,10 @@
       <button class="btn btn-primary" disabled={scanning} on:click={() => fileInput?.click()}>
         {#if scanning}
           <span class="material-symbols-rounded spin">progress_activity</span>
-          {phase === 'uploading' ? `Uploading ${uploadPercent}%` : 'Scanning…'}
+          {phase === 'uploading' ? $_('settings_import_ui.uploading_pct', { values: { pct: uploadPercent } }) : $_('settings_import_ui.scanning')}
         {:else}
           <span class="material-symbols-rounded">upload_file</span>
-          Choose File
+          {$_('settings_import_ui.choose_file')}
         {/if}
       </button>
     </div>
@@ -239,12 +239,12 @@
       <div class="progress-row">
         <div class="progress-label">
           {#if phase === 'uploading'}
-            Uploading <strong>{uploadPercent}%</strong>
+            {$_('settings_import_ui.uploading')} <strong>{uploadPercent}%</strong>
             <span class="muted">· {_fmtBytes(uploadLoaded)} / {_fmtBytes(uploadTotal)}</span>
           {:else}
             <span class="material-symbols-rounded spin">progress_activity</span>
-            Scanning archive on the server
-            <span class="muted">· this can take a moment for big backups</span>
+            {$_('settings_import_ui.scanning_archive')}
+            <span class="muted">· {$_('settings_import_ui.scanning_archive_hint')}</span>
           {/if}
         </div>
         <div class="progress-track">
@@ -270,10 +270,10 @@
       <div class="picker-head">
         <div>
           <div class="picker-title">
-            Found {manifest.count} {manifest.count === 1 ? 'recipe' : 'recipes'}
+            {$_('settings_import_ui.found_recipes', { values: { count: manifest.count } })}
           </div>
           <div class="picker-sub">
-            <strong>{selected.size}</strong> selected · {pickedFile?.name}
+            <strong>{selected.size}</strong> {$_('settings_import_ui.selected')} · {pickedFile?.name}
           </div>
         </div>
         <div class="picker-bulk">
@@ -297,7 +297,7 @@
               {:else if r.img_url}
                 <img src={resolveAssetUrl(r.img_url)} alt="" class="thumb" />
               {:else if r.has_image_asset}
-                <span class="thumb thumb-stub" title="Image included in archive">
+                <span class="thumb thumb-stub" title={$_('settings_import_ui.image_in_archive')}>
                   <span class="material-symbols-rounded">image</span>
                 </span>
               {:else}
@@ -310,13 +310,13 @@
                 <span class="row-meta">
                   <span class="badge">{sourceLabel(r.source)}</span>
                   {#if r.ingredient_count > 0}
-                    <span class="muted">{r.ingredient_count} ing</span>
+                    <span class="muted">{$_('settings_import_ui.ingredient_count', { values: { count: r.ingredient_count } })}</span>
                   {/if}
                   {#if r.step_count > 0}
-                    <span class="muted">· {r.step_count} steps</span>
+                    <span class="muted">· {$_('settings_import_ui.step_count', { values: { count: r.step_count } })}</span>
                   {/if}
                   {#if r.has_image_asset}
-                    <span class="muted">· img</span>
+                    <span class="muted">· {$_('settings_import_ui.img')}</span>
                   {/if}
                 </span>
               </span>
@@ -332,7 +332,7 @@
         </label>
         <label class="opt">
           <input type="checkbox" bind:checked={addToPantry} />
-          <span>Link ingredients to your Pantry (matches existing, creates new)</span>
+          <span>{$_('settings_import_ui.link_pantry')}</span>
         </label>
         <label class="opt">
           <input type="checkbox" bind:checked={applyTags} />
@@ -340,12 +340,12 @@
         </label>
         <label class="opt">
           <input type="checkbox" bind:checked={importCategories} />
-          <span>Import the source's categories (auto-creates new ones in your catalog)</span>
+          <span>{$_('settings_import_ui.import_categories')}</span>
         </label>
         {#if hasTimelineInZip}
           <label class="opt">
             <input type="checkbox" bind:checked={importTimeline} />
-            <span>Bring Mealie cook history into the Diary ({totalTimelineEvents} event{totalTimelineEvents === 1 ? '' : 's'} found)</span>
+            <span>{$_('settings_import_ui.import_timeline', { values: { count: totalTimelineEvents } })}</span>
           </label>
         {/if}
         <div class="opt opt-row">
@@ -358,7 +358,7 @@
         </div>
         {#if dedup === 'skip' && hasTimelineInZip}
           <p class="opt-hint">
-            Cook history still lands on existing recipes when they're skipped — only the recipe row itself is left alone.
+            {$_('settings_import_ui.timeline_skip_hint')}
           </p>
         {/if}
       </div>
@@ -367,12 +367,12 @@
         <div class="progress-row">
           <div class="progress-label">
             {#if phase === 'uploading'}
-              Uploading <strong>{uploadPercent}%</strong>
+              {$_('settings_import_ui.uploading')} <strong>{uploadPercent}%</strong>
               <span class="muted">· {_fmtBytes(uploadLoaded)} / {_fmtBytes(uploadTotal)}</span>
             {:else}
               <span class="material-symbols-rounded spin">progress_activity</span>
-              Writing recipes
-              <span class="muted">· this is the slow part for image-heavy archives</span>
+              {$_('settings_import_ui.writing_recipes')}
+              <span class="muted">· {$_('settings_import_ui.writing_recipes_hint')}</span>
             {/if}
           </div>
           <div class="progress-track">
@@ -393,9 +393,9 @@
         >
           {#if committing}
             <span class="material-symbols-rounded spin">progress_activity</span>
-            {phase === 'uploading' ? `Uploading ${uploadPercent}%` : 'Importing…'}
+            {phase === 'uploading' ? $_('settings_import_ui.uploading_pct', { values: { pct: uploadPercent } }) : $_('settings_import_ui.importing')}
           {:else}
-            Import {selected.size} {selected.size === 1 ? 'Recipe' : 'Recipes'}
+            {$_('settings_import_ui.import_n_recipes', { values: { count: selected.size } })}
           {/if}
         </button>
       </div>

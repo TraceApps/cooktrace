@@ -1,7 +1,7 @@
 <script>
   import { closeOnBack } from '../../lib/back-stack.js';
   /**
-   * ImportUrlDialog — unified URL import for one or many URLs.
+   * ImportUrlDialog: unified URL import for one or many URLs.
    *
    * Paste one URL for a fast single import. Paste many URLs (one per
    * line, comma-separated, or whitespace-separated) and the dialog
@@ -98,7 +98,7 @@
 
   async function _importSingle(url) {
     phase = 'busy';
-    progressLine = 'Fetching recipe…';
+    progressLine = $_('import_url_dialog_ui.fetching');
     try {
       const created = await NtApi.scrapeRecipe(url, {
         addToPantry,
@@ -129,7 +129,7 @@
       push(`/recipes/${created.id}`);
     } catch (e) {
       phase = 'error';
-      errorMessage = e.message || 'Could not import recipe';
+      errorMessage = e.message || $_('import_url_dialog_ui.import_failed');
     }
   }
 
@@ -141,7 +141,7 @@
       return;
     }
     phase = 'busy';
-    progressLine = `Scraping ${urls.length} URLs…`;
+    progressLine = $_('import_url_dialog_ui.scraping_n', { values: { count: urls.length } });
     try {
       const res = await fetch('/api/recipes/batch-scrape', {
         method: 'POST',
@@ -152,7 +152,7 @@
       const data = await res.json();
       if (!res.ok) {
         phase = 'error';
-        errorMessage = data?.error || `Scrape failed (HTTP ${res.status})`;
+        errorMessage = data?.error || $_('import_url_dialog_ui.scrape_failed_http', { values: { status: res.status } });
         return;
       }
       scanResult = data;
@@ -161,7 +161,7 @@
       phase = 'scanned';
     } catch (e) {
       phase = 'error';
-      errorMessage = e.message || 'Scrape failed.';
+      errorMessage = e.message || $_('import_url_dialog_ui.scrape_failed');
     }
   }
 
@@ -177,7 +177,7 @@
     if (!scanResult?.cacheUuid) return;
     if (selected.size === 0) { showError($_('import_url_dialog.toast.pick_one_url')); return; }
     phase = 'saving';
-    progressLine = `Saving ${selected.size} recipes…`;
+    progressLine = $_('import_url_dialog_ui.saving_n', { values: { count: selected.size } });
     try {
       const res = await fetch('/api/recipes/bulk-commit', {
         method: 'POST',
@@ -192,7 +192,7 @@
       const data = await res.json();
       if (!res.ok) {
         phase = 'error';
-        errorMessage = data?.error || `Save failed (HTTP ${res.status})`;
+        errorMessage = data?.error || $_('import_url_dialog_ui.save_failed_http', { values: { status: res.status } });
         return;
       }
       savedRecipes = data.recipes || [];
@@ -203,7 +203,7 @@
       }
     } catch (e) {
       phase = 'error';
-      errorMessage = e.message || 'Save failed.';
+      errorMessage = e.message || $_('import_url_dialog_ui.save_failed');
     }
   }
 
@@ -218,42 +218,39 @@
     <div class="modal" on:click|stopPropagation>
       <header class="head">
         <h3>{$_('import_url_dialog.title')}</h3>
-        <button class="btn-icon" on:click={close} aria-label="Close" title="Close">
+        <button class="btn-icon" on:click={close} aria-label={$_('common.close')} title={$_('common.close')}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </header>
 
       {#if phase === 'input'}
-        <p class="hint">
-          Paste one URL for a quick single import, or many URLs (one per line)
-          to scrape them all and pick which to save. Up to 100 URLs per batch.
-        </p>
+        <p class="hint">{$_('import_url_dialog_ui.hint')}</p>
         <textarea
           class="url-area"
           placeholder={"https://example.com/recipe-1\nhttps://example.com/recipe-2\n…"}
           bind:value={urlText}
           rows="6"></textarea>
-        <p class="counter">{urlCount === 0 ? 'No URLs detected' : urlCount === 1 ? '1 URL detected (will save directly)' : `${urlCount} URLs detected (will show a picker)`}</p>
+        <p class="counter">{urlCount === 0 ? $_('import_url_dialog_ui.no_urls') : urlCount === 1 ? $_('import_url_dialog_ui.one_url') : $_('import_url_dialog_ui.n_urls', { values: { count: urlCount } })}</p>
         <div class="opts">
           <label class="opt-row">
             <input type="checkbox" bind:checked={addToPantry} />
             <span>
               <span class="opt-label">{$_('import_url_dialog.link_to_pantry')}</span>
-              <span class="opt-desc">Matches imported names to your existing Pantry items and creates new rows for any that don't exist. Off = ingredients save as plain text only.</span>
+              <span class="opt-desc">{$_('import_url_dialog_ui.link_pantry_desc')}</span>
             </span>
           </label>
           <label class="opt-row">
             <input type="checkbox" bind:checked={applyTags} />
             <span>
               <span class="opt-label">{$_('import_url_dialog.apply_tags')}</span>
-              <span class="opt-desc">Off by default. Tags from food blogs are usually noisy.</span>
+              <span class="opt-desc">{$_('import_url_dialog_ui.tags_desc')}</span>
             </span>
           </label>
           <label class="opt-row">
             <input type="checkbox" bind:checked={importCategories} />
             <span>
               <span class="opt-label">{$_('import_url_dialog.import_source_category')}</span>
-              <span class="opt-desc">Carries the recipe's category from the source page; auto-creates one if it doesn't already exist in your catalog.</span>
+              <span class="opt-desc">{$_('import_url_dialog_ui.category_desc')}</span>
             </span>
           </label>
         </div>
@@ -261,22 +258,22 @@
           <button class="btn btn-secondary" on:click={close}>{$_('import_url_dialog.cancel')}</button>
           <button class="btn btn-primary" on:click={submit} disabled={urlCount === 0}>
             <span class="material-symbols-rounded">{urlCount > 1 ? 'travel_explore' : 'download'}</span>
-            {urlCount > 1 ? `Scrape ${urlCount} URLs` : 'Import'}
+            {urlCount > 1 ? $_('import_url_dialog_ui.scrape_n_urls', { values: { count: urlCount } }) : $_('import_url_dialog_ui.import')}
           </button>
         </footer>
 
       {:else if phase === 'busy' || phase === 'saving'}
         <div class="state busy">
           <span class="material-symbols-rounded spin">progress_activity</span>
-          <p class="progress">{progressLine || 'Working…'}</p>
+          <p class="progress">{progressLine || $_('import_url_dialog_ui.working')}</p>
         </div>
 
       {:else if phase === 'scanned'}
         <div class="scan-summary">
           <div class="summary-row">
-            <span class="summary-stat clean">{cleanCount} scraped</span>
-            {#if errorCount}<span class="summary-stat error">{errorCount} failed</span>{/if}
-            <span class="summary-meta">{selected.size} selected</span>
+            <span class="summary-stat clean">{$_('import_url_dialog_ui.scraped_n', { values: { count: cleanCount } })}</span>
+            {#if errorCount}<span class="summary-stat error">{$_('import_url_dialog_ui.failed_n', { values: { count: errorCount } })}</span>{/if}
+            <span class="summary-meta">{$_('import_url_dialog_ui.selected_n', { values: { count: selected.size } })}</span>
           </div>
           <div class="summary-actions">
             <button class="link-btn" on:click={_selectAll}>{$_('import_url_dialog.select_all')}</button>
@@ -297,8 +294,8 @@
                     <span class="confidence-pill low">{$_('import_url_dialog.failed')}</span>
                     <span class="row-msg">{item.error}</span>
                   {:else}
-                    <span class="confidence-pill high">Scraped ({item.tier || 'standard'})</span>
-                    <span class="row-msg">{item.ingredientCount}&nbsp;ing &middot; {item.stepCount}&nbsp;steps</span>
+                    <span class="confidence-pill high">{$_('import_url_dialog_ui.scraped_tier', { values: { tier: item.tier || $_('import_url_dialog_ui.tier_standard') } })}</span>
+                    <span class="row-msg">{$_('import_url_dialog_ui.ing_steps', { values: { ingredients: item.ingredientCount, steps: item.stepCount } })}</span>
                   {/if}
                 </div>
                 <div class="row-url" title={item.url}>{item.url}</div>
@@ -310,24 +307,24 @@
           <button class="btn btn-secondary" on:click={close}>{$_('import_url_dialog.cancel')}</button>
           <button class="btn btn-primary" on:click={commit} disabled={selected.size === 0}>
             <span class="material-symbols-rounded">save</span>
-            Save {selected.size || ''} Recipes
+            {$_('import_url_dialog_ui.save_n_recipes', { values: { count: selected.size } })}
           </button>
         </footer>
 
       {:else if phase === 'done'}
         <div class="state done">
           <span class="material-symbols-rounded done-icon">check_circle</span>
-          <h4>Imported {savedRecipes.length} recipes</h4>
+          <h4>{$_('import_url_dialog_ui.imported_n', { values: { count: savedRecipes.length } })}</h4>
           {#if saveFailures.length}
-            <p class="muted">{saveFailures.length} could not be saved.</p>
+            <p class="muted">{$_('import_url_dialog_ui.not_saved_n', { values: { count: saveFailures.length } })}</p>
           {:else}
-            <p>Saved to your library.</p>
+            <p>{$_('import_url_dialog_ui.saved_library')}</p>
           {/if}
         </div>
         <footer class="actions">
           <button class="btn btn-primary" on:click={() => { open = false; dispatch('close'); push('/recipes'); }}>
             <span class="material-symbols-rounded">open_in_new</span>
-            Open Recipes
+            {$_('import_url_dialog_ui.open_recipes')}
           </button>
         </footer>
 

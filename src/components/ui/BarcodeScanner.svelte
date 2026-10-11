@@ -31,7 +31,9 @@
   let selectedEngine = localStorage.getItem('wl_scanEngine') || 'zxing';
   let selectedCamId  = localStorage.getItem('wl_scanCamId')  || '';
   let cameras = [];
-  let status = 'Requesting camera…';
+  // Status pill text, held as an i18n key; statusLib fills {library}.
+  let status = 'barcode_scanner_ui.status_requesting';
+  let statusLib = '';
   let torchVisible = false;
   let torchOn = false;
   let manualCode = '';
@@ -129,12 +131,12 @@
 
   async function startCamera(deviceId) {
     if (detected || !deviceId || !scannerDiv) return;
-    status = 'Starting camera…';
+    status = 'barcode_scanner_ui.status_starting';
     torchVisible = false;
     torchOn = false;
 
     if (selectedEngine === 'zxing') {
-      if (!window.ZXing || !ZXing.BrowserMultiFormatReader) { status = 'ZXing not loaded.'; return; }
+      if (!window.ZXing || !ZXing.BrowserMultiFormatReader) { statusLib = 'ZXing'; status = 'barcode_scanner_ui.status_not_loaded'; return; }
       scannerDiv.innerHTML = '';
       const videoEl = document.createElement('video');
       videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;position:absolute;top:0;left:0';
@@ -147,7 +149,7 @@
           videoEl.srcObject = stream;
           return videoEl.play().then(() => reader.decodeFromStream(stream, videoEl, async r => { if (r) await onCode(r.getText()); }));
         }).then(() => {
-          if (!detected) status = continuousMode ? 'Continuous Scan' : 'Align Barcode';
+          if (!detected) status = continuousMode ? 'barcode_scanner_ui.status_continuous' : 'barcode_scanner_ui.status_align';
           try {
             const t = videoEl.srcObject && videoEl.srcObject.getVideoTracks()[0];
             if (t) {
@@ -161,10 +163,10 @@
               }
             }
           } catch(e) {}
-        }).catch(err => { console.error('[ZXing]', err); status = 'Camera error — try another engine.'; });
+        }).catch(err => { console.error('[ZXing]', err); status = 'barcode_scanner_ui.status_camera_error'; });
 
     } else if (selectedEngine === 'html5qr') {
-      if (!window.Html5Qrcode) { status = 'html5-qrcode not loaded.'; return; }
+      if (!window.Html5Qrcode) { statusLib = 'html5-qrcode'; status = 'barcode_scanner_ui.status_not_loaded'; return; }
       scannerDiv.innerHTML = '';
       const hId = readerId + 'h';
       const inner = document.createElement('div');
@@ -207,7 +209,7 @@
       reader.start(deviceId, { fps: 10 }, async t => await onCode(t), () => {})
         .then(() => {
           engine.running = true;
-          if (!detected) status = continuousMode ? 'Continuous Scan' : 'Align Barcode';
+          if (!detected) status = continuousMode ? 'barcode_scanner_ui.status_continuous' : 'barcode_scanner_ui.status_align';
           try {
             inner.querySelectorAll('div,img,button,span').forEach(el => _hideEl(el));
             const shaded = document.getElementById('qr-shaded-region');
@@ -235,10 +237,10 @@
               }
             }
           } catch(e) {}
-        }).catch(err => { console.error('[html5qr]', err); status = 'Camera error — try another engine.'; });
+        }).catch(err => { console.error('[html5qr]', err); status = 'barcode_scanner_ui.status_camera_error'; });
 
     } else if (selectedEngine === 'quagga2') {
-      if (!window.Quagga) { status = 'Quagga2 not loaded.'; return; }
+      if (!window.Quagga) { statusLib = 'Quagga2'; status = 'barcode_scanner_ui.status_not_loaded'; return; }
       scannerDiv.innerHTML = '';
       engine = { _type: 'quagga2', torchOn: false };
       Quagga.init({
@@ -246,9 +248,9 @@
         decoder: { readers: ['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader','code_39_reader'] },
         locate: true
       }, err => {
-        if (err) { console.error('[Quagga2]', err); status = 'Quagga2 error — try another engine.'; return; }
+        if (err) { console.error('[Quagga2]', err); statusLib = 'Quagga2'; status = 'barcode_scanner_ui.status_engine_error'; return; }
         Quagga.start();
-        if (!detected) status = continuousMode ? 'Continuous Scan' : 'Align Barcode';
+        if (!detected) status = continuousMode ? 'barcode_scanner_ui.status_continuous' : 'barcode_scanner_ui.status_align';
         setTimeout(() => {
           try {
             const t = window.Quagga && Quagga.CameraAccess && Quagga.CameraAccess.getActiveTrack && Quagga.CameraAccess.getActiveTrack();
@@ -315,7 +317,7 @@
 
   async function toggleContinuous() {
     continuousMode = !continuousMode;
-    status = continuousMode ? 'Continuous Scan' : 'Align Barcode';
+    status = continuousMode ? 'barcode_scanner_ui.status_continuous' : 'barcode_scanner_ui.status_align';
   }
 
   async function doManual() {
@@ -330,11 +332,11 @@
   async function startScanner() {
     detected = false;
     scanning = true;
-    status = 'Loading scanner…';
+    status = 'barcode_scanner_ui.status_loading';
     try {
       await _loadBarcodeLibs();
     } catch (e) {
-      status = 'Failed to load scanner libraries.';
+      status = 'barcode_scanner_ui.status_load_failed';
       scanning = false;
       return;
     }
@@ -351,9 +353,9 @@
       .then(devices => {
         if (detected) return;
         cameras = devices.filter(d => d.kind === 'videoinput').map((d, i) => ({
-          deviceId: d.deviceId, label: d.label || ('Camera ' + (i + 1))
+          deviceId: d.deviceId, label: d.label || $_('barcode_scanner_ui.camera_n', { values: { n: i + 1 } })
         }));
-        if (!cameras.length) { status = 'No camera found.'; return; }
+        if (!cameras.length) { status = 'barcode_scanner_ui.status_no_camera'; return; }
         const preferred = (selectedCamId && cameras.find(d => d.deviceId === selectedCamId))
                        || cameras.find(d => /back|rear|environment/i.test(d.label))
                        || cameras[0];
@@ -361,7 +363,7 @@
         localStorage.setItem('wl_scanCamId', selectedCamId);
         startCamera(selectedCamId);
       })
-      .catch(() => { status = 'Camera access denied.'; });
+      .catch(() => { status = 'barcode_scanner_ui.status_denied'; });
   }
 
   // Native mode: use ML Kit barcode scanner instead of HTML5 camera
@@ -422,7 +424,7 @@
       <!-- Header -->
       <div class="scanner-header">
         <span class="scanner-title">{$_('barcode_scanner.title')}</span>
-        <button class="btn-icon" on:click={close} aria-label="Close" title="Close scanner">
+        <button class="btn-icon" on:click={close} aria-label={$_('common.close')} title={$_('barcode_scanner_ui.close_scanner')}>
           <span class="material-symbols-rounded">close</span>
         </button>
       </div>
@@ -441,7 +443,7 @@
           <label class="sc-label">{$_('barcode_scanner.camera')}</label>
           <select class="sc-select" bind:value={selectedCamId} on:change={onCamChange}>
             {#if cameras.length === 0}
-              <option>Loading…</option>
+              <option>{$_('common.loading')}</option>
             {:else}
               {#each cameras as cam}
                 <option value={cam.deviceId}>{cam.label}</option>
@@ -467,7 +469,7 @@
           </div>
         </div>
         <!-- Status pill -->
-        <div class="scanner-status-pill">{status}</div>
+        <div class="scanner-status-pill">{$_(status, { values: { library: statusLib } })}</div>
       </div>
 
       <!-- Action buttons. Mirrors NutriTrace exactly: Refresh + Torch
@@ -477,12 +479,12 @@
       <div class="scanner-actions">
         <button class="sc-btn" on:click={refresh}>
           <span class="material-symbols-rounded">refresh</span>
-          Refresh
+          {$_('barcode_scanner_ui.refresh')}
         </button>
         {#if torchVisible}
           <button class="sc-btn" class:sc-btn-torch={torchOn} on:click={toggleTorch}>
             <span class="material-symbols-rounded">{torchOn ? 'flash_on' : 'flash_off'}</span>
-            {torchOn ? 'Flash On' : 'Flash Off'}
+            {torchOn ? $_('barcode_scanner_ui.flash_on') : $_('barcode_scanner_ui.flash_off')}
           </button>
         {/if}
       </div>
@@ -492,7 +494,7 @@
         <input
           class="input"
           type="text"
-          placeholder="Or type barcode manually…"
+          placeholder={$_('barcode_scanner_ui.manual_ph')}
           bind:value={manualCode}
           on:keydown={e => e.key === 'Enter' && doManual()}
         />

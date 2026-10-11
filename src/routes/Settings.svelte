@@ -265,9 +265,13 @@
   // visible so users can jump between them). Never hides the section
   // the user is currently on so a mid-typing search that doesn't
   // match doesn't make the rail feel like it lost the user's place.
+  // The section's translated title also matches, so search works in the
+  // UI language as well as through the English keywords above.
   $: sectionVisible = (query, key) => {
     if (!query) return true;
     if (key === currentSection) return true;
+    const titleKey = SECTION_META[key]?.titleKey;
+    if (titleKey && foldText($_(titleKey)).includes(query)) return true;
     return (SECTION_KEYWORDS[key] || []).some(kw => kw.includes(query));
   };
   // Rail "no matches" placeholder — set to true when the query is
@@ -489,7 +493,7 @@
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
 
-  <p class="settings-group-label">Data &amp; Tracking</p>
+  <p class="settings-group-label">{$_('settings_ui.group_data')}</p>
   <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'nutrition')} class:active={currentSection === 'nutrition'} aria-current={currentSection === 'nutrition' ? 'page' : undefined} on:click={() => toggleSection('nutrition')}>
     <span class="material-symbols-rounded si">nutrition</span>
     <span>{$_('settings.nutrition.section')}</span>
@@ -508,7 +512,7 @@
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
 
-  <p class="settings-group-label">App</p>
+  <p class="settings-group-label">{$_('settings_ui.group_app')}</p>
   {#if isNative}
     <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'serverconn')} class:active={currentSection === 'serverconn'} aria-current={currentSection === 'serverconn' ? 'page' : undefined} on:click={() => toggleSection('serverconn')}>
       <span class="material-symbols-rounded si">cloud_sync</span>
@@ -622,11 +626,11 @@
          back to the index with the query active (mobile). -->
     <div class="settings-search-bar">
       <span class="material-symbols-rounded settings-search-icon">search</span>
-      <input class="settings-search-input" type="search" placeholder="Search settings…"
+      <input class="settings-search-input" type="search" placeholder={$_('settings_ui.search_ph')}
         bind:value={settingsSearch}
         on:input={_onSearchInput} />
       {#if settingsSearch}
-        <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''} title="Clear search">
+        <button class="settings-search-clear btn-icon" on:click={() => settingsSearch = ''} title={$_('settings_ui.clear_search')}>
           <span class="material-symbols-rounded" style="font-size:18px">close</span>
         </button>
       {/if}
@@ -653,10 +657,10 @@
         {#if _railNoMatches}
           <div class="settings-nav-empty">
             <span class="material-symbols-rounded">search_off</span>
-            <p>No sections match "{settingsSearch}"</p>
+            <p>{$_('settings_ui.no_match', { values: { q: settingsSearch } })}</p>
             <button type="button" class="settings-nav-clear"
               on:click={() => settingsSearch = ''}>
-              Clear search
+              {$_('settings_ui.clear_search')}
             </button>
           </div>
         {/if}
@@ -689,8 +693,9 @@
               {#if sectionVisible(settingsQuery, 'profile')}
                 {@const _u = $currentUser || {}}
                 {@const _full = (_u.full_name || '').trim()}
-                {@const _displayName = (_full && _full !== 'Local User' ? _full : '') || (_u.username || '').trim() || 'My Profile'}
-                {@const _hasName = _displayName !== 'My Profile'}
+                {@const _named = (_full && _full !== 'Local User' ? _full : '') || (_u.username || '').trim()}
+                {@const _displayName = _named || $_('settings.profile_hero.label_fallback')}
+                {@const _hasName = !!_named}
                 {@const _initial = (_displayName[0] || '?').toUpperCase()}
                 <button class="profile-hero" on:click={() => push('/profile')}>
                   <div class="profile-hero-avatar">
@@ -726,8 +731,9 @@
             {#if sectionVisible(settingsQuery, 'profile')}
               {@const _u = $currentUser || {}}
               {@const _full = (_u.full_name || '').trim()}
-              {@const _displayName = (_full && _full !== 'Local User' ? _full : '') || (_u.username || '').trim() || 'My Profile'}
-              {@const _hasName = _displayName !== 'My Profile'}
+              {@const _named = (_full && _full !== 'Local User' ? _full : '') || (_u.username || '').trim()}
+              {@const _displayName = _named || $_('settings.profile_hero.label_fallback')}
+              {@const _hasName = !!_named}
               {@const _initial = (_displayName[0] || '?').toUpperCase()}
               <button class="profile-hero profile-hero-expander" on:click={_toggleProfileHero}
                 aria-expanded={_profileHeroExpanded}>
@@ -773,7 +779,7 @@
      SettingsAppearance's Custom swatch (which calls openColorPicker()
      from the shared store) can trigger it without needing the sliders
      re-mounted per section. -->
-<Sheet bind:open={$colorPickerOpen} title="Custom Color">
+<Sheet bind:open={$colorPickerOpen} title={$_('settings_appearance_ui.custom_color')}>
   <div class="cp-body">
     <!-- Live preview -->
     <div class="cp-preview" style="background:{customColorHex}">
@@ -781,7 +787,7 @@
     </div>
 
     <div class="cp-slider-group">
-      <label class="form-label">Hue</label>
+      <label class="form-label">{$_('settings_ui.hue')}</label>
       <div class="cp-slider-wrap">
         <input type="range" class="cp-slider cp-hue" min="0" max="360"
           bind:value={cpHue} on:input={cpUpdateFromSliders} />
