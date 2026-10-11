@@ -19,10 +19,13 @@
  * fixed (see server/lib/auto-share.js).
  */
 import { z } from 'zod';
+import crypto from 'crypto';
 import db from '../../../db.js';
 import { toolResult, toolError } from '../_util.js';
 import { autoShareNewRecipe } from '../../auto-share.js';
 import { recordRevision } from '../../recipe-history.js';
+import { nutritionSchema, mergeNutrition } from './recipe-edit.js';
+import { deriveSodiumSalt } from '../../nutrition-derive.js';
 
 const ingredientSchema = z.object({
   name: z.string().min(1).max(200),
@@ -39,7 +42,8 @@ export function registerCreateRecipe(server, { userId }) {
       description:
         'Add a new recipe. Requires confirm=true. Ingredients are a flat list of ' +
         '{name, qty, unit, note} objects (no need to group them). Steps are a plain ' +
-        'list of instruction strings, one per step.',
+        'list of instruction strings, one per step. nutrition: per-serving values, as the source ' +
+        'states them.',
       inputSchema: {
         confirm:      z.boolean(),
         name:         z.string().min(1).max(200),
@@ -52,9 +56,10 @@ export function registerCreateRecipe(server, { userId }) {
         tags:         z.array(z.string().min(1).max(50)).max(20).optional(),
         source_url:   z.string().url().max(500).optional(),
         notes:        z.string().max(2000).optional(),
+        nutrition:    nutritionSchema.optional(),
       },
     },
-    async ({ confirm, name, description, servings, prep_minutes, cook_minutes, ingredients, steps, tags, source_url, notes }) => {
+    async ({ confirm, name, description, servings, prep_minutes, cook_minutes, ingredients, steps, tags, source_url, notes, nutrition }) => {
       if (confirm !== true) {
         return toolError(
           'create_recipe requires confirm=true. This safeguards against accidental ' +
@@ -64,7 +69,10 @@ export function registerCreateRecipe(server, { userId }) {
       const cleanName = name.trim();
       if (!cleanName) return toolError('name is required and cannot be blank.');
 
+      // Each with an id, as the editor gives them: steps' ingredient chips
+      // and a later update_recipe point at it.
       const storedIngredients = ingredients.map(it => ({
+        id:   crypto.randomUUID(),
         name: it.name.trim(),
         qty:  it.qty != null ? String(it.qty) : '',
         unit: it.unit || '',
@@ -75,8 +83,8 @@ export function registerCreateRecipe(server, { userId }) {
       const result = db.prepare(
         `INSERT INTO recipes
            (user_id, name, description, servings, prep_minutes, cook_minutes,
-            ingredients, steps, tags, source_url, notes, visibility)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'private')`
+            ingredients, steps, tags, source_url, notes, nutrition, visibility)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'private')`
       ).run(
         userId,
         cleanName,
@@ -89,6 +97,8 @@ export function registerCreateRecipe(server, { userId }) {
         JSON.stringify(tags || []),
         source_url || null,
         notes || null,
+        // Per serving, as the source states it (#74).
+        JSON.stringify(deriveSodiumSalt(mergeNutrition({}, nutrition))),
       );
 
       const recipeId = result.lastInsertRowid;

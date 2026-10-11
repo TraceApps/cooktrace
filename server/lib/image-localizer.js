@@ -176,3 +176,54 @@ export function localizeDataUrls(value) {
   if (Array.isArray(value)) return value.map(localizeDataUrl).filter(Boolean);
   return localizeDataUrl(value);
 }
+
+// ── An image an agent hands over (MCP set_recipe_image) ─────────────────
+// Unlike localizeImage, these refuse rather than fall back: what's saved is
+// checked to be an image by its bytes, at most MAX_EMBEDDED_BYTES, and a
+// URL is fetched through the address guard on every redirect hop.
+const _EXT = { jpeg: 'jpg', png: 'png', gif: 'gif', webp: 'webp', avif: 'avif', heic: 'heic', bmp: 'bmp' };
+
+/** Save image bytes under /uploads; returns '/uploads/<file>'. Throws if they aren't an image. */
+export function saveImageBytes(bytes) {
+  if (!bytes?.length) throw new Error('the image is empty');
+  if (bytes.length > MAX_EMBEDDED_BYTES) throw new Error(`the image is over ${MAX_EMBEDDED_BYTES / 1024 / 1024} MB`);
+  const type = detectImageTypeFromBuffer(bytes);
+  if (!type) throw new Error('that is not an image (JPEG, PNG, WebP, GIF, AVIF or HEIC)');
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  const filename = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}.${_EXT[type] || 'jpg'}`;
+  fs.writeFileSync(path.join(UPLOADS_DIR, filename), bytes);
+  return `/uploads/${filename}`;
+}
+
+/** Base64, with or without a data: prefix, saved as saveImageBytes does. */
+export function saveImageBase64(data) {
+  const b64 = String(data || '').replace(/^data:[^,]*,/, '').replace(/\s+/g, '');
+  if (!b64 || /[^A-Za-z0-9+/=_-]/.test(b64)) throw new Error('image_data is not base64');
+  return saveImageBytes(Buffer.from(b64, 'base64'));
+}
+
+/** Download an image from a public address and save it; throws with the reason. */
+export async function downloadImage(url, { allowPrivate = false } = {}) {
+  const { fetchChecked, readBody } = await import('./ssrf-guard.js');
+  const parsed = new URL(url);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('only http and https addresses');
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 20000);
+  try {
+    const res = await fetchChecked(parsed.toString(), {
+      signal: ctl.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; CookTrace/1.0)', Accept: 'image/*' },
+    }, { allowPrivate, allowPrivateEnvHint: 'ALLOW_PRIVATE_RECIPE_URLS', maxRedirects: 3 });
+    if (!res.ok) throw new Error(`the address answered ${res.status}`);
+    return saveImageBytes(await readBody(res, MAX_EMBEDDED_BYTES));
+  } catch (e) {
+    if (e?.name === 'AbortError') throw new Error('the address took too long to answer');
+    // As the URL import does (recipe-scraper.js): why an address on the
+    // server's own network was refused is said only to whoever may reach
+    // it, so a refusal can't be used to learn which names exist there.
+    if (!allowPrivate && /addresses are|resolve host/.test(e?.message || '')) throw new Error('could not fetch the image');
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}

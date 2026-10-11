@@ -34,7 +34,7 @@ export async function handleMcpRequest(req, res) {
       capabilities: { tools: {} },
     }
   );
-  const ctx = { userId: req.apiUser.id };
+  const ctx = { userId: req.apiUser.id, role: req.apiUser.role || null, username: req.apiUser.username || null };
   // Each tier needs its own scope. Registering reads unconditionally
   // handed every read tool to a token minted with only mcp:write.
   if (req.mcpReads)   registerReadTools(server, ctx);

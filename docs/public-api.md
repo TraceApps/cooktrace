@@ -82,13 +82,15 @@ A bad request (an invalid date, a recipe id with no match) returns
 | PATCH | `/api/v1/shopping/:id/check` | `{checked}` | Marks a shopping list item checked or unchecked. |
 | PATCH | `/api/v1/pantry/:id/stock` | `{in_stock?, quantity?}` | Updates an existing pantry item's stock state and/or quantity. Does not create new pantry rows. |
 
-Not yet exposed here: creating a recipe, adding a pantry or shopping
-item, or deleting a diary/shopping entry. Those stay MCP-only for now
-(`create_recipe`, `add_pantry_item`, `add_shopping_item`,
-`remove_shopping_item`, `delete_cook_diary_entry` in the MCP setup
-guide), since each requires `MCP_DESTROY_ENABLED` plus the
-`mcp:destroy` scope plus `confirm: true` on the MCP side, and this
-surface has not needed that capability yet.
+Not yet exposed here: creating, importing or editing a recipe, setting
+its photo or nutrition, adding a pantry or shopping item, or deleting a
+diary/shopping entry. Those stay MCP-only for now (`create_recipe`,
+`import_recipe_from_url`, `update_recipe`, `set_recipe_image`,
+`add_pantry_item`, `add_shopping_item`, `remove_shopping_item`,
+`delete_cook_diary_entry` in the MCP setup guide). The destructive ones
+need `MCP_DESTROY_ENABLED`, the `mcp:destroy` scope and `confirm: true`
+on the MCP side; recipe edits need `mcp:write`, since every one can be
+undone in the app.
 
 ## Examples
 

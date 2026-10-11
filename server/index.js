@@ -98,6 +98,9 @@ const EMBEDDED_PHOTO_LIMIT = '6mb';
 for (const path of ['/api/recipes', '/api/cook-diary', '/api/pantry', '/api/cookbooks', '/api/auth/profile']) {
   router.use(path, express.json({ limit: EMBEDDED_PHOTO_LIMIT }));
 }
+// MCP's set_recipe_image takes a photo as base64 (up to 12 MB of image,
+// about 16 MB of text).
+router.use('/api/mcp', express.json({ limit: '18mb' }));
 router.use(express.json({ limit: '1mb' }));
 router.use(cookieParser());
 

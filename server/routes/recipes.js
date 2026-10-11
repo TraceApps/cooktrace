@@ -605,21 +605,23 @@ router.post('/', wrap((req, res) => {
 }));
 
 // ── PUT /:id — update ───────────────────────────────────────────────────
-router.put('/:id', wrap((req, res) => {
-  const u = uid(req);
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
-
+// A save of recipe `id` by user `u` (role: theirs), with `body` as the app
+// sends it: the whole recipe, and _sync when the save says which copy it
+// was made on. The REST route and MCP's update_recipe both save through
+// here, so an edit from either keeps the same versions, sync stamps,
+// pantry links and wipe guard. Returns { status, body }.
+const _out = (status, json) => ({ status, body: json });
+export function updateRecipe(id, body, { u, role = null } = {}) {
   const existing = db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(id);
-  if (!existing) return res.status(404).json({ error: 'Not found' });
+  if (!existing) return _out(404, { error: 'Not found' });
   const isOwner = (u == null && existing.user_id == null) || existing.user_id === u;
-  const isAdmin = req.user?.role === 'admin';
+  const isAdmin = role === 'admin';
   const isKitchenEditor = !isOwner && !isAdmin && _canEditViaKitchen(id, u);
   if (!isOwner && !isAdmin && !isKitchenEditor) {
-    return res.status(403).json({ error: 'Only the recipe owner or an admin can edit this recipe' });
+    return _out(403, { error: 'Only the recipe owner or an admin can edit this recipe' });
   }
 
-  const body = { ...(req.body || {}) };
+  body = { ...(body || {}) };
   // Pantry links live inside the recipe's own JSON and point at rows in
   // ONE person's pantry. Resolve them against the owner's pantry, never
   // the editor's, or a Sous Chef's save would silently repoint the
@@ -630,7 +632,7 @@ router.put('/:id', wrap((req, res) => {
     body.ingredients = _linkIngredientsToPantry(pantryOwner, body.ingredients);
   }
   const data = _toStorage(body);
-  if (!data.name) return res.status(400).json({ error: 'Name is required' });
+  if (!data.name) return _out(400, { error: 'Name is required' });
 
   // A Sous Chef edits the recipe, not its place in the owner's library.
   // Categories are per person, visibility is the owner's call, and the
@@ -690,7 +692,7 @@ router.put('/:id', wrap((req, res) => {
       });
     }
     if (!m.write) {
-      return res.json({ ..._withCreatorAvatar(_hydrate(existing), existing), ...(m.devicePulls ? { kept: 'server' } : {}) });
+      return _out(200, { ..._withCreatorAvatar(_hydrate(existing), existing), ...(m.devicePulls ? { kept: 'server' } : {}) });
     }
     for (const f of [...VERSION_FIELDS, ...META_FIELDS]) { data[f] = m.row[f]; guarded[f] = m.row[f]; }
     editedAt = m.updatedAt;
@@ -729,7 +731,14 @@ router.put('/:id', wrap((req, res) => {
   // A change to what you cook is a new version (lib/recipe-history.js).
   recordRevision(id, { by: u, at: editedAt });
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(id);
-  res.json({ ..._withCreatorAvatar(_hydrate(row), row), ...(keptServer ? { kept: 'server' } : {}) });
+  return _out(200, { ..._withCreatorAvatar(_hydrate(row), row), ...(keptServer ? { kept: 'server' } : {}) });
+}
+
+router.put('/:id', wrap((req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+  const r = updateRecipe(id, req.body, { u: uid(req), role: req.user?.role || null });
+  res.status(r.status).json(r.body);
 }));
 
 
@@ -1369,6 +1378,27 @@ async function _scrapeUrlOnly(url, opts = {}) {
     if (!parsed && aiCfg) await trySmart();
   }
   return { parsed, usedTier, errors };
+}
+
+// An import from a URL for MCP's import_recipe_from_url: the same tiers,
+// settings and save as POST /scrape. `tier` overrides the user's choice,
+// and 'standard' asked for by name means the page's data only (no AI to
+// fall back on). `allowPrivate`: the caller decides who may reach the
+// server's own network. Returns { recipe, tier } or { skipped,
+// existing_id } or { error, details }.
+export async function importRecipeFromUrl(url, { u, role = null, username = null, tier = null, allowPrivate = false } = {}) {
+  // The AI endpoint is one the user set up (a home Ollama), so their role
+  // decides it as in the app; the page's address is the caller's call.
+  const req = { user: { id: u, role } };
+  const engine   = tier || _userSetting(u, 'urlImportEngine') || 'standard';
+  const fallback = _userSetting(u, 'urlImportFallback') || 'standard';
+  const aiCfg    = tier === 'standard' ? null : _aiConfigForUser(u, req);
+  if (engine === 'smart' && !aiCfg) return { error: 'The smart tier needs an AI provider set up in Settings > Trace.' };
+  const { parsed, usedTier, errors } = await _scrapeUrlOnly(url, { engine, fallback, aiCfg, allowPrivate });
+  if (!parsed) return { error: 'No recipe could be extracted from that URL', details: errors };
+  const row = _saveImportedRecipe(u, parsed, { addToPantry: true, applyTags: false, importCategories: true, dedup: 'skip', creatorUsername: username });
+  if (!row) return { skipped: true, existing_id: _findImportDuplicate(u, parsed)?.id || null, name: parsed.name };
+  return { recipe: row, tier: usedTier };
 }
 
 router.post('/scrape', wrap(async (req, res) => {

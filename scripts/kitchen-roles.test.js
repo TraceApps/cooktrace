@@ -47,8 +47,9 @@ test('edit access is read live from the share plus current membership', () => {
 });
 
 test('PUT /recipes/:id admits a Sous Chef but keeps the owner-only fields', () => {
-  const put = recipesJs.slice(recipesJs.indexOf("router.put('/:id',"));
-  const body = put.slice(0, put.indexOf('\n}));'));
+  // The save the route (and MCP's update_recipe) runs: updateRecipe.
+  const put = recipesJs.slice(recipesJs.indexOf('export function updateRecipe('));
+  const body = put.slice(0, put.indexOf('\n}\n'));
   assert.match(body, /const isKitchenEditor = !isOwner && !isAdmin && _canEditViaKitchen\(id, u\)/);
   assert.match(body, /if \(!isOwner && !isAdmin && !isKitchenEditor\)/);
   for (const field of ['visibility', 'category_id', 'rating', 'favorite']) {
@@ -57,8 +58,9 @@ test('PUT /recipes/:id admits a Sous Chef but keeps the owner-only fields', () =
 });
 
 test('pantry links resolve against the recipe owner, never the editor', () => {
-  const put = recipesJs.slice(recipesJs.indexOf("router.put('/:id',"));
-  const body = put.slice(0, put.indexOf('\n}));'));
+  // The save the route (and MCP's update_recipe) runs: updateRecipe.
+  const put = recipesJs.slice(recipesJs.indexOf('export function updateRecipe('));
+  const body = put.slice(0, put.indexOf('\n}\n'));
   assert.match(body, /const pantryOwner = isOwner \? u : existing\.user_id/);
   assert.match(body, /_linkIngredientsToPantry\(pantryOwner, body\.ingredients\)/);
   assert.doesNotMatch(body, /_linkIngredientsToPantry\(u,/, 'the editor of a shared recipe must not repoint it at their own pantry');
@@ -66,8 +68,8 @@ test('pantry links resolve against the recipe owner, never the editor', () => {
 
 test('a non-owner save is recorded, and delete stays owner or admin only', () => {
   assert.match(dbJs, /ALTER TABLE recipes ADD COLUMN last_edited_by INTEGER/);
-  const put = recipesJs.slice(recipesJs.indexOf("router.put('/:id',"));
-  assert.match(put.slice(0, put.indexOf('\n}));')), /isOwner \? null : u/);
+  const put = recipesJs.slice(recipesJs.indexOf('export function updateRecipe('));
+  assert.match(put.slice(0, put.indexOf('\n}\n')), /isOwner \? null : u/);
   const del = recipesJs.slice(recipesJs.indexOf("router.delete('/:id',"));
   assert.match(del.slice(0, 900), /if \(!isOwner && !isAdmin\) return res\.status\(403\)/);
   assert.doesNotMatch(del.slice(0, 900), /_canEditViaKitchen/);
