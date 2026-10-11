@@ -51,6 +51,9 @@ export function registerCreateRecipe(server, { userId }) {
         servings:     z.number().int().positive().max(1000).optional(),
         prep_minutes: z.number().int().min(0).max(10000).optional(),
         cook_minutes: z.number().int().min(0).max(10000).optional(),
+        rest_minutes: z.number().int().min(0).max(10000).optional(),
+        total_minutes: z.number().int().min(0).max(10000).optional()
+          .describe('Only when it differs from prep + cook + rest, e.g. when steps overlap.'),
         ingredients:  z.array(ingredientSchema).min(1),
         steps:        z.array(z.string().min(1).max(2000)).min(1),
         tags:         z.array(z.string().min(1).max(50)).max(20).optional(),
@@ -59,7 +62,7 @@ export function registerCreateRecipe(server, { userId }) {
         nutrition:    nutritionSchema.optional(),
       },
     },
-    async ({ confirm, name, description, servings, prep_minutes, cook_minutes, ingredients, steps, tags, source_url, notes, nutrition }) => {
+    async ({ confirm, name, description, servings, prep_minutes, cook_minutes, rest_minutes, total_minutes, ingredients, steps, tags, source_url, notes, nutrition }) => {
       if (confirm !== true) {
         return toolError(
           'create_recipe requires confirm=true. This safeguards against accidental ' +
@@ -82,9 +85,9 @@ export function registerCreateRecipe(server, { userId }) {
 
       const result = db.prepare(
         `INSERT INTO recipes
-           (user_id, name, description, servings, prep_minutes, cook_minutes,
+           (user_id, name, description, servings, prep_minutes, cook_minutes, rest_minutes, total_minutes,
             ingredients, steps, tags, source_url, notes, nutrition, visibility)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'private')`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'private')`
       ).run(
         userId,
         cleanName,
@@ -92,6 +95,8 @@ export function registerCreateRecipe(server, { userId }) {
         servings ?? null,
         prep_minutes ?? null,
         cook_minutes ?? null,
+        rest_minutes ?? null,
+        total_minutes ?? null,
         JSON.stringify(storedIngredients),
         JSON.stringify(storedSteps),
         JSON.stringify(tags || []),

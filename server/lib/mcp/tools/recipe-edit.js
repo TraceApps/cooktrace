@@ -130,11 +130,11 @@ function _summary(r) {
   };
 }
 
-function _save(recipeId, body, ctx) {
+function _save(recipeId, body, ctx, extra = {}) {
   const r = updateRecipe(recipeId, body, { u: ctx.userId, role: ctx.role ?? null });
   if (r.status !== 200) return toolError(r.body?.error || `Couldn't save the recipe (${r.status}).`);
-  const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(recipeId);
-  return toolResult({ ok: true, updated: _summary(row) });
+  const row = db.prepare(`SELECT * FROM recipes WHERE id = ? AND user_id = ?`).get(recipeId, ctx.userId);
+  return toolResult({ ok: true, ...extra, updated: _summary(row) });
 }
 
 export function registerUpdateRecipe(server, ctx) {
@@ -155,6 +155,8 @@ export function registerUpdateRecipe(server, ctx) {
         prep_minutes: z.number().int().min(0).max(10000).nullable().optional(),
         cook_minutes: z.number().int().min(0).max(10000).nullable().optional(),
         rest_minutes: z.number().int().min(0).max(10000).nullable().optional(),
+        total_minutes: z.number().int().min(0).max(10000).nullable().optional()
+          .describe('Only when it differs from prep + cook + rest; null goes back to the sum.'),
         ingredients:  z.array(ingredientSchema).min(1).optional(),
         steps:        z.array(z.string().min(1).max(2000)).min(1).optional(),
         tags:         z.array(z.string().min(1).max(50)).max(20).optional(),
@@ -167,7 +169,8 @@ export function registerUpdateRecipe(server, ctx) {
       const row = _own(args.recipe_id, ctx.userId);
       if (!row) return toolError(`recipe_id ${args.recipe_id} not found in your recipes.`);
       const body = _asBody(row);
-      for (const f of ['name', 'description', 'servings', 'prep_minutes', 'cook_minutes', 'rest_minutes', 'tags', 'source_url', 'notes']) {
+      const was = JSON.stringify(body);
+      for (const f of ['name', 'description', 'servings', 'prep_minutes', 'cook_minutes', 'rest_minutes', 'total_minutes', 'tags', 'source_url', 'notes']) {
         if (args[f] !== undefined) body[f] = typeof args[f] === 'string' && f !== 'description' && f !== 'notes' ? args[f].trim() : args[f];
       }
       if (args.ingredients) body.ingredients = _ingredients(args.ingredients, body.ingredients);
@@ -180,9 +183,14 @@ export function registerUpdateRecipe(server, ctx) {
           return toolError('nutrition would end up empty, which a save keeps from happening: leave at least one value, or remove them in the app.');
         }
       }
-      const changed = Object.keys(args).filter(k => k !== 'recipe_id' && args[k] !== undefined);
-      if (!changed.length) return toolError('Nothing to change: send at least one field besides recipe_id.');
-      return _save(row.id, body, ctx);
+      const sent = Object.keys(args).filter(k => k !== 'recipe_id' && args[k] !== undefined);
+      if (!sent.length) return toolError('Nothing to change: send at least one field besides recipe_id.');
+      // Which of them differ from what's there; none, and nothing is saved
+      // (thanks to @Stasky745's #79 for the shape).
+      const before = JSON.parse(was);
+      const changed = sent.filter(f => JSON.stringify(body[f]) !== JSON.stringify(before[f]));
+      if (!changed.length) return toolResult({ ok: true, recipe_id: row.id, changed: [] });
+      return _save(row.id, body, ctx, { changed });
     }
   );
 }

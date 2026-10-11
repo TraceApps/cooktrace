@@ -50,6 +50,7 @@ export function registerGetRecipe(server, { userId }) {
         ingredients: hydrated.ingredients,
         steps: hydrated.steps,
         nutrition: hydrated.nutrition,
+        img_url: hydrated.img_url ?? hydrated.imgUrl ?? null,
         source_url: hydrated.source_url,
         notes: hydrated.notes,
         cook_count: hydrated.cook_count,

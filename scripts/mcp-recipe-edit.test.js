@@ -176,6 +176,13 @@ test('MCP: update a recipe, its nutrition and photo, and import one from a URL',
 
     // Nothing to change, another's recipe, both or neither image.
     assert.match((await t.agent('update_recipe', { recipe_id: rid })).error, /Nothing to change/);
+    // The same value again changes nothing and saves nothing (#79's shape).
+    const same = await t.agent('update_recipe', { recipe_id: rid, servings: 4 });
+    assert.deepEqual(same.data, { ok: true, recipe_id: rid, changed: [] });
+    const total = await t.agent('update_recipe', { recipe_id: rid, total_minutes: 25, servings: 4 });
+    assert.deepEqual(total.data.changed, ['total_minutes']);
+    assert.equal((await t.json('GET', `/api/recipes/${rid}`, null, t.admin)).total_minutes, 25);
+    assert.equal('img_url' in (await t.agent('get_recipe', { recipe_id: rid })).data, true, 'get_recipe says the photo');
     const patsOwn = await t.json('POST', '/api/recipes', { name: 'Pat Soup', servings: 1, ingredients: [{ title: '', items: [{ name: 'water' }] }], steps: [{ title: '', text: 'Boil.' }] }, t.member);
     assert.match((await t.agent('update_recipe', { recipe_id: patsOwn.id, servings: 9 })).error, /not found/, "only the token owner's own recipes");
     assert.match((await t.agent('set_recipe_image', { recipe_id: patsOwn.id, image_data: PNG })).error, /not found/);

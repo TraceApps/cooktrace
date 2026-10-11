@@ -138,6 +138,9 @@ test('All destructive tools are registered in registerDestroyTools', () => {
     'registerAddPantryItem',
     'registerDeleteCookDiaryEntry',
     'registerRemoveShoppingItem',
+    'registerUpdateRecipe',
+    'registerSetRecipeImage',
+    'registerImportRecipeFromUrl',
   ];
   for (const fn of expected) {
     assert.match(mcpTools, new RegExp(`\\b${fn}\\s*\\(`), `expected ${fn}() call in tools/index.js`);
@@ -150,6 +153,7 @@ test('Every destructive tool requires confirm=true', () => {
     'add-pantry-item.js',
     'delete-cook-diary-entry.js',
     'remove-shopping-item.js',
+    'recipe-edit.js', // import_recipe_from_url
   ];
   for (const f of destroyFiles) {
     const src = readFileSync(new URL(`../server/lib/mcp/tools/${f}`, import.meta.url), 'utf8');
@@ -194,6 +198,7 @@ test('MCP tool DB queries scope on user_id — no cross-user access', () => {
     'add-pantry-item.js',
     'delete-cook-diary-entry.js',
     'remove-shopping-item.js',
+    'recipe-edit.js',
   ];
   for (const f of toolFiles) {
     const src = readFileSync(new URL(`../server/lib/mcp/tools/${f}`, import.meta.url), 'utf8');
