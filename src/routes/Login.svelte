@@ -140,7 +140,7 @@
       // Refresh CSRF token from /api/auth/me before any state-changing request
       // can fire (otherwise reactive settings saves would use a stale csrf from
       // a previous session and 403). loadAuthState() handles the fetch and
-      // populates localStorage.nt:csrf as a side effect.
+      // populates localStorage ct:csrf as a side effect.
       await loadAuthState();
       // The password was right but the session didn't stick: the browser
       // dropped the cookie. Say why here instead of looping back to sign-in.

@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import db from '../db.js';
 import { wrap } from '../logger.js';
-import { signToken, sessionMaxAge, userMgmtActive, requireAuth, requireAdmin } from '../middleware/auth.js';
+import { signToken, sessionMaxAge, userMgmtActive, setupRequired, requireAuth, requireAdmin } from '../middleware/auth.js';
 import { listProviders as oidcListProviders, publicProvider as oidcPublicProvider, isPasswordLoginEnabled, listUserLinks } from '../lib/oidc.js';
 import { sendPasswordReset, sendInvite, isEmailConfigured } from '../email.js';
 import { estimate as estimatePasswordStrength, STRONG_MIN_SCORE } from '../lib/password-strength.js';
@@ -135,7 +135,7 @@ router.get('/status', wrap((req, res) => {
   const policy = db.prepare(`SELECT value FROM app_config WHERE key = 'password_policy'`).get()?.value || 'standard';
   res.json({
     active,
-    setup_required: !active && !singleUser,
+    setup_required: setupRequired(),
     single_user_mode: singleUser,
     oidc: { providers, enable_email_password_login: isPasswordLoginEnabled() },
     password_policy: policy,                  // 'standard' | 'strong'
@@ -166,6 +166,12 @@ router.post('/login', rateLimitLogin, wrap((req, res) => {
   }
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+
+  // A fresh install has no account to sign in to yet. Said plainly: Android
+  // apps from before /api/health reported it show this message as is.
+  if (setupRequired()) {
+    return res.status(503).json({ error: "This server isn't set up yet. Open it in a browser to create the first account.", setup_required: true });
+  }
 
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username.trim().toLowerCase());
   if (!user || !user.password_hash || !bcrypt.compareSync(password, user.password_hash)) {

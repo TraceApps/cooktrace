@@ -39,7 +39,7 @@ import webhooksRoutes     from './routes/webhooks.js';
 import mcpRoutes          from './routes/mcp.js';
 import v1ApiRoutes        from './routes/api/v1/index.js';
 import { logger }   from './logger.js';
-import { authenticate, userMgmtActive } from './middleware/auth.js';
+import { authenticate, userMgmtActive, setupRequired } from './middleware/auth.js';
 import { csrfProtect } from './middleware/csrf.js';
 import { seedSmtpFromEnv } from './email.js';
 import { seedAiFromEnv } from './ai.js';
@@ -186,6 +186,11 @@ router.get('/api/oidc/callback', (req, res) => {
   res.redirect(307, `${BASE_URL}/api/auth/oidc/callback${q >= 0 ? req.originalUrl.slice(q) : ''}`);
 });
 
+// Health answers before setup too: the server is up and only needs its first
+// account, which the Android app's connect screen says instead of "not
+// reachable". A server that is set up still answers exactly { ok: true }.
+router.get('/api/health', (req, res) => res.json(setupRequired() ? { ok: true, setup_required: true } : { ok: true }));
+
 // Setup enforcement — block data APIs until the first user account is created.
 // /api/auth/* is allowed so the client can register the admin. /api/r/*
 // (public share-link reads) is also allowed so a recipient with a
@@ -200,9 +205,7 @@ router.get('/api/oidc/callback', (req, res) => {
 router.use('/api', (req, res, next) => {
   if (req.path.startsWith('/auth')) return next();
   if (req.path.startsWith('/r/'))   return next();
-  if (userMgmtActive()) return next();             // users exist — normal operation
-  const singleUser = db.prepare(`SELECT value FROM app_config WHERE key = 'single_user_mode'`).get()?.value === '1';
-  if (singleUser) return next();                   // intentional single-user mode — let data APIs through
+  if (!setupRequired()) return next();              // set up, or single-user mode by choice
   res.status(503).json({ error: 'Setup required', setup_required: true });
 });
 
@@ -240,7 +243,6 @@ router.use('/api/admin/webhooks', webhooksRoutes);
 router.use('/api/mcp',          mcpRoutes);
 router.use('/api/v1',           v1ApiRoutes);
 router.use('/api/r',            shareRoutes);   // public share-link reads
-router.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Serve Svelte frontend (production build) — anything except index.html.
 // Content-hashed assets (in /assets/) are safe to cache forever — new deploy =

@@ -2368,7 +2368,8 @@
     "strength_4": "Very strong"
   },
   "connect": {
-    "https_only": "This app only connects over HTTPS. Put the server behind a reverse proxy (Caddy, Tailscale or Cloudflare Tunnel), or use a debug build. DEPLOY.md, Connecting from Android, has the steps."
+    "https_only": "This app only connects over HTTPS. Put the server behind a reverse proxy (Caddy, Tailscale or Cloudflare Tunnel), or use a debug build. DEPLOY.md, Connecting from Android, has the steps.",
+    "needs_setup": "This server isn't set up yet. Open it in a browser to create the first account, then connect here."
   },
   "when": {
     "just_now": "Just Now",

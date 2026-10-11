@@ -18,6 +18,15 @@ export function userMgmtActive() {
   return db.prepare('SELECT 1 FROM users LIMIT 1').get() != null;
 }
 
+/**
+ * A fresh install: no account yet, and not single-user mode by choice. The
+ * setup gate, /api/health, /api/auth/status and /api/auth/login all ask this.
+ */
+export function setupRequired() {
+  if (userMgmtActive()) return false;
+  return db.prepare(`SELECT value FROM app_config WHERE key = 'single_user_mode'`).get()?.value !== '1';
+}
+
 // Default raised from 720h (30 days) to 8760h (1 year) on 2026-06-09 after
 // users with biometric sign-in hit the silent 30-day token expiry. With
 // biometric on, the JWT is essentially a refresh proxy — the actual auth

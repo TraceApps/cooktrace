@@ -19,7 +19,7 @@
   import { onMount, onDestroy } from 'svelte';
   import {
     isNative, getNativeMode, getServerUrl, setNativeMode, setServerUrl,
-    setAuthToken, getAuthToken, explainConnectError,
+    setAuthToken, getAuthToken, explainConnectError, healthNeedsSetup,
   } from '../../lib/platform.js';
   import { _ } from 'svelte-i18n';
   import { showError, showSuccess } from '../../stores/toast.js';
@@ -77,6 +77,7 @@
     try {
       const { CapacitorHttp } = await import('@capacitor/core');
       const health = await CapacitorHttp.get({ url: `${url}/api/health` });
+      if (healthNeedsSetup(health)) { showError($_('connect.needs_setup')); return; }
       if (health.status < 200 || health.status >= 300) throw new Error('Server not reachable');
 
       const login = await CapacitorHttp.post({

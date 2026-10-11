@@ -1,7 +1,7 @@
 <script>
   import { failed } from '../lib/messages.js';
   import { _ } from 'svelte-i18n';
-  import { push } from 'svelte-spa-router';
+  import { push, replace } from 'svelte-spa-router';
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { DB } from '../lib/db.js';
@@ -116,6 +116,12 @@
       });
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
+        // Refused because the first account was made elsewhere meanwhile
+        // (another tab or device): this tab belongs on sign-in, not here.
+        if (_forceAccountCreation) {
+          await loadAuthState();
+          if (!get(setupRequired)) { replace('/'); return; }
+        }
         throw new Error(e.error || '');
       }
       await loadAuthState();

@@ -1,6 +1,6 @@
 <script>
   import { _ } from 'svelte-i18n';
-  import { setNativeMode, setServerUrl, setAuthToken, resolveAssetUrl, iconUrl, explainConnectError } from '../lib/platform.js';
+  import { setNativeMode, setServerUrl, setAuthToken, resolveAssetUrl, iconUrl, explainConnectError, healthNeedsSetup } from '../lib/platform.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { DB } from '../lib/db.js';
 
@@ -51,6 +51,7 @@
     try {
       const { CapacitorHttp } = await import('@capacitor/core');
       const healthRes = await CapacitorHttp.get({ url: `${url}/api/health` });
+      if (healthNeedsSetup(healthRes)) { showError($_('connect.needs_setup')); return; }
       if (healthRes.status < 200 || healthRes.status >= 300) {
         throw new Error('Server not reachable');
       }

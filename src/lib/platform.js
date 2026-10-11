@@ -87,6 +87,19 @@ export function getAuthToken() {
 }
 
 /**
+ * A server that answered but has no account yet (a fresh install): it needs
+ * setting up in a browser before an app can sign in. `res` is what
+ * CapacitorHttp returns for /api/health ({ status, data }). Newer servers say
+ * so with a 200, older ones with a 503 "Setup required".
+ */
+export function healthNeedsSetup(res) {
+  try {
+    const d = typeof res?.data === 'string' ? JSON.parse(res.data) : res?.data;
+    return !!d?.setup_required;
+  } catch { return false; }
+}
+
+/**
  * Translate a connect-server error into something the user can act on.
  * Release-signed Android APKs ship with a strict network_security_config
  * that blocks cleartext (http://) traffic — the WebView and CapacitorHttp
