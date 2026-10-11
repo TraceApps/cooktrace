@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   // SettingsNotifications — device + push-service reminders.
   //
   // Two delivery channels (NT parity):
@@ -72,7 +73,7 @@
       showSuccess($_('settings_notifications.toast.test_sent'));
       testStatus = 'ok';
     } catch (e) {
-      showError(e.message || 'Push test failed');
+      showError(failed('fail.push_test', e));
       testStatus = 'fail';
     } finally {
       testing = false;
@@ -92,7 +93,7 @@
       if (result === 'granted') showSuccess($_('settings_notifications.toast.permission_granted'));
       else if (result === 'denied') showError($_('settings_notifications.toast.permission_denied'));
     } catch (e) {
-      showError(e.message || 'Permission request failed');
+      showError(failed('fail.permission', e));
     }
   }
 </script>

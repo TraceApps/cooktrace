@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../lib/messages.js';
   import { onMount } from 'svelte';
   import { currentUser, userMgmtActive, loadAuthState, signInProblem } from '../stores/auth.js';
   import { cookieBlockedByHttp, droppedCookieReason } from '../lib/cookie-check.js';
@@ -114,7 +115,7 @@
         body: JSON.stringify({ username: username.trim(), password }),
       });
       const data = await res.json();
-      if (!res.ok) { showError(data.error || $_('login.errors.failed')); return; }
+      if (!res.ok) { showError(failed('login.errors.failed', data.error)); return; }
       // Store auth token for native server mode
       if (isNative && data.token) setAuthToken(data.token);
       // If biometric is enabled, stash the JWT so the next launch can unlock
@@ -168,7 +169,7 @@
         body: JSON.stringify({ token: recoveryToken.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) { showError(data.error || $_('login.recovery.failed')); return; }
+      if (!res.ok) { showError(failed('login.recovery.failed', data.error)); return; }
       localStorage.removeItem('wl:userId');
       await loadAuthState();
       recoveryDone = true;

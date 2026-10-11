@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../lib/messages.js';
   import { _ } from 'svelte-i18n';
   import { push } from 'svelte-spa-router';
   import { fade, fly } from 'svelte/transition';
@@ -91,10 +92,10 @@
       next();
       return;
     }
-    if (!umUsername.trim()) { umError = 'Username required'; return; }
+    if (!umUsername.trim()) { umError = $_('settings.users.err_username_required'); return; }
     const pwErr = validatePassword(umPassword);
     if (pwErr) { umError = pwErr; return; }
-    if (umPassword !== umConfirm) { umError = "Passwords don't match"; return; }
+    if (umPassword !== umConfirm) { umError = $_('settings.users.err_passwords_mismatch'); return; }
 
     umBusy = true;
     try {
@@ -115,7 +116,7 @@
       });
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
-        throw new Error(e.error || `Registration failed (${res.status})`);
+        throw new Error(e.error || '');
       }
       await loadAuthState();
       // The account exists, but the browser didn't keep the sign-in cookie,
@@ -126,8 +127,8 @@
       }
       next();
     } catch (e) {
-      umError = e.message;
-      showError(e.message);
+      umError = failed('fail.create_account', e);
+      showError(umError);
     } finally {
       umBusy = false;
     }

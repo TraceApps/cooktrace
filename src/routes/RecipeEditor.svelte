@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../lib/messages.js';
   import { closeOnBack } from '../lib/back-stack.js';
   import { onMount, onDestroy } from 'svelte';
   import { slide } from 'svelte/transition';
@@ -400,7 +401,7 @@
       nutritionOpen = Object.entries(incomingNut)
         .some(([k, v]) => k !== '_derived' && v != null && v !== '');
     } catch (e) {
-      showError(e.message || 'Could not load recipe');
+      showError(failed('fail.load_recipe', e));
       push('/recipes');
     } finally {
       loading = false;
@@ -425,7 +426,7 @@
       videoUrl = url;
       showSuccess($_('recipe_editor_ct.toast.video_uploaded'));
     } catch (e) {
-      showError(e.message || 'Could not upload video');
+      showError(failed('fail.upload_video', e));
     } finally {
       videoUploading = false;
     }
@@ -573,7 +574,7 @@
       comboCategoryRef?.acceptCreated(c.name);
       categoryNewOpen = false;
     } catch (err) {
-      showError(err.message || 'Could not create category');
+      showError(failed('fail.create_category', err));
     }
   }
 
@@ -948,11 +949,11 @@
         ? await NtApi.updateRecipe(id, payload)
         : await NtApi.createRecipe(payload);
 
-      showSuccess(isEdit ? 'Recipe saved' : 'Recipe created');
+      showSuccess(isEdit ? $_('done.recipe_saved') : $_('done.recipe_created'));
       _clearDraft();
       push(`/recipes/${saved.id}`);
     } catch (e) {
-      showError(e.message || 'Save failed');
+      showError(failed('fail.save_recipe', e));
     } finally {
       saving = false;
     }

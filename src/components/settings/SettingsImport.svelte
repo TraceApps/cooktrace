@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   /**
    * SettingsImport — bulk recipe import from another app's backup zip.
    *
@@ -129,7 +130,7 @@
       // Default: every recipe ticked.
       selected = new Set((res.recipes || []).map(r => r.idx));
     } catch (err) {
-      showError(err.message || 'Could not read this zip');
+      showError(failed('fail.read_zip', err));
       pickedFile = null;
     } finally {
       scanning = false;
@@ -191,7 +192,7 @@
         showError($_('settings_import_ct.summary_failed', { values: { count: summary.failed.length } }));
       }
     } catch (err) {
-      showError(err.message || 'Import failed');
+      showError(failed('fail.import_recipes', err));
     } finally {
       committing = false;
       phase = 'idle';

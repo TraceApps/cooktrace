@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   /**
    * ManagePantryCategories — DB-backed pantry category catalog.
    *
@@ -37,7 +38,7 @@
   async function load() {
     loading = true;
     try { categories = await NtApi.getPantryCategories(); }
-    catch (e) { showError(e.message || 'Could not load pantry categories'); categories = []; }
+    catch (e) { showError(failed('fail.load_categories', e)); categories = []; }
     finally { loading = false; }
   }
   onMount(load);
@@ -63,7 +64,7 @@
       categories = categories.map(x => x.id === c.id ? updated : x);
       cancelEdit();
       showSuccess($_('manage_pantry_cats.toast.saved'));
-    } catch (e) { showError(e.message || 'Could not save'); }
+    } catch (e) { showError(failed('fail.save_category', e)); }
   }
 
   async function remove(c) {
@@ -77,7 +78,7 @@
     try {
       await NtApi.deletePantryCategory(c.id);
       categories = categories.filter(x => x.id !== c.id);
-    } catch (e) { showError(e.message || 'Could not delete'); }
+    } catch (e) { showError(failed('fail.delete_category', e)); }
   }
 
   // ── Drag-and-drop reorder ───────────────────────────────────────
@@ -115,7 +116,7 @@
     next.splice(insertAt, 0, moved);
     categories = next;
     try { await NtApi.reorderPantryCategories(next.map(c => c.id)); }
-    catch (err) { showError(err.message || 'Could not save order'); }
+    catch (err) { showError(failed('fail.save_order', err)); }
   }
   function _onDragEnd() { draggingId = null; dragOverId = null; }
 
@@ -134,7 +135,7 @@
       newIcon = 'kitchen';
       newDefaultAisle = '';
       showSuccess($_('manage_pantry_cats.toast.category_added'));
-    } catch (e) { showError(e.message || 'Could not add'); }
+    } catch (e) { showError(failed('fail.add_category', e)); }
     finally { creating = false; }
   }
 </script>

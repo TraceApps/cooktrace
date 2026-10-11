@@ -378,7 +378,7 @@ ${parseResult.text}
 
   function openCreated() {
     if (!createdRecipe) return;
-    showSuccess(`Imported "${createdRecipe.name}"`);
+    showSuccess($_('done.recipe_imported_named', { values: { name: createdRecipe.name } }));
     close();
     push(`/recipes/${createdRecipe.id}`);
   }

@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   /**
    * PantryItemSheet — slide-up bottom sheet for a single pantry item.
    *
@@ -121,7 +122,7 @@
       draft = { ...draft };
       showSuccess($_('pantry_sheet_extra.toast.nutrition_extracted'));
     } catch (e) {
-      showError($_('pantry_sheet_extra.toast.scan_failed', { values: { reason: e?.message || $_('pantry_sheet_extra.toast.scan_unknown') } }));
+      showError(failed('pantry_sheet_extra.toast.scan_failed', e));
     } finally {
       scanningLabel = false;
     }
@@ -313,7 +314,7 @@
       variantPickerOpen = false;
       variantPickerQuery = '';
       await _loadVariantContext();
-      showSuccess(parentId ? 'Added as a variant' : 'Detached from parent');
+      showSuccess(parentId ? $_('done.variant_added') : $_('done.variant_detached'));
       dispatch('changed', { item: updated });
       // Variant relationship moved; the parent (if any) and any sibling
       // rows in the host list won't be patched by the targeted `changed`
@@ -321,7 +322,7 @@
       // new hierarchy.
       dispatch('refresh');
     } catch (e) {
-      showError(e?.message || 'Could not update variant link');
+      showError(failed('fail.update_variant_link', e));
     }
   }
 
@@ -380,7 +381,7 @@
       // Surface the underlying error so logcat / DevTools show what failed
       // when the toast isn't specific enough for triage.
       console.error('[pantry] _addNewVariant failed:', e);
-      showError(e?.message || 'Could not add variant');
+      showError(failed('fail.add_variant', e));
     }
   }
 
@@ -463,7 +464,7 @@
       if (updatedChild?.id) dispatch('changed', { item: updatedChild });
       dispatch('refresh');
     } catch (e) {
-      showError(e?.message || 'Could not link variant');
+      showError(failed('fail.link_variant', e));
     }
   }
 
@@ -480,10 +481,10 @@
         nutrition_source_variant_id: variantId,
       });
       item = updated;
-      showSuccess(variantId ? 'Pulling nutrition from variant' : 'Nutrition set to manual');
+      showSuccess(variantId ? $_('done.nutrition_from_variant') : $_('done.nutrition_manual'));
       dispatch('changed', { item: updated });
     } catch (e) {
-      showError(e?.message || 'Could not update nutrition source');
+      showError(failed('fail.nutrition_source', e));
     }
   }
 
@@ -592,7 +593,7 @@
       draft = { ...draft };
       comboCategoryRef?.acceptCreated(c.name);
       categoryNewOpen = false;
-    } catch (err) { showError(err.message || 'Could not create category'); }
+    } catch (err) { showError(failed('fail.create_category', err)); }
   }
 
   // ── Barcode + OFF ──────────────────────────────────────────────────
@@ -628,7 +629,7 @@
       draft = { ...draft };
       downloadSuccess = true;
       setTimeout(() => downloadSuccess = false, 2000);
-    } catch (e) { showError(e.message || 'OFF lookup failed'); }
+    } catch (e) { showError(failed('fail.off_lookup', e)); }
     finally { downloading = false; }
   }
 
@@ -681,7 +682,7 @@
           offVerified = !!found;
         } catch { offVerified = false; }
       }, 3000);
-    } catch (e) { showError(e.message || 'Share to OFF failed'); }
+    } catch (e) { showError(failed('fail.off_share', e)); }
     finally { contributing = false; }
   }
 
@@ -745,7 +746,7 @@
       item = { ...item, ...e.detail };
       dispatch('changed', { ...item });
       showSuccess($_('allergen_info.saved'));
-    } catch (err) { showError(err.message || 'Save failed'); }
+    } catch (err) { showError(failed('fail.save_allergens', err)); }
   }
 
   // ── Save / Cancel / Delete ─────────────────────────────────────────
@@ -788,7 +789,7 @@
         editing = false;
         draft = null;
       }
-    } catch (e) { showError(e.message || 'Save failed'); }
+    } catch (e) { showError(failed('fail.save_item', e)); }
     finally { saving = false; }
   }
 
@@ -822,7 +823,7 @@
     if (!item || itemId == null) return;
     try {
       await NtApi.deletePantryItem(itemId, { cascade });
-      showSuccess(cascade ? 'Removed item + variants' : 'Removed');
+      showSuccess(cascade ? $_('done.removed_with_variants') : $_('done.item_removed'));
       const id = itemId;
       open = false;
       dispatch('deleted', { id });
@@ -832,7 +833,7 @@
       // 'deleted' event for the parent — refetch to keep the list
       // consistent with the new state.
       if (isGeneric && variantContext.children.length > 0) dispatch('refresh');
-    } catch (e) { showError(e.message || 'Delete failed'); }
+    } catch (e) { showError(failed('fail.remove_item', e)); }
   }
 
   async function _confirmVariantDelete() {

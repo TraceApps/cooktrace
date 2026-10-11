@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   /**
    * SettingsUpdates — in-app update UX. Layout modeled on Fathom's
    * lib/screens/updates_screen.dart so the mental model transfers.
@@ -94,7 +95,7 @@
       await refreshCacheInfo();
       showSuccess($_('updates.storage.cleared'));
     } catch (e) {
-      showError(e?.message || String(e));
+      showError(failed('fail.clear_updates', e));
     } finally {
       clearing = false;
     }

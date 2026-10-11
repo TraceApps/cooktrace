@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   import { closeOnBack } from '../../lib/back-stack.js';
   /**
    * SettingsEmail — SMTP form. Layout / verbiage / classes match
@@ -154,16 +155,16 @@
         const data = await res.json().catch(() => ({}));
         smtpTestRecipient = data.to || to;
         smtpTestStatus = 'ok';
-        showSuccess(`SMTP test email sent to ${smtpTestRecipient}`);
+        showSuccess($_('done.smtp_sent', { values: { to: smtpTestRecipient } }));
       } else {
         smtpTestStatus = 'fail';
         let detail = `HTTP ${res.status}`;
         try { const j = await res.json(); if (j?.error) detail = j.error; } catch {}
-        showError(`SMTP test failed: ${detail}`);
+        showError(failed('fail.smtp_test', { message: detail }));
       }
     } catch (e) {
       smtpTestStatus = 'fail';
-      showError(`SMTP test failed: ${e?.message || 'network error'}`);
+      showError(failed('fail.smtp_test', e));
     }
   }
 

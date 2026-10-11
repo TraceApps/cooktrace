@@ -199,7 +199,7 @@
       saveFailures = data.failed || [];
       phase = 'done';
       if (savedRecipes.length > 0) {
-        showSuccess(`Imported ${savedRecipes.length} recipes`);
+        showSuccess($_('settings_import_ct.toast_imported', { values: { count: savedRecipes.length } }));
       }
     } catch (e) {
       phase = 'error';

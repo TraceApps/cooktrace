@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   /**
    * SettingsImportFromNT — search + bulk-import foods from a connected
    * NutriTrace instance into the local pantry.
@@ -14,7 +15,7 @@
   import { _ } from 'svelte-i18n';
   import { ntFederationEnabled, ntInstanceUrl } from '../../stores/settings.js';
   import { resolveAssetUrl, apiUrl, isNative, getServerUrl, getAuthToken } from '../../lib/platform.js';
-  import { showSuccess, showError } from '../../stores/toast.js';
+  import { showSuccess, showError, showInfo } from '../../stores/toast.js';
   import { NtApi } from '../../lib/api.js';
 
   let query = '';
@@ -81,7 +82,7 @@
       // Default to nothing checked so user makes an explicit pick.
       selected = new Set();
     } catch (e) {
-      showError(e.message || 'Search failed');
+      showError(failed('fail.nt_search', e));
       results = [];
     } finally {
       searching = false;
@@ -127,12 +128,12 @@
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `Import failed (${res.status})`);
       summary = body;
-      if (body.count > 0) showSuccess(`Imported ${body.count} ${body.count === 1 ? 'item' : 'items'} into pantry`);
+      if (body.count > 0) showSuccess($_('done.nt_imported', { values: { count: body.count } }));
       if (Array.isArray(body.skipped) && body.skipped.length) {
-        showError(`${body.skipped.length} ${body.skipped.length === 1 ? 'item' : 'items'} skipped`);
+        showInfo($_('done.nt_skipped', { values: { count: body.skipped.length } }));
       }
     } catch (e) {
-      showError(e.message || 'Import failed');
+      showError(failed('fail.nt_import', e));
     } finally {
       importing = false;
     }

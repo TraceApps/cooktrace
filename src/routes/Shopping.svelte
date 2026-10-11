@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../lib/messages.js';
   import { closeOnBack } from '../lib/back-stack.js';
   import { onSyncChanges } from '../lib/sync-refresh.js';
   import { onMount } from 'svelte';
@@ -207,7 +208,7 @@
     try { const list = await NtApi.getShoppingList(); if (seq === _loadSeq) { items = list; loadError = null; } }
     catch (e) {
       // A quiet read after a sync that fails keeps what's shown, unsaid.
-      if (seq === _loadSeq && !quiet) { loadError = e.message || 'Could not load list'; showError(loadError); }
+      if (seq === _loadSeq && !quiet) { loadError = failed('fail.load_list', e); showError(loadError); }
     }
     finally { if (seq === _loadSeq) loading = false; }
   }
@@ -257,7 +258,7 @@
       items = [...items, created];
       addName = ''; addNameTyped = ''; addQty = '';
     } catch (e) {
-      showError(e.message || 'Could not add');
+      showError(failed('fail.add_list_item', e));
     } finally {
       addBusy = false;
     }
@@ -269,7 +270,7 @@
     items = items.map(i => ids.has(i.id) ? { ...i, checked: next } : i);
     try { await Promise.all([...ids].map(id => NtApi.toggleShoppingChecked(id, next))); }
     catch (e) {
-      showError(e.message || 'Could not update');
+      showError(failed('fail.check_item', e));
       await load();
     }
   }
@@ -294,7 +295,7 @@
     const id = (item.members || [item])[0].id;
     items = items.map(i => (i.id === id ? { ...i, notes: notes || null } : i));
     try { await NtApi.updateShoppingItem(id, { notes }); }
-    catch (e) { showError(e.message || 'Could not save the note'); await load(); }
+    catch (e) { showError(failed('fail.save_note', e)); await load(); }
   }
   // The sheet follows the list: a check or a note shows at once.
   $: sheetItem = itemSheetItem && !itemSheetItem.members
@@ -309,7 +310,7 @@
     try {
       await Promise.all(targets.map(r => NtApi.toggleShoppingChecked(r.id, next)));
     } catch (e) {
-      showError(e.message || 'Could not update all items');
+      showError(failed('fail.update_list', e));
       await load();
     }
   }
@@ -320,7 +321,7 @@
     try { for (const id of ids) await NtApi.deleteShoppingItem(id); }
     catch (e) {
       await load();
-      showError(e.message || 'Delete failed');
+      showError(failed('fail.remove_item', e));
     }
   }
 
@@ -342,9 +343,9 @@
       } else {
         for (const id of removedIds) await NtApi.deleteShoppingItem(id);
       }
-      showSuccess(`Removed ${n} ${n === 1 ? 'item' : 'items'}`);
+      showSuccess($_('done.items_removed', { values: { count: n } }));
     } catch (e) {
-      showError(e.message || 'Remove failed');
+      showError(failed('fail.remove_items', e));
       await load();
     }
   }
@@ -437,7 +438,7 @@
       items = items.filter(i => !i.checked);
     } catch (e) {
       clearBusy = false;
-      showError(e.message || 'Clear failed');
+      showError(failed('fail.clear_checked', e));
       return;
     }
     const picks = restockRows.filter(r => r.enabled);
@@ -480,7 +481,7 @@
           for (const d of done) await NtApi.updatePantryItem(d.id, d.prev);
           showSuccess($_('shopping_page.toast.restock_undone'));
         } catch (e) {
-          showError(e.message || 'Could not undo');
+          showError(failed('fail.undo', e));
         }
         loadPantry();
       },
@@ -567,7 +568,7 @@
         for (const id of ids) await NtApi.updateShoppingItem(id, nameUnit);
       }
     } catch (e) {
-      showError(e.message || 'Could not save');
+      showError(failed('fail.save_item', e));
       await load();
     }
   }
@@ -585,7 +586,7 @@
     items = items.map(i => ids.has(i.id) ? { ...i, aisle: nextTrim } : i);
     try { for (const id of ids) await NtApi.updateShoppingItem(id, { aisle: nextTrim }); }
     catch (e) {
-      showError(e.message || 'Could not update');
+      showError(failed('fail.change_aisle', e));
       await load();
     }
   }
@@ -685,7 +686,7 @@
         }
       }
     } catch (err) {
-      showError(err.message || 'Could not save order');
+      showError(failed('fail.save_order', err));
       await load();
     }
   }
@@ -726,7 +727,7 @@
       if (res.downloaded) showSuccess($_('shopping_page.toast.saved_image'));
       else if (res.canceled) { /* silent */ }
     } catch (e) {
-      showError(e.message || 'Could not share');
+      showError(failed('fail.share_list', e));
     }
   }
   async function shareAsText() {
@@ -735,7 +736,7 @@
       const res = await shareText(text, 'Shopping List');
       if (res.copied) showSuccess($_('shopping_page.toast.copied'));
     } catch (e) {
-      showError(e.message || 'Could not share');
+      showError(failed('fail.share_list', e));
     }
   }
 
@@ -795,7 +796,7 @@
       planImportOpen = false;
       await load();
     } catch (e) {
-      showError(e.message || 'Could not import');
+      showError(failed('fail.add_plan', e));
     } finally {
       planBusy = false;
     }
@@ -812,7 +813,7 @@
       pickerOpen = false;
       await load();
     } catch (e) {
-      showError(e.message || 'Could not add');
+      showError(failed('fail.add_to_list', e));
     } finally {
       pickerBusy = false;
     }

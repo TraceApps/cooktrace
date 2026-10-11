@@ -13,6 +13,7 @@
       Sync Now, Push All, and Disconnect.
 -->
 <script>
+  import { failed } from '../../lib/messages.js';
   import { closeOnBack } from '../../lib/back-stack.js';
   import { fade } from 'svelte/transition';
   import { onMount, onDestroy } from 'svelte';
@@ -167,7 +168,7 @@
       }
     } catch (e) {
       mergeStep = null;
-      showError($_('settings_server_conn.toast.sync_failed', { values: { reason: e.message || $_('settings_server_conn.toast.sync_unknown') } }));
+      showError(failed('settings_server_conn.toast.sync_failed', e));
     }
   }
 
@@ -213,7 +214,7 @@
     busy = true;
     try {
       const r = await fullSync(false);
-      if (r?.ok === false && r.error) showError(r.error);
+      if (r?.ok === false && r.error) showError(failed('settings_server_conn.toast.sync_failed', r.error));
       else showSuccess($_('settings_server_conn.toast.synced'));
     } finally { busy = false; }
   }
@@ -228,7 +229,7 @@
     busy = true;
     try {
       const r = await pushAllFromDevice();
-      if (r?.ok === false && r.error) showError(r.error);
+      if (r?.ok === false && r.error) showError(failed('fail.push_all', r.error));
       else showSuccess($_('settings_server_conn.toast.pushed_all'));
     } finally { busy = false; }
   }

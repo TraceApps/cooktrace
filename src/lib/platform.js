@@ -6,6 +6,9 @@
  */
 
 import { Capacitor } from '@capacitor/core';
+import { get } from 'svelte/store';
+import { _ } from 'svelte-i18n';
+import { failed } from './messages.js';
 
 /**
  * True when running inside the Capacitor native shell (Android / iOS).
@@ -99,14 +102,14 @@ export function explainConnectError(rawError, serverUrl) {
     msg.includes('err_cleartext') ||
     (isNative && isHttp && (msg.includes('network') || msg.includes('not reachable') || msg.includes('failed to fetch')));
   if (isHttp && looksLikeCleartextBlock) {
-    return 'This build only allows HTTPS connections. Set up a reverse proxy (Caddy, Tailscale, Cloudflare Tunnel) or install a debug APK. See DEPLOY.md → Connecting from Android.';
+    return get(_)('connect.https_only');
   }
   if (isHttp && isNative) {
     // Plain http on native — even if it succeeded, surface the warning so
     // users on debug builds know release builds will reject this URL.
-    return rawError?.message || 'Could not reach server';
+    return failed('fail.connect', rawError);
   }
-  return rawError?.message || 'Could not reach server';
+  return failed('fail.connect', rawError);
 }
 
 /**

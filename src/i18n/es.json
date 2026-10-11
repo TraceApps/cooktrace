@@ -11,7 +11,7 @@
     "synced": "Sincronizado",
     "syncing": "Sincronizando…",
     "pending_web": "{count, plural, =0 {Sin conexión. Tu cocina sigue funcionando aquí.} one {Sin conexión. Hay # cambio pendiente de subir.} other {Sin conexión. Hay # cambios pendientes de subir.}}",
-    "refused": "Tu servidor no aceptó {what}: {reason}",
+    "refused": "Tu servidor no aceptó {what}: {reason}.",
     "sign_out_waiting_title": "Hay cambios pendientes",
     "sign_out_waiting": "{count, plural, one {# cambio todavía no llegó a tu servidor. Si cierras sesión ahora, se va a perder. Conéctate y vuelve a intentarlo para conservarlo.} other {# cambios todavía no llegaron a tu servidor. Si cierras sesión ahora, se van a perder. Conéctate y vuelve a intentarlo para conservarlos.}}",
     "sign_out_anyway": "Salir de todos modos",
@@ -31,7 +31,16 @@
       "mobile_data": "Estás conectado por datos móviles. Puede que este servidor requiera tu Wi-Fi de casa o una VPN.",
       "check_connection": "Revisa tu Wi-Fi, la VPN o el servidor.",
       "saved_locally": "Tus cambios se guardaron localmente y se sincronizarán automáticamente."
-    }
+    },
+    "switch_account_waiting_title": "Hay cambios de otra cuenta esperando",
+    "switch_account_waiting": "{count, plural, one {# cambio hecho en este dispositivo por la cuenta que tenía la sesión iniciada antes no ha llegado al servidor. Si inicias sesión ahora, se descarta. Para conservarlo, inicia sesión primero con esa cuenta.} other {# cambios hechos en este dispositivo por la cuenta que tenía la sesión iniciada antes no han llegado al servidor. Si inicias sesión ahora, se descartan. Para conservarlos, inicia sesión primero con esa cuenta.}}",
+    "switch_account_anyway": "Iniciar sesión de todos modos",
+    "same_server_title": "¿Es el mismo servidor?",
+    "same_server": "Este servidor está en una dirección distinta de la que usaba este dispositivo, y no se puede saber si es el mismo servidor. Si lo es, tus datos de aquí se quedan y se sincronizan con él. Si no, se tratan como datos de otra cuenta.",
+    "same_server_yes": "Mismo servidor",
+    "same_server_no": "Otro servidor",
+    "account_check_failed_title": "No se pudieron abrir tus datos",
+    "account_check_failed": "Este dispositivo no pudo comprobar de quién son los datos que guarda, así que aún no se muestra nada. Inténtalo de nuevo o cierra sesión."
   },
   "routes": {
     "recipes": {
@@ -105,12 +114,12 @@
     "signed_in": "Sesión iniciada",
     "signed_out": "Sesión cerrada",
     "linked": "Vinculado",
-    "unlinked": "Desvinculado",
+    "unlinked": "Cuenta desvinculada",
     "admin": "administrador",
     "errors": {
-      "cant_reach_server": "No se pudo conectar con el servidor",
-      "failed": "Falló",
-      "unlink_failed": "No se pudo desvincular"
+      "cant_reach_server": "No se pudo conectar con el servidor.",
+      "failed": "No se pudo hacer. Inténtalo de nuevo.",
+      "unlink_failed": "No se pudo desvincular la cuenta"
     }
   },
   "pantry_sheet": {
@@ -349,15 +358,15 @@
       "toast_um_enabled": "Gestión de usuarios activada",
       "toast_um_disabled": "Gestión de usuarios desactivada",
       "toast_invite_sent": "Invitación enviada",
-      "toast_link_copied": "¡Copiado!",
-      "err_username_required": "El nombre de usuario es obligatorio",
-      "err_passwords_mismatch": "Las contraseñas no coinciden",
-      "err_username_password_required": "Se requieren usuario y contraseña",
-      "err_registration_failed": "No se pudo completar el registro",
+      "toast_link_copied": "Enlace copiado",
+      "err_username_required": "Escribe un nombre de usuario.",
+      "err_passwords_mismatch": "Las contraseñas no coinciden.",
+      "err_username_password_required": "Escribe un nombre de usuario y una contraseña.",
+      "err_registration_failed": "No se pudo crear la cuenta de administrador",
       "err_failed_to_add": "No se pudo agregar el usuario",
       "err_could_not_change_role": "No se pudo cambiar el rol",
       "err_could_not_reset_password": "No se pudo restablecer la contraseña",
-      "err_could_not_reach_server": "No se pudo conectar con el servidor"
+      "err_could_not_reach_server": "No se pudo conectar con el servidor."
     },
     "server": {
       "section": "Conexión al servidor"
@@ -380,7 +389,7 @@
     "sso_or": "o",
     "no_signin_methods": "No hay métodos de inicio de sesión disponibles. Consulta con tu administrador.",
     "errors": {
-      "failed": "Falló el inicio de sesión"
+      "failed": "No se pudo iniciar sesión"
     },
     "recovery": {
       "confirm": "Esto eliminará todas las cuentas de usuario. Tus alimentos y tu diario se conservan. ¿Continuar?",
@@ -389,9 +398,16 @@
       "token_placeholder": "Token de recuperación",
       "action": "Desactivar gestión de usuarios y reiniciar",
       "disabling": "Desactivando…",
-      "failed": "Falló la recuperación",
-      "success": "Gestión de usuarios desactivada: ahora estás en modo de un solo usuario",
+      "failed": "No se pudo recuperar la cuenta",
+      "success": "Gestión de usuarios desactivada. Ahora estás en modo de un solo usuario.",
       "done": "Se desactivó la gestión de usuarios.<br>Redirigiendo…"
+    },
+    "cookie_warning": {
+      "http_title": "Iniciar sesión no funcionará en esta dirección",
+      "http_body": "Esta página usa HTTP sin cifrar, pero el servidor solo envía su cookie de sesión por HTTPS, así que tu navegador la descarta y al iniciar sesión vuelves a la página de inicio de sesión. Abre CookTrace por HTTPS o, en una red doméstica de confianza, pon INSECURE_COOKIES=1 en el servidor y reinícialo.",
+      "dropped_title": "Tu navegador no mantuvo la sesión iniciada",
+      "dropped_body": "La contraseña era correcta, pero el navegador no guardó la cookie de sesión. Comprueba que las cookies estén permitidas para este sitio y, si CookTrace está detrás de un proxy inverso, que el proxy deje pasar las cookies.",
+      "fix_link": "Cómo arreglarlo"
     }
   },
   "forgot_password": {
@@ -417,7 +433,7 @@
     "saving": "Guardando…",
     "errors": {
       "required": "La contraseña es obligatoria",
-      "mismatch": "Las contraseñas no coinciden",
+      "mismatch": "Las contraseñas no coinciden.",
       "failed": "Falló el restablecimiento"
     }
   },
@@ -454,7 +470,7 @@
     "account_deleted": "Cuenta eliminada",
     "errors": {
       "save_failed": "No se pudo guardar el perfil",
-      "upload_failed": "Falló la subida",
+      "upload_failed": "No se pudo subir la foto",
       "password_change_failed": "No se pudo cambiar la contraseña",
       "delete_account_failed": "No se pudo eliminar la cuenta"
     }
@@ -800,8 +816,8 @@
   },
   "settings_page": {
     "toast": {
-      "copy_failed": "No se pudo copiar, selecciona el texto a mano",
-      "no_log_file": "Todavía no hay archivo de registro: activa el modo diagnóstico y reproduce el problema primero"
+      "copy_failed": "No se pudo copiar. Selecciona el texto y cópialo tú.",
+      "no_log_file": "Aún no hay archivo de registro. Activa el modo de diagnóstico y reproduce el problema primero."
     },
     "profile_hero": {
       "admin_badge": "Administrador",
@@ -911,7 +927,9 @@
     "about": {
       "app_name": "CookTrace",
       "federation_prefix": "Federación opcional con ",
-      "federation_suffix": " para el seguimiento nutricional"
+      "federation_suffix": " para el seguimiento nutricional",
+      "family_line_prefix": "Parte de ",
+      "family_line_suffix": ", una familia de apps"
     },
     "custom_color": {
       "saturation": "Saturación",
@@ -932,15 +950,15 @@
   },
   "backup_page": {
     "toast": {
-      "deleted": "Eliminado",
-      "restored_reloading": "Restaurado, recargando…",
+      "deleted": "Copia de seguridad eliminada",
+      "restored_reloading": "Copia de seguridad restaurada. Recargando.",
       "all_data_cleared": "Se borraron todos los datos",
-      "clear_failed": "No se pudo borrar: {msg}",
+      "clear_failed": "No se pudo borrar",
       "all_settings_cleared": "Se borraron todos los ajustes",
-      "exported": "Exportado",
+      "exported": "Datos exportados",
       "backup_saved": "Respaldo guardado",
-      "imported_reloading": "Importado, recargando",
-      "imported": "Importado"
+      "imported_reloading": "Datos importados. Recargando.",
+      "imported": "Datos importados"
     },
     "full_backup": "Respaldo completo",
     "auto_backup": "Respaldo automático",
@@ -982,8 +1000,8 @@
   },
   "settings_email_ct": {
     "toast": {
-      "smtp_host_required": "Falló la prueba SMTP: falta el host",
-      "invalid_email": "Ingresa una dirección de correo válida"
+      "smtp_host_required": "Escribe primero el servidor SMTP.",
+      "invalid_email": "Escribe una dirección de correo válida."
     },
     "hint": "Se usa para restablecer contraseñas e invitar usuarios",
     "smtp_host": "Host SMTP",
@@ -999,8 +1017,8 @@
   },
   "settings_trace_ct": {
     "toast": {
-      "fill_fields": "Primero completa el proveedor, la clave de API y el modelo",
-      "connected": "Trace AI conectado, el asistente está listo"
+      "fill_fields": "Rellena primero el proveedor, la clave de API y el modelo.",
+      "connected": "Trace conectado"
     },
     "enable_assistant": "Activar el asistente Trace",
     "provider": "Proveedor",
@@ -1049,8 +1067,8 @@
   "settings_users_ct": {
     "toast": {
       "invite_revoked": "Invitación revocada",
-      "invite_email_or_blank": "Ingresa un correo válido o vacía el campo para crear un enlace para compartir",
-      "cant_create_invite": "No se pudo crear la invitación"
+      "invite_email_or_blank": "Escribe un correo válido, o déjalo vacío para obtener un enlace que compartir.",
+      "cant_create_invite": "No se pudo crear la invitación."
     },
     "pending_invites": "Invitaciones pendientes",
     "require_strong_passwords": "Exigir contraseñas seguras",
@@ -1107,7 +1125,7 @@
     "summary_partial": "Se importaron {imported} de {total} recetas",
     "summary_find": "Las encontrarás en la pestaña Recetas.",
     "summary_dupes": "{count, plural, one {Se omitió # duplicado} other {Se omitieron # duplicados}}",
-    "summary_failed": "{count, plural, one {No se pudo importar # receta} other {No se pudieron importar # recetas}}",
+    "summary_failed": "{count, plural, one {No se pudo importar # receta.} other {No se pudieron importar # recetas.}}",
     "dupes_heading": "Duplicados omitidos",
     "dupes_hint": "Ya existe una receta con el mismo nombre o enlace de origen. Para importarlas de todos modos, elige Permitir duplicados en Si la receta ya existe e importa de nuevo.",
     "failed_heading": "No importadas",
@@ -1115,7 +1133,7 @@
   },
   "settings_federation_ct": {
     "toast": {
-      "url_token_required": "Primero ingresa una URL y un token de acceso"
+      "url_token_required": "Escribe primero una URL y un token de acceso."
     },
     "connect_to_nt": "Conectar con NutriTrace",
     "instance_url": "URL de la instancia",
@@ -1129,11 +1147,11 @@
   },
   "settings_auth_extra": {
     "toast": {
-      "issuer_client_required": "La URL del emisor y el Client ID son obligatorios",
-      "redirect_required": "Hace falta al menos una URI de redirección",
-      "cant_reach_server": "No se pudo conectar con el servidor",
-      "provider_deleted": "Proveedor eliminado",
-      "need_active_provider": "Agrega al menos un proveedor OIDC activo antes de desactivar el inicio de sesión con contraseña."
+      "issuer_client_required": "Escribe la URL del emisor y el ID de cliente.",
+      "redirect_required": "Añade al menos una URI de redirección.",
+      "cant_reach_server": "No se pudo conectar con el servidor.",
+      "provider_deleted": "Proveedor de inicio de sesión eliminado",
+      "need_active_provider": "Añade al menos un proveedor OIDC activo antes de desactivar el inicio de sesión con contraseña."
     },
     "user_mgmt_required": "Hace falta la gestión de usuarios",
     "admin_only": "Solo administradores",
@@ -1195,13 +1213,13 @@
     },
     "toast": {
       "load_failed": "No se pudieron cargar los tokens",
-      "scope_required": "Elige al menos un permiso",
-      "name_required": "El nombre es obligatorio",
+      "scope_required": "Elige al menos un permiso.",
+      "name_required": "Escribe un nombre.",
       "create_failed": "No se pudo crear el token",
       "revoke_failed": "No se pudo revocar el token",
       "revoked": "Token revocado",
       "copied": "Copiado al portapapeles",
-      "copy_failed": "No se pudo copiar"
+      "copy_failed": "No se pudo copiar."
     }
   },
   "settings_webhooks": {
@@ -1248,29 +1266,29 @@
     },
     "toast": {
       "load_failed": "No se pudieron cargar los webhooks",
-      "url_required": "Ingresa una URL de destino",
-      "event_required": "Selecciona al menos un evento",
+      "url_required": "Escribe una URL de destino.",
+      "event_required": "Elige al menos un evento.",
       "create_failed": "No se pudo crear el webhook",
       "update_failed": "No se pudo actualizar el webhook",
       "delete_failed": "No se pudo eliminar el webhook",
       "deleted": "Webhook eliminado",
-      "test_failed": "Falló el envío de prueba",
+      "test_failed": "No se pudo entregar el evento de prueba",
       "test_delivered": "Evento de prueba entregado",
       "copied": "Copiado al portapapeles",
-      "copy_failed": "No se pudo copiar, selecciona el texto a mano"
+      "copy_failed": "No se pudo copiar. Selecciona el texto y cópialo tú."
     }
   },
   "settings_server_conn": {
     "toast": {
-      "enter_url": "Ingresa la URL de tu servidor",
-      "enter_credentials": "Ingresa tus credenciales",
-      "sync_failed": "Falló la sincronización: {reason}",
-      "sync_unknown": "Error desconocido",
-      "connected_reloading": "Conectado, recargando",
+      "enter_url": "Escribe la dirección de tu servidor.",
+      "enter_credentials": "Escribe tu usuario y contraseña.",
+      "sync_failed": "No se pudo sincronizar",
+      "sync_unknown": "error desconocido",
+      "connected_reloading": "Conectado. Recargando.",
       "synced": "Sincronizado",
-      "pushed_all": "Se subieron todos los datos",
-      "logged_out_reloading": "Sesión cerrada, recargando",
-      "disconnected_reloading": "Desconectado, recargando"
+      "pushed_all": "Todos los datos enviados al servidor",
+      "logged_out_reloading": "Sesión cerrada. Recargando.",
+      "disconnected_reloading": "Desconectado. Recargando."
     },
     "state_connected": "Conectado",
     "last_synced": "Última sincronización",
@@ -1289,10 +1307,10 @@
   },
   "settings_notifications": {
     "toast": {
-      "test_sent": "Prueba enviada, revisa tu servicio de push.",
+      "test_sent": "Prueba enviada. Revisa tu servicio de notificaciones.",
       "not_supported": "Este navegador no admite notificaciones.",
-      "permission_granted": "Permiso de notificaciones concedido.",
-      "permission_denied": "Permiso denegado. Actívalo en los ajustes del navegador."
+      "permission_granted": "Notificaciones permitidas",
+      "permission_denied": "Notificaciones bloqueadas. Permítelas en los ajustes del navegador."
     },
     "device_notifications": "Notificaciones en el dispositivo",
     "enable_on_device": "Activar en este dispositivo",
@@ -1410,7 +1428,7 @@
   },
   "recipes_page": {
     "toast": {
-      "paste_or_pick": "Primero pega una receta o elige un archivo",
+      "paste_or_pick": "Pega una receta o elige un archivo primero.",
       "recipe_imported": "Receta importada",
       "already_exists": "Esta receta ya existe. Abriéndola.",
       "already_exists_short": "Esta receta ya existe.",
@@ -1418,14 +1436,14 @@
       "archive_imported": "{count, plural, one {Se importó # receta} other {Se importaron # recetas}}",
       "archive_imported_skipped": "{count, plural, one {Se importó # receta} other {Se importaron # recetas}}; {skipped, plural, one {se omitió # duplicado} other {se omitieron # duplicados}}",
       "archive_all_duplicates": "Nada nuevo que importar: {skipped, plural, one {# receta ya existe} other {las # recetas ya existen}}",
-      "new_link_generated": "Se generó un enlace nuevo",
+      "new_link_generated": "Enlace nuevo creado",
       "link_revoked": "Enlace revocado",
       "copied": "Copiado al portapapeles",
-      "copy_failed": "No se pudo copiar",
-      "clipboard_unavailable": "El portapapeles no está disponible",
+      "copy_failed": "No se pudo copiar.",
+      "clipboard_unavailable": "El portapapeles no está disponible.",
       "recipe_duplicated": "Receta duplicada",
-      "preparing_share": "Preparando para compartir…",
-      "deleted": "Eliminado"
+      "preparing_share": "Preparándolo para compartir",
+      "deleted": "Receta eliminada"
     },
     "share_recipe": "Compartir receta",
     "share_cookbook": "Compartir recetario",
@@ -1448,8 +1466,8 @@
       "pick_video": "Elige un archivo de video.",
       "video_uploaded": "Video subido",
       "draft_restored": "Borrador restaurado",
-      "cant_restore_draft": "No se pudo restaurar el borrador",
-      "name_required": "El nombre es obligatorio"
+      "cant_restore_draft": "No se pudo restaurar el borrador.",
+      "name_required": "Escribe un nombre."
     },
     "discard": "Descartar",
     "restore": "Restaurar",
@@ -1479,11 +1497,11 @@
     "last_edited_by": "Editada por última vez por {name}",
     "toast": {
       "recipe_deleted": "Receta eliminada",
-      "preparing_share": "Preparando para compartir…",
+      "preparing_share": "Preparándolo para compartir",
       "link_copied": "Enlace copiado",
-      "share_unsupported": "Este navegador no permite compartir",
+      "share_unsupported": "Este navegador no puede compartir.",
       "diary_updated": "Entrada del diario actualizada",
-      "logged_cooked": "¡Registrada como cocinada!"
+      "logged_cooked": "Registrada"
     },
     "shared_chip": "Compartidos",
     "retry": "Reintentar",
@@ -1492,7 +1510,39 @@
     "tags": "Etiquetas",
     "step": "Paso",
     "notes": "Notas",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "versions": {
+      "title": "Versiones anteriores",
+      "notice": "Dos dispositivos editaron esta receta. La edición más antigua se guarda como versión anterior.",
+      "view": "Ver",
+      "dismiss": "Descartar",
+      "intro": "Cuando dos dispositivos editan esta receta, la edición más reciente se queda y la otra se guarda aquí. Restaura una para que vuelva a ser la receta.",
+      "reason_conflict": "Guardada en una sincronización",
+      "reason_restore": "Guardada antes de restaurar",
+      "reason_replaced": "Guardada antes de un cambio posterior",
+      "reason_conflict_by": "Edición de {name}, guardada en una sincronización",
+      "reason_restore_by": "Edición de {name}, guardada antes de restaurar",
+      "reason_replaced_by": "Edición de {name}, guardada antes de un cambio posterior",
+      "differs": "Cambia en",
+      "part_title": "Título",
+      "part_ingredients": "Ingredientes",
+      "part_steps": "Pasos",
+      "part_notes": "Notas",
+      "part_category": "Categoría",
+      "part_photo": "Foto",
+      "part_nutrition": "Nutrición",
+      "part_details": "Detalles",
+      "preview": "Vista previa",
+      "hide_preview": "Ocultar vista previa",
+      "restore": "Restaurar",
+      "confirm_title": "¿Restaurar esta versión?",
+      "confirm_message": "La receta pasará a ser esta versión. La receta actual se guarda como versión anterior, así que puedes deshacerlo.",
+      "restored": "Receta restaurada",
+      "ingredients": "Ingredientes",
+      "steps": "Pasos",
+      "no_ingredients": "Sin ingredientes",
+      "no_steps": "Sin pasos"
+    }
   },
   "cookbook_view_ct": {
     "toast": {
@@ -1522,13 +1572,17 @@
     "steps": "Pasos",
     "no_steps": "Todavía no hay pasos.",
     "notes": "Notas",
-    "powered_by_html": "Hecho con <strong>CookTrace</strong>."
+    "powered_by_html": "Hecho con <strong>CookTrace</strong>.",
+    "gone": "Este enlace para compartir ya no funciona.",
+    "gone_hint": "Pide un enlace nuevo a quien lo compartió.",
+    "load_failed": "No se pudo cargar la receta. Comprueba tu conexión e inténtalo de nuevo.",
+    "retry": "Reintentar"
   },
   "barcode_scanner": {
     "toast": {
-      "camera_denied": "Permiso de cámara denegado",
-      "scan_failed": "Falló el escaneo del código: {reason}",
-      "scan_unknown": "Error desconocido"
+      "camera_denied": "Acceso a la cámara denegado",
+      "scan_failed": "No se pudo escanear el código de barras",
+      "scan_unknown": "error desconocido"
     },
     "title": "Escanear código",
     "library": "Galería",
@@ -1548,7 +1602,7 @@
   },
   "image_picker_ct": {
     "toast": {
-      "camera_denied": "Acceso a la cámara denegado o no disponible."
+      "camera_denied": "La cámara no está disponible o se denegó el acceso."
     },
     "title": "Tomar foto"
   },
@@ -1567,22 +1621,25 @@
   },
   "trace_ai_ct": {
     "toast": {
-      "voice_unsupported": "Este navegador no admite entrada por voz",
-      "configure_ai": "Configura Trace AI en Ajustes para usar la función de mantener pulsado para hablar",
-      "enable_smart_log": "Activa Smart Log en Ajustes, Trace AI, para usar la función de mantener pulsado para hablar",
-      "voice_needs_https": "La voz necesita HTTPS. El HTTP común bloquea el micrófono: configura TLS o usa el dominio público.",
-      "voice_cancelled": "Voz cancelada",
-      "trace_disabled": "Trace está desactivado. Actívalo en Ajustes, Trace.",
-      "voice_unsupported_full": "Este navegador no admite entrada por voz. Prueba con Chrome en escritorio o con Safari o Chrome en el teléfono.",
-      "voice_needs_https_smart": "La voz necesita HTTPS. Smart Log no funciona con HTTP común: configura TLS o usa el dominio público.",
-      "mic_denied": "Permiso del micrófono denegado",
+      "voice_unsupported": "Este navegador no admite la entrada de voz.",
+      "configure_ai": "Configura Trace en Ajustes > Trace para usar mantener para hablar.",
+      "enable_smart_log": "Activa Smart Log en Ajustes > Trace para usar mantener para hablar.",
+      "voice_needs_https": "La entrada de voz necesita HTTPS. Los navegadores bloquean el micrófono con HTTP, así que configura TLS o usa tu dirección pública.",
+      "voice_cancelled": "Entrada de voz cancelada",
+      "trace_disabled": "Trace está desactivado. Actívalo en Ajustes > Trace.",
+      "voice_unsupported_full": "Este navegador no admite la entrada de voz. Prueba con Chrome, o con Safari en un iPhone.",
+      "voice_needs_https_smart": "Smart Log necesita HTTPS. Los navegadores bloquean el micrófono con HTTP, así que configura TLS o usa tu dirección pública.",
+      "mic_denied": "Acceso al micrófono denegado",
       "pick_image": "Elige un archivo de imagen."
-    }
+    },
+    "tools_unsupported": "Este modelo no puede usar herramientas: puede responder, pero no puede consultar ni cambiar tus recetas y tu despensa. Elige un modelo compatible con herramientas en Ajustes.",
+    "tools_unsupported_routed": "El modelo que respondió no puede usar herramientas, así que no se consultó ni se cambió nada.",
+    "tools_unsupported_import": "Este modelo no puede usar herramientas, así que no puede importar recetas. Elige un modelo compatible con herramientas en Ajustes."
   },
   "manage_cookbooks": {
     "toast": {
       "cookbook_created": "Recetario creado",
-      "saved": "Guardado",
+      "saved": "Libro de recetas guardado",
       "cover_updated": "Portada actualizada"
     },
     "title": "Recetarios",
@@ -1596,8 +1653,8 @@
   "manage_units": {
     "toast": {
       "unit_added": "Unidad personalizada agregada",
-      "saved": "Guardado",
-      "builtins_restored": "Se restauraron todas las unidades incluidas"
+      "saved": "Unidad guardada",
+      "builtins_restored": "Unidades incorporadas restauradas"
     },
     "title": "Unidades",
     "restore_all": "Restaurar todas",
@@ -1608,7 +1665,7 @@
   },
   "manage_pantry_cats": {
     "toast": {
-      "saved": "Guardado",
+      "saved": "Categoría guardada",
       "category_added": "Categoría agregada"
     },
     "title": "Categorías de la despensa",
@@ -1619,7 +1676,7 @@
   },
   "manage_recipe_cats": {
     "toast": {
-      "saved": "Guardado",
+      "saved": "Categoría guardada",
       "category_added": "Categoría agregada"
     },
     "title": "Categorías de recetas",
@@ -1713,10 +1770,10 @@
     "plan_it": "Planificar",
     "saving": "Guardando…",
     "toast": {
-      "pick_recipe": "Elige una receta",
+      "pick_recipe": "Elige primero una receta.",
       "planned": "Planificada",
       "marked_cooked": "Marcada como cocinada",
-      "removed": "Quitada"
+      "removed": "Entrada eliminada"
     },
     "this_week": "Esta semana",
     "current_streak": "Racha actual",
@@ -1792,15 +1849,15 @@
   },
   "shopping_page": {
     "toast": {
-      "cleared": "Lista vaciada",
-      "add_items": "Primero agrega algunos ítems",
-      "preparing_share": "Preparando para compartir…",
+      "cleared": "Artículos marcados quitados",
+      "add_items": "Añade primero algunos artículos.",
+      "preparing_share": "Preparándolo para compartir",
       "saved_image": "Imagen guardada",
       "copied": "Copiado al portapapeles",
-      "nothing_planned": "No hay nada planificado en ese rango",
-      "already_in_pantry": "Ya tienes todo en tu despensa",
-      "cleared_restocked": "Lista vaciada. {n} marcados en stock",
-      "restock_failed": "Algunos ítems de la despensa no se pudieron reponer ({n})",
+      "nothing_planned": "No hay nada planificado para esos días.",
+      "already_in_pantry": "Ya tienes todo en la despensa",
+      "cleared_restocked": "Lista vaciada. {n, plural, one {# artículo marcado} other {# artículos marcados}} en la despensa.",
+      "restock_failed": "{n, plural, one {No se pudo reponer # artículo de la despensa.} other {No se pudieron reponer # artículos de la despensa.}}",
       "restock_undone": "Se deshicieron los cambios en la despensa",
       "plan_added": "{count, plural, one {# ítem} other {# ítems}} para {cooks, plural, one {# comida planificada} other {# comidas planificadas}}",
       "plan_removed": "{count, plural, one {# ítem ya no hace falta y salió de la lista} other {# ítems ya no hacen falta y salieron de la lista}}",
@@ -1827,10 +1884,10 @@
   },
   "native_setup_ct": {
     "toast": {
-      "enter_url": "Ingresa la URL de tu servidor",
-      "enter_credentials": "Ingresa tus credenciales",
+      "enter_url": "Escribe la dirección de tu servidor.",
+      "enter_credentials": "Escribe tu usuario y contraseña.",
       "connected_to_server": "Conectado al servidor",
-      "cant_open_signin": "No se pudo abrir el navegador de inicio de sesión"
+      "cant_open_signin": "No se pudo abrir la página de inicio de sesión."
     },
     "app_name": "CookTrace",
     "tagline": "Registra cada bocado",
@@ -1844,7 +1901,7 @@
   },
   "login_ct": {
     "toast": {
-      "no_saved": "No hay un inicio de sesión guardado. Usa tu contraseña una primera vez.",
+      "no_saved": "Aún no hay un inicio de sesión guardado. Inicia sesión con tu contraseña una vez primero.",
       "saved_expired": "Tu inicio de sesión guardado venció. Usa tu contraseña para entrar.",
       "biometric_failed": "Falló el inicio de sesión biométrico. Usa tu contraseña."
     },
@@ -1853,14 +1910,14 @@
   },
   "pantry_editor_ct": {
     "toast": {
-      "enter_barcode": "Primero ingresa un código de barras",
-      "not_found_off": "No se encontró en Open Food Facts",
-      "add_barcode": "Primero agrega un código de barras",
-      "add_name": "Primero agrega un nombre",
-      "name_required": "El nombre es obligatorio",
-      "saved": "Guardado",
-      "added_to_pantry": "Agregado a la despensa",
-      "removed": "Quitado"
+      "enter_barcode": "Escribe primero un código de barras.",
+      "not_found_off": "Open Food Facts no tiene este producto.",
+      "add_barcode": "Añade primero un código de barras.",
+      "add_name": "Añade primero un nombre.",
+      "name_required": "Escribe un nombre.",
+      "saved": "Artículo guardado",
+      "added_to_pantry": "Añadido a la despensa",
+      "removed": "Artículo quitado"
     },
     "photo": "Foto",
     "basic_info": "Datos básicos",
@@ -1884,7 +1941,7 @@
   },
   "pantry_page": {
     "toast": {
-      "removed": "Quitado"
+      "removed": "Artículo quitado"
     },
     "variant_banner_title": "La despensa ahora admite variantes de producto",
     "sort_updated": "Última actualización",
@@ -1898,7 +1955,7 @@
   },
   "pantry_view_ct": {
     "toast": {
-      "removed": "Quitado"
+      "removed": "Artículo quitado"
     },
     "retry": "Reintentar",
     "in_stock": "En stock",
@@ -1910,19 +1967,19 @@
   "pantry_sheet_extra": {
     "toast": {
       "cant_read_label": "No se pudo leer la etiqueta. Prueba con una foto más nítida.",
-      "nutrition_extracted": "Datos nutricionales extraídos de la etiqueta",
-      "scan_failed": "Falló el escaneo: {reason}",
+      "nutrition_extracted": "Nutrición leída de la etiqueta",
+      "scan_failed": "No se pudo escanear la etiqueta",
       "scan_unknown": "error desconocido",
       "brand_or_name_required": "Agrega una marca o un nombre propio para distinguir esta variante.",
-      "added_variant": "Se agregó la variante {name}",
+      "added_variant": "Variante {name} añadida",
       "linked_as_variant": "Vinculado como variante",
-      "enter_barcode": "Primero ingresa un código de barras",
-      "not_found_off": "No se encontró en Open Food Facts",
-      "add_barcode": "Primero agrega un código de barras",
-      "add_name": "Primero agrega un nombre",
-      "name_required": "El nombre es obligatorio",
-      "added_to_pantry": "Agregado a la despensa",
-      "saved": "Guardado"
+      "enter_barcode": "Escribe primero un código de barras.",
+      "not_found_off": "Open Food Facts no tiene este producto.",
+      "add_barcode": "Añade primero un código de barras.",
+      "add_name": "Añade primero un nombre.",
+      "name_required": "Escribe un nombre.",
+      "added_to_pantry": "Añadido a la despensa",
+      "saved": "Artículo guardado"
     },
     "retry": "Reintentar",
     "add_a_photo": "Agregar una foto",
@@ -1986,8 +2043,8 @@
     "download_install": "Descargar e instalar",
     "install_downloaded": "Instalar",
     "downloading": "Descargando… {percent} %",
-    "install_starting": "Abriendo instalador…",
-    "install_failed": "No se pudo instalar. Vuelve a intentarlo.",
+    "install_starting": "Abriendo el instalador",
+    "install_failed": "No se pudo instalar la actualización. Inténtalo de nuevo.",
     "skip_this_version": "Omitir esta versión",
     "no_apk_asset": "Esta versión no tiene un archivo APK adjunto.",
     "banner_cta": "Toca para ver novedades e instalar.",
@@ -1997,7 +2054,7 @@
       "empty": "Sin APK en caché. La limpieza se completó con éxito.",
       "clear_now": "Limpiar ahora",
       "clearing": "Limpiando…",
-      "cleared": "Caché borrada."
+      "cleared": "Caché borrada"
     },
     "server": {
       "heading": "Servidor",
@@ -2008,8 +2065,8 @@
       "available_chip": "Actualización disponible",
       "instructions": "Para actualizar el servidor, ejecuta en el equipo host:",
       "copy_command": "Copiar comando",
-      "copied": "Copiado al portapapeles.",
-      "copy_failed": "No se pudo copiar. Copia el comando a mano.",
+      "copied": "Copiado",
+      "copy_failed": "No se pudo copiar. Copia el comando tú.",
       "view_notes": "Ver notas de la versión",
       "channel_note": "Para cambiar de canal en el servidor, cambia la etiqueta de la imagen en tu docker-compose.yml (:latest, :dev) y vuelve a ejecutar docker-compose pull && docker-compose up -d."
     }
@@ -2176,5 +2233,216 @@
     "detail_cook": "Cocción",
     "detail_rest": "Reposo",
     "detail_total": "Tiempo total"
+  },
+  "fail": {
+    "because": "{what}: {why}.",
+    "plain": "{what}.",
+    "offline": "no se puede conectar con el servidor",
+    "sign_in": "No se pudo iniciar sesión",
+    "voice": "No se pudo usar la entrada de voz",
+    "mic": "No se pudo activar el micrófono",
+    "save_allergens": "No se pudieron guardar los alérgenos",
+    "plan_week": "No se pudo planificar la semana",
+    "load_cookbooks": "No se pudieron cargar los libros de recetas",
+    "create_cookbook": "No se pudo crear el libro de recetas",
+    "save_cookbook": "No se pudo guardar el libro de recetas",
+    "upload_cover": "No se pudo subir la portada",
+    "save_order": "No se pudo guardar el orden",
+    "delete_cookbook": "No se pudo eliminar el libro de recetas",
+    "load_categories": "No se pudieron cargar las categorías",
+    "save_category": "No se pudo guardar la categoría",
+    "delete_category": "No se pudo eliminar la categoría",
+    "add_category": "No se pudo añadir la categoría",
+    "create_category": "No se pudo crear la categoría",
+    "load_list": "No se pudo cargar la lista",
+    "rename": "No se pudo cambiar el nombre",
+    "remove_it": "No se pudo quitar",
+    "load_units": "No se pudieron cargar las unidades",
+    "save_unit": "No se pudo guardar la unidad",
+    "create_unit": "No se pudo crear la unidad",
+    "delete_unit": "No se pudo eliminar la unidad",
+    "update_variant_link": "No se pudo cambiar la variante",
+    "add_variant": "No se pudo añadir la variante",
+    "link_variant": "No se pudo vincular la variante",
+    "nutrition_source": "No se pudo cambiar el origen de la nutrición",
+    "off_lookup": "No se pudo buscar en Open Food Facts",
+    "off_share": "No se pudo compartir en Open Food Facts",
+    "save_item": "No se pudo guardar el artículo",
+    "remove_item": "No se pudo quitar el artículo",
+    "update_item": "No se pudo actualizar el artículo",
+    "update_stock": "No se pudo actualizar el inventario",
+    "load_item": "No se pudo cargar el artículo",
+    "upload_photo": "No se pudo subir la foto",
+    "camera": "No se pudo usar la cámara",
+    "load_comments": "No se pudieron cargar los comentarios",
+    "post_comment": "No se pudo publicar el comentario",
+    "post_reply": "No se pudo publicar la respuesta",
+    "save_comment": "No se pudo guardar el comentario",
+    "delete_comment": "No se pudo eliminar el comentario",
+    "save_provider": "No se pudo guardar el proveedor de inicio de sesión",
+    "delete_provider": "No se pudo eliminar el proveedor de inicio de sesión",
+    "password_login": "No se pudo cambiar el inicio de sesión con contraseña",
+    "save_backup_settings": "No se pudieron guardar los ajustes de copia de seguridad",
+    "load_backups": "No se pudieron cargar las copias de seguridad",
+    "create_backup": "No se pudo hacer la copia de seguridad",
+    "delete_backup": "No se pudo eliminar la copia de seguridad",
+    "restore_backup": "No se pudo restaurar la copia de seguridad",
+    "export": "No se pudieron exportar tus datos",
+    "import_file": "No se pudo importar el archivo",
+    "smtp_test": "No se pudo enviar el correo de prueba",
+    "read_zip": "No se pudo leer el zip",
+    "import_recipes": "No se pudieron importar las recetas",
+    "nt_search": "No se pudo buscar en NutriTrace",
+    "nt_import": "No se pudo importar desde NutriTrace",
+    "load_kitchens": "No se pudieron cargar tus cocinas",
+    "create_kitchen": "No se pudo crear la cocina",
+    "load_members": "No se pudieron cargar los miembros",
+    "add_member": "No se pudo añadir al miembro",
+    "hand_over": "No se pudo traspasar la cocina",
+    "remove_member": "No se pudo quitar al miembro",
+    "auto_share": "No se pudo cambiar el uso compartido automático",
+    "delete_kitchen": "No se pudo eliminar la cocina",
+    "change_role": "No se pudo cambiar el rol",
+    "change_roles": "No se pudieron cambiar los roles",
+    "push_test": "No se pudo enviar la notificación de prueba",
+    "permission": "No se pudo pedir permiso",
+    "ai_test": "No se pudo conectar con el proveedor de IA",
+    "revoke_invite": "No se pudo revocar la invitación",
+    "password_policy": "No se pudieron guardar las reglas de contraseña",
+    "update_user": "No se pudo actualizar el usuario",
+    "create_invite": "No se pudo crear la invitación",
+    "update_entry": "No se pudo actualizar la entrada del diario",
+    "delete_entry": "No se pudo eliminar la entrada del diario",
+    "build_list": "No se pudo crear la lista de compras",
+    "plan_cook": "No se pudo planificar",
+    "load_recipes": "No se pudieron cargar las recetas",
+    "add_recipes": "No se pudieron añadir las recetas",
+    "move_recipe": "No se pudo mover la receta",
+    "remove_from_cookbook": "No se pudo quitar del libro de recetas",
+    "change_cover": "No se pudo cambiar la portada",
+    "search": "No se pudo buscar",
+    "load_recipe": "No se pudo cargar la receta",
+    "upload_video": "No se pudo subir el vídeo",
+    "save_recipe": "No se pudo guardar la receta",
+    "delete_recipe": "No se pudo eliminar la receta",
+    "share_card": "No se pudo compartir la tarjeta",
+    "share_link": "No se pudo compartir el enlace",
+    "log_cook": "No se pudo registrar",
+    "save_rating": "No se pudo guardar la valoración",
+    "favorite": "No se pudo cambiar el favorito",
+    "recompute": "No se pudo calcular la nutrición",
+    "save_nutrition": "No se pudo guardar la nutrición",
+    "set_density": "No se pudo fijar la densidad",
+    "import_recipe": "No se pudo importar la receta",
+    "add_to_cookbook": "No se pudo añadir al libro de recetas",
+    "change_sharing": "No se pudo cambiar el uso compartido",
+    "share_recipe": "No se pudo compartir la receta",
+    "create_link": "No se pudo crear el enlace",
+    "new_link": "No se pudo crear un enlace nuevo",
+    "revoke_link": "No se pudo desactivar el enlace",
+    "update_cookbooks": "No se pudieron actualizar los libros de recetas",
+    "add_to_list": "No se pudo añadir a la lista de compras",
+    "duplicate_recipe": "No se pudo duplicar la receta",
+    "add_list_item": "No se pudo añadir el artículo",
+    "check_item": "No se pudo marcar el artículo",
+    "save_note": "No se pudo guardar la nota",
+    "update_list": "No se pudo actualizar la lista",
+    "remove_items": "No se pudieron quitar los artículos",
+    "clear_checked": "No se pudieron quitar los artículos marcados",
+    "undo": "No se pudo deshacer",
+    "change_aisle": "No se pudo cambiar el pasillo",
+    "share_list": "No se pudo compartir la lista",
+    "add_plan": "No se pudieron añadir las comidas planificadas",
+    "delete_version": "No se pudo eliminar la versión",
+    "restore_version": "No se pudo restaurar la versión",
+    "name_version": "No se pudo poner el nombre",
+    "load_cookbook": "No se pudo cargar el libro de recetas",
+    "load_diary": "No se pudo cargar el diario",
+    "load_pantry": "No se pudo cargar la despensa",
+    "load_history": "No se pudo cargar el historial",
+    "nt_connect": "No se pudo conectar con NutriTrace",
+    "connect": "No se pudo conectar con el servidor",
+    "push_all": "No se pudo enviar todo al servidor",
+    "delete_user": "No se pudo eliminar el usuario",
+    "turn_off_users": "No se pudo desactivar la gestión de usuarios",
+    "turn_on_users": "No se pudo activar la gestión de usuarios",
+    "load_users": "No se pudieron cargar los usuarios",
+    "clear_updates": "No se pudieron borrar las actualizaciones descargadas",
+    "create_account": "No se pudo crear la cuenta",
+    "send_reset": "No se pudo enviar el correo para restablecer"
+  },
+  "done": {
+    "tap_exit": "Toca otra vez para salir",
+    "linked": "Cuenta vinculada",
+    "signed_in": "Sesión iniciada",
+    "tags_updated": "{count, plural, one {# receta actualizada} other {# recetas actualizadas}}",
+    "tags_removed": "{count, plural, one {Quitado de # receta} other {Quitado de # recetas}}",
+    "unit_builtin": "«{abbr}» ya es una unidad incorporada. Elige otra abreviatura.",
+    "unit_exists": "La unidad «{abbr}» ya existe.",
+    "variant_added": "Añadido como variante",
+    "variant_detached": "Separado del artículo principal",
+    "nutrition_from_variant": "La nutrición viene ahora de la variante",
+    "nutrition_manual": "Nutrición fijada a mano",
+    "removed_with_variants": "Artículo y variantes quitados",
+    "item_removed": "Artículo quitado",
+    "saved_via_trace": "«{name}» guardada con Trace",
+    "cookbook_imported": "{count, plural, one {# receta importada del libro} other {# recetas importadas del libro}}",
+    "recipe_imported_named": "«{name}» importada",
+    "provider_updated": "Proveedor de inicio de sesión actualizado",
+    "provider_created": "Proveedor de inicio de sesión añadido",
+    "password_login_on": "Inicio de sesión con contraseña activado",
+    "password_login_off": "Inicio de sesión con contraseña desactivado",
+    "backup_created": "Copia de seguridad hecha ({size})",
+    "smtp_sent": "Correo de prueba enviado a {to}",
+    "nt_connected": "Conectado a NutriTrace como {name}",
+    "nt_imported": "{count, plural, one {# artículo importado a la despensa} other {# artículos importados a la despensa}}",
+    "nt_skipped": "{count, plural, one {# artículo omitido} other {# artículos omitidos}}",
+    "kitchen_created": "Cocina «{name}» creada",
+    "member_added": "{name} añadido",
+    "kitchen_handed": "Ahora la cocina es de {name}",
+    "auto_share_on_n": "{count, plural, one {Compartiendo # receta con esta cocina} other {Compartiendo # recetas con esta cocina}}",
+    "auto_share_on": "Uso compartido automático activado. Las recetas nuevas se compartirán.",
+    "auto_share_off": "Uso compartido automático desactivado. Las recetas ya compartidas siguen compartidas; quita a un miembro para retirarle el acceso.",
+    "user_updated": "Usuario actualizado",
+    "invite_emailed": "Invitación enviada a {email}",
+    "recipes_added": "{count, plural, one {# receta añadida} other {# recetas añadidas}}",
+    "moved_to": "Movida a «{name}»",
+    "copied_to": "Copiada a «{name}»",
+    "items_removed": "{count, plural, one {# artículo quitado} other {# artículos quitados}}",
+    "items_removed_partial": "Se quitaron {done} de {total} artículos. {failed, plural, one {# no se pudo quitar.} other {# no se pudieron quitar.}}",
+    "density_set": "Densidad de {name}: {dens} g/taza",
+    "no_density": "No hay una densidad incorporada para «{name}». Pide a Trace que «fije la densidad de {name}».",
+    "recipe_saved": "Receta guardada",
+    "recipe_created": "Receta creada",
+    "card_saved": "Tarjeta guardada",
+    "pages_saved": "{count} páginas guardadas",
+    "nutrition_saved": "Nutrición guardada a partir de {used} de {total} ingredientes",
+    "recipes_deleted": "{count, plural, one {# receta eliminada} other {# recetas eliminadas}}",
+    "recipes_deleted_partial": "{done, plural, one {# receta eliminada} other {# recetas eliminadas}}. {failed, plural, one {# no se pudo eliminar.} other {# no se pudieron eliminar.}}",
+    "added_to_cookbooks": "{recipes, plural, one {# receta añadida} other {# recetas añadidas}} a {cookbooks, plural, one {# libro de recetas} other {# libros de recetas}}",
+    "shared_with_n": "Compartida con {count, plural, one {# miembro} other {# miembros}} de {kitchen}",
+    "already_shared": "Ya está compartida con todos en {kitchen}",
+    "cookbooks_updated": "{count, plural, one {# libro de recetas actualizado} other {# libros de recetas actualizados}}",
+    "cover_updated": "Portada actualizada"
+  },
+  "password": {
+    "too_short": "Usa al menos 8 caracteres.",
+    "needs_lower": "Añade una letra minúscula.",
+    "needs_upper": "Añade una letra mayúscula.",
+    "needs_number": "Añade un número.",
+    "needs_symbol": "Añade un símbolo, como ! o #.",
+    "strength_0": "Demasiado débil",
+    "strength_1": "Débil",
+    "strength_2": "Aceptable",
+    "strength_3": "Fuerte",
+    "strength_4": "Muy fuerte"
+  },
+  "connect": {
+    "https_only": "Esta app solo se conecta por HTTPS. Pon el servidor detrás de un proxy inverso (Caddy, Tailscale o Cloudflare Tunnel), o usa una versión de depuración. DEPLOY.md, Connecting from Android, tiene los pasos."
+  },
+  "attach_image": {
+    "button": "Adjuntar imagen",
+    "camera": "Cámara",
+    "gallery": "Galería"
   }
 }

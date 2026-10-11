@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   import { _ } from 'svelte-i18n';
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { fly } from 'svelte/transition';
@@ -396,7 +397,7 @@
     } catch (e) {
       console.error('[BarcodeScanner] Native scan failed:', e);
       const { showError } = await import('../../stores/toast.js');
-      showError($_('barcode_scanner.toast.scan_failed', { values: { reason: e?.message || $_('barcode_scanner.toast.scan_unknown') } }));
+      showError(failed('barcode_scanner.toast.scan_failed', e));
       open = false; scanning = false;
     }
   }

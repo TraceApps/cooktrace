@@ -13,6 +13,7 @@
   Events: corrected ({ allergen_overrides }) after a correction is saved
 -->
 <script>
+  import { failed } from '../../lib/messages.js';
   import { createEventDispatcher } from 'svelte';
   import { _, locale } from 'svelte-i18n';
   import Sheet from '../ui/Sheet.svelte';
@@ -58,7 +59,7 @@
       showSuccess($_('allergen_info.saved'));
       open = false;
     } catch (e) {
-      showError(e.message || 'Could not save');
+      showError(failed('fail.save_allergens', e));
     } finally {
       saving = false;
     }

@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   /**
    * ManageRecipeCategories — relocated from Settings → Recipe Categories.
    * Same UX: list rows with rename/recolor inline, plus a create row
@@ -39,7 +40,7 @@
   async function load() {
     loading = true;
     try { categories = await NtApi.getRecipeCategories(); }
-    catch (e) { showError(e.message || 'Could not load categories'); categories = []; }
+    catch (e) { showError(failed('fail.load_categories', e)); categories = []; }
     finally { loading = false; }
   }
   onMount(load);
@@ -55,7 +56,7 @@
       categories = categories.map(x => x.id === c.id ? updated : x);
       cancelEdit();
       showSuccess($_('manage_recipe_cats.toast.saved'));
-    } catch (e) { showError(e.message || 'Could not save'); }
+    } catch (e) { showError(failed('fail.save_category', e)); }
   }
 
   async function remove(c) {
@@ -69,7 +70,7 @@
     try {
       await NtApi.deleteRecipeCategory(c.id);
       categories = categories.filter(x => x.id !== c.id);
-    } catch (e) { showError(e.message || 'Could not delete'); }
+    } catch (e) { showError(failed('fail.delete_category', e)); }
   }
 
   // ── Drag-and-drop reorder ───────────────────────────────────────
@@ -110,7 +111,7 @@
     next.splice(insertAt, 0, moved);
     categories = next;
     try { await NtApi.reorderRecipeCategories(next.map(c => c.id)); }
-    catch (err) { showError(err.message || 'Could not save order'); }
+    catch (err) { showError(failed('fail.save_order', err)); }
   }
   function _onDragEnd() { draggingId = null; dragOverId = null; }
 
@@ -124,7 +125,7 @@
       newName = '';
       newColor = SWATCHES[0];
       showSuccess($_('manage_recipe_cats.toast.category_added'));
-    } catch (e) { showError(e.message || 'Could not add'); }
+    } catch (e) { showError(failed('fail.add_category', e)); }
     finally { creating = false; }
   }
 </script>

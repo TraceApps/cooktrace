@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../lib/messages.js';
   import { closeOnBack } from '../lib/back-stack.js';
   /**
    * PantryEditor — full-page editor for a pantry item.
@@ -75,9 +76,9 @@
     const dens = lookupCommonDensity(item.name);
     if (dens) {
       item.g_per_cup = dens;
-      showSuccess(`Set ${dens} g/cup for ${item.name}`);
+      showSuccess($_('done.density_set', { values: { name: item.name, dens } }));
     } else {
-      showError(`No built-in density for "${item.name}". Ask Trace: "set the density of ${item.name}".`);
+      showError($_('done.no_density', { values: { name: item.name } }));
     }
   }
 
@@ -124,7 +125,7 @@
       comboCategoryRef?.acceptCreated(c.name);
       categoryNewOpen = false;
     } catch (err) {
-      showError(err.message || 'Could not create category');
+      showError(failed('fail.create_category', err));
     }
   }
 
@@ -186,7 +187,7 @@
       downloadSuccess = true;
       setTimeout(() => downloadSuccess = false, 2000);
     } catch (e) {
-      showError(e.message || 'OFF lookup failed');
+      showError(failed('fail.off_lookup', e));
     } finally {
       downloading = false;
     }
@@ -257,7 +258,7 @@
         } catch { offVerified = false; }
       }, 3000);
     } catch (e) {
-      showError(e.message || 'Share to OFF failed');
+      showError(failed('fail.off_share', e));
     } finally {
       contributing = false;
     }
@@ -344,7 +345,7 @@
       };
       _lastServingSize = Number(item.serving_size) || null;
     } catch (e) {
-      showError(e.message || 'Could not load pantry item');
+      showError(failed('fail.load_item', e));
       pop();
     } finally {
       loading = false;
@@ -392,7 +393,7 @@
       }
       pop();
     } catch (e) {
-      showError(e.message || 'Save failed');
+      showError(failed('fail.save_item', e));
     } finally {
       saving = false;
     }
@@ -412,7 +413,7 @@
       showSuccess($_('pantry_editor_ct.toast.removed'));
       pop();
     } catch (e) {
-      showError(e.message || 'Delete failed');
+      showError(failed('fail.remove_item', e));
     }
   }
 

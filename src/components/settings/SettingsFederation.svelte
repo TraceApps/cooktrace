@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   import { _ } from 'svelte-i18n';
   import {
     ntInstanceUrl, ntInstanceToken, ntFederationEnabled, ntConnectionVerified,
@@ -78,17 +79,17 @@
         // are no-ops since the flag is already on.
         ntFederationEnabled.set(true);
         ntConnectionVerified.set(true);
-        if (!silentOk) showSuccess(`Connected to NutriTrace as ${lastConnectedUser}`);
+        if (!silentOk) showSuccess($_('done.nt_connected', { values: { name: lastConnectedUser } }));
       } else {
         testStatus = 'fail';
-        lastError = body.error || 'Connection failed';
+        lastError = failed('fail.nt_connect', body.error);
         ntFederationEnabled.set(false);
         ntConnectionVerified.set(false);
         showError(lastError);
       }
     } catch (e) {
       testStatus = 'fail';
-      lastError = e.message || 'Connection failed';
+      lastError = failed('fail.nt_connect', e);
       ntFederationEnabled.set(false);
       ntConnectionVerified.set(false);
       showError(lastError);

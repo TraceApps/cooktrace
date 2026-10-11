@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   /**
    * Trace — assistant chat panel + FAB.
    *
@@ -929,7 +930,7 @@ When you write to the user's data, summarise what you did briefly and concretely
             showError($_('trace_ai_ct.toast.mic_denied'));
           }
         } else if (e.error !== 'aborted') {
-          showError(`Voice error: ${e.error || 'unknown'}`);
+          showError(failed('fail.voice', { message: e.error }));
         }
       };
       rec.onend = () => {
@@ -942,7 +943,7 @@ When you write to the user's data, summarise what you did briefly and concretely
     } catch (e) {
       recording = false;
       _smartLogActive = false;
-      showError(`Could not start mic: ${e.message || ''}`);
+      showError(failed('fail.mic', e));
     }
   }
   function _stopVoice() {

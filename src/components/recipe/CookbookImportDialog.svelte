@@ -239,7 +239,7 @@ Rules:
         errorMessage = 'Trace did not identify any recipes in this document. Try Bulk Import with the PDF split into smaller files, or verify the document actually contains recipes.';
         phase = 'error';
       } else {
-        showSuccess(`Imported ${createdRecipes.length} recipe${createdRecipes.length === 1 ? '' : 's'} from the cookbook`);
+        showSuccess($_('done.cookbook_imported', { values: { count: createdRecipes.length } }));
       }
     } catch (e) {
       // If we collected SOME recipes before the error, surface the partial success.

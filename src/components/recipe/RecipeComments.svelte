@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   /**
    * RecipeComments — threaded comment list for a recipe.
    *
@@ -91,7 +92,7 @@
     try {
       comments = await NtApi.getRecipeComments(recipeId);
     } catch (e) {
-      showError(e.message || 'Could not load comments');
+      showError(failed('fail.load_comments', e));
       comments = [];
     } finally {
       loading = false;
@@ -109,7 +110,7 @@
       draft = '';
       showAll = true;
     } catch (e) {
-      showError(e.message || 'Could not post comment');
+      showError(failed('fail.post_comment', e));
     } finally {
       posting = false;
     }
@@ -124,7 +125,7 @@
       replyDraft = '';
       replyingTo = null;
     } catch (e) {
-      showError(e.message || 'Could not post reply');
+      showError(failed('fail.post_reply', e));
     } finally {
       posting = false;
     }
@@ -144,7 +145,7 @@
       cancelEdit();
       showSuccess($_('recipe_comments.toast.comment_updated'));
     } catch (e) {
-      showError(e.message || 'Could not save');
+      showError(failed('fail.save_comment', e));
     }
   }
 
@@ -160,7 +161,7 @@
       await NtApi.deleteRecipeComment(recipeId, c.id);
       comments = comments.filter(x => x.id !== c.id);
     } catch (e) {
-      showError(e.message || 'Could not delete');
+      showError(failed('fail.delete_comment', e));
     }
   }
 

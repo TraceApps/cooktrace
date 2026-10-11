@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   /**
    * ManageCookbooks — list / create / rename / delete cookbooks.
    *
@@ -60,7 +61,7 @@
       categories = cats || [];
       tagOptions = tags || [];
     } catch (e) {
-      showError(e.message || 'Could not load cookbooks');
+      showError(failed('fail.load_cookbooks', e));
       cookbooks = [];
     } finally { loading = false; }
   }
@@ -93,7 +94,7 @@
       newSmartFavoritesOnly = false;
       showSuccess($_('manage_cookbooks.toast.cookbook_created'));
     } catch (e) {
-      showError(e.message || 'Could not create');
+      showError(failed('fail.create_cookbook', e));
     } finally {
       creating = false;
     }
@@ -119,7 +120,7 @@
       cookbooks = cookbooks.map(x => x.id === cb.id ? { ...x, ...updated } : x);
       cancelEdit();
       showSuccess($_('manage_cookbooks.toast.saved'));
-    } catch (e) { showError(e.message || 'Could not save'); }
+    } catch (e) { showError(failed('fail.save_cookbook', e)); }
   }
 
   async function uploadCover(cb, file) {
@@ -140,7 +141,7 @@
         showSuccess($_('manage_cookbooks.toast.cover_updated'));
       }
     } catch (e) {
-      showError(e.message || 'Could not upload');
+      showError(failed('fail.upload_cover', e));
     } finally {
       coverUploading = false;
     }
@@ -162,7 +163,7 @@
     [next[idx], next[target]] = [next[target], next[idx]];
     cookbooks = next;
     try { await NtApi.reorderCookbooks(next.map(c => c.id)); }
-    catch (e) { showError(e.message || 'Could not save order'); }
+    catch (e) { showError(failed('fail.save_order', e)); }
   }
 
   // ── Drag-and-drop reorder ───────────────────────────────────────────
@@ -204,7 +205,7 @@
     next.splice(insertAt, 0, moved);
     cookbooks = next;
     try { await NtApi.reorderCookbooks(next.map(c => c.id)); }
-    catch (e) { showError(e.message || 'Could not save order'); }
+    catch (e) { showError(failed('fail.save_order', e)); }
   }
   function _onDragEnd() {
     draggingId = null;
@@ -222,7 +223,7 @@
     try {
       await NtApi.deleteCookbook(cb.id);
       cookbooks = cookbooks.filter(x => x.id !== cb.id);
-    } catch (e) { showError(e.message || 'Could not delete'); }
+    } catch (e) { showError(failed('fail.delete_cookbook', e)); }
   }
 
   function open(cb) { push(`/cookbooks/${cb.id}`); }

@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   /**
    * SettingsApiTokens.svelte
    *
@@ -58,14 +59,14 @@
       const r = await fetch(apiUrl('/api/admin/api-tokens'), {
         credentials: 'include', headers: _csrfHeaders(),
       });
-      if (!r.ok) throw new Error($_('settings_api_tokens_ct.toast.load_failed'));
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || '');
       const data = await r.json();
       tokens = data.tokens || [];
       knownScopes = data.known_scopes || [];
       scopeDescriptions = data.scope_descriptions || {};
       mcpState = data.mcp_state || { enabled: false, write: false, destroy: false };
     } catch (e) {
-      showError(e.message);
+      showError(failed('settings_api_tokens_ct.toast.load_failed', e));
     } finally {
       loading = false;
     }
@@ -102,7 +103,7 @@
         }),
       });
       const data = await r.json();
-      if (!r.ok) { showError(data.error || $_('settings_api_tokens_ct.toast.create_failed')); return; }
+      if (!r.ok) { showError(failed('settings_api_tokens_ct.toast.create_failed', data.error)); return; }
 
       justCreatedRaw = data.raw;
       justCreatedName = data.token.name;
@@ -112,7 +113,7 @@
       newExpiresDays = '';
       await load();
     } catch (e) {
-      showError(e.message);
+      showError(failed('settings_api_tokens_ct.toast.create_failed', e));
     } finally {
       creating = false;
     }
@@ -131,12 +132,12 @@
       });
       if (!r.ok) {
         const data = await r.json().catch(() => ({}));
-        showError(data.error || $_('settings_api_tokens_ct.toast.revoke_failed')); return;
+        showError(failed('settings_api_tokens_ct.toast.revoke_failed', data.error)); return;
       }
       showSuccess($_('settings_api_tokens_ct.toast.revoked'));
       await load();
     } catch (e) {
-      showError(e.message);
+      showError(failed('settings_api_tokens_ct.toast.revoke_failed', e));
     }
   }
 

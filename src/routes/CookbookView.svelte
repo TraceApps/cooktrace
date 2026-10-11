@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../lib/messages.js';
   import { closeOnBack } from '../lib/back-stack.js';
   /**
    * CookbookView — single cookbook detail page.
@@ -55,7 +56,7 @@
     loading = true;
     loadError = null;
     try { cookbook = await NtApi.getCookbook(id); }
-    catch (e) { loadError = e.message || 'Could not load cookbook'; showError(loadError); }
+    catch (e) { loadError = failed('fail.load_cookbook', e); showError(loadError); }
     finally { loading = false; }
   }
   $: if (Number.isFinite(id)) load();
@@ -67,7 +68,7 @@
     if (allRecipes.length === 0) {
       allRecipesLoading = true;
       try { allRecipes = await NtApi.getRecipes(); }
-      catch (e) { showError(e.message || 'Could not load recipes'); allRecipes = []; }
+      catch (e) { showError(failed('fail.load_recipes', e)); allRecipes = []; }
       finally { allRecipesLoading = false; }
     }
   }
@@ -93,11 +94,11 @@
     if (addSelected.size === 0) { closeAddDialog(); return; }
     try {
       const res = await NtApi.addRecipesToCookbook(id, [...addSelected]);
-      showSuccess(`Added ${res.added} recipe${res.added === 1 ? '' : 's'}`);
+      showSuccess($_('done.recipes_added', { values: { count: res.added } }));
       closeAddDialog();
       await load();
     } catch (e) {
-      showError(e.message || 'Could not add');
+      showError(failed('fail.add_recipes', e));
     }
   }
 
@@ -158,7 +159,7 @@
     const next = e.detail.items.filter(r => !r?.isDndShadowItem);
     cookbook = { ...cookbook, recipes: next };
     try { await NtApi.reorderCookbookRecipes(cookbook.id, next.map(x => x.id)); }
-    catch (e2) { showError(e2.message || 'Could not save order'); }
+    catch (e2) { showError(failed('fail.save_order', e2)); }
   }
 
   // Wraps svelte-dnd-action's own `dragHandle` action so it can be
@@ -214,10 +215,10 @@
         cookbook = { ...cookbook, recipes: cookbook.recipes.filter(x => x.id !== moveDialogRecipe.id) };
       }
       const targetName = allCookbooks.find(c => c.id === targetId)?.name || 'cookbook';
-      showSuccess(moveAction === 'move' ? `Moved to "${targetName}"` : `Copied to "${targetName}"`);
+      showSuccess(moveAction === 'move' ? $_('done.moved_to', { values: { name: targetName } }) : $_('done.copied_to', { values: { name: targetName } }));
       closeMoveDialog();
     } catch (e) {
-      showError(e.message || 'Could not save');
+      showError(failed('fail.move_recipe', e));
     }
   }
   $: moveTargets = (allCookbooks || []).filter(c => c.id !== id && !c.is_smart);
@@ -233,7 +234,7 @@
       await NtApi.removeRecipeFromCookbook(id, r.id);
       cookbook = { ...cookbook, recipes: cookbook.recipes.filter(x => x.id !== r.id) };
     } catch (e) {
-      showError(e.message || 'Could not remove');
+      showError(failed('fail.remove_from_cookbook', e));
     }
   }
 
@@ -251,7 +252,7 @@
       showSuccess($_('cookbook_view_ct.toast.cookbook_deleted'));
       push('/recipes?view=cookbooks');
     } catch (e) {
-      showError(e.message || 'Could not delete');
+      showError(failed('fail.delete_cookbook', e));
     }
   }
 
@@ -279,9 +280,9 @@
       const updated = await NtApi.updateCookbook(cookbook.id, { cover_image_url: coverDraft || null });
       cookbook = { ...cookbook, cover_image_url: updated.cover_image_url };
       coverSheetOpen = false;
-      showSuccess('Cover updated');
+      showSuccess($_('done.cover_updated'));
     } catch (e) {
-      showError(e.message || 'Could not update cover');
+      showError(failed('fail.change_cover', e));
     }
   }
 

@@ -11,7 +11,7 @@
     "synced": "Synced",
     "syncing": "Syncing…",
     "pending_web": "{count, plural, =0 {Offline. Your kitchen still works here.} one {Offline. # change is waiting to go up.} other {Offline. # changes are waiting to go up.}}",
-    "refused": "Your server would not accept {what}: {reason}",
+    "refused": "Your server didn't accept {what}: {reason}.",
     "sign_out_waiting_title": "Changes are still waiting",
     "sign_out_waiting": "{count, plural, one {# change has not reached your server yet. Signing out now discards it. Connect and try again to keep it.} other {# changes have not reached your server yet. Signing out now discards them. Connect and try again to keep them.}}",
     "sign_out_anyway": "Sign Out Anyway",
@@ -112,12 +112,12 @@
     "signed_in":    "Signed In",
     "signed_out":   "Signed Out",
     "linked":       "Linked",
-    "unlinked":     "Unlinked",
+    "unlinked":     "Account unlinked",
     "admin":        "admin",
     "errors": {
-      "cant_reach_server": "Could not reach server",
-      "failed":            "Failed",
-      "unlink_failed":     "Could not unlink"
+      "cant_reach_server": "Couldn't reach the server.",
+      "failed":            "Couldn't do that. Try again.",
+      "unlink_failed":     "Couldn't unlink the account"
     }
   },
   "pantry_sheet": {
@@ -300,18 +300,18 @@
       "toast_user_deleted":   "User deleted",
       "toast_password_reset": "Password reset",
       "toast_role_changed":   "{name} is now {role}",
-      "toast_um_enabled":     "User management enabled",
-      "toast_um_disabled":    "User management disabled",
+      "toast_um_enabled":     "User management turned on",
+      "toast_um_disabled":    "User management turned off",
       "toast_invite_sent":    "Invite sent",
-      "toast_link_copied":    "Copied!",
-      "err_username_required": "Username is required",
-      "err_passwords_mismatch": "Passwords do not match",
-      "err_username_password_required": "Username and password required",
-      "err_registration_failed": "Registration failed",
-      "err_failed_to_add":    "Failed to add user",
-      "err_could_not_change_role": "Could not change role",
-      "err_could_not_reset_password": "Could not reset password",
-      "err_could_not_reach_server": "Could not reach server"
+      "toast_link_copied":    "Link copied",
+      "err_username_required": "Enter a username.",
+      "err_passwords_mismatch": "The passwords don't match.",
+      "err_username_password_required": "Enter a username and a password.",
+      "err_registration_failed": "Couldn't create the admin account",
+      "err_failed_to_add":    "Couldn't add the user",
+      "err_could_not_change_role": "Couldn't change the role",
+      "err_could_not_reset_password": "Couldn't reset the password",
+      "err_could_not_reach_server": "Couldn't reach the server."
     },
     "server":             { "section": "Server Connection" }
   },
@@ -334,7 +334,7 @@
     "sso_or":               "or",
     "no_signin_methods":    "No sign-in methods available. Ask your administrator.",
     "errors": {
-      "failed": "Login failed"
+      "failed": "Couldn't sign in"
     },
     "cookie_warning": {
       "http_title": "Signing in won't work on this address",
@@ -350,8 +350,8 @@
       "token_placeholder": "Recovery token",
       "action":            "Disable User Management & Reset",
       "disabling":         "Disabling…",
-      "failed":            "Recovery failed",
-      "success":           "User management disabled — you are now in single-user mode",
+      "failed":            "Couldn't recover the account",
+      "success":           "User management turned off. You're in single-user mode now.",
       "done":              "User management has been disabled.<br>Redirecting…"
     }
   },
@@ -378,7 +378,7 @@
     "saving":              "Saving…",
     "errors": {
       "required": "Password is required",
-      "mismatch": "Passwords do not match",
+      "mismatch": "The passwords don't match.",
       "failed":   "Reset failed"
     }
   },
@@ -414,10 +414,10 @@
     "deleting":             "Deleting…",
     "account_deleted":      "Account deleted",
     "errors": {
-      "save_failed":            "Could not save profile",
-      "upload_failed":          "Upload failed",
-      "password_change_failed": "Could not change password",
-      "delete_account_failed":  "Could not delete account"
+      "save_failed":            "Couldn't save the profile",
+      "upload_failed":          "Couldn't upload the photo",
+      "password_change_failed": "Couldn't change the password",
+      "delete_account_failed":  "Couldn't delete the account"
     }
   },
   "wizard": {
@@ -757,8 +757,8 @@
   },
   "settings_page": {
     "toast": {
-      "copy_failed":            "Copy failed, select the text manually",
-      "no_log_file":            "No log file yet, turn on Diagnostic Mode and reproduce the issue first"
+      "copy_failed":            "Couldn't copy. Select the text and copy it yourself.",
+      "no_log_file":            "There's no log file yet. Turn on Diagnostic Mode and reproduce the issue first."
     },
     "profile_hero": {
       "admin_badge":            "Admin",
@@ -891,15 +891,15 @@
   },
   "backup_page": {
     "toast": {
-      "deleted":                "Deleted",
-      "restored_reloading":     "Restored, reloading…",
+      "deleted":                "Backup deleted",
+      "restored_reloading":     "Backup restored. Reloading.",
       "all_data_cleared":       "All data cleared",
-      "clear_failed":           "Clear failed: {msg}",
+      "clear_failed":           "Couldn't clear it",
       "all_settings_cleared":   "All settings cleared",
-      "exported":               "Exported",
+      "exported":               "Data exported",
       "backup_saved":           "Backup saved",
-      "imported_reloading":     "Imported, reloading",
-      "imported":               "Imported"
+      "imported_reloading":     "Data imported. Reloading.",
+      "imported":               "Data imported"
     },
     "full_backup":              "Full Backup",
     "auto_backup":              "Auto Backup",
@@ -941,8 +941,8 @@
   },
   "settings_email_ct": {
     "toast": {
-      "smtp_host_required":      "SMTP test failed: host required",
-      "invalid_email":           "Enter a valid email address"
+      "smtp_host_required":      "Enter the SMTP host first.",
+      "invalid_email":           "Enter a valid email address."
     },
     "hint":                      "Used for password resets and user invites",
     "smtp_host":                 "SMTP Host",
@@ -958,8 +958,8 @@
   },
   "settings_trace_ct": {
     "toast": {
-      "fill_fields":             "Fill in provider, API key, and model first",
-      "connected":               "Trace AI connected, assistant is ready"
+      "fill_fields":             "Fill in the provider, API key and model first.",
+      "connected":               "Trace connected"
     },
     "enable_assistant":          "Enable Trace Assistant",
     "provider":                  "Provider",
@@ -1008,8 +1008,8 @@
   "settings_users_ct": {
     "toast": {
       "invite_revoked":          "Invite revoked",
-      "invite_email_or_blank":   "Enter a valid email or leave blank to generate a shareable link",
-      "cant_create_invite":      "Could not create invite"
+      "invite_email_or_blank":   "Enter a valid email, or leave it blank for a link to share.",
+      "cant_create_invite":      "Couldn't create the invite."
     },
     "pending_invites":           "Pending Invites",
     "require_strong_passwords":  "Require Strong Passwords",
@@ -1066,7 +1066,7 @@
     "summary_partial":           "Imported {imported} of {total} Recipes",
     "summary_find":              "Find them on the Recipes tab.",
     "summary_dupes":             "{count, plural, one {# duplicate skipped} other {# duplicates skipped}}",
-    "summary_failed":            "{count, plural, one {# recipe couldn't be imported} other {# recipes couldn't be imported}}",
+    "summary_failed":            "{count, plural, one {# recipe couldn't be imported.} other {# recipes couldn't be imported.}}",
     "dupes_heading":             "Duplicates Skipped",
     "dupes_hint":                "A recipe with the same name or source link already exists. To import these anyway, set If a Recipe Already Exists to Allow Duplicates and import again.",
     "failed_heading":            "Not Imported",
@@ -1074,7 +1074,7 @@
   },
   "settings_federation_ct": {
     "toast": {
-      "url_token_required":      "Enter a URL and access token first"
+      "url_token_required":      "Enter a URL and access token first."
     },
     "connect_to_nt":             "Connect to NutriTrace",
     "instance_url":              "Instance URL",
@@ -1088,11 +1088,11 @@
   },
   "settings_auth_extra": {
     "toast": {
-      "issuer_client_required":     "Issuer URL and Client ID are required",
-      "redirect_required":          "At least one redirect URI is required",
-      "cant_reach_server":          "Could not reach server",
-      "provider_deleted":           "Provider deleted",
-      "need_active_provider":       "Add at least one active OIDC provider before disabling password login."
+      "issuer_client_required":     "Enter the issuer URL and client ID.",
+      "redirect_required":          "Add at least one redirect URI.",
+      "cant_reach_server":          "Couldn't reach the server.",
+      "provider_deleted":           "Sign-in provider deleted",
+      "need_active_provider":       "Add at least one active OIDC provider before turning off password sign-in."
     },
     "user_mgmt_required":            "User Management Is Required",
     "admin_only":                    "Admin Only",
@@ -1153,14 +1153,14 @@
       "revoke_confirm": "Revoke"
     },
     "toast": {
-      "load_failed":     "Could not load tokens",
-      "scope_required":  "Pick at least one scope",
-      "name_required":   "Name is required",
-      "create_failed":   "Could not create token",
-      "revoke_failed":   "Could not revoke token",
+      "load_failed":     "Couldn't load the tokens",
+      "scope_required":  "Pick at least one scope.",
+      "name_required":   "Enter a name.",
+      "create_failed":   "Couldn't create the token",
+      "revoke_failed":   "Couldn't revoke the token",
       "revoked":         "Token revoked",
       "copied":          "Copied to clipboard",
-      "copy_failed":     "Could not copy"
+      "copy_failed":     "Couldn't copy it."
     }
   },
   "settings_webhooks": {
@@ -1206,30 +1206,30 @@
       "delete_confirm": "Delete"
     },
     "toast": {
-      "load_failed": "Could not load webhooks",
-      "url_required": "Enter a target URL",
-      "event_required": "Select at least one event",
-      "create_failed": "Could not create webhook",
-      "update_failed": "Could not update webhook",
-      "delete_failed": "Could not delete webhook",
+      "load_failed": "Couldn't load the webhooks",
+      "url_required": "Enter a target URL.",
+      "event_required": "Pick at least one event.",
+      "create_failed": "Couldn't create the webhook",
+      "update_failed": "Couldn't update the webhook",
+      "delete_failed": "Couldn't delete the webhook",
       "deleted": "Webhook deleted",
-      "test_failed": "Test delivery failed",
+      "test_failed": "Couldn't deliver the test event",
       "test_delivered": "Test event delivered",
       "copied": "Copied to clipboard",
-      "copy_failed": "Could not copy, select the text manually"
+      "copy_failed": "Couldn't copy. Select the text and copy it yourself."
     }
   },
   "settings_server_conn": {
     "toast": {
-      "enter_url":               "Enter your server URL",
-      "enter_credentials":       "Enter your credentials",
-      "sync_failed":             "Sync failed: {reason}",
-      "sync_unknown":            "Unknown error",
-      "connected_reloading":     "Connected, reloading",
+      "enter_url":               "Enter your server's address.",
+      "enter_credentials":       "Enter your username and password.",
+      "sync_failed":             "Couldn't sync",
+      "sync_unknown":            "unknown error",
+      "connected_reloading":     "Connected. Reloading.",
       "synced":                  "Synced",
-      "pushed_all":              "Pushed all data",
-      "logged_out_reloading":    "Logged out, reloading",
-      "disconnected_reloading":  "Disconnected, reloading"
+      "pushed_all":              "All data sent to the server",
+      "logged_out_reloading":    "Signed out. Reloading.",
+      "disconnected_reloading":  "Disconnected. Reloading."
     },
     "state_connected":           "Connected",
     "last_synced":               "Last Synced",
@@ -1248,10 +1248,10 @@
   },
   "settings_notifications": {
     "toast": {
-      "test_sent":                 "Test sent, check your push service.",
-      "not_supported":             "This browser does not support notifications.",
-      "permission_granted":        "Notification permission granted.",
-      "permission_denied":         "Permission denied. Enable it in browser settings."
+      "test_sent":                 "Test sent. Check your push service.",
+      "not_supported":             "This browser doesn't support notifications.",
+      "permission_granted":        "Notifications allowed",
+      "permission_denied":         "Notifications blocked. Allow them in your browser's settings."
     },
     "device_notifications":        "Device Notifications",
     "enable_on_device":            "Enable on This Device",
@@ -1369,7 +1369,7 @@
   },
   "recipes_page": {
     "toast": {
-      "paste_or_pick":           "Paste a recipe or pick a file first",
+      "paste_or_pick":           "Paste a recipe or pick a file first.",
       "recipe_imported":         "Recipe imported",
       "already_exists":          "This recipe already exists. Opening it.",
       "already_exists_short":    "This recipe already exists.",
@@ -1377,14 +1377,14 @@
       "archive_imported":        "Imported {count, plural, one {# recipe} other {# recipes}}",
       "archive_imported_skipped": "Imported {count, plural, one {# recipe} other {# recipes}}; {skipped, plural, one {# duplicate skipped} other {# duplicates skipped}}",
       "archive_all_duplicates":  "Nothing new to import: {skipped, plural, one {# recipe already exists} other {all # recipes already exist}}",
-      "new_link_generated":      "New link generated",
+      "new_link_generated":      "New link made",
       "link_revoked":            "Link revoked",
       "copied":                  "Copied to clipboard",
-      "copy_failed":             "Copy failed",
-      "clipboard_unavailable":   "Clipboard not available",
+      "copy_failed":             "Couldn't copy it.",
+      "clipboard_unavailable":   "The clipboard isn't available.",
       "recipe_duplicated":       "Recipe duplicated",
-      "preparing_share":         "Preparing share…",
-      "deleted":                 "Deleted"
+      "preparing_share":         "Getting it ready to share",
+      "deleted":                 "Recipe deleted"
     },
     "share_recipe":              "Share Recipe",
     "share_cookbook":            "Share Cookbook",
@@ -1407,8 +1407,8 @@
       "pick_video":              "Pick a video file.",
       "video_uploaded":          "Video uploaded",
       "draft_restored":          "Draft restored",
-      "cant_restore_draft":      "Could not restore draft",
-      "name_required":           "Name is required"
+      "cant_restore_draft":      "Couldn't restore the draft.",
+      "name_required":           "Enter a name."
     },
     "discard":                   "Discard",
     "restore":                   "Restore",
@@ -1438,11 +1438,11 @@
     "last_edited_by":            "Last edited by {name}",
     "toast": {
       "recipe_deleted":          "Recipe deleted",
-      "preparing_share":         "Preparing share…",
+      "preparing_share":         "Getting it ready to share",
       "link_copied":             "Link copied",
-      "share_unsupported":       "Sharing not supported on this browser",
+      "share_unsupported":       "This browser can't share.",
       "diary_updated":           "Diary entry updated",
-      "logged_cooked":           "Logged, cooked it!"
+      "logged_cooked":           "Cook logged"
     },
     "shared_chip":               "Shared",
     "retry":                     "Retry",
@@ -1479,7 +1479,6 @@
       "confirm_title":           "Restore This Version?",
       "confirm_message":         "The recipe will change to this version. The current recipe is kept as an earlier version, so you can undo this.",
       "restored":                "Recipe restored",
-      "restore_failed":          "Couldn't restore the recipe",
       "ingredients":             "Ingredients",
       "steps":                   "Steps",
       "no_ingredients":          "No ingredients",
@@ -1522,9 +1521,9 @@
   },
   "barcode_scanner": {
     "toast": {
-      "camera_denied":           "Camera permission denied",
-      "scan_failed":             "Barcode scan failed: {reason}",
-      "scan_unknown":            "Unknown error"
+      "camera_denied":           "Camera access denied",
+      "scan_failed":             "Couldn't scan the barcode",
+      "scan_unknown":            "unknown error"
     },
     "title":                     "Scan Barcode",
     "library":                   "Library",
@@ -1544,7 +1543,7 @@
   },
   "image_picker_ct": {
     "toast": {
-      "camera_denied":           "Camera access denied or unavailable."
+      "camera_denied":           "The camera isn't available, or access was denied."
     },
     "title":                     "Take Photo"
   },
@@ -1563,15 +1562,15 @@
   },
   "trace_ai_ct": {
     "toast": {
-      "voice_unsupported":       "Voice input not supported in this browser",
-      "configure_ai":            "Configure Trace AI in Settings to use hold-to-talk",
-      "enable_smart_log":        "Enable Smart Log in Settings, Trace AI, to use hold-to-talk",
-      "voice_needs_https":       "Voice needs HTTPS. Plain HTTP blocks the mic, set up TLS or use the public domain.",
-      "voice_cancelled":         "Voice cancelled",
-      "trace_disabled":          "Trace is disabled. Enable it in Settings, Trace.",
-      "voice_unsupported_full":  "Voice input not supported in this browser. Try Chrome on desktop or mobile Safari/Chrome.",
-      "voice_needs_https_smart": "Voice needs HTTPS. Smart Log won't work over plain HTTP, set up TLS or use the public domain.",
-      "mic_denied":              "Microphone permission denied",
+      "voice_unsupported":       "This browser doesn't support voice input.",
+      "configure_ai":            "Set up Trace in Settings > Trace to use hold-to-talk.",
+      "enable_smart_log":        "Turn on Smart Log in Settings > Trace to use hold-to-talk.",
+      "voice_needs_https":       "Voice input needs HTTPS. Browsers block the microphone over plain HTTP, so set up TLS or use your public address.",
+      "voice_cancelled":         "Voice input canceled",
+      "trace_disabled":          "Trace is turned off. Turn it on in Settings > Trace.",
+      "voice_unsupported_full":  "This browser doesn't support voice input. Try Chrome, or Safari on an iPhone.",
+      "voice_needs_https_smart": "Smart Log needs HTTPS. Browsers block the microphone over plain HTTP, so set up TLS or use your public address.",
+      "mic_denied":              "Microphone access denied",
       "pick_image":              "Pick an image file."
     },
     "tools_unsupported":         "This model can't use tools: it can answer, but it can't look up or change your recipes and pantry. Pick a model with tool support in Settings.",
@@ -1581,7 +1580,7 @@
   "manage_cookbooks": {
     "toast": {
       "cookbook_created":        "Cookbook created",
-      "saved":                   "Saved",
+      "saved":                   "Cookbook saved",
       "cover_updated":           "Cover updated"
     },
     "title":                     "Cookbooks",
@@ -1595,8 +1594,8 @@
   "manage_units": {
     "toast": {
       "unit_added":              "Custom unit added",
-      "saved":                   "Saved",
-      "builtins_restored":       "All built-ins restored"
+      "saved":                   "Unit saved",
+      "builtins_restored":       "Built-in units restored"
     },
     "title":                     "Units",
     "restore_all":               "Restore All",
@@ -1607,7 +1606,7 @@
   },
   "manage_pantry_cats": {
     "toast": {
-      "saved":                   "Saved",
+      "saved":                   "Category saved",
       "category_added":          "Category added"
     },
     "title":                     "Pantry Categories",
@@ -1618,7 +1617,7 @@
   },
   "manage_recipe_cats": {
     "toast": {
-      "saved":                   "Saved",
+      "saved":                   "Category saved",
       "category_added":          "Category added"
     },
     "title":                     "Recipe Categories",
@@ -1712,10 +1711,10 @@
     "plan_it":                   "Plan It",
     "saving":                    "Saving…",
     "toast": {
-      "pick_recipe":             "Pick a recipe",
-      "planned":                 "Planned",
-      "marked_cooked":           "Marked cooked",
-      "removed":                 "Removed"
+      "pick_recipe":             "Pick a recipe first.",
+      "planned":                 "Cook planned",
+      "marked_cooked":           "Marked as cooked",
+      "removed":                 "Entry removed"
     },
     "this_week":                 "This Week",
     "current_streak":            "Current Streak",
@@ -1791,15 +1790,15 @@
   },
   "shopping_page": {
     "toast": {
-      "cleared":                 "Cleared",
-      "add_items":               "Add some items first",
-      "preparing_share":         "Preparing share…",
-      "saved_image":             "Saved image",
+      "cleared":                 "Checked items cleared",
+      "add_items":               "Add some items first.",
+      "preparing_share":         "Getting it ready to share",
+      "saved_image":             "Image saved",
       "copied":                  "Copied to clipboard",
-      "nothing_planned":         "Nothing planned in that range",
-      "already_in_pantry":       "Everything's already in your pantry",
-      "cleared_restocked":       "List cleared. {n} marked in stock",
-      "restock_failed":          "Some pantry items couldn't be restocked ({n})",
+      "nothing_planned":         "Nothing is planned for those days.",
+      "already_in_pantry":       "Everything is already in your pantry",
+      "cleared_restocked":       "List cleared. {n, plural, one {# item} other {# items}} marked in stock.",
+      "restock_failed":          "{n, plural, one {# pantry item couldn't be restocked.} other {# pantry items couldn't be restocked.}}",
       "restock_undone":          "Pantry changes undone",
       "plan_added":              "{count, plural, one {# item} other {# items}} for {cooks, plural, one {# planned cook} other {# planned cooks}}",
       "plan_removed":            "{count, plural, one {# item is} other {# items are}} no longer needed and left the list",
@@ -1826,10 +1825,10 @@
   },
   "native_setup_ct": {
     "toast": {
-      "enter_url":               "Enter your server URL",
-      "enter_credentials":       "Enter your credentials",
+      "enter_url":               "Enter your server's address.",
+      "enter_credentials":       "Enter your username and password.",
       "connected_to_server":     "Connected to server",
-      "cant_open_signin":        "Could not open sign-in browser"
+      "cant_open_signin":        "Couldn't open the sign-in page."
     },
     "app_name":                  "CookTrace",
     "tagline":                   "Trace Every Bite",
@@ -1843,7 +1842,7 @@
   },
   "login_ct": {
     "toast": {
-      "no_saved":                "No saved sign-in. Please use your password once first.",
+      "no_saved":                "There's no saved sign-in yet. Sign in with your password once first.",
       "saved_expired":           "Your saved sign-in expired. Use your password to sign in.",
       "biometric_failed":        "Biometric sign-in failed. Use your password instead."
     },
@@ -1852,14 +1851,14 @@
   },
   "pantry_editor_ct": {
     "toast": {
-      "enter_barcode":           "Enter a barcode first",
-      "not_found_off":           "Not found on Open Food Facts",
-      "add_barcode":             "Add a barcode first",
-      "add_name":                "Add a name first",
-      "name_required":           "Name is required",
-      "saved":                   "Saved",
-      "added_to_pantry":         "Added to pantry",
-      "removed":                 "Removed"
+      "enter_barcode":           "Enter a barcode first.",
+      "not_found_off":           "Open Food Facts doesn't have this product.",
+      "add_barcode":             "Add a barcode first.",
+      "add_name":                "Add a name first.",
+      "name_required":           "Enter a name.",
+      "saved":                   "Item saved",
+      "added_to_pantry":         "Added to the pantry",
+      "removed":                 "Item removed"
     },
     "photo":                     "Photo",
     "basic_info":                "Basic Info",
@@ -1883,7 +1882,7 @@
   },
   "pantry_page": {
     "toast": {
-      "removed":                 "Removed"
+      "removed":                 "Item removed"
     },
     "variant_banner_title":      "Pantry Now Supports Product Variants",
     "sort_updated":              "Last Updated",
@@ -1897,7 +1896,7 @@
   },
   "pantry_view_ct": {
     "toast": {
-      "removed":                 "Removed"
+      "removed":                 "Item removed"
     },
     "retry":                     "Retry",
     "in_stock":                  "In Stock",
@@ -1908,20 +1907,20 @@
   },
   "pantry_sheet_extra": {
     "toast": {
-      "cant_read_label":         "Could not read the label. Try a clearer photo.",
-      "nutrition_extracted":     "Nutrition extracted from label",
-      "scan_failed":             "Scan failed: {reason}",
+      "cant_read_label":         "Couldn't read the label. Try a clearer photo.",
+      "nutrition_extracted":     "Nutrition read from the label",
+      "scan_failed":             "Couldn't scan the label",
       "scan_unknown":            "unknown error",
       "brand_or_name_required":  "Add a brand or override name to tell this variant apart.",
-      "added_variant":           "Added variant {name}",
+      "added_variant":           "Variant {name} added",
       "linked_as_variant":       "Linked as a variant",
-      "enter_barcode":           "Enter a barcode first",
-      "not_found_off":           "Not found on Open Food Facts",
-      "add_barcode":             "Add a barcode first",
-      "add_name":                "Add a name first",
-      "name_required":           "Name is required",
-      "added_to_pantry":         "Added to pantry",
-      "saved":                   "Saved"
+      "enter_barcode":           "Enter a barcode first.",
+      "not_found_off":           "Open Food Facts doesn't have this product.",
+      "add_barcode":             "Add a barcode first.",
+      "add_name":                "Add a name first.",
+      "name_required":           "Enter a name.",
+      "added_to_pantry":         "Added to the pantry",
+      "saved":                   "Item saved"
     },
     "retry":                     "Retry",
     "add_a_photo":               "Add a Photo",
@@ -1985,8 +1984,8 @@
     "download_install":      "Download & Install",
     "install_downloaded":    "Install",
     "downloading":           "Downloading… {percent}%",
-    "install_starting":      "Opening installer…",
-    "install_failed":        "Install failed. Try again.",
+    "install_starting":      "Opening the installer",
+    "install_failed":        "Couldn't install the update. Try again.",
     "skip_this_version":     "Skip This Version",
     "no_apk_asset":          "This release has no APK asset attached.",
     "banner_cta":            "Tap to view what's new and install.",
@@ -1996,7 +1995,7 @@
       "empty":       "No cached APKs. Cleanup passes ran successfully.",
       "clear_now":   "Clear Now",
       "clearing":    "Clearing…",
-      "cleared":     "Cache cleared."
+      "cleared":     "Cache cleared"
     },
     "server": {
       "heading":          "Server",
@@ -2007,8 +2006,8 @@
       "available_chip":   "Update Available",
       "instructions":     "To update the server, run on the host machine:",
       "copy_command":     "Copy Command",
-      "copied":           "Copied to clipboard.",
-      "copy_failed":      "Copy failed. Copy the command manually.",
+      "copied":           "Copied",
+      "copy_failed":      "Couldn't copy. Copy the command yourself.",
       "view_notes":       "View Release Notes",
       "channel_note":     "To switch server channels, change your docker-compose.yml image tag (:latest, :dev) and re-run docker-compose pull && docker-compose up -d."
     }
@@ -2175,5 +2174,211 @@
     "detail_cook": "Cook time",
     "detail_rest": "Rest time",
     "detail_total": "Total time"
+  },
+  "fail": {
+    "because": "{what}: {why}.",
+    "plain": "{what}.",
+    "offline": "the server can't be reached",
+    "sign_in": "Couldn't sign in",
+    "voice": "Couldn't use voice input",
+    "mic": "Couldn't start the microphone",
+    "save_allergens": "Couldn't save the allergens",
+    "plan_week": "Couldn't plan the week",
+    "load_cookbooks": "Couldn't load the cookbooks",
+    "create_cookbook": "Couldn't create the cookbook",
+    "save_cookbook": "Couldn't save the cookbook",
+    "upload_cover": "Couldn't upload the cover",
+    "save_order": "Couldn't save the order",
+    "delete_cookbook": "Couldn't delete the cookbook",
+    "load_categories": "Couldn't load the categories",
+    "save_category": "Couldn't save the category",
+    "delete_category": "Couldn't delete the category",
+    "add_category": "Couldn't add the category",
+    "create_category": "Couldn't create the category",
+    "load_list": "Couldn't load the list",
+    "rename": "Couldn't rename it",
+    "remove_it": "Couldn't remove it",
+    "load_units": "Couldn't load the units",
+    "save_unit": "Couldn't save the unit",
+    "create_unit": "Couldn't create the unit",
+    "delete_unit": "Couldn't delete the unit",
+    "update_variant_link": "Couldn't change the variant",
+    "add_variant": "Couldn't add the variant",
+    "link_variant": "Couldn't link the variant",
+    "nutrition_source": "Couldn't change where the nutrition comes from",
+    "off_lookup": "Couldn't look it up on Open Food Facts",
+    "off_share": "Couldn't share it to Open Food Facts",
+    "save_item": "Couldn't save the item",
+    "remove_item": "Couldn't remove the item",
+    "update_item": "Couldn't update the item",
+    "update_stock": "Couldn't update the stock",
+    "load_item": "Couldn't load the item",
+    "upload_photo": "Couldn't upload the photo",
+    "camera": "Couldn't use the camera",
+    "load_comments": "Couldn't load the comments",
+    "post_comment": "Couldn't post the comment",
+    "post_reply": "Couldn't post the reply",
+    "save_comment": "Couldn't save the comment",
+    "delete_comment": "Couldn't delete the comment",
+    "save_provider": "Couldn't save the sign-in provider",
+    "delete_provider": "Couldn't delete the sign-in provider",
+    "password_login": "Couldn't change password sign-in",
+    "save_backup_settings": "Couldn't save the backup settings",
+    "load_backups": "Couldn't load the backups",
+    "create_backup": "Couldn't make the backup",
+    "delete_backup": "Couldn't delete the backup",
+    "restore_backup": "Couldn't restore the backup",
+    "export": "Couldn't export your data",
+    "import_file": "Couldn't import the file",
+    "smtp_test": "Couldn't send the test email",
+    "read_zip": "Couldn't read the zip",
+    "import_recipes": "Couldn't import the recipes",
+    "nt_search": "Couldn't search NutriTrace",
+    "nt_import": "Couldn't import from NutriTrace",
+    "load_kitchens": "Couldn't load your Kitchens",
+    "create_kitchen": "Couldn't create the Kitchen",
+    "load_members": "Couldn't load the members",
+    "add_member": "Couldn't add the member",
+    "hand_over": "Couldn't hand over the Kitchen",
+    "remove_member": "Couldn't remove the member",
+    "auto_share": "Couldn't change auto-share",
+    "delete_kitchen": "Couldn't delete the Kitchen",
+    "change_role": "Couldn't change the role",
+    "change_roles": "Couldn't change the roles",
+    "push_test": "Couldn't send the test notification",
+    "permission": "Couldn't ask for permission",
+    "ai_test": "Couldn't reach the AI provider",
+    "revoke_invite": "Couldn't revoke the invite",
+    "password_policy": "Couldn't save the password rules",
+    "update_user": "Couldn't update the user",
+    "create_invite": "Couldn't create the invite",
+    "update_entry": "Couldn't update the diary entry",
+    "delete_entry": "Couldn't delete the diary entry",
+    "build_list": "Couldn't build the shopping list",
+    "plan_cook": "Couldn't plan the cook",
+    "load_recipes": "Couldn't load the recipes",
+    "add_recipes": "Couldn't add the recipes",
+    "move_recipe": "Couldn't move the recipe",
+    "remove_from_cookbook": "Couldn't take it out of the cookbook",
+    "change_cover": "Couldn't change the cover",
+    "search": "Couldn't search",
+    "load_recipe": "Couldn't load the recipe",
+    "upload_video": "Couldn't upload the video",
+    "save_recipe": "Couldn't save the recipe",
+    "delete_recipe": "Couldn't delete the recipe",
+    "share_card": "Couldn't share the card",
+    "share_link": "Couldn't share the link",
+    "log_cook": "Couldn't log the cook",
+    "save_rating": "Couldn't save the rating",
+    "favorite": "Couldn't change the favorite",
+    "recompute": "Couldn't work out the nutrition",
+    "save_nutrition": "Couldn't save the nutrition",
+    "set_density": "Couldn't set the density",
+    "import_recipe": "Couldn't import the recipe",
+    "add_to_cookbook": "Couldn't add it to the cookbook",
+    "change_sharing": "Couldn't change the sharing",
+    "share_recipe": "Couldn't share the recipe",
+    "create_link": "Couldn't create the link",
+    "new_link": "Couldn't make a new link",
+    "revoke_link": "Couldn't turn off the link",
+    "update_cookbooks": "Couldn't update the cookbooks",
+    "add_to_list": "Couldn't add it to the shopping list",
+    "duplicate_recipe": "Couldn't duplicate the recipe",
+    "add_list_item": "Couldn't add the item",
+    "check_item": "Couldn't check off the item",
+    "save_note": "Couldn't save the note",
+    "update_list": "Couldn't update the list",
+    "remove_items": "Couldn't remove the items",
+    "clear_checked": "Couldn't clear the checked items",
+    "undo": "Couldn't undo it",
+    "change_aisle": "Couldn't change the aisle",
+    "share_list": "Couldn't share the list",
+    "add_plan": "Couldn't add the planned cooks",
+    "delete_version": "Couldn't delete the version",
+    "restore_version": "Couldn't restore the version",
+    "name_version": "Couldn't name the version",
+    "load_cookbook": "Couldn't load the cookbook",
+    "load_diary": "Couldn't load the diary",
+    "load_pantry": "Couldn't load the pantry",
+    "load_history": "Couldn't load the history",
+    "nt_connect": "Couldn't connect to NutriTrace",
+    "connect": "Couldn't connect to the server",
+    "push_all": "Couldn't send everything to the server",
+    "delete_user": "Couldn't delete the user",
+    "turn_off_users": "Couldn't turn off user management",
+    "turn_on_users": "Couldn't turn on user management",
+    "load_users": "Couldn't load the users",
+    "clear_updates": "Couldn't clear the downloaded updates",
+    "create_account": "Couldn't create the account",
+    "send_reset": "Couldn't send the reset email"
+  },
+  "done": {
+    "tap_exit": "Tap again to exit",
+    "linked": "Account linked",
+    "signed_in": "Signed in",
+    "tags_updated": "{count, plural, one {# recipe updated} other {# recipes updated}}",
+    "tags_removed": "{count, plural, one {Removed from # recipe} other {Removed from # recipes}}",
+    "unit_builtin": "\"{abbr}\" is already a built-in unit. Pick another abbreviation.",
+    "unit_exists": "The custom unit \"{abbr}\" already exists.",
+    "variant_added": "Added as a variant",
+    "variant_detached": "Detached from its parent",
+    "nutrition_from_variant": "Nutrition comes from the variant now",
+    "nutrition_manual": "Nutrition set by hand",
+    "removed_with_variants": "Item and its variants removed",
+    "item_removed": "Item removed",
+    "saved_via_trace": "Saved \"{name}\" with Trace",
+    "cookbook_imported": "{count, plural, one {Imported # recipe from the cookbook} other {Imported # recipes from the cookbook}}",
+    "recipe_imported_named": "Imported \"{name}\"",
+    "provider_updated": "Sign-in provider updated",
+    "provider_created": "Sign-in provider added",
+    "password_login_on": "Password sign-in turned on",
+    "password_login_off": "Password sign-in turned off",
+    "backup_created": "Backup made ({size})",
+    "smtp_sent": "Test email sent to {to}",
+    "nt_connected": "Connected to NutriTrace as {name}",
+    "nt_imported": "{count, plural, one {# item imported into the pantry} other {# items imported into the pantry}}",
+    "nt_skipped": "{count, plural, one {# item skipped} other {# items skipped}}",
+    "kitchen_created": "Kitchen \"{name}\" created",
+    "member_added": "{name} added",
+    "kitchen_handed": "{name} owns this Kitchen now",
+    "auto_share_on_n": "{count, plural, one {Sharing # recipe with this Kitchen} other {Sharing # recipes with this Kitchen}}",
+    "auto_share_on": "Auto-share is on. New recipes will be shared.",
+    "auto_share_off": "Auto-share turned off. Recipes already shared stay shared; remove a member to take away their access.",
+    "user_updated": "User updated",
+    "invite_emailed": "Invite emailed to {email}",
+    "recipes_added": "{count, plural, one {# recipe added} other {# recipes added}}",
+    "moved_to": "Moved to \"{name}\"",
+    "copied_to": "Copied to \"{name}\"",
+    "items_removed": "{count, plural, one {# item removed} other {# items removed}}",
+    "items_removed_partial": "Removed {done} of {total} items. {failed, plural, one {# couldn't be removed.} other {# couldn't be removed.}}",
+    "density_set": "Density for {name} set to {dens} g/cup",
+    "no_density": "There's no built-in density for \"{name}\". Ask Trace to \"set the density of {name}\".",
+    "recipe_saved": "Recipe saved",
+    "recipe_created": "Recipe created",
+    "card_saved": "Card saved",
+    "pages_saved": "{count} pages saved",
+    "nutrition_saved": "Nutrition saved from {used} of {total} ingredients",
+    "recipes_deleted": "{count, plural, one {# recipe deleted} other {# recipes deleted}}",
+    "recipes_deleted_partial": "{done, plural, one {# recipe deleted} other {# recipes deleted}}. {failed, plural, one {# couldn't be deleted.} other {# couldn't be deleted.}}",
+    "added_to_cookbooks": "Added {recipes, plural, one {# recipe} other {# recipes}} to {cookbooks, plural, one {# cookbook} other {# cookbooks}}",
+    "shared_with_n": "Shared with {count, plural, one {# member} other {# members}} of {kitchen}",
+    "already_shared": "Already shared with everyone in {kitchen}",
+    "cookbooks_updated": "{count, plural, one {# cookbook updated} other {# cookbooks updated}}",
+    "cover_updated": "Cover updated"
+  },
+  "password": {
+    "too_short": "Use at least 8 characters.",
+    "needs_lower": "Add a lowercase letter.",
+    "needs_upper": "Add an uppercase letter.",
+    "needs_number": "Add a number.",
+    "needs_symbol": "Add a symbol, like ! or #.",
+    "strength_0": "Too weak",
+    "strength_1": "Weak",
+    "strength_2": "Fair",
+    "strength_3": "Strong",
+    "strength_4": "Very strong"
+  },
+  "connect": {
+    "https_only": "This app only connects over HTTPS. Put the server behind a reverse proxy (Caddy, Tailscale or Cloudflare Tunnel), or use a debug build. DEPLOY.md, Connecting from Android, has the steps."
   }
 }

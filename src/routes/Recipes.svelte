@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../lib/messages.js';
   import { closeOnBack } from '../lib/back-stack.js';
   import { onSyncChanges } from '../lib/sync-refresh.js';
   import { onMount, tick } from 'svelte';
@@ -146,7 +147,7 @@
         push(`/recipes/${created.id}`);
       }
     } catch (e) {
-      showError(e.message || 'Import failed');
+      showError(failed('fail.import_recipe', e));
     } finally {
       pasteBusy = false;
     }
@@ -208,15 +209,15 @@
       dangerous: true,
     });
     if (!ok) return;
-    let success = 0, failed = 0;
+    let success = 0, failures = 0;
     for (const id of ids) {
       try { await NtApi.deleteRecipe(id); success++; }
-      catch { failed++; }
+      catch { failures++; }
     }
     recipes = recipes.filter(r => !selectedIds.has(r.id));
     exitSelectMode();
-    if (failed === 0) showSuccess(`Deleted ${success}`);
-    else showError(`Deleted ${success}, ${failed} failed`);
+    if (failures === 0) showSuccess($_('done.recipes_deleted', { values: { count: success } }));
+    else showError($_('done.recipes_deleted_partial', { values: { done: success, failed: failures } }));
   }
 
   // Add-to-Cookbook dialog state. Triggered from the long-press menu
@@ -277,12 +278,12 @@
         totalAdded += res?.added ?? 0;
       }
       try { cookbooks = await NtApi.getCookbooks(); } catch {}
-      showSuccess(`Added ${recipeIds.length} ${recipeIds.length === 1 ? 'recipe' : 'recipes'} to ${cbIds.length} ${cbIds.length === 1 ? 'cookbook' : 'cookbooks'}`);
+      showSuccess($_('done.added_to_cookbooks', { values: { recipes: recipeIds.length, cookbooks: cbIds.length } }));
       bulkCookbookOpen = false;
       selectMode = false;
       selectedIds = new Set();
     } catch (e) {
-      showError(e.message || 'Could not add to cookbook');
+      showError(failed('fail.add_to_cookbook', e));
     } finally {
       bulkCookbookBusy = false;
     }
@@ -339,7 +340,7 @@
         const next = new Set(cookbookShareGrants); next.add(userId);
         cookbookShareGrants = next;
       }
-    } catch (e) { showError(e.message || 'Could not update share'); }
+    } catch (e) { showError(failed('fail.change_sharing', e)); }
     finally { cookbookShareBusy = false; }
   }
   async function shareCookbookWithKitchen(kitchen) {
@@ -350,9 +351,9 @@
       const fresh = await NtApi.getCookbookShares(cookbookShareTarget.id).catch(() => []);
       cookbookShareGrants = new Set((fresh || []).map(g => g.user_id));
       const added = res?.added ?? 0;
-      if (added > 0) showSuccess(`Shared with ${added} ${added === 1 ? 'member' : 'members'} of ${kitchen.name}`);
-      else showSuccess(`Already shared with everyone in ${kitchen.name}`);
-    } catch (e) { showError(e.message || 'Could not share'); }
+      if (added > 0) showSuccess($_('done.shared_with_n', { values: { count: added, kitchen: kitchen.name } }));
+      else showSuccess($_('done.already_shared', { values: { kitchen: kitchen.name } }));
+    } catch (e) { showError(failed('fail.share_recipe', e)); }
     finally { cookbookShareKitchenBusyId = null; }
   }
   function closeCookbookShareDialog() {
@@ -375,9 +376,9 @@
       const fresh = await NtApi.getRecipeShares(shareDialogRecipe.id).catch(() => []);
       shareGrants = new Set((fresh || []).map(g => g.user_id));
       const added = res?.added ?? 0;
-      if (added > 0) showSuccess(`Shared with ${added} ${added === 1 ? 'member' : 'members'} of ${kitchen.name}`);
-      else showSuccess(`Already shared with everyone in ${kitchen.name}`);
-    } catch (e) { showError(e.message || 'Could not share'); }
+      if (added > 0) showSuccess($_('done.shared_with_n', { values: { count: added, kitchen: kitchen.name } }));
+      else showSuccess($_('done.already_shared', { values: { kitchen: kitchen.name } }));
+    } catch (e) { showError(failed('fail.share_recipe', e)); }
     finally { shareKitchenBusyId = null; }
   }
   function shareLinkUrl(token) {
@@ -416,7 +417,7 @@
       shareDialogToken = res.share_token;
       recipes = recipes.map(x => x.id === shareDialogRecipe.id ? { ...x, share_token: res.share_token } : x);
     } catch (e) {
-      showError(e.message || 'Could not create link');
+      showError(failed('fail.create_link', e));
     } finally {
       shareDialogBusy = false;
     }
@@ -432,7 +433,7 @@
         await NtApi.shareRecipeWithUsers(shareDialogRecipe.id, [peer.id]);
         const next = new Set(shareGrants); next.add(peer.id); shareGrants = next;
       }
-    } catch (e) { showError(e.message || 'Could not update share'); }
+    } catch (e) { showError(failed('fail.change_sharing', e)); }
   }
   async function rotateShareLink() {
     if (!shareDialogRecipe) return;
@@ -443,7 +444,7 @@
       recipes = recipes.map(x => x.id === shareDialogRecipe.id ? { ...x, share_token: res.share_token } : x);
       showSuccess($_('recipes_page.toast.new_link_generated'));
     } catch (e) {
-      showError(e.message || 'Could not rotate');
+      showError(failed('fail.new_link', e));
     } finally {
       shareDialogBusy = false;
     }
@@ -464,7 +465,7 @@
       shareDialogOpen = false;
       showSuccess($_('recipes_page.toast.link_revoked'));
     } catch (e) {
-      showError(e.message || 'Could not revoke');
+      showError(failed('fail.revoke_link', e));
     }
   }
   async function copyShareLink() {
@@ -495,11 +496,11 @@
       // Refresh cookbook counts.
       try { cookbooks = await NtApi.getCookbooks(); } catch {}
       const total = adds.length + dels.length;
-      if (total > 0) showSuccess(`Updated ${total} cookbook${total === 1 ? '' : 's'}`);
+      if (total > 0) showSuccess($_('done.cookbooks_updated', { values: { count: total } }));
       cookbookDialogOpen = false;
       cookbookDialogRecipe = null;
     } catch (e) {
-      showError(e.message || 'Could not update');
+      showError(failed('fail.update_cookbooks', e));
     }
   }
 
@@ -527,14 +528,14 @@
         // than an edit made elsewhere since, which the save mustn't undo.
         const updated = await NtApi.updateRecipe(r.id, { ...r, favorite: !r.favorite, _base: recipeBaseOf(r), _changed: ['favorite'] });
         recipes = recipes.map(x => x.id === r.id ? updated : x);
-      } catch (err) { showError(err.message || 'Update failed'); }
+      } catch (err) { showError(failed('fail.favorite', err)); }
     }
     else if (v === 'plan')     push(`/diary?plan=${r.id}`);
     else if (v === 'shop') {
       try {
         const result = await NtApi.shopFromRecipe(r.id, { only_missing: true });
         showSuccess($_('shopping_page.toast.recipe_added', { values: { count: result.added, name: r.name } }));
-      } catch (err) { showError(err.message || 'Could not add'); }
+      } catch (err) { showError(failed('fail.add_to_list', err)); }
     }
     else if (v === 'duplicate') {
       try {
@@ -543,7 +544,7 @@
         const dup = await NtApi.createRecipe({ ...rest, name: rest.name + ' (copy)', favorite: false, rating: null });
         recipes = [dup, ...recipes];
         showSuccess($_('recipes_page.toast.recipe_duplicated'));
-      } catch (err) { showError(err.message || 'Duplicate failed'); }
+      } catch (err) { showError(failed('fail.duplicate_recipe', err)); }
     }
     else if (v === 'share') {
       // Client-side PNG share. Long recipes paginate; on native
@@ -562,9 +563,9 @@
           parts.push({ blob, filename: fname });
         }
         const res = await shareBlobs(parts, full.name);
-        if (res.downloaded) showSuccess(parts.length > 1 ? `Saved ${parts.length} pages` : 'Saved card');
+        if (res.downloaded) showSuccess(parts.length > 1 ? $_('done.pages_saved', { values: { count: parts.length } }) : $_('done.card_saved'));
       } catch (e) {
-        showError(e.message || 'Could not share');
+        showError(failed('fail.share_card', e));
       }
     }
     else if (v === 'delete') {
@@ -579,7 +580,7 @@
         await NtApi.deleteRecipe(r.id);
         recipes = recipes.filter(x => x.id !== r.id);
         showSuccess($_('recipes_page.toast.deleted'));
-      } catch (err) { showError(err.message || 'Delete failed'); }
+      } catch (err) { showError(failed('fail.delete_recipe', err)); }
     }
   }
 
@@ -848,7 +849,7 @@
       // Only the newest read speaks; a quiet one after a sync that fails
       // keeps what's shown, unsaid.
       if (seq === _loadSeq && !quiet) {
-        loadError = e.message || 'Could not load recipes';
+        loadError = failed('fail.load_recipes', e);
         showError(loadError);
       }
     } finally {

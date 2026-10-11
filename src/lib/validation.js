@@ -9,12 +9,17 @@
  *   - at least one digit
  *   - at least one special character
  */
+import { get } from 'svelte/store';
+import { _ } from 'svelte-i18n';
+
+const t = key => get(_)(key);
+
 export function validatePassword(pw) {
-  if (!pw || pw.length < 8) return 'Password must be at least 8 characters';
-  if (!/[a-z]/.test(pw)) return 'Password must include a lowercase letter';
-  if (!/[A-Z]/.test(pw)) return 'Password must include an uppercase letter';
-  if (!/[0-9]/.test(pw)) return 'Password must include a number';
-  if (!/[^a-zA-Z0-9]/.test(pw)) return 'Password must include a special character';
+  if (!pw || pw.length < 8) return t('password.too_short');
+  if (!/[a-z]/.test(pw)) return t('password.needs_lower');
+  if (!/[A-Z]/.test(pw)) return t('password.needs_upper');
+  if (!/[0-9]/.test(pw)) return t('password.needs_number');
+  if (!/[^a-zA-Z0-9]/.test(pw)) return t('password.needs_symbol');
   return null;
 }
 
@@ -28,6 +33,5 @@ export function passwordStrength(pw) {
   if (/[0-9]/.test(pw)) score++;
   if (/[^a-zA-Z0-9]/.test(pw)) score++;
   score = Math.min(4, score);
-  const labels = ['Too weak', 'Weak', 'Fair', 'Strong', 'Very strong'];
-  return { score, label: labels[score] };
+  return { score, label: t(`password.strength_${score}`) };
 }

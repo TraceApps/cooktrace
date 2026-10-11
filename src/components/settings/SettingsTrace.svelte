@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   import { _ } from 'svelte-i18n';
   import { aiEnabled, aiProvider, aiApiKey, aiModel, aiBaseUrl, aiAssistantName, aiKeyVerified, smartLogEnabled, smartLogVoiceLang, traceChefHat, envLocks as envLocksStore } from '../../stores/settings.js';
   import { AI_PROVIDERS, AI_DEFAULT_MODELS, AI_MODELS, AI_MODEL_CUSTOM, callAI, callAIProxy } from '../../lib/aiChat.js';
@@ -182,7 +183,7 @@
     } catch (e) {
       testStatus = 'fail';
       aiKeyVerified.set(false);
-      showError(e.message || 'Test failed');
+      showError(failed('fail.ai_test', e));
     } finally {
       testing = false;
     }

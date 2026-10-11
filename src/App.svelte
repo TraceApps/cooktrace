@@ -1,4 +1,5 @@
 <script>
+  import { failed } from './lib/messages.js';
   import { onMount }   from 'svelte';
   import { fade, fly, slide } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
@@ -421,7 +422,7 @@
             } else {
               lastBack = now;
               import('./stores/toast.js').then(({ showSuccess }) => {
-                showSuccess('Tap again to exit');
+                showSuccess($_('done.tap_exit'));
               });
             }
           }
@@ -449,14 +450,14 @@
                   idTokenHint = data.id_token_hint || null;
                   providerId = data.provider_id != null ? String(data.provider_id) : null;
                 } catch (e) {
-                  import('./stores/toast.js').then(({ showError }) => showError(e?.message || 'Sign-in failed'));
+                  import('./stores/toast.js').then(({ showError }) => showError(failed('fail.sign_in', e)));
                   return;
                 }
               }
               if (errMsg) {
-                import('./stores/toast.js').then(({ showError }) => showError(decodeURIComponent(errMsg)));
+                import('./stores/toast.js').then(({ showError }) => showError(failed('fail.sign_in', decodeURIComponent(errMsg))));
               } else if (linked) {
-                import('./stores/toast.js').then(({ showSuccess }) => showSuccess('Linked'));
+                import('./stores/toast.js').then(({ showSuccess }) => showSuccess($_('done.linked')));
                 await loadAuthState();
               } else if (token) {
                 const { setAuthToken } = await import('./lib/platform.js');
@@ -473,7 +474,7 @@
                     }));
                   } catch {}
                 }
-                import('./stores/toast.js').then(({ showSuccess }) => showSuccess('Signed in'));
+                import('./stores/toast.js').then(({ showSuccess }) => showSuccess($_('done.signed_in')));
                 await loadAuthState();
                 // Re-evaluate the NativeSetup gate. Without this the user
                 // completes OIDC from NativeSetup, gets a valid token, and

@@ -263,14 +263,15 @@ export async function handleOidcCallback() {
     catch { return fallback; }
   };
   if (err) {
-    showError(decodeURIComponent(err));
+    const { failed } = await import('../lib/messages.js');
+    showError(failed('fail.sign_in', decodeURIComponent(err)));
     return true;
   }
   if (ok === 'ok') {
-    showSuccess(t('common.signed_in', 'Signed in'));
+    showSuccess(t('done.signed_in', 'Signed in'));
     await _fetchAuthFromServer();
   } else if (ok === 'linked') {
-    showSuccess(t('common.linked', 'Linked'));
+    showSuccess(t('done.linked', 'Account linked'));
     await _fetchAuthFromServer();
   }
   return true;

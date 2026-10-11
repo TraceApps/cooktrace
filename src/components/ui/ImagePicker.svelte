@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   import { closeOnBack } from '../../lib/back-stack.js';
   /**
    * ImagePicker — three-source hero image input (Camera / Upload / URL).
@@ -73,7 +74,7 @@
       value = resolveAssetUrl(url);
       dispatch('change', value);
     } catch (err) {
-      showError(err.message || 'Upload failed');
+      showError(failed('fail.upload_photo', err));
     } finally {
       uploading = false;
     }
@@ -87,7 +88,7 @@
         const { takePhoto } = await import('../../lib/camera.js');
         const file = await takePhoto();
         if (file) await _uploadFile(file);
-      } catch (e) { showError(e.message || 'Camera failed'); }
+      } catch (e) { showError(failed('fail.camera', e)); }
       return;
     }
     // Web: in-page camera popup with getUserMedia

@@ -8,6 +8,7 @@
   Opened from a cook (?cook=<id>): "You made this on ..." comes first.
 -->
 <script>
+  import { failed } from '../lib/messages.js';
   import { _, locale } from 'svelte-i18n';
   import { pop, push, querystring } from 'svelte-spa-router';
   import { fade } from 'svelte/transition';
@@ -52,7 +53,7 @@
       history = { ...history, revisions: history.revisions.map(x => (x.rev === v.rev ? { ...x, label: next || null } : x)) };
       showSuccess(next ? $_('history.label_saved', { values: { n: v.number } }) : $_('history.label_cleared', { values: { n: v.number } }));
       naming = false;
-    } catch (e) { showError(e.message || $_('history.label_failed')); }
+    } catch (e) { showError(failed('fail.name_version', e)); }
     finally { busy = false; }
   }
 
@@ -61,7 +62,7 @@
     try {
       [recipe, history] = await Promise.all([NtApi.getRecipe(id), NtApi.getRecipeRevisions(id)]);
     } catch (e) {
-      loadError = e.message || $_('history.load_failed');
+      loadError = failed('fail.load_history', e);
     } finally {
       loading = false;
     }
@@ -112,7 +113,7 @@
       await NtApi.restoreRecipeRevision(id, v.rev);
       showSuccess($_('history.restored', { values: { n: v.number } }));
       await load();
-    } catch (e) { showError(e.message || $_('history.restore_failed')); }
+    } catch (e) { showError(failed('fail.restore_version', e)); }
     finally { busy = false; }
   }
 
@@ -130,7 +131,7 @@
       showSuccess($_('history.deleted', { values: { n: v.number } }));
       push(`/recipes/${id}`);
     } catch (e) {
-      showError(e.code === 'used' ? $_('history.used_stays') : e.code === 'current' ? $_('history.current_stays') : (e.message || $_('history.delete_failed')));
+      showError(e.code === 'used' ? $_('history.used_stays') : e.code === 'current' ? $_('history.current_stays') : failed('fail.delete_version', e));
     } finally { busy = false; }
   }
 
@@ -140,7 +141,7 @@
       await NtApi.markCooked(id, { ...e.detail, recipe_rev: v.rev });
       showSuccess($_('history.cook_logged', { values: { n: v.number } }));
       await load();
-    } catch (err) { showError(err.message || $_('history.cook_failed')); }
+    } catch (err) { showError(failed('fail.log_cook', err)); }
     finally { busy = false; }
   }
 </script>

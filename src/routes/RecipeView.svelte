@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../lib/messages.js';
   import { closeOnBack } from '../lib/back-stack.js';
   import { push } from 'svelte-spa-router';
 
@@ -553,7 +554,7 @@
     try {
       recipe = await NtApi.getRecipe(id);
     } catch (e) {
-      loadError = e.message || 'Could not load recipe';
+      loadError = failed('fail.load_recipe', e);
       showError(loadError);
     } finally {
       loading = false;
@@ -611,7 +612,7 @@
       showSuccess($_('recipe_view_ct.toast.recipe_deleted'));
       push('/recipes');
     } catch (e) {
-      showError(e.message || 'Delete failed');
+      showError(failed('fail.delete_recipe', e));
     }
   }
 
@@ -657,9 +658,9 @@
         parts.push({ blob, filename: fname });
       }
       const res = await shareBlobs(parts, recipe.name);
-      if (res.downloaded) showSuccess(parts.length > 1 ? `Saved ${parts.length} pages` : 'Saved card');
+      if (res.downloaded) showSuccess(parts.length > 1 ? $_('done.pages_saved', { values: { count: parts.length } }) : $_('done.card_saved'));
     } catch (e) {
-      showError(e.message || 'Could not share');
+      showError(failed('fail.share_card', e));
     }
   }
   async function shareAsLink() {
@@ -687,7 +688,7 @@
         showError($_('recipe_view_ct.toast.share_unsupported'));
       }
     } catch (e) {
-      showError(e.message || 'Could not share');
+      showError(failed('fail.share_link', e));
     }
   }
 
@@ -856,7 +857,7 @@
       showSuccess($_('recipe_view_ct.versions.restored'));
       await loadVersions();
     } catch (e) {
-      showError(e.message || $_('recipe_view_ct.versions.restore_failed'));
+      showError(failed('fail.restore_version', e));
     } finally {
       restoringVersion = false;
     }
@@ -886,7 +887,7 @@
       // Recipe aggregates change after cook events — re-fetch.
       if (editingCook) recipe = await NtApi.getRecipe(recipe.id);
     } catch (err) {
-      showError(err.message || 'Could not log cook');
+      showError(failed('fail.log_cook', err));
     } finally {
       cookBusy = false;
       editingCook = null;
@@ -906,7 +907,7 @@
       await loadCooks();
       recipe = await NtApi.getRecipe(recipe.id);
     } catch (e) {
-      showError(e.message || 'Could not delete');
+      showError(failed('fail.delete_entry', e));
     }
   }
 
@@ -916,7 +917,7 @@
       const updated = await NtApi.updateRecipe(recipe.id, { ...recipe, rating: next, _base: recipeBaseOf(recipe), _changed: ['rating'] });
       recipe = updated;
     } catch (err) {
-      showError(err.message || 'Could not save rating');
+      showError(failed('fail.save_rating', err));
     }
   }
 
@@ -930,7 +931,7 @@
       const updated = await NtApi.updateRecipe(recipe.id, { ...recipe, favorite: next, _base: recipeBaseOf(recipe), _changed: ['favorite'] });
       recipe = updated;
     } catch (err) {
-      showError(err.message || 'Could not update favorite');
+      showError(failed('fail.favorite', err));
     }
   }
 
@@ -998,7 +999,7 @@
       });
       recomputeResult = { ...result, skipped: enriched };
     } catch (e) {
-      showError(e.message || 'Recompute failed');
+      showError(failed('fail.recompute', e));
     } finally {
       recomputeBusy = false;
     }
@@ -1016,9 +1017,9 @@
       const updated = await NtApi.updateRecipe(recipe.id, { ...recipe, nutrition: perServing, _base: recipeBaseOf(recipe), _changed: ['nutrition'] });
       recipe = updated;
       recomputeResult = null;
-      showSuccess(`Saved auto-calc — ${recomputeResult?.used ?? '?'} of ${recomputeResult?.total ?? '?'} ingredients`);
+      showSuccess($_('done.nutrition_saved', { values: { used: recomputeResult?.used ?? 0, total: recomputeResult?.total ?? 0 } }));
     } catch (e) {
-      showError(e.message || 'Could not save');
+      showError(failed('fail.save_nutrition', e));
     }
   }
 
@@ -1029,15 +1030,15 @@
     if (!row?.pantry_id) return;
     const dens = row.suggested_density || lookupCommonDensity(row.name);
     if (!dens) {
-      showError(`No built-in density for "${row.name}". Ask Trace: "set the density of ${row.name}".`);
+      showError($_('done.no_density', { values: { name: row.name } }));
       return;
     }
     try {
       await NtApi.updatePantryItem(row.pantry_id, { g_per_cup: dens });
-      showSuccess(`Set ${row.name} to ${dens} g/cup`);
+      showSuccess($_('done.density_set', { values: { name: row.name, dens } }));
       await runRecompute();
     } catch (e) {
-      showError(e.message || 'Could not set density');
+      showError(failed('fail.set_density', e));
     }
   }
 

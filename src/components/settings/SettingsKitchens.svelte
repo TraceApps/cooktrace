@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   /**
    * SettingsKitchens — manage household / roommate Kitchens.
    *
@@ -55,7 +56,7 @@
       const [ks] = await Promise.all([NtApi.getKitchens(), loadPeers()]);
       kitchens = ks;
     }
-    catch (e) { showError(e.message || 'Could not load Kitchens'); kitchens = []; }
+    catch (e) { showError(failed('fail.load_kitchens', e)); kitchens = []; }
     finally { loading = false; }
   }
   onMount(load);
@@ -68,14 +69,14 @@
       const k = await NtApi.createKitchen(name);
       kitchens = [...kitchens, k];
       newName = '';
-      showSuccess(`Created Kitchen "${k.name}"`);
-    } catch (e) { showError(e.message || 'Could not create'); }
+      showSuccess($_('done.kitchen_created', { values: { name: k.name } }));
+    } catch (e) { showError(failed('fail.create_kitchen', e)); }
     finally { creating = false; }
   }
 
   async function loadMembers(id) {
     try { members[id] = await NtApi.getKitchenMembers(id); members = members; }
-    catch (e) { showError(e.message || 'Could not load members'); }
+    catch (e) { showError(failed('fail.load_members', e)); }
   }
   async function toggleOpen(id) {
     if (openId === id) { openId = null; return; }
@@ -108,13 +109,13 @@
     inviteBusy = true;
     try {
       await NtApi.addKitchenMember(kitchenId, username, inviteRole);
-      showSuccess(`Added ${username}`);
+      showSuccess($_('done.member_added', { values: { name: username } }));
       inviteName = '';
       inviteTyped = '';
       await loadMembers(kitchenId);
       // Update member_count cached on the row.
       kitchens = kitchens.map(k => k.id === kitchenId ? { ...k, member_count: (members[kitchenId] || []).length } : k);
-    } catch (e) { showError(e.message || 'Could not add member'); }
+    } catch (e) { showError(failed('fail.add_member', e)); }
     finally { inviteBusy = false; }
   }
 
@@ -131,8 +132,8 @@
       await NtApi.transferKitchen(kitchenId, member.user_id);
       await load();
       await loadMembers(kitchenId);
-      showSuccess(`${name} owns this Kitchen now`);
-    } catch (e) { showError(e.message || 'Could not hand over the Kitchen'); }
+      showSuccess($_('done.kitchen_handed', { values: { name } }));
+    } catch (e) { showError(failed('fail.hand_over', e)); }
   }
 
   // The roles, named once. A native select opens the operating system's own
@@ -192,7 +193,7 @@
         await loadMembers(kitchenId);
         kitchens = kitchens.map(k => k.id === kitchenId ? { ...k, member_count: (members[kitchenId] || []).length } : k);
       }
-    } catch (e) { showError(e.message || 'Could not remove member'); }
+    } catch (e) { showError(failed('fail.remove_member', e)); }
   }
 
   // Per-user auto-share toggle. On enable, backfill every existing
@@ -222,13 +223,11 @@
         ? { ...x, auto_share: !!res.enabled, auto_shared_count: enabling ? (res.recipes || 0) : x.auto_shared_count }
         : x);
       if (enabling) {
-        showSuccess(res.recipes > 0
-          ? `Sharing ${res.recipes} ${res.recipes === 1 ? 'recipe' : 'recipes'} with this Kitchen`
-          : `Auto-share is on — new recipes will be shared`);
+        showSuccess(res.recipes > 0 ? $_('done.auto_share_on_n', { values: { count: res.recipes } }) : $_('done.auto_share_on'));
       } else {
-        showSuccess(`Auto-share turned off. Previously shared recipes stay visible; remove members to revoke access.`);
+        showSuccess($_('done.auto_share_off'));
       }
-    } catch (e) { showError(e.message || 'Could not update auto-share'); }
+    } catch (e) { showError(failed('fail.auto_share', e)); }
     finally { autoShareBusyId = null; }
   }
 
@@ -245,7 +244,7 @@
       kitchens = kitchens.filter(x => x.id !== k.id);
       openId = null;
       showSuccess($_('settings_kitchens_ct.toast.kitchen_deleted'));
-    } catch (e) { showError(e.message || 'Could not delete'); }
+    } catch (e) { showError(failed('fail.delete_kitchen', e)); }
   }
 
   function isOwner(k) { return k.role === 'owner'; }
@@ -268,7 +267,7 @@
         : $_('settings_kitchens_ct.toast.read_only_now', { values: { name: member.full_name || member.username } }));
     } catch (e) {
       members[kitchenId] = (members[kitchenId] || []).map(m => m.user_id === member.user_id ? { ...m, role: prev } : m);
-      showError(e.message || 'Could not change the role');
+      showError(failed('fail.change_role', e));
     }
   }
 
@@ -285,7 +284,7 @@
         : $_('settings_kitchens_ct.toast.all_read_only'));
     } catch (e) {
       members[kitchenId] = prev;
-      showError(e.message || 'Could not change the roles');
+      showError(failed('fail.change_roles', e));
     }
   }
 </script>

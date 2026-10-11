@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   /**
    * ManageTaxonomyList — generic list-with-rename-delete editor for the
    * "JSON-array on each recipe" taxonomies (Tags + Kitchen Gear).
@@ -66,7 +67,7 @@
   async function load() {
     loading = true;
     try { items = await loadFn(); }
-    catch (e) { showError(e.message || 'Could not load'); items = []; }
+    catch (e) { showError(failed('fail.load_list', e)); items = []; }
     finally { loading = false; }
   }
   onMount(load);
@@ -97,8 +98,8 @@
       const res = await renameFn(item.name, next);
       cancelEdit();
       await load();
-      showSuccess(`Updated ${res?.modified ?? 0} recipe${res?.modified === 1 ? '' : 's'}`);
-    } catch (e) { showError(e.message || 'Could not rename'); }
+      showSuccess($_('done.tags_updated', { values: { count: res?.modified ?? 0 } }));
+    } catch (e) { showError(failed('fail.rename', e)); }
   }
 
   async function remove(item) {
@@ -112,8 +113,8 @@
     try {
       const res = await deleteFn(item.name);
       await load();
-      showSuccess(`Removed from ${res?.modified ?? 0} recipe${res?.modified === 1 ? '' : 's'}`);
-    } catch (e) { showError(e.message || 'Could not delete'); }
+      showSuccess($_('done.tags_removed', { values: { count: res?.modified ?? 0 } }));
+    } catch (e) { showError(failed('fail.remove_it', e)); }
   }
 </script>
 

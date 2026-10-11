@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../lib/messages.js';
   import { closeOnBack } from '../lib/back-stack.js';
   import { onSyncChanges } from '../lib/sync-refresh.js';
   import { onMount } from 'svelte';
@@ -176,7 +177,7 @@
         offResults = [];
         usdaResults = [];
         ntResults = [];
-        showError(e.message || 'Search failed');
+        showError(failed('fail.search', e));
       } finally {
         externalLoading = false;
       }
@@ -407,16 +408,16 @@
     });
     if (!ok) return;
     const ids = [...selectedIds];
-    let failed = 0;
+    let failures = 0;
     for (const id of ids) {
       try { await NtApi.deletePantryItem(id); }
-      catch { failed++; }
+      catch { failures++; }
     }
     items = items.filter(i => !selectedIds.has(i.id));
     selectedIds = new Set();
     selectMode = false;
-    if (failed === 0) showSuccess(`Removed ${ids.length} item${ids.length === 1 ? '' : 's'}`);
-    else showError(`Removed ${ids.length - failed} of ${ids.length} — ${failed} failed`);
+    if (failures === 0) showSuccess($_('done.items_removed', { values: { count: ids.length } }));
+    else showError($_('done.items_removed_partial', { values: { done: ids.length - failures, total: ids.length, failed: failures } }));
   }
 
   // Items match a category by either:
@@ -711,7 +712,7 @@
       // Only the newest read speaks; a quiet one after a sync that fails
       // keeps what's shown, unsaid.
       if (seq === _loadSeq && !quiet) {
-        loadError = e.message || 'Could not load pantry';
+        loadError = failed('fail.load_pantry', e);
         showError(loadError);
       }
     } finally {
@@ -894,7 +895,7 @@
       await NtApi.updatePantryItem(it.id, { quantity: nextQty, in_stock: nextInStock ? 1 : 0 });
     } catch (e) {
       items = items.map(i => i.id === it.id ? { ...i, quantity: prevQty, in_stock: prevInStock } : i);
-      showError(e.message || 'Could not update');
+      showError(failed('fail.update_stock', e));
     }
   }
 
@@ -911,7 +912,7 @@
       items = items.filter(i => i.id !== it.id);
       showSuccess($_('pantry_page.toast.removed'));
     } catch (e) {
-      showError(e.message || 'Delete failed');
+      showError(failed('fail.remove_item', e));
     }
   }
 </script>

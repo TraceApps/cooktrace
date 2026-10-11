@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   import { slide } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
   import Toggle from './Toggle.svelte';
@@ -267,8 +268,8 @@
         body: JSON.stringify(body),
       });
       const data = await r.json();
-      if (!r.ok) { showError(data?.error || 'Save failed'); return; }
-      showSuccess(isEdit ? 'Provider updated' : 'Provider created');
+      if (!r.ok) { showError(failed('fail.save_provider', { message: data?.error })); return; }
+      showSuccess(isEdit ? $_('done.provider_updated') : $_('done.provider_created'));
       oidcEditing = null;
       await loadData();
     } catch (e) {
@@ -300,7 +301,7 @@
       });
       if (!r.ok) {
         const data = await r.json().catch(() => ({}));
-        showError(data?.error || 'Delete failed'); return;
+        showError(failed('fail.delete_provider', { message: data?.error })); return;
       }
       showSuccess($_('settings_auth_extra.toast.provider_deleted'));
       await loadData();
@@ -321,9 +322,9 @@
         body: JSON.stringify({ enabled: next }),
       });
       const data = await r.json();
-      if (!r.ok) { showError(data?.error || 'Save failed'); return; }
+      if (!r.ok) { showError(failed('fail.password_login', { message: data?.error })); return; }
       enablePasswordLogin = !!data.enable_email_password_login;
-      showSuccess(enablePasswordLogin ? 'Password login enabled' : 'Password login disabled');
+      showSuccess(enablePasswordLogin ? $_('done.password_login_on') : $_('done.password_login_off'));
     } catch { showError($_('settings_auth_extra.toast.cant_reach_server')); }
   }
 

@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../lib/messages.js';
   import { onMount } from 'svelte';
   import { pop, location } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
@@ -91,7 +92,7 @@
     try {
       const res = await fetch(apiUrl('/api/auth/me'), { method: 'DELETE', credentials: 'include', headers: _headers() });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showError(data?.error || $_('profile.errors.delete_account_failed')); deletingAccount = false; return; }
+      if (!res.ok) { showError(failed('profile.errors.delete_account_failed', data?.error)); deletingAccount = false; return; }
       localStorage.removeItem('wl:userId');
       await loadAuthState();
       showSuccess($_('profile.account_deleted'));
@@ -167,7 +168,7 @@
       if (data?.user) currentUser.set(data.user);
       showSuccess($_('profile.saved'));
     } catch(e) {
-      showError($_('profile.errors.save_failed'));
+      showError(failed('profile.errors.save_failed', e));
     } finally {
       saving = false;
     }
@@ -181,7 +182,7 @@
         uploading = true;
         const url = await NtApi.uploadImage(file);
         avatar_url = url;
-      } catch { showError($_('profile.errors.upload_failed')); }
+      } catch (e) { showError(failed('profile.errors.upload_failed', e)); }
       finally { uploading = false; }
       return;
     }
@@ -196,7 +197,7 @@
       const url = await NtApi.uploadImage(file);
       avatar_url = url;
     } catch(e) {
-      showError($_('profile.errors.upload_failed'));
+      showError(failed('profile.errors.upload_failed', e));
     } finally {
       uploading = false;
     }
@@ -243,7 +244,7 @@
         headers: _headers(csrf ? { 'X-CSRF-Token': csrf } : {}),
       });
       const data = await r.json();
-      if (!r.ok) { showError(data?.error || $_('common.errors.unlink_failed')); return; }
+      if (!r.ok) { showError(failed('common.errors.unlink_failed', data?.error)); return; }
       linkedProviders = data.links || [];
       showSuccess($_('common.unlinked'));
     } catch (e) {
@@ -272,12 +273,12 @@
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) { showError(data.error || $_('common.errors.failed')); return; }
+      if (!res.ok) { showError(failed('profile.errors.password_change_failed', data.error)); return; }
       showSuccess($_('profile.password_changed'));
       changingPassword = false;
       cur_password = new_password = new_password2 = '';
     } catch(e) {
-      showError($_('profile.errors.password_change_failed'));
+      showError(failed('profile.errors.password_change_failed', e));
     } finally {
       pwSaving = false;
     }

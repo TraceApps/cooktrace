@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../lib/messages.js';
   /**
    * PantryView — read-only view for a pantry item.
    *
@@ -51,13 +52,13 @@
       : '');
 
   async function load() {
-    if (!isValid) { loadError = 'Invalid id'; loading = false; return; }
+    if (!isValid) { loadError = failed('fail.load_item'); loading = false; return; }
     loading = true;
     loadError = null;
     try {
       item = await NtApi.getPantryItem(id);
     } catch (e) {
-      loadError = e.message || 'Could not load item';
+      loadError = failed('fail.load_item', e);
       showError(loadError);
     } finally {
       loading = false;
@@ -80,7 +81,7 @@
     try { await NtApi.toggleStock(item.id, next); }
     catch (e) {
       item = { ...item, in_stock: !next };
-      showError(e.message || 'Could not update');
+      showError(failed('fail.update_stock', e));
     } finally {
       toggling = false;
     }
@@ -100,7 +101,7 @@
       await NtApi.updatePantryItem(item.id, { quantity: rounded });
     } catch (e) {
       item = { ...item, quantity: prev };
-      showError(e.message || 'Could not update');
+      showError(failed('fail.update_stock', e));
     } finally {
       qtyBusy = false;
     }
@@ -115,7 +116,7 @@
       await NtApi.updatePantryItem(item.id, { ...e.detail, _base: item });
       item = { ...item, ...e.detail };
       showSuccess($_('allergen_info.saved'));
-    } catch (err) { showError(err.message || 'Could not update'); }
+    } catch (err) { showError(failed('fail.save_allergens', err)); }
   }
 
   async function deleteItem() {
@@ -132,7 +133,7 @@
       showSuccess($_('pantry_view_ct.toast.removed'));
       pop();
     } catch (e) {
-      showError(e.message || 'Delete failed');
+      showError(failed('fail.remove_item', e));
     }
   }
 

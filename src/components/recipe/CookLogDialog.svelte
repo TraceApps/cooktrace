@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   import { closeOnBack } from '../../lib/back-stack.js';
   import { _ } from 'svelte-i18n';
   import { scale, fade } from 'svelte/transition';
@@ -118,7 +119,7 @@
       const url = await NtApi.uploadImage(file);
       _pushPhoto(url);
     } catch (e) {
-      showError(e.message || 'Upload failed');
+      showError(failed('fail.upload_photo', e));
     } finally {
       photoUploading = false;
     }
@@ -156,7 +157,7 @@
         const file = await takePhoto();
         if (file) await _uploadFile(file);
       } catch (e) {
-        showError(e.message || 'Camera failed');
+        showError(failed('fail.camera', e));
       }
       return;
     }

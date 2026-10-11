@@ -263,7 +263,7 @@ ${textPayload.text}
       const next = new Set(selected);
       next.delete(item.id);
       selected = next;
-      showSuccess(`Saved "${aiSaved.name}" via Trace AI`);
+      showSuccess($_('done.saved_via_trace', { values: { name: aiSaved.name } }));
     } else {
       _aiError(item.id, $_('bulk_import_dialog.toast.no_ai_saved'));
     }

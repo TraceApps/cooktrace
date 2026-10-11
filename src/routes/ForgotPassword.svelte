@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../lib/messages.js';
   import { push } from 'svelte-spa-router';
   import { _ } from 'svelte-i18n';
   import { apiUrl, resolveAssetUrl, iconUrl } from '../lib/platform.js';
@@ -20,7 +21,7 @@
         body: JSON.stringify({ email: email.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) { error = data.error || $_('common.errors.failed'); return; }
+      if (!res.ok) { error = failed('fail.send_reset', data.error); return; }
       sent = true;
     } catch {
       error = $_('common.errors.cant_reach_server');

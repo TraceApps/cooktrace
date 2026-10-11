@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../lib/messages.js';
   import { closeOnBack } from '../lib/back-stack.js';
   import { onSyncChanges } from '../lib/sync-refresh.js';
   import { onMount } from 'svelte';
@@ -228,7 +229,7 @@
       // Only the newest read speaks; a quiet one after a sync that fails
       // keeps what's shown, unsaid.
       if (seq === _loadSeq && !quiet) {
-        loadError = e.message || 'Could not load diary';
+        loadError = failed('fail.load_diary', e);
         showError(loadError);
       }
     } finally {
@@ -379,7 +380,7 @@
     _servingsTimers.set(entry.id, setTimeout(async () => {
       _servingsTimers.delete(entry.id);
       try { await NtApi.updateDiaryEntry(entry.id, { servings: value }); }
-      catch (e) { showError(e.message || 'Could not update'); load({ quiet: true }); }
+      catch (e) { showError(failed('fail.update_entry', e)); load({ quiet: true }); }
     }, 600));
   }
 
@@ -394,7 +395,7 @@
       else showSuccess($_('shopping_page.toast.already_in_pantry'));
       await loadWeekExtras();
     } catch (e) {
-      showError(e.message || 'Could not build the list');
+      showError(failed('fail.build_list', e));
     } finally {
       weekBuilding = false;
     }
@@ -417,7 +418,7 @@
       await NtApi.updateDiaryEntry(e.id, { date: iso, any_day: false });
       await load({ quiet: true });
     } catch (err) {
-      showError(err.message || 'Could not update');
+      showError(failed('fail.update_entry', err));
     }
   }
 
@@ -514,7 +515,7 @@
       loadStats();
       loadHeatmap();
     } catch (e) {
-      showError(e.message || 'Could not plan');
+      showError(failed('fail.plan_cook', e));
     } finally {
       planBusy = false;
     }
@@ -535,7 +536,7 @@
       loadStats();
       loadHeatmap();
     } catch (e) {
-      showError(e.message || 'Could not update');
+      showError(failed('fail.update_entry', e));
     }
   }
 
@@ -593,7 +594,7 @@
       loadStats();
       loadHeatmap();
     } catch (e) {
-      showError(e.message || 'Delete failed');
+      showError(failed('fail.delete_entry', e));
     }
   }
 </script>

@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   /**
    * SettingsBackup — full DB+uploads ZIP backups + portable JSON.
    *
@@ -58,13 +59,13 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        showError(data.error || 'Save failed');
+        showError(failed('fail.save_backup_settings', { message: data.error }));
         await loadSchedule();
         return;
       }
       scheduleCfg = data;
     } catch (e) {
-      showError(e?.message || 'Save failed');
+      showError(failed('fail.save_backup_settings', e));
     } finally {
       scheduleBusy = false;
     }
@@ -157,12 +158,12 @@
         // table doesn't get misread as "no backups yet."
         if (res.status === 403 || res.status === 401) { fullBackups = []; return; }
         const body = await res.json().catch(() => ({}));
-        showError(body?.error || `Couldn't load backups (${res.status})`);
+        showError(failed('fail.load_backups', { message: body?.error }));
         return;
       }
       fullBackups = await res.json();
     } catch (e) {
-      showError(e?.message || "Couldn't reach the server to load backups");
+      showError(failed('fail.load_backups', e));
     }
   }
   export function loadLocalBackups() { /* parity stub */ }
@@ -181,10 +182,10 @@
       });
       if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
       const result = await res.json();
-      showSuccess(`Backup created (${fmtBytes(result.size)})`);
+      showSuccess($_('done.backup_created', { values: { size: fmtBytes(result.size) } }));
       await loadFullBackups();
     } catch (e) {
-      showError(e.message || 'Backup failed');
+      showError(failed('fail.create_backup', e));
     } finally {
       fullBackupBusy = false;
       restoreStatus = null;
@@ -215,7 +216,7 @@
       showSuccess($_('backup_page.toast.deleted'));
       await loadFullBackups();
     } catch (e) {
-      showError(e.message || 'Delete failed');
+      showError(failed('fail.delete_backup', e));
     }
   }
 
@@ -237,7 +238,7 @@
       showSuccess($_('backup_page.toast.restored_reloading'));
       setTimeout(() => window.location.reload(), 800);
     } catch (e) {
-      showError(e.message || 'Restore failed');
+      showError(failed('fail.restore_backup', e));
       restoreStatus = null;
       fullBackupBusy = false;
     }
@@ -272,7 +273,7 @@
       showSuccess($_('backup_page.toast.restored_reloading'));
       setTimeout(() => window.location.reload(), 800);
     } catch (e) {
-      showError(e.message || 'Restore failed');
+      showError(failed('fail.restore_backup', e));
       restoreStatus = null;
       fullBackupBusy = false;
       if (uploadInput) uploadInput.value = '';
@@ -298,7 +299,7 @@
       // Reload so every route's local state (recipe lists, pantry,
       // diary, shopping) re-fetches and reflects the empty database.
       setTimeout(() => location.reload(), 800);
-    } catch (e) { showError($_('backup_page.toast.clear_failed', { values: { msg: e.message || e } })); }
+    } catch (e) { showError(failed('backup_page.toast.clear_failed', e)); }
   }
 
   async function clearAllSettings() {
@@ -319,7 +320,7 @@
       DB.setSetting('setupComplete', true);
       showSuccess($_('backup_page.toast.all_settings_cleared'));
       setTimeout(() => location.reload(), 800);
-    } catch (e) { showError($_('backup_page.toast.clear_failed', { values: { msg: e.message || e } })); }
+    } catch (e) { showError(failed('backup_page.toast.clear_failed', e)); }
   }
 
   async function _confirmClearAllData() {
@@ -391,7 +392,7 @@
       URL.revokeObjectURL(url);
       showSuccess($_('backup_page.toast.exported'));
     } catch (e) {
-      showError(e.message || 'Export failed');
+      showError(failed('fail.export', e));
     }
   }
   function importBackup() {
@@ -411,7 +412,7 @@
       const res = await shareBlob(blob, fileName, 'CookTrace Backup');
       if (res.downloaded) showSuccess($_('backup_page.toast.backup_saved'));
     } catch (e) {
-      showError(e.message || 'Backup failed');
+      showError(failed('fail.create_backup', e));
     } finally {
       localBackupBusy = false;
     }
@@ -429,7 +430,7 @@
       showSuccess($_('backup_page.toast.restored_reloading'));
       setTimeout(() => window.location.reload(), 400);
     } catch (e) {
-      showError(e.message || 'Restore failed');
+      showError(failed('fail.restore_backup', e));
     }
   }
 
@@ -459,7 +460,7 @@
       }
       showSuccess($_('backup_page.toast.imported'));
     } catch (e) {
-      showError(e.message || 'Import failed');
+      showError(failed('fail.import_file', e));
     }
   }
 </script>

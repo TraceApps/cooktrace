@@ -14,6 +14,7 @@
   Events: added ({ count })
 -->
 <script>
+  import { failed } from '../../lib/messages.js';
   import { createEventDispatcher } from 'svelte';
   import { _, locale } from 'svelte-i18n';
   import Sheet from '../ui/Sheet.svelte';
@@ -119,7 +120,7 @@
       open = false;
       dispatch('added', { count: picks.length });
     } catch (e) {
-      showError(e.message || 'Could not plan');
+      showError(failed('fail.plan_week', e));
     } finally {
       saving = false;
     }

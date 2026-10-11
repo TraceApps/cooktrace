@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   /**
    * ManageUnits — unified Units catalog editor.
    *
@@ -76,7 +77,7 @@
       custom = res.custom || [];
       usage = res.usage || {};
     } catch (e) {
-      showError(e.message || 'Could not load units');
+      showError(failed('fail.load_units', e));
       disabled = new Set();
       custom = [];
       usage = {};
@@ -95,7 +96,7 @@
       disabled = updated;
       refreshUnitsOverlay();
     } catch (e) {
-      showError(e.message || 'Could not save');
+      showError(failed('fail.save_unit', e));
     }
   }
 
@@ -104,11 +105,11 @@
     const full = (newFull.trim() || abbr);
     if (!abbr) return;
     if (BUILTIN_ABBRS.has(abbr)) {
-      showError(`"${abbr}" is already a built-in unit. Pick a different abbreviation.`);
+      showError($_('done.unit_builtin', { values: { abbr } }));
       return;
     }
     if (custom.some(c => c.abbr.toLowerCase() === abbr.toLowerCase())) {
-      showError(`Custom unit "${abbr}" already exists.`);
+      showError($_('done.unit_exists', { values: { abbr } }));
       return;
     }
     creating = true;
@@ -120,7 +121,7 @@
       refreshUnitsOverlay();
       showSuccess($_('manage_units.toast.unit_added'));
     } catch (e) {
-      showError(e.message || 'Could not create');
+      showError(failed('fail.create_unit', e));
     } finally {
       creating = false;
     }
@@ -146,7 +147,7 @@
       refreshUnitsOverlay();
       showSuccess($_('manage_units.toast.saved'));
     } catch (e) {
-      showError(e.message || 'Could not save');
+      showError(failed('fail.save_unit', e));
     }
   }
 
@@ -163,7 +164,7 @@
       custom = custom.filter(x => x.id !== u.id);
       refreshUnitsOverlay();
     } catch (e) {
-      showError(e.message || 'Could not delete');
+      showError(failed('fail.delete_unit', e));
     }
   }
 

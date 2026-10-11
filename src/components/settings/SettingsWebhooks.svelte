@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   /**
    * SettingsWebhooks.svelte
    *
@@ -63,14 +64,14 @@
       const r = await fetch(apiUrl('/api/admin/webhooks'), {
         credentials: 'include', headers: _csrfHeaders(),
       });
-      if (!r.ok) throw new Error($_('settings_webhooks.toast.load_failed'));
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || '');
       const data = await r.json();
       webhooks = data.webhooks || [];
       knownEvents = data.known_events || [];
       eventDescriptions = data.event_descriptions || {};
       webhooksEnabled = !!data.webhooks_enabled;
     } catch (e) {
-      showError(e.message);
+      showError(failed('settings_webhooks.toast.load_failed', e));
     } finally {
       loading = false;
     }
@@ -101,7 +102,7 @@
         }),
       });
       const data = await r.json();
-      if (!r.ok) { showError(data.error || $_('settings_webhooks.toast.create_failed')); return; }
+      if (!r.ok) { showError(failed('settings_webhooks.toast.create_failed', data.error)); return; }
 
       justCreatedSecret = data.secret;
       justCreatedUrl = data.webhook.url;
@@ -111,7 +112,7 @@
       newSecret = '';
       await load();
     } catch (e) {
-      showError(e.message);
+      showError(failed('settings_webhooks.toast.create_failed', e));
     } finally {
       creating = false;
     }
@@ -130,12 +131,12 @@
       });
       if (!r.ok) {
         const data = await r.json().catch(() => ({}));
-        showError(data.error || $_('settings_webhooks.toast.delete_failed')); return;
+        showError(failed('settings_webhooks.toast.delete_failed', data.error)); return;
       }
       showSuccess($_('settings_webhooks.toast.deleted'));
       await load();
     } catch (e) {
-      showError(e.message);
+      showError(failed('settings_webhooks.toast.delete_failed', e));
     }
   }
 
@@ -147,10 +148,10 @@
         body: JSON.stringify({ enabled: !w.enabled }),
       });
       const data = await r.json();
-      if (!r.ok) { showError(data.error || $_('settings_webhooks.toast.update_failed')); return; }
+      if (!r.ok) { showError(failed('settings_webhooks.toast.update_failed', data.error)); return; }
       await load();
     } catch (e) {
-      showError(e.message);
+      showError(failed('settings_webhooks.toast.update_failed', e));
     }
   }
 
@@ -162,12 +163,12 @@
         method: 'POST', credentials: 'include', headers: _csrfHeaders(),
       });
       const data = await r.json();
-      if (!r.ok) { showError(data.error || $_('settings_webhooks.toast.test_failed')); return; }
+      if (!r.ok) { showError(failed('settings_webhooks.toast.test_failed', data.error)); return; }
       if (data.ok) showSuccess($_('settings_webhooks.toast.test_delivered'));
-      else showError(data.last_delivery_error || $_('settings_webhooks.toast.test_failed'));
+      else showError(failed('settings_webhooks.toast.test_failed', data.last_delivery_error));
       await load();
     } catch (e) {
-      showError(e.message);
+      showError(failed('settings_webhooks.toast.test_failed', e));
     } finally {
       testingId = null;
     }

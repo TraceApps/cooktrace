@@ -1,4 +1,5 @@
 <script>
+  import { failed } from '../../lib/messages.js';
   import { onMount } from 'svelte';
   import { slide } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
@@ -81,7 +82,7 @@
       await NtApi.del(`/api/auth/invites/${token}`);
       await loadPendingInvites();
       showSuccess($_('settings_users_ct.toast.invite_revoked'));
-    } catch (e) { showError(e.message || 'Could not revoke invite'); }
+    } catch (e) { showError(failed('fail.revoke_invite', e)); }
   }
 
   export async function loadData() {
@@ -141,7 +142,7 @@
         const data = await res.json().catch(() => ({}));
         const msg = data.error || `Save failed (${res.status})`;
         console.warn('[password-policy] save rejected:', msg);
-        showError(`Could not save password policy: ${msg}. Server may need to redeploy.`);
+        showError(failed('fail.password_policy', { message: msg }));
         passwordPolicy = prev;
         return;
       }
@@ -153,7 +154,7 @@
       setTimeout(() => passwordPolicySaved = false, 2000);
     } catch (e) {
       console.warn('[password-policy] save threw:', e);
-      showError(`Could not save password policy: ${e?.message || 'network error'}`);
+      showError(failed('fail.password_policy', e));
       passwordPolicy = prev;
     }
   }
@@ -198,7 +199,7 @@
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { enableUmError = data.error || $_('settings.users.err_registration_failed'); enableUmLoading = false; return; }
+      if (!res.ok) { enableUmError = failed('settings.users.err_registration_failed', data.error); enableUmLoading = false; return; }
       // Migrate previously-anonymous settings (`wl_<key>`) to the new admin's
       // per-user prefix BEFORE flipping wl:userId, so the wizard-configured
       // mealNames/dob/gender/goals/etc. survive the mode switch instead of
@@ -228,14 +229,14 @@
       enableAdminUser = ''; enableAdminPass = ''; enableAdminConf = ''; enableAdminName = ''; enableAdminEmail = '';
       await loadUsers();
       showSuccess($_('settings.users.toast_um_enabled'));
-    } catch(e) { enableUmError = $_('settings.users.err_could_not_reach_server'); }
+    } catch(e) { enableUmError = failed('fail.turn_on_users', e); }
     enableUmLoading = false;
   }
 
   async function loadUsers() {
     try {
       umUsers = await NtApi.get('/api/auth/users');
-    } catch(e) { umError = e.message; }
+    } catch(e) { umError = failed('fail.load_users', e); }
   }
 
   async function addUser() {
@@ -249,13 +250,13 @@
         body: JSON.stringify({ username: newUsername.trim(), password: newPassword, full_name: newFullName.trim() || undefined, role: newRole }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { umError = data.error || $_('settings.users.err_failed_to_add'); } else {
+      if (!res.ok) { umError = failed('settings.users.err_failed_to_add', data.error); } else {
         newUsername = ''; newPassword = ''; newFullName = ''; newRole = 'user';
         showAddUser = false;
         await loadUsers();
         showSuccess($_('settings.users.toast_user_created'));
       }
-    } catch(e) { umError = e.message; }
+    } catch(e) { umError = failed('settings.users.err_failed_to_add', e); }
     umLoading = false;
   }
 
@@ -276,7 +277,7 @@
         body: JSON.stringify({ role: newRole }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showError(data?.error || $_('settings.users.err_could_not_change_role')); return; }
+      if (!res.ok) { showError(failed('settings.users.err_could_not_change_role', data?.error)); return; }
       showSuccess($_('settings.users.toast_role_changed', { values: { name, role: newRole } }));
       await loadUsers();
     } catch (e) { showError($_('settings.users.err_could_not_reach_server')); }
@@ -311,10 +312,10 @@
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showError(data?.error || 'Could not update user'); return; }
+      if (!res.ok) { showError(failed('fail.update_user', { message: data?.error })); return; }
       cancelEditUser();
       await loadUsers();
-      showSuccess('User updated');
+      showSuccess($_('done.user_updated'));
     } catch (e) { showError($_('settings.users.err_could_not_reach_server')); }
   }
 
@@ -332,7 +333,7 @@
         body: JSON.stringify({ new_password: pw }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showError(data?.error || $_('settings.users.err_could_not_reset_password')); return; }
+      if (!res.ok) { showError(failed('settings.users.err_could_not_reset_password', data?.error)); return; }
       showSuccess($_('settings.users.toast_password_reset'));
     } catch (e) { showError($_('settings.users.err_could_not_reach_server')); }
   }
@@ -349,7 +350,7 @@
       await NtApi.del(`/api/auth/users/${u.id}`);
       await loadUsers();
       showSuccess($_('settings.users.toast_user_deleted'));
-    } catch(e) { showError(e.message); }
+    } catch(e) { showError(failed('fail.delete_user', e)); }
   }
 
   async function disableUserManagement() {
@@ -384,7 +385,7 @@
       await loadAuthState();
       showSuccess($_('settings.users.toast_um_disabled'));
       await loadUsers();
-    } catch(e) { showError(e.message); }
+    } catch(e) { showError(failed('fail.turn_off_users', e)); }
   }
 
   async function logoutServer() {
@@ -435,12 +436,12 @@
         body: JSON.stringify({ email: _inviteEmailTrimmed || undefined, role: inviteRole }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showError(data.error || 'Failed to create invite'); return; }
+      if (!res.ok) { showError(failed('fail.create_invite', { message: data.error })); return; }
       inviteResult = data;
       // Server reports sent: true only after nodemailer's SMTP handoff
       // resolves — that's the strongest delivery confirmation any app can
       // make without webhooks from the upstream provider.
-      if (data.sent) showSuccess(`Invite emailed to ${_inviteEmailTrimmed}`);
+      if (data.sent) showSuccess($_('done.invite_emailed', { values: { email: _inviteEmailTrimmed } }));
       inviteEmail  = '';
       await loadPendingInvites();
     } catch {
