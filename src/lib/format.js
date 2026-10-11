@@ -15,6 +15,12 @@ function _toDate(input) {
     const d = new Date(input);
     return Number.isNaN(d.getTime()) ? null : d;
   }
+  // A day ("2026-10-09", a cook's date) is that day where the user is. Read
+  // as UTC midnight it showed a day early anywhere west of UTC.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    const [y, m, d] = input.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
   // SQLite-naïve timestamp ("YYYY-MM-DD HH:MM:SS"): treat as UTC.
   if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(input)) {
     const d = new Date(input.replace(' ', 'T') + 'Z');
