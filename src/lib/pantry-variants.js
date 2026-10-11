@@ -105,6 +105,31 @@ export function isItemInStock(item) {
   return Number(item.quantity) > 0;
 }
 
+/**
+ * What a tap on In Stock writes, from the card's check button or the item
+ * sheet's switch. Back in stock keeps the amount there is, or sets 1, so On
+ * Hand shows the tap took; out of stock sets 0.
+ */
+export function stockAfterToggle(item) {
+  const inStock = !isItemInStock(item);
+  const had = Number(item?.quantity);
+  return { in_stock: inStock ? 1 : 0, quantity: inStock ? (had > 0 ? had : 1) : 0 };
+}
+
+/**
+ * What On Hand's - and + write. A blank amount is untracked, not zero, so
+ * + starts it at 1 and - has nothing to take away (null: no change).
+ * Reaching 0 is out of stock; anything above is in stock.
+ */
+export function stockAfterStep(item, delta) {
+  const blank = item?.quantity == null || item.quantity === '' || !Number.isFinite(Number(item.quantity));
+  if (blank && delta < 0) return null;
+  const from = blank ? 0 : Number(item.quantity);
+  if (from <= 0 && delta < 0) return null;
+  const quantity = Math.max(0, Math.round((from + delta) * 100) / 100);
+  return { quantity, in_stock: quantity > 0 ? 1 : 0 };
+}
+
 export function aggregateStock(item, variantsByParent) {
   if (!item) return { stocked: 0, total: 0, isGeneric: false };
   const children = variantsByParent?.get?.(item.id) || [];

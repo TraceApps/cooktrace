@@ -186,7 +186,7 @@
   import { wrap } from 'svelte-spa-router/wrap';
   const RecipeEditor   = wrap({ asyncComponent: () => import('./routes/RecipeEditor.svelte') });
   const PantryEditor   = wrap({ asyncComponent: () => import('./routes/PantryEditor.svelte') });
-  const PantryView     = wrap({ asyncComponent: () => import('./routes/PantryView.svelte') });
+  const PantryItemLink = wrap({ asyncComponent: () => import('./routes/PantryItemLink.svelte') });
   const RecipeVersion  = wrap({ asyncComponent: () => import('./routes/RecipeVersion.svelte') });
   const Manage         = wrap({ asyncComponent: () => import('./routes/Manage.svelte') });
   const CookbookView   = wrap({ asyncComponent: () => import('./routes/CookbookView.svelte') });
@@ -208,7 +208,7 @@
     '/pantry':             Pantry,
     '/pantry/edit':        PantryEditor,
     '/pantry/edit/:id':    PantryEditor,
-    '/pantry/:id':         PantryView,
+    '/pantry/:id':         PantryItemLink,
     '/diary':              CookDiary,
     '/shopping':           Shopping,
     '/manage':             Manage,

@@ -10,7 +10,7 @@
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { confirmDialog } from '../stores/confirmDialog.js';
-  import { push } from 'svelte-spa-router';
+  import { push, replace, querystring } from 'svelte-spa-router';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import BarcodeScanner from '../components/ui/BarcodeScanner.svelte';
   import PantryItemSheet from '../components/pantry/PantryItemSheet.svelte';
@@ -31,6 +31,7 @@
     queryHitVariant,
     matchingVariants,
     classifySearchHit,
+    stockAfterToggle,
   } from '../lib/pantry-variants.js';
   import * as OFF from '../lib/off.js';
   import * as USDA from '../lib/usda.js';
@@ -746,18 +747,47 @@
   let sheetItemId = null;
   let sheetStartInEdit = false;
   let sheetPrefill = null;
+  // 'used-in' opens the sheet scrolled to the recipes that use the item
+  // (the card's Used In pill, or back from one of those recipes).
+  let sheetFocus = null;
+  $: if (!sheetOpen) sheetFocus = null;
   function startCreate() {
+    sheetFocus = null;
     sheetPrefill = null;
     sheetItemId = null;
     sheetStartInEdit = true;
     sheetOpen = true;
   }
-  function openItem(it) {
+  function openItem(it, { focus = null } = {}) {
+    sheetFocus = focus;
     sheetPrefill = null;
     sheetItemId = it.id;
     sheetStartInEdit = false;  // land in read view
     sheetOpen = true;
   }
+  // ?open=<id> (from #/pantry/<id>, or back from a recipe opened in a
+  // sheet's Used In) opens that item's sheet; ?focus=used-in lands on the
+  // list. The query is dropped once read so a reload doesn't reopen it.
+  $: _openFromQuery($querystring);
+  function _openFromQuery(qs) {
+    const q = new URLSearchParams(qs || '');
+    const id = parseInt(q.get('open'), 10);
+    if (!Number.isInteger(id) || id <= 0) return;
+    openItem({ id }, { focus: q.get('focus') === 'used-in' ? 'used-in' : null });
+    replace('/pantry');
+  }
+
+  // A recipe tapped in the sheet's Used In. Back from it reopens this
+  // sheet on the list: the Pantry's own history entry is pointed at it
+  // first (no navigation, so nothing reloads here).
+  function onSheetOpenRecipe(e) {
+    const recipeId = e.detail?.id;
+    if (recipeId == null) return;
+    try { history.replaceState(history.state, '', `#/pantry?open=${sheetItemId}&focus=used-in`); } catch {}
+    sheetOpen = false;
+    push(`/recipes/${recipeId}`);
+  }
+
   // Sheet's `changed` event lets us patch the in-memory grid so the
   // user sees stock / qty edits without a full reload.
   function onSheetChanged(e) {
@@ -785,6 +815,7 @@
     try { items = await NtApi.getPantry(); } catch {}
   }
   function startEdit(it) {
+    sheetFocus = null;
     sheetPrefill = null;
     sheetItemId = it.id;
     sheetStartInEdit = true;
@@ -884,15 +915,12 @@
     // Marking out sets qty to 0. Marking in keeps a positive quantity if
     // there is one and otherwise sets 1, so On Hand shows the tap took
     // effect instead of a blank that the sheet then misread.
-    const nextInStock = !isItemInStock(it);
-    const nextQty = nextInStock ? (Number(it.quantity) > 0 ? Number(it.quantity) : 1) : 0;
+    const next = stockAfterToggle(it);
     const prevQty = it.quantity;
     const prevInStock = it.in_stock;
-    items = items.map(i => i.id === it.id
-      ? { ...i, quantity: nextQty, in_stock: nextInStock ? 1 : 0 }
-      : i);
+    items = items.map(i => i.id === it.id ? { ...i, ...next } : i);
     try {
-      await NtApi.updatePantryItem(it.id, { quantity: nextQty, in_stock: nextInStock ? 1 : 0 });
+      await NtApi.updatePantryItem(it.id, next);
     } catch (e) {
       items = items.map(i => i.id === it.id ? { ...i, quantity: prevQty, in_stock: prevInStock } : i);
       showError(failed('fail.update_stock', e));
@@ -1273,12 +1301,17 @@
                       {it.quantity ?? ''}{it.quantity != null && it.unit ? ' ' : ''}{it.unit ?? ''}
                     </span>
                   {/if}
-                  <!-- Recipe-usage pill, only when actually used. -->
+                  <!-- Recipe-usage pill, only when actually used. Opens the
+                       sheet on its Used In list (in select mode the tap
+                       selects the card, like anywhere else on it). -->
                   {#if it.recipe_count > 0}
-                    <span class="pcard-pill usage-pill" title={$_('pantry_ui.used_in_recipes', { values: { n: it.recipe_count } })}>
+                    <button type="button" class="pcard-pill usage-pill"
+                      title={$_('pantry_ui.used_in_recipes', { values: { n: it.recipe_count } })}
+                      aria-label={$_('pantry_ui.show_used_in', { values: { n: it.recipe_count } })}
+                      on:click={(e) => { if (selectMode) return; e.stopPropagation(); openItem(it, { focus: 'used-in' }); }}>
                       <span class="material-symbols-rounded">restaurant</span>
                       {it.recipe_count}
-                    </span>
+                    </button>
                   {/if}
                   <!-- Expiry pill (Issue #9). For generics, the effExp
                        above is the earliest expiring child. For flat
@@ -1505,6 +1538,8 @@
   itemId={sheetItemId}
   startInEdit={sheetStartInEdit}
   prefill={sheetPrefill}
+  focus={sheetFocus}
+  on:openrecipe={onSheetOpenRecipe}
   on:changed={onSheetChanged}
   on:deleted={onSheetDeleted}
   on:created={onSheetCreated}
@@ -2280,6 +2315,18 @@
     border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
   }
   .pcard-pill.usage-pill .material-symbols-rounded { color: var(--accent); }
+  /* A button: a reach wider than its small face, for a thumb. */
+  button.pcard-pill.usage-pill {
+    position: relative; font: inherit; font-size: 11px; font-weight: 600;
+    line-height: inherit; cursor: pointer;
+    transition: background var(--dur-fast), border-color var(--dur-fast);
+  }
+  button.pcard-pill.usage-pill::after { content: ''; position: absolute; inset: -8px -4px; }
+  button.pcard-pill.usage-pill:hover {
+    background: color-mix(in srgb, var(--accent) 24%, transparent);
+    border-color: var(--accent);
+  }
+  button.pcard-pill.usage-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* Generic + variant rendering (Issue #4) */
   .pcard.generic { position: relative; }

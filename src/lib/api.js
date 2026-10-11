@@ -371,9 +371,20 @@ const _CtApiHttp = {
     return this.get(`/api/pantry${qs ? '?' + qs : ''}`);
   },
   getPantryItem(id)              { return this.get(`/api/pantry/${id}`); },
-  async getPantryItemRecipes(id) {
-    const rows = await this.get(`/api/pantry/${id}/recipes`);
-    return Array.isArray(rows) ? rows.map(r => this._imgFromApi(r)) : [];
+  // { family: true }: { direct, through } with the recipes that reach the
+  // item through its generic or variants (lib/pantry-usage.js).
+  async getPantryItemRecipes(id, { family = false } = {}) {
+    if (!family) {
+      const rows = await this.get(`/api/pantry/${id}/recipes`);
+      return Array.isArray(rows) ? rows.map(r => this._imgFromApi(r)) : [];
+    }
+    const out = await this.get(`/api/pantry/${id}/recipes?family=1`);
+    // A server from before family=1 answers with the plain list.
+    if (Array.isArray(out)) return { direct: out.map(r => this._imgFromApi(r)), through: [] };
+    return {
+      direct: (out?.direct || []).map(r => this._imgFromApi(r)),
+      through: (out?.through || []).map(r => this._imgFromApi(r)),
+    };
   },
   async getPantryItemByBarcode(code) {
     if (!code) return null;

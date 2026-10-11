@@ -1953,17 +1953,6 @@
     "usda_data_type": "Tipo de dato del USDA",
     "reset": "Restablecer"
   },
-  "pantry_view_ct": {
-    "toast": {
-      "removed": "Artículo quitado"
-    },
-    "retry": "Reintentar",
-    "in_stock": "En stock",
-    "serving_size": "Tamaño de la porción",
-    "not_set": "Sin definir",
-    "on_hand": "Cantidad",
-    "notes": "Notas"
-  },
   "pantry_sheet_extra": {
     "toast": {
       "cant_read_label": "No se pudo leer la etiqueta. Prueba con una foto más nítida.",
@@ -2515,17 +2504,6 @@
     "tooltip_none": "Nada cocinado · {date}",
     "tooltip_count": "{count, plural, one {# receta cocinada} other {# recetas cocinadas}} · {date}"
   },
-  "pantry_view_ui": {
-    "remove_title": "¿Quitar de la despensa?",
-    "remove_message": "Se quitará \"{name}\". Las recetas que lo usan no cambian; solo se quita de tu biblioteca.",
-    "remove": "Quitar",
-    "title_fallback": "Artículo de la despensa",
-    "toggle_in_stock": "Cambiar en stock",
-    "decrease": "Disminuir",
-    "increase": "Aumentar",
-    "used_in": "Se usa en",
-    "used_in_empty": "Todavía ninguna receta usa este artículo."
-  },
   "pantry_editor_ui": {
     "remove_title": "¿Quitar de la despensa?",
     "remove_message": "Se quitará \"{name}\". Las recetas que lo usan no cambian; solo se quita de tu despensa.",
@@ -2600,7 +2578,8 @@
     "tier_complete": "Completo (85 %+)",
     "tier_partial": "Parcial (60-85 %)",
     "tier_sparse": "Escaso (<60 %)",
-    "tier_unknown": "Desconocido"
+    "tier_unknown": "Desconocido",
+    "show_used_in": "Ver {n, plural, one {la receta que lo usa} other {las # recetas que lo usan}}"
   },
   "shopping_ui": {
     "clear_group_title": "¿Quitar {n, plural, one {# artículo} other {# artículos}}?",
@@ -2738,7 +2717,20 @@
     "no_matching_items": "No hay artículos que coincidan en la despensa.",
     "variant_delete_msg": "{n, plural, one {Este artículo tiene # variante. ¿Qué quieres hacer con ella?} other {Este artículo tiene # variantes. ¿Qué quieres hacer con ellas?}}",
     "keep_standalone_hint": "Las variantes se quedan en tu despensa como filas propias. Recomendado.",
-    "remove_variants_hint": "{n, plural, one {La variante se quita junto con este artículo.} other {Las # variantes se quitan junto con este artículo.}}"
+    "remove_variants_hint": "{n, plural, one {La variante se quita junto con este artículo.} other {Las # variantes se quitan junto con este artículo.}}",
+    "used_in": "Se usa en",
+    "used_in_none": "Ninguna receta lo usa todavía.",
+    "used_in_offline": "Conéctate para ver qué recetas lo usan.",
+    "used_in_failed": "No se pudieron cargar las recetas que lo usan.",
+    "used_in_retry": "Reintentar",
+    "used_in_all": "Mostrar las {n}",
+    "used_in_fewer": "Mostrar menos",
+    "used_in_through_generic": "También a través de {name}",
+    "used_in_through_variants": "A través de sus variantes",
+    "used_in_via": "vía {name}",
+    "open_recipe": "Abrir {name}",
+    "on_hand_less": "Uno menos",
+    "on_hand_more": "Uno más"
   },
   "recipes_ui": {
     "create_manually": "Crear manualmente",

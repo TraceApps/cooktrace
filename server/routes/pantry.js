@@ -25,6 +25,7 @@ import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-key
 import { ownId } from '../lib/link-checks.js';
 import { ingredientKey } from '../lib/quantity.js';
 import { cleanCodes, knownCodes } from '../lib/allergens.js';
+import { usageCounts, recipesUsing } from '../lib/pantry-usage.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -245,25 +246,9 @@ router.get('/', wrap((req, res) => {
   // Recipe-usage map — single pass through every recipe's ingredients
   // JSON, counting how many recipes reference each pantry_item_id.
   // Powers the "Used in N" pill on every pantry card.
-  const recipeCount = new Map();
-  const recipeRows = db.prepare(
+  const recipeCount = usageCounts(db.prepare(
     `SELECT ingredients FROM recipes WHERE ${userClause(u)} AND deleted_at IS NULL`
-  ).all(...userArgs(u));
-  for (const r of recipeRows) {
-    let groups = [];
-    try { groups = JSON.parse(r.ingredients || '[]'); } catch {}
-    const seen = new Set();
-    for (const g of groups) {
-      for (const it of (g.items || [])) {
-        const pid = it && it.pantry_item_id;
-        if (pid && !seen.has(pid)) {
-          seen.add(pid);
-          recipeCount.set(pid, (recipeCount.get(pid) || 0) + 1);
-        }
-      }
-    }
-  }
-
+  ).all(...userArgs(u)));
   res.json(rows.map(r => ({ ..._hydrate(r, catMap), recipe_count: recipeCount.get(r.id) || 0 })));
 }));
 
@@ -287,20 +272,17 @@ router.get('/:id/recipes', wrap((req, res) => {
      WHERE ${userClause(u)} AND deleted_at IS NULL
      ORDER BY name COLLATE NOCASE ASC`
   ).all(...userArgs(u));
-  const matches = [];
-  for (const r of rows) {
-    let groups = [];
-    try { groups = JSON.parse(r.ingredients || '[]') || []; } catch { groups = []; }
-    let used = false;
-    for (const g of groups) {
-      for (const it of (g.items || [])) {
-        if (it && it.pantry_item_id === id) { used = true; break; }
-      }
-      if (used) break;
-    }
-    if (used) matches.push({ id: r.id, name: r.name, img_url: r.img_url });
-  }
-  res.json(matches);
+  // ?family=1 (the item sheet's Used In) also returns the recipes that reach
+  // the item through its generic or its variants. Without it the answer is
+  // the plain list older apps expect.
+  if (req.query.family !== '1') return res.json(recipesUsing(rows, id).direct);
+  const generic = item.generic_parent_id != null
+    ? db.prepare(`SELECT id, name FROM pantry_items WHERE id = ? AND deleted_at IS NULL`).get(item.generic_parent_id) || null
+    : null;
+  const variants = generic ? [] : db.prepare(
+    `SELECT id, name FROM pantry_items WHERE generic_parent_id = ? AND deleted_at IS NULL`
+  ).all(id);
+  res.json(recipesUsing(rows, id, { generic, variants }));
 }));
 
 // ── GET /by-barcode/:code — look up an existing pantry item by barcode ─

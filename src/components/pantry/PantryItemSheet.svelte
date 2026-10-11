@@ -30,7 +30,7 @@
    *     startInEdit={false} prefill={null}
    *     on:changed={e => ...} on:deleted={e => ...} on:created={e => ...} />
    */
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, tick } from 'svelte';
   import { fade } from 'svelte/transition';
   import { _, locale } from 'svelte-i18n';
   import Sheet from '../ui/Sheet.svelte';
@@ -48,7 +48,8 @@
   import { categoryLabel, categoryIcon } from '../../lib/pantry-categories.js';
   import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS, isDerived, deriveSodiumSalt } from '../../lib/nutriments.js';
   import { lookupBarcode, contributeToOFF } from '../../lib/off.js';
-  import { displayVariantName as _sharedDisplayVariantName, isItemInStock } from '../../lib/pantry-variants.js';
+  import { displayVariantName as _sharedDisplayVariantName, isItemInStock, stockAfterToggle, stockAfterStep } from '../../lib/pantry-variants.js';
+  import { isOfflineError } from '../../lib/offline-edits.js';
   import { foldText } from '../../lib/search-text.js';
   import { visibleNutriments, offEnabled, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks } from '../../stores/settings.js';
   import { scanNutritionLabel } from '../../lib/scan-nutrition.js';
@@ -60,6 +61,9 @@
   export let itemId = null;
   export let startInEdit = false;
   export let prefill = null;
+  // 'used-in': open on the Used In list (the card's pill, or back from one
+  // of those recipes).
+  export let focus = null;
 
   const dispatch = createEventDispatcher();
 
@@ -189,15 +193,98 @@
       return;
     }
     loading = true; loadError = null; item = null;
+    _openedAt = Date.now();
     try {
       const row = await NtApi.getPantryItem(id);
       item = row;
       if (asEdit) _startEdit();
     } catch (e) { loadError = e.message || $_('fail.load_item'); }
     finally { loading = false; }
+    // Used In first: on the phone each read waits its turn on the database.
+    _loadUsedIn(id);
     _loadPantryCategories();
     _loadVariantContext();
   }
+
+  // ── Used In (#60): the recipes that use this item ──────────────────
+  // `direct` link to the item itself and match the card's count; `through`
+  // reach it through its generic or variants (lib/pantry-usage.js).
+  const USED_IN_SHOWN = 6;
+  let usedIn = { direct: [], through: [] };
+  let usedInState = 'idle';  // 'loading' | 'ready' | 'offline' | 'error'
+  let usedInAll = false;
+  let usedInEl;
+  let usedInFlash = false;
+  async function _loadUsedIn(id) {
+    usedInState = 'loading';
+    usedInAll = false;
+    try {
+      const got = await NtApi.getPantryItemRecipes(id, { family: true });
+      if (item?.id !== id) return;
+      usedIn = { direct: got?.direct || [], through: got?.through || [] };
+      usedInState = 'ready';
+    } catch (e) {
+      if (item?.id !== id) return;
+      usedIn = { direct: [], through: [] };
+      usedInState = isOfflineError(e) ? 'offline' : 'error';
+    }
+    if (focus === 'used-in') _showUsedIn();
+  }
+  // When the sheet opened: on the phone the list is there at once, and a
+  // scroll while the sheet is still flying in (Sheet.svelte, 280ms) lands
+  // short, so it waits for the sheet to settle.
+  let _openedAt = 0;
+  async function _showUsedIn() {
+    await tick();
+    const settle = 320 - (Date.now() - _openedAt);
+    if (settle > 0) await new Promise(r => setTimeout(r, settle));
+    if (!usedInEl) return;
+    const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    usedInEl.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' });
+    usedInFlash = true;
+    setTimeout(() => { usedInFlash = false; }, 1400);
+  }
+  // A variant's name as this sheet's Variants list shows it ("GreenWise").
+  function _viaName(via, ctx) {
+    const kid = ctx.children.find(v => v.id === via.id);
+    return kid ? _displayVariantName(kid, item, { nested: true }) : via.name;
+  }
+  function _openRecipe(r) { dispatch('openrecipe', { id: r.id }); }
+  $: usedInShown = usedInAll ? usedIn.direct : usedIn.direct.slice(0, USED_IN_SHOWN);
+
+  // ── Stock from the sheet (#60) ─────────────────────────────────────
+  // The same writes as the card's check button (lib/pantry-variants.js).
+  // Taps on - and + gather for a moment and save once.
+  let _savedStock = null;   // { quantity, in_stock } last known saved
+  let _stockTimer = null;
+  function _applyStock(next, { wait = 0 } = {}) {
+    if (!item || !next) return;
+    if (_savedStock == null) _savedStock = { quantity: item.quantity, in_stock: item.in_stock };
+    item = { ...item, ...next };
+    dispatch('changed', item);
+    clearTimeout(_stockTimer);
+    _stockTimer = setTimeout(_saveStock, wait);
+  }
+  async function _saveStock() {
+    _stockTimer = null;
+    if (!item || _savedStock == null) return;
+    const id = item.id;
+    const before = _savedStock;
+    const next = { quantity: item.quantity, in_stock: item.in_stock };
+    _savedStock = null;
+    try {
+      await NtApi.updatePantryItem(id, next);
+    } catch (e) {
+      if (item?.id === id) {
+        item = { ...item, ...before };
+        dispatch('changed', item);
+      }
+      showError(failed('fail.update_stock', e));
+    }
+  }
+  function toggleStock() { _applyStock(stockAfterToggle(item)); }
+  function stepStock(delta) { _applyStock(stockAfterStep(item, delta), { wait: 500 }); }
+  $: canStepDown = !!item && stockAfterStep(item, -1) != null;
 
   function _enterCreateMode() {
     item = { ..._blank(), ...(prefill || {}),
@@ -232,6 +319,10 @@
   }
 
   function _reset() {
+    if (_stockTimer) { clearTimeout(_stockTimer); _saveStock(); }
+    usedIn = { direct: [], through: [] };
+    usedInState = 'idle';
+    usedInAll = false;
     item = null;
     draft = null;
     loadError = null;
@@ -1028,10 +1119,20 @@
                     {item.barcode}
                   </span>
                 {/if}
-                <span class="pill" class:in={isInStock} class:out={!isInStock}>
-                  <span class="material-symbols-rounded">{isInStock ? 'check_circle' : 'remove_shopping_cart'}</span>
-                  {isInStock ? $_('pantry.filters.in_stock') : $_('pantry_item_sheet_ui.out_of_stock_label')}
-                </span>
+                {#if isGeneric}
+                  <span class="pill" class:in={isInStock} class:out={!isInStock}>
+                    <span class="material-symbols-rounded">{isInStock ? 'check_circle' : 'remove_shopping_cart'}</span>
+                    {isInStock ? $_('pantry.filters.in_stock') : $_('pantry_item_sheet_ui.out_of_stock_label')}
+                  </span>
+                {:else}
+                  <!-- Flips stock right here, the same write as the card's
+                       check button. A generic's stock is its variants'. -->
+                  <button type="button" class="pill stock-switch" class:in={isInStock} class:out={!isInStock}
+                    role="switch" aria-checked={isInStock} aria-label={$_('pantry.filters.in_stock')} on:click={toggleStock}>
+                    <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
+                    <span aria-hidden="true">{isInStock ? $_('pantry.filters.in_stock') : $_('pantry_item_sheet_ui.out_of_stock_label')}</span>
+                  </button>
+                {/if}
               </div>
             {/if}
           </div>
@@ -1058,11 +1159,29 @@
               {#if editing}
                 <input class="input num" type="number" min="0" step="0.01"
                   bind:value={draft.quantity} placeholder="0" />
+              {:else if !isGeneric}
+                <!-- View mode: - and + right here, saved after a short
+                     pause so a run of taps is one write. Reaching 0 marks
+                     it out of stock. An untracked amount shows a dash, not
+                     "Not set", so the card reads cleanly. -->
+                <div class="stepper">
+                  <button type="button" class="step-btn" on:click={() => stepStock(-1)} disabled={!canStepDown}
+                    aria-label={$_('pantry_item_sheet_ui.on_hand_less')}>
+                    <span class="material-symbols-rounded">remove</span>
+                  </button>
+                  <span class="stat-value step-value" aria-live="polite">
+                    {#if item.quantity == null || item.quantity === ''}
+                      <span class="muted">—</span>
+                    {:else}
+                      {item.quantity}
+                    {/if}
+                  </span>
+                  <button type="button" class="step-btn" on:click={() => stepStock(1)}
+                    aria-label={$_('pantry_item_sheet_ui.on_hand_more')}>
+                    <span class="material-symbols-rounded">add</span>
+                  </button>
+                </div>
               {:else}
-                <!-- View mode: pure display. The In Stock pill already
-                     communicates stock state; the stat shows an em-dash
-                     when quantity is untracked (null) instead of "Not
-                     set" so the card reads cleanly. -->
                 <div class="stat-value">
                   {#if item.quantity == null}
                     <span class="muted">—</span>
@@ -1224,6 +1343,86 @@
           <PantryAllergens allergens={item.allergens ?? null} traces={item.traces ?? null} source={item.allergens_source ?? null}
             members={householdMembers} on:change={saveAllergens} />
         </div>
+      {/if}
+
+      <!-- Used In (#60): the recipes that use this item, each one opens.
+           Read view only; the card's pill opens the sheet here. -->
+      {#if item?.id != null && !loading && !editing}
+        <section class="used-in" class:flash={usedInFlash} bind:this={usedInEl} aria-labelledby="used-in-title">
+          <div class="used-in-head">
+            <span class="material-symbols-rounded">restaurant</span>
+            <h3 id="used-in-title" class="used-in-title">{$_('pantry_item_sheet_ui.used_in')}</h3>
+            {#if usedInState === 'ready' && usedIn.direct.length}
+              <span class="used-in-count">{usedIn.direct.length}</span>
+            {/if}
+          </div>
+
+          {#if usedInState === 'loading' || usedInState === 'idle'}
+            <div class="used-in-list" aria-hidden="true">
+              {#each [0, 1] as _row}<div class="used-in-skel"></div>{/each}
+            </div>
+          {:else if usedInState === 'offline'}
+            <p class="used-in-note">{$_('pantry_item_sheet_ui.used_in_offline')}</p>
+          {:else if usedInState === 'error'}
+            <p class="used-in-note">
+              {$_('pantry_item_sheet_ui.used_in_failed')}
+              <button type="button" class="used-in-retry" on:click={() => _loadUsedIn(item.id)}>{$_('pantry_item_sheet_ui.used_in_retry')}</button>
+            </p>
+          {:else}
+            {#if usedIn.direct.length}
+              <ul class="used-in-list">
+                {#each usedInShown as r (r.id)}
+                  <li>
+                    <button type="button" class="used-in-row" on:click={() => _openRecipe(r)}
+                      aria-label={$_('pantry_item_sheet_ui.open_recipe', { values: { name: r.name } })}>
+                      {#if r.imgUrl}
+                        <img class="used-in-thumb" src={r.imgUrl} alt="" loading="lazy" />
+                      {:else}
+                        <span class="used-in-thumb stub"><span class="material-symbols-rounded">restaurant_menu</span></span>
+                      {/if}
+                      <span class="used-in-name">{r.name}</span>
+                      <span class="material-symbols-rounded used-in-chevron">chevron_right</span>
+                    </button>
+                  </li>
+                {/each}
+              </ul>
+              {#if usedIn.direct.length > USED_IN_SHOWN}
+                <button type="button" class="used-in-more" on:click={() => usedInAll = !usedInAll} aria-expanded={usedInAll}>
+                  {usedInAll ? $_('pantry_item_sheet_ui.used_in_fewer') : $_('pantry_item_sheet_ui.used_in_all', { values: { n: usedIn.direct.length } })}
+                </button>
+              {/if}
+            {:else if !usedIn.through.length}
+              <p class="used-in-note">{$_('pantry_item_sheet_ui.used_in_none')}</p>
+            {/if}
+
+            {#if usedIn.through.length}
+              <div class="used-in-sub">
+                {isVariant
+                  ? $_('pantry_item_sheet_ui.used_in_through_generic', { values: { name: variantContext.parentName || usedIn.through[0].via.name } })
+                  : $_('pantry_item_sheet_ui.used_in_through_variants')}
+              </div>
+              <ul class="used-in-list">
+                {#each usedIn.through as r (r.id)}
+                  <li>
+                    <button type="button" class="used-in-row" on:click={() => _openRecipe(r)}
+                      aria-label={$_('pantry_item_sheet_ui.open_recipe', { values: { name: r.name } })}>
+                      {#if r.imgUrl}
+                        <img class="used-in-thumb" src={r.imgUrl} alt="" loading="lazy" />
+                      {:else}
+                        <span class="used-in-thumb stub"><span class="material-symbols-rounded">restaurant_menu</span></span>
+                      {/if}
+                      <span class="used-in-name">
+                        {r.name}
+                        {#if !isVariant}<span class="used-in-via">{$_('pantry_item_sheet_ui.used_in_via', { values: { name: _viaName(r.via, variantContext) } })}</span>{/if}
+                      </span>
+                      <span class="material-symbols-rounded used-in-chevron">chevron_right</span>
+                    </button>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          {/if}
+        </section>
       {/if}
 
       <!-- Variants section (Issue #4). Visible only on a saved item
@@ -1606,6 +1805,48 @@
   /* Stats — two bordered stat cards side-by-side. On Hand stays
      narrow (just a qty number); Serving Size takes the remaining
      width so its [num][unit picker] row fits comfortably. */
+  /* In Stock as a switch (#60): the pill, with a small track whose knob
+     slides across. Same colors as the read-only pill it replaced. */
+  .stock-switch {
+    font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
+    padding: 3px 10px 3px 4px; gap: 6px;
+    transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
+  }
+  .stock-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .switch-track {
+    position: relative; flex: 0 0 auto;
+    width: 26px; height: 16px; border-radius: 999px;
+    background: color-mix(in srgb, currentColor 30%, transparent);
+    transition: background var(--dur-fast);
+  }
+  .switch-knob {
+    position: absolute; top: 2px; left: 2px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--surface-1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+  .stock-switch.in .switch-track { background: currentColor; }
+  .stock-switch.in .switch-knob { transform: translateX(10px); }
+  @media (prefers-reduced-motion: reduce) {
+    .switch-knob, .switch-track, .stock-switch { transition: none; }
+  }
+
+  /* On Hand - and + in the read view. */
+  .stepper { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+  .step-value { flex: 1; text-align: center; font-variant-numeric: tabular-nums; }
+  .step-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; flex: 0 0 32px; padding: 0;
+    border-radius: 50%; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text-1); cursor: pointer;
+    transition: background var(--dur-fast), border-color var(--dur-fast);
+  }
+  .step-btn .material-symbols-rounded { font-size: 18px; }
+  .step-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .step-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .step-btn:disabled { opacity: 0.35; cursor: default; }
+
   .stats { display: flex; flex-direction: row; gap: 8px; align-items: stretch; }
   .stat {
     min-width: 0;
@@ -1616,7 +1857,7 @@
     display: flex; flex-direction: column; gap: 6px;
   }
   /* On Hand: fixed-narrow. Serving Size: fills the rest. */
-  .stat:first-child  { flex: 0 0 110px; padding: 12px 10px; }
+  .stat:first-child  { flex: 0 0 132px; padding: 12px 10px; }
   .stat:last-child   { flex: 1 1 0; }
   /* On Hand's number input fills its (narrow) card. */
   .stat > .input.num { width: 100%; max-width: 100%; }
@@ -1852,6 +2093,73 @@
   }
 
   /* Variants (Issue #4) */
+  /* Used In (#60): the recipes that use the item. Same box as Variants. */
+  .used-in {
+    margin-top: 16px;
+    padding: 12px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    scroll-margin-top: 12px;
+    transition: border-color 0.6s var(--ease-out), box-shadow 0.6s var(--ease-out);
+  }
+  .used-in.flash {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  .used-in-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .used-in-head .material-symbols-rounded { color: var(--accent); font-size: 20px; }
+  .used-in-title { margin: 0; font-weight: 700; color: var(--text-1); font-size: 14px; }
+  .used-in-count {
+    font-size: 11px; font-weight: 700; color: var(--text-3);
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 999px; padding: 0 7px; line-height: 18px;
+  }
+  .used-in-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+  .used-in-row {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    min-height: 48px; padding: 6px 8px 6px 6px;
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); cursor: pointer;
+    font: inherit; color: var(--text-1); text-align: left;
+    transition: border-color var(--dur-fast), background var(--dur-fast);
+  }
+  .used-in-row:hover { border-color: var(--accent); }
+  .used-in-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .used-in-thumb {
+    width: 36px; height: 36px; flex: 0 0 36px;
+    border-radius: 8px; object-fit: cover; background: var(--surface-2);
+  }
+  .used-in-thumb.stub { display: inline-flex; align-items: center; justify-content: center; color: var(--text-3); }
+  .used-in-thumb.stub .material-symbols-rounded { font-size: 20px; }
+  .used-in-name {
+    flex: 1; min-width: 0; font-size: 14px; font-weight: 500;
+    display: flex; flex-direction: column; overflow-wrap: anywhere;
+  }
+  .used-in-via { font-size: 12px; font-weight: 400; color: var(--text-3); }
+  .used-in-chevron { color: var(--text-3); font-size: 20px; flex: 0 0 auto; }
+  .used-in-more, .used-in-retry {
+    background: none; border: none; padding: 8px 2px 0; cursor: pointer;
+    font: inherit; font-size: 13px; font-weight: 600; color: var(--accent);
+  }
+  .used-in-retry { padding: 0; }
+  .used-in-note { margin: 0; color: var(--text-3); font-size: 13px; line-height: 1.5; }
+  .used-in-sub {
+    margin: 12px 0 6px; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3);
+  }
+  .used-in-skel {
+    height: 48px; border-radius: var(--radius-sm);
+    background: linear-gradient(90deg, var(--surface-1) 25%, var(--surface-2) 50%, var(--surface-1) 75%);
+    background-size: 200% 100%;
+    animation: used-in-shimmer 1.2s linear infinite;
+  }
+  @keyframes used-in-shimmer { to { background-position: -200% 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .used-in-skel { animation: none; }
+    .used-in { transition: none; }
+  }
+
   .variants {
     margin-top: 16px;
     padding: 12px 14px;

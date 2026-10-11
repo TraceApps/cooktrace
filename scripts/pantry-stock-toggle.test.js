@@ -9,16 +9,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { isItemInStock } from '../src/lib/pantry-variants.js';
+import { isItemInStock, stockAfterToggle, stockAfterStep } from '../src/lib/pantry-variants.js';
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
 
-// The same rule quickToggle applies, so the sequence below runs the real logic.
-function toggle(it) {
-  const nextInStock = !isItemInStock(it);
-  const quantity = nextInStock ? (Number(it.quantity) > 0 ? Number(it.quantity) : 1) : 0;
-  return { ...it, quantity, in_stock: nextInStock ? 1 : 0 };
-}
+// The card's check button and the sheet's switch both write stockAfterToggle.
+const toggle = (it) => ({ ...it, ...stockAfterToggle(it) });
 
 test('a blank On Hand is not zero', () => {
   assert.equal(isItemInStock({ in_stock: 1, quantity: null }), true);
@@ -54,12 +50,26 @@ test('marking in keeps a quantity that is already there', () => {
   assert.deepEqual([it.in_stock, it.quantity], [1, 4]);
 });
 
-test('the button, the card check and the sheet all use isItemInStock', () => {
+test('On Hand - and + (#60): blank is untracked, 0 is out of stock', () => {
+  assert.deepEqual(stockAfterStep({ in_stock: 1, quantity: null }, 1), { quantity: 1, in_stock: 1 });
+  assert.equal(stockAfterStep({ in_stock: 1, quantity: null }, -1), null, 'nothing to take from a blank');
+  assert.equal(stockAfterStep({ in_stock: 1, quantity: '' }, -1), null);
+  assert.equal(stockAfterStep({ in_stock: 0, quantity: 0 }, -1), null, 'not below zero');
+  assert.deepEqual(stockAfterStep({ in_stock: 1, quantity: 1 }, -1), { quantity: 0, in_stock: 0 });
+  assert.deepEqual(stockAfterStep({ in_stock: 0, quantity: 0 }, 1), { quantity: 1, in_stock: 1 });
+  assert.deepEqual(stockAfterStep({ in_stock: 1, quantity: 2.5 }, -1), { quantity: 1.5, in_stock: 1 });
+  assert.deepEqual(stockAfterStep({ in_stock: 1, quantity: 0.4 }, -1), { quantity: 0, in_stock: 0 });
+  assert.deepEqual(stockAfterStep({ in_stock: 1, quantity: '3' }, 1), { quantity: 4, in_stock: 1 });
+});
+
+test('the button, the card check and the sheet all use the same rules', () => {
   const pantry = read('../src/routes/Pantry.svelte');
   const sheet = read('../src/components/pantry/PantryItemSheet.svelte');
   const fn = pantry.slice(pantry.indexOf('async function quickToggle'));
-  assert.match(fn.slice(0, 1200), /const nextInStock = !isItemInStock\(it\)/);
+  assert.match(fn.slice(0, 1200), /const next = stockAfterToggle\(it\)/);
   assert.doesNotMatch(fn.slice(0, 1200), /Number\(it\.quantity\) === 0/);
+  assert.match(sheet, /function toggleStock\(\) \{ _applyStock\(stockAfterToggle\(item\)\); \}/);
+  assert.match(sheet, /_applyStock\(stockAfterStep\(item, delta\)/);
   assert.match(pantry, /inStockDisplay = isGen \? stockAgg\.stocked > 0 : isItemInStock\(it\)/);
   assert.match(sheet, /\$: isInStock = item \? isItemInStock\(item\) : true/);
 });

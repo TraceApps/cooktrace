@@ -21,6 +21,7 @@ import { recipeContributions, mergeIntoList, parseSources } from './shopping-pla
 import { ingredientKey } from './quantity.js';
 import { allergenSummary, cleanCodes, cleanOverrides, knownCodes } from './allergens.js';
 import { revisionOf, parseRevision, restoreValues } from './recipe-content.js';
+import { usageCounts, recipesUsing } from './pantry-usage.js';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
 // ── Small utilities ──────────────────────────────────────────────────
@@ -810,18 +811,7 @@ export const CtApiNative = {
       `SELECT id, ingredients FROM recipes WHERE user_id = ? AND deleted_at IS NULL`,
       [LOCAL_USER_ID]
     );
-    const usage = new Map();
-    for (const r of recipeRows) {
-      const groups = _parseJson(r.ingredients, []);
-      const seen = new Set();
-      for (const g of groups) for (const it of (g.items || [])) {
-        const pid = it?.pantry_item_id;
-        if (pid && !seen.has(pid)) {
-          seen.add(pid);
-          usage.set(pid, (usage.get(pid) || 0) + 1);
-        }
-      }
-    }
+    const usage = usageCounts(recipeRows);
 
     const catMap = await _pantryCategoryMap();
     return rows.map(r => ({ ..._pantryFromRow(r, catMap), recipe_count: usage.get(r.id) || 0 }));
@@ -843,22 +833,30 @@ export const CtApiNative = {
     return _pantryFromRow(rows[0], catMap) || null;
   },
 
-  async getPantryItemRecipes(id) {
+  // Same answer as GET /api/pantry/:id/recipes (lib/pantry-usage.js).
+  // { family: true } adds the recipes that reach the item through its
+  // generic or its variants, as { direct, through }.
+  async getPantryItemRecipes(id, { family = false } = {}) {
     const rows = await _query(
       `SELECT id, name, img_url, ingredients FROM recipes
         WHERE user_id = ? AND deleted_at IS NULL ORDER BY name COLLATE NOCASE ASC`,
       [LOCAL_USER_ID]
     );
-    const out = [];
-    for (const r of rows) {
-      const groups = _parseJson(r.ingredients, []);
-      let used = false;
-      for (const g of groups) for (const it of (g.items || [])) {
-        if (it?.pantry_item_id === id) { used = true; break; }
-      }
-      if (used) out.push({ id: r.id, name: r.name, imgUrl: resolveAssetUrl(r.img_url) || '' });
-    }
-    return out;
+    const shape = r => ({ id: r.id, name: r.name, imgUrl: resolveAssetUrl(r.img_url) || '', ...(r.via ? { via: r.via } : {}) });
+    if (!family) return recipesUsing(rows, id).direct.map(shape);
+    // The item, its generic and its variants in one read (each query is a
+    // trip over the plugin bridge).
+    const kin = await _query(
+      `SELECT id, name, generic_parent_id FROM pantry_items
+        WHERE deleted_at IS NULL AND (id = ? OR generic_parent_id = ?
+          OR id = (SELECT generic_parent_id FROM pantry_items WHERE id = ?))`,
+      [id, id, id]
+    );
+    const item = kin.find(k => k.id === id);
+    const generic = item?.generic_parent_id != null ? kin.find(k => k.id === item.generic_parent_id) || null : null;
+    const variants = generic ? [] : kin.filter(k => k.generic_parent_id === id);
+    const { direct, through } = recipesUsing(rows, id, { generic, variants });
+    return { direct: direct.map(shape), through: through.map(shape) };
   },
 
   async createPantryItem(data) {

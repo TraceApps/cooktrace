@@ -1894,17 +1894,6 @@
     "usda_data_type":            "USDA Data Type",
     "reset":                     "Reset"
   },
-  "pantry_view_ct": {
-    "toast": {
-      "removed":                 "Item removed"
-    },
-    "retry":                     "Retry",
-    "in_stock":                  "In Stock",
-    "serving_size":              "Serving Size",
-    "not_set":                   "Not set",
-    "on_hand":                   "On Hand",
-    "notes":                     "Notes"
-  },
   "pantry_sheet_extra": {
     "toast": {
       "cant_read_label":         "Couldn't read the label. Try a clearer photo.",
@@ -2451,17 +2440,6 @@
     "tooltip_none": "No cooks · {date}",
     "tooltip_count": "{count, plural, one {# cook} other {# cooks}} · {date}"
   },
-  "pantry_view_ui": {
-    "remove_title": "Remove from Pantry?",
-    "remove_message": "\"{name}\" will be removed. Recipes referencing it stay; this just drops it from your library.",
-    "remove": "Remove",
-    "title_fallback": "Pantry Item",
-    "toggle_in_stock": "Toggle in stock",
-    "decrease": "Decrease",
-    "increase": "Increase",
-    "used_in": "Used In",
-    "used_in_empty": "No recipes use this item yet."
-  },
   "pantry_editor_ui": {
     "remove_title": "Remove from Pantry?",
     "remove_message": "\"{name}\" will be removed. Recipes referencing it stay; this just drops it from your pantry.",
@@ -2536,7 +2514,8 @@
     "tier_complete": "Complete (85%+)",
     "tier_partial": "Partial (60-85%)",
     "tier_sparse": "Sparse (<60%)",
-    "tier_unknown": "Unknown"
+    "tier_unknown": "Unknown",
+    "show_used_in": "Show the {n, plural, one {recipe} other {# recipes}} that use this"
   },
   "shopping_ui": {
     "clear_group_title": "Remove {n, plural, one {# Item} other {# Items}}?",
@@ -2674,7 +2653,20 @@
     "no_matching_items": "No matching pantry items.",
     "variant_delete_msg": "{n, plural, one {This item has # variant. What should happen to it?} other {This item has # variants. What should happen to them?}}",
     "keep_standalone_hint": "The variants stay in your pantry as their own rows. Recommended.",
-    "remove_variants_hint": "{n, plural, one {The variant gets removed alongside this item.} other {All # variants get removed alongside this item.}}"
+    "remove_variants_hint": "{n, plural, one {The variant gets removed alongside this item.} other {All # variants get removed alongside this item.}}",
+    "used_in": "Used In",
+    "used_in_none": "No recipes use this yet.",
+    "used_in_offline": "Connect to see which recipes use this.",
+    "used_in_failed": "Couldn't load the recipes that use this.",
+    "used_in_retry": "Try Again",
+    "used_in_all": "Show All {n}",
+    "used_in_fewer": "Show Fewer",
+    "used_in_through_generic": "Also Through {name}",
+    "used_in_through_variants": "Through Its Variants",
+    "used_in_via": "via {name}",
+    "open_recipe": "Open {name}",
+    "on_hand_less": "One Less",
+    "on_hand_more": "One More"
   },
   "recipes_ui": {
     "create_manually": "Create Manually",
