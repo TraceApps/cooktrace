@@ -2054,7 +2054,9 @@
     "include_anyway": "Include Them",
     "leave_out": "Leave Them Out",
     "dislikes": "{who} doesn't like {item}",
-    "dislikes_many": "{who} don't like {item}"
+    "dislikes_many": "{who} don't like {item}",
+    "by_name": "Found by ingredient name",
+    "allergy": "Allergy"
   },
   "household": {
     "title": "Household",
@@ -2079,7 +2081,11 @@
     "removed": "{name} removed from the household",
     "save": "Save",
     "name_required": "Enter a name",
-    "you": "You"
+    "you": "You",
+    "other_allergies": "Other Allergies",
+    "other_allergies_placeholder": "Like corn or kiwi, then press Enter",
+    "other_allergies_hint": "For foods not in the list above. Recipes are checked by ingredient name, since product labels don't list these.",
+    "remove_other_allergy": "Remove {item}"
   },
   "history": {
     "version_named": "Version {n}: {label}",

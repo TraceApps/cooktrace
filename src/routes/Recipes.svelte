@@ -27,7 +27,7 @@
   import { foldText } from '../lib/search-text.js';
   import AllergenChips from '../components/allergens/AllergenChips.svelte';
   import { household } from '../stores/settings.js';
-  import { cardAllergens, cleanHousehold, conflicts, avoids } from '../lib/allergens.js';
+  import { cardAllergens, cleanHousehold, conflicts, hasConflict, avoids } from '../lib/allergens.js';
 
   let createSheetOpen = false;
   // Measured page-header height: exposed as --header-h on page-shell so
@@ -662,7 +662,7 @@
   // avoid (lib/allergens.js). Offered once someone avoids something.
   let safeOnly = false;
   $: householdMembers = cleanHousehold($household);
-  $: hasAvoids = householdMembers.some(m => avoids(m).size > 0);
+  $: hasAvoids = householdMembers.some(m => avoids(m).size > 0 || m.other_allergies?.length > 0);
   $: if (!hasAvoids) safeOnly = false;
   // Read ?category=<slug> from the hash query string. svelte-spa-router
   // hands us routes like #/recipes?category=dinner.
@@ -755,7 +755,7 @@
       list = [...recipes, ...extras];
     }
     if (favoritesOnly) list = list.filter(r => r.favorite);
-    if (safeOnly) list = list.filter(r => !conflicts(cardAllergens(r), householdMembers).contains.length);
+    if (safeOnly) list = list.filter(r => !hasConflict(conflicts(cardAllergens(r), householdMembers, { recipe: r })));
     if (activeCategorySlug) {
       list = list.filter(r => r.category && r.category.slug === activeCategorySlug);
     }
@@ -1672,7 +1672,7 @@
                 {/if}
               </div>
               {#if hasAvoids}
-                <AllergenChips summary={cardAllergens(r)} members={householdMembers} />
+                <AllergenChips summary={cardAllergens(r)} recipe={r} members={householdMembers} />
               {/if}
             </div>
           </button>

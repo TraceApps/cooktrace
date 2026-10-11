@@ -693,7 +693,8 @@
     const dayName = d => new Date(2023, 0, 1 + d).toLocaleDateString('en-US', { weekday: 'short' });
     const people = members.map(m => {
       const bits = [];
-      if (m.allergies.length) bits.push('allergic to ' + m.allergies.map(allergenKey).join(', ').replace(/_/g, ' '));
+      const allergic = [...m.allergies.map(a => allergenKey(a).replace(/_/g, ' ')), ...(m.other_allergies || [])];
+      if (allergic.length) bits.push('allergic to ' + allergic.join(', '));
       if (m.diet.length) bits.push(m.diet.join(', ').replace(/_/g, ' '));
       if (m.dislikes.length) bits.push('dislikes ' + m.dislikes.join(', '));
       if (m.days.length) bits.push('home ' + m.days.map(dayName).join(', '));

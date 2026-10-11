@@ -33,8 +33,8 @@
   $: dislikes = recipe ? dislikesIn(recipe, members) : [];
   $: list = new Intl.ListFormat($locale || undefined, { style: 'short', type: 'conjunction' });
   // Allergens, or a diet someone home keeps (meat for a vegetarian).
-  $: hits = conflicts(info, members);
-  $: showContains = info.contains.some(x => ALLERGENS.includes(x.code)) || hits.contains.length > 0;
+  $: hits = conflicts(info, members, { recipe });
+  $: showContains = info.contains.some(x => ALLERGENS.includes(x.code)) || hits.contains.length > 0 || hits.foods.length > 0;
   $: anything = showContains || info.traces.length > 0 || dislikes.length > 0;
 
   // ── Correct ─────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@
     {#if showContains}
       <div class="row">
         <span class="row-label">{$_('allergen_info.contains')}</span>
-        <AllergenChips summary={{ contains: info.contains, traces: [] }} {members} only="all" />
+        <AllergenChips summary={{ contains: info.contains, traces: [] }} {members} {recipe} only="all" />
       </div>
     {/if}
     {#if info.traces.length}

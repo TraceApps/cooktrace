@@ -2113,7 +2113,9 @@
     "include_anyway": "Incluirlas",
     "leave_out": "Descartarlas",
     "dislikes": "A {who} no le gusta {item}",
-    "dislikes_many": "A {who} no les gusta {item}"
+    "dislikes_many": "A {who} no les gusta {item}",
+    "by_name": "Encontrado por el nombre del ingrediente",
+    "allergy": "Alergia"
   },
   "household": {
     "title": "Hogar",
@@ -2138,7 +2140,11 @@
     "removed": "{name} ya no está en el hogar",
     "save": "Guardar",
     "name_required": "Escribe un nombre",
-    "you": "Tú"
+    "you": "Tú",
+    "other_allergies": "Otras alergias",
+    "other_allergies_placeholder": "Como maíz o kiwi, y pulsa Intro",
+    "other_allergies_hint": "Para alimentos que no están en la lista de arriba. Las recetas se revisan por el nombre de los ingredientes, ya que las etiquetas no los indican.",
+    "remove_other_allergy": "Quitar {item}"
   },
   "history": {
     "version_named": "Versión {n}: {label}",
@@ -2427,7 +2433,8 @@
     "strength_4": "Muy fuerte"
   },
   "connect": {
-    "https_only": "Esta app solo se conecta por HTTPS. Pon el servidor detrás de un proxy inverso (Caddy, Tailscale o Cloudflare Tunnel), o usa una versión de depuración. DEPLOY.md, Connecting from Android, tiene los pasos."
+    "https_only": "Esta app solo se conecta por HTTPS. Pon el servidor detrás de un proxy inverso (Caddy, Tailscale o Cloudflare Tunnel), o usa una versión de depuración. DEPLOY.md, Connecting from Android, tiene los pasos.",
+    "needs_setup": "Este servidor aún no está configurado. Ábrelo en un navegador para crear la primera cuenta y después conéctate aquí."
   },
   "attach_image": {
     "button": "Adjuntar imagen",

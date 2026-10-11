@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   nameCodes, cleanCodes, knownCodes, itemAllergens, recipeAllergens, allergenSummary,
-  cleanHousehold, homeOn, conflicts, dislikesIn, allergenKey, applyOverrides, cardAllergens,
+  cleanHousehold, homeOn, conflicts, hasConflict, dislikesIn, allergenKey, applyOverrides, cardAllergens,
 } from '../src/lib/allergens.js';
 
 test('the server and the app use the same allergens.js', () => {
@@ -99,7 +99,7 @@ test('the household: who is home, what they avoid, what they dislike', () => {
   assert.deepEqual(homeOn(members, '2030-01-05').map(m => m.name), ['Alex']);
   assert.deepEqual(homeOn(members, '2030-01-07').map(m => m.name), ['Alex', 'Sam']);
   const summary = { contains: ['en:gluten', 'meat'], traces: ['en:peanuts'] };
-  assert.deepEqual(conflicts(summary, members), { contains: [{ code: 'en:gluten', who: ['Sam'] }, { code: 'meat', who: ['Sam'] }], traces: [{ code: 'en:peanuts', who: ['Alex'] }] });
+  assert.deepEqual(conflicts(summary, members), { contains: [{ code: 'en:gluten', who: ['Sam'] }, { code: 'meat', who: ['Sam'] }], traces: [{ code: 'en:peanuts', who: ['Alex'] }], foods: [] });
   assert.deepEqual(conflicts(summary, members, { date: '2030-01-05' }).contains, [], 'Sam is away on Saturday');
   const recipe = { ingredients: [{ items: [{ name: 'Mushrooms' }, { name: 'rice' }] }] };
   assert.deepEqual(dislikesIn(recipe, members, { date: '2030-01-07' }), [{ item: 'Mushrooms', who: ['Sam'] }]);
@@ -112,4 +112,25 @@ test('a card applies the recipe\'s correction once, however often', () => {
   assert.deepEqual(once, { contains: ['en:eggs', 'en:sesame-seeds'], traces: [] });
   assert.deepEqual(applyOverrides(once, fix), once);
   assert.deepEqual(cardAllergens({ ingredients: [{ items: [{ name: 'butter' }] }] }), { contains: ['en:milk'], traces: [] }, 'no summary from the server: the names');
+});
+
+test('an allergy beyond the 14, by ingredient name: as strict as an allergen, and not also a dislike', () => {
+  const [sam, ana] = cleanHousehold([
+    { name: 'Sam', other_allergies: ['Corn', 'corn', ' kiwi ', ''], dislikes: ['corn', 'onion'], days: [1] },
+    { name: 'Ana', diet: ['pescatarian'] },
+  ]);
+  assert.deepEqual(sam.other_allergies, ['corn', 'kiwi'], 'cleaned, once each');
+  assert.deepEqual(sam.dislikes, ['onion'], 'corn is an allergy, not a dislike');
+  const soup = { ingredients: [{ title: '', items: [{ name: 'Sweet corn kernels' }, { name: '2 kiwis' }, { name: 'onion' }, { name: 'popcorn salt' }] }] };
+  const hit = conflicts(null, [sam, ana], { recipe: soup });
+  assert.deepEqual(hit.foods, [{ item: 'Sweet corn kernels', who: ['Sam'] }, { item: '2 kiwis', who: ['Sam'] }], 'whole words, plural or not; "popcorn" is not corn');
+  assert.equal(hasConflict(hit), true);
+  // Only who's home that day: Sam is home on Mondays.
+  assert.equal(hasConflict(conflicts(null, [sam], { recipe: soup, date: '2026-10-12' })), true, 'a Monday');
+  assert.equal(hasConflict(conflicts(null, [sam], { recipe: soup, date: '2026-10-13' })), false, 'a Tuesday');
+  // Without the recipe, only the 14 and the diets count, as before.
+  assert.deepEqual(conflicts(null, [sam]).foods, []);
+  // A pescatarian has fish, not meat.
+  assert.equal(hasConflict(conflicts({ contains: ['en:fish'] }, [ana])), false);
+  assert.equal(hasConflict(conflicts({ contains: ['meat'] }, [ana])), true);
 });

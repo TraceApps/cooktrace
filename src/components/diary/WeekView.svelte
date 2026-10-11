@@ -35,8 +35,9 @@
   export let usesUp = null;
   export let recipes = new Map();
   export let members = [];
+  const recipeOf = e => (e.recipe_id != null ? recipes.get(e.recipe_id) || null : null);
   const allergensOf = e => {
-    const r = e.recipe_id != null ? recipes.get(e.recipe_id) : null;
+    const r = recipeOf(e);
     return r ? cardAllergens(r) : null;
   };
   let usesUpEl;
@@ -109,7 +110,7 @@
           <span class="tray-text">
             <span class="name">{e.recipe_name || 'Recipe'}</span>
             <span class="sub">{$_('cookdiary_page.servings_count', { values: { count: servingsOf(e) } })}</span>
-            {#if members.length}<AllergenChips summary={allergensOf(e)} {members} />{/if}
+            {#if members.length}<AllergenChips summary={allergensOf(e)} recipe={recipeOf(e)} {members} />{/if}
           </span>
         </button>
       {/each}
@@ -159,7 +160,7 @@
                     {#if e.meal_type}
                       <span class="chips"><span class="chip"><span class="material-symbols-rounded" aria-hidden="true">{MEAL_ICONS[e.meal_type] || 'restaurant'}</span>{$_(`cookdiary_page.week.meal_${e.meal_type}`)}</span></span>
                     {/if}
-                    {#if members.length}<AllergenChips summary={allergensOf(e)} {members} date={d.iso} />{/if}
+                    {#if members.length}<AllergenChips summary={allergensOf(e)} recipe={recipeOf(e)} {members} date={d.iso} />{/if}
                   </span>
                 </button>
                 <ServingsStepper value={servingsOf(e)} label={$_('cookdiary_page.servings')}
@@ -211,7 +212,7 @@
         <span class="idea-text">
           <span class="name">{idea.recipe.name}</span>
           <span class="sub">{$_('cookdiary_page.week.idea_uses', { values: { items: list.format(idea.uses) } })}</span>
-          {#if members.length}<AllergenChips summary={cardAllergens(idea.recipe)} {members} />{/if}
+          {#if members.length}<AllergenChips summary={cardAllergens(idea.recipe)} recipe={idea.recipe} {members} />{/if}
         </span>
         <button class="btn btn-primary idea-plan" on:click={() => dispatch('planRecipe', idea.recipe)}
           aria-label={$_('cookdiary_page.week.plan_recipe', { values: { name: idea.recipe.name } })}>

@@ -1004,7 +1004,7 @@
               {/if}
               <span class="recipe-text">
                 <span class="recipe-name">{r.name}</span>
-                {#if householdMembers.length}<AllergenChips summary={cardAllergens(r)} members={householdMembers} date={planAnyDay ? '' : planDate} />{/if}
+                {#if householdMembers.length}<AllergenChips summary={cardAllergens(r)} recipe={r} members={householdMembers} date={planAnyDay ? '' : planDate} />{/if}
               </span>
               {#if planRecipeId === r.id}<span class="material-symbols-rounded check">check</span>{/if}
             </button>

@@ -8,6 +8,8 @@
     members: the household (cleanHousehold)
     date: YYYY-MM-DD, to count only who's home that day; none: everyone
     only: 'conflicts' (recipe cards, the week) or 'all' (the recipe view)
+    recipe: the recipe, so foods someone is allergic to beyond the 14
+            (found by ingredient name) show too
 -->
 <script>
   import { _, locale } from 'svelte-i18n';
@@ -17,10 +19,11 @@
   export let members = [];
   export let date = '';
   export let only = 'conflicts';
+  export let recipe = null;
 
   $: list = new Intl.ListFormat($locale || undefined, { style: 'short', type: 'conjunction' });
   const codeOf = x => (typeof x === 'string' ? x : x?.code);
-  $: hit = conflicts(summary, members, { date: date || undefined });
+  $: hit = conflicts(summary, members, { date: date || undefined, recipe });
   $: hitContains = new Map(hit.contains.map(x => [x.code, x.who]));
   $: hitTraces = new Map(hit.traces.map(x => [x.code, x.who]));
   $: contains = (summary?.contains || []).map(codeOf).filter(c => hitContains.has(c) || (only === 'all' && ALLERGENS.includes(c)));
@@ -32,8 +35,13 @@
   }
 </script>
 
-{#if contains.length || traces.length}
+{#if contains.length || traces.length || hit.foods.length}
   <span class="chips">
+    {#each hit.foods as f (f.item)}
+      <span class="chip warn" title={$_('allergen_info.by_name')}>
+        <span class="material-symbols-rounded" aria-hidden="true">warning</span>{$_('allergen_info.conflict', { values: { what: f.item, who: list.format(f.who) } })}
+      </span>
+    {/each}
     {#each contains as c (c)}
       <span class="chip" class:warn={hitContains.has(c)}>
         {#if hitContains.has(c)}<span class="material-symbols-rounded" aria-hidden="true">warning</span>{/if}{text(c, hitContains.get(c))}

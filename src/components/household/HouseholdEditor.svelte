@@ -61,9 +61,13 @@
         <span class="row-label">{$_('household.allergies')}</span>
         {#each m.allergies as a (a)}
           <span class="chip warn"><span class="material-symbols-rounded" aria-hidden="true">warning</span>{$_(`allergens.${allergenKey(a)}`)}</span>
-        {:else}
-          <span class="muted">{$_('household.none')}</span>
         {/each}
+        {#each m.other_allergies || [] as a (a)}
+          <span class="chip warn"><span class="material-symbols-rounded" aria-hidden="true">warning</span>{a}</span>
+        {/each}
+        {#if !m.allergies.length && !m.other_allergies?.length}
+          <span class="muted">{$_('household.none')}</span>
+        {/if}
       </div>
       {#if m.diet.length}
         <div class="row">

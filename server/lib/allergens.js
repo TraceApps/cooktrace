@@ -264,8 +264,14 @@ export function cardAllergens(recipe) {
 }
 
 // ── The household ───────────────────────────────────────────────────────
-// A member: { id, name, allergies: [codes], diet: [diet ids],
-// dislikes: [words], days: [0-6, Sunday 0] } where no days means every day.
+// A member: { id, name, allergies: [codes], other_allergies: [words],
+// diet: [diet ids], dislikes: [words], days: [0-6, Sunday 0] } where no days
+// means every day. other_allergies are foods that aren't one of the 14
+// (corn, kiwi, pork for someone who never eats it): as strict as an
+// allergen, but found by ingredient name only, as no label lists them.
+
+const _words = list => [...new Map((Array.isArray(list) ? list : [])
+  .map(d => String(d || '').trim()).filter(Boolean).map(d => [_fold(d), d])).values()].slice(0, 30);
 
 /** Members as stored (a setting), cleaned. */
 export function cleanHousehold(list) {
@@ -277,7 +283,9 @@ export function cleanHousehold(list) {
     name: String(m.name).trim().slice(0, 60),
     allergies: cleanCodes(m.allergies).filter(c => ALLERGENS.includes(c)),
     diet: (Array.isArray(m.diet) ? m.diet : []).filter(d => d in DIETS),
-    dislikes: (Array.isArray(m.dislikes) ? m.dislikes : []).map(d => String(d || '').trim()).filter(Boolean).slice(0, 30),
+    other_allergies: _words(m.other_allergies),
+    // A food that's an allergy isn't also a dislike.
+    dislikes: _words(m.dislikes).filter(d => !_words(m.other_allergies).some(a => _fold(a) === _fold(d))),
     days: [...new Set((Array.isArray(m.days) ? m.days : []).map(Number).filter(d => Number.isInteger(d) && d >= 0 && d <= 6))].sort(),
   }));
 }
@@ -302,26 +310,43 @@ export function avoids(member) {
 
 /**
  * The household members a recipe is a problem for:
- * { contains: [{ code, who: [names] }], traces: [{ code, who }] }.
+ * { contains: [{ code, who: [names] }], traces: [{ code, who }],
+ *   foods: [{ item, who }] }.
  * `summary` is recipeAllergens() or allergenSummary() output; with a
- * date, only those home that day count.
+ * date, only those home that day count. With the recipe, `foods` are its
+ * ingredients someone is allergic to beyond the 14 (other_allergies).
  */
-export function conflicts(summary, members, { date } = {}) {
+export function conflicts(summary, members, { date, recipe } = {}) {
   const people = homeOn(members, date);
   const codesOf = list => (list || []).map(x => (typeof x === 'string' ? x : x.code));
   const find = codes => codes.map(code => ({ code, who: people.filter(m => avoids(m).has(code)).map(m => m.name) })).filter(x => x.who.length);
-  return { contains: find(codesOf(summary?.contains)), traces: find(codesOf(summary?.traces)) };
+  return {
+    contains: find(codesOf(summary?.contains)),
+    traces: find(codesOf(summary?.traces)),
+    foods: recipe ? _foodsIn(recipe, people, m => m.other_allergies) : [],
+  };
+}
+
+/** Someone can't have it: an allergen or diet it contains, or another food they're allergic to. */
+export function hasConflict(hit) {
+  return !!(hit?.contains?.length || hit?.foods?.length);
 }
 
 /** Ingredients someone home that day doesn't like: [{ item, who: [names] }]. */
 export function dislikesIn(recipe, members, { date } = {}) {
-  const people = homeOn(members, date).filter(m => m.dislikes?.length);
+  return _foodsIn(recipe, homeOn(members, date), m => m.dislikes);
+}
+
+// The recipe's ingredients whose names have one of each person's words in
+// them (a whole word, plural or not): [{ item, who: [names] }].
+function _foodsIn(recipe, people, wordsOf) {
+  people = people.filter(m => wordsOf(m)?.length);
   if (!people.length) return [];
   const out = [];
   for (const g of _groups(recipe?.ingredients)) {
     for (const it of g?.items || []) {
       const text = _fold(it?.name);
-      const who = people.filter(m => m.dislikes.some(d => {
+      const who = people.filter(m => wordsOf(m).some(d => {
         const w = _fold(d).trim();
         return w && new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:e?s)?\\b`).test(text);
       })).map(m => m.name);

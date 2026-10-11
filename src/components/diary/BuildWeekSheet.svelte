@@ -25,7 +25,7 @@
   import { buildWeek, freeDays, picksNeeds } from '../../lib/plan-ideas.js';
   import { fromIso, isoDay, planHorizon } from '../../lib/week.js';
   import AllergenChips from '../allergens/AllergenChips.svelte';
-  import { cardAllergens, conflicts, dislikesIn, homeOn } from '../../lib/allergens.js';
+  import { cardAllergens, conflicts, hasConflict, dislikesIn, homeOn } from '../../lib/allergens.js';
 
   export let open = false;
   export let weekStart = '';
@@ -62,7 +62,7 @@
   // lower when someone home doesn't like an ingredient.
   $: fit = members.length ? (r, slot) => {
     const date = days[slot] || null;
-    if (leaveOut && conflicts(cardAllergens(r), members, { date }).contains.length) return false;
+    if (leaveOut && hasConflict(conflicts(cardAllergens(r), members, { date, recipe: r }))) return false;
     return dislikesIn(r, members, { date }).length ? -1.5 : 0;
   } : null;
   $: exclude = new Set(planned.map(e => e.recipe_id));
@@ -73,7 +73,7 @@
   // Recipes that couldn't go on any of the days being planned.
   $: slotDates = Array.from({ length: count }, (_, i) => days[i] || null);
   $: blocked = members.length && open
-    ? recipes.filter(r => !exclude.has(r.id) && slotDates.every(date => conflicts(cardAllergens(r), members, { date }).contains.length)).length
+    ? recipes.filter(r => !exclude.has(r.id) && slotDates.every(date => hasConflict(conflicts(cardAllergens(r), members, { date, recipe: r })))).length
     : 0;
   $: totals = picksNeeds(picks, pantry, { today, horizon: planHorizon(weekEnd, today) });
   $: list = new Intl.ListFormat($locale || undefined, { style: 'long', type: 'conjunction' });
@@ -184,7 +184,7 @@
               <span class="name">{p.recipe.name}</span>
               <span class="why" class:good={p.reason.kind === 'uses'}>{reasonText(p.reason)}</span>
               {#if members.length}
-                <AllergenChips summary={cardAllergens(p.recipe)} {members} date={days[i] || ''} />
+                <AllergenChips summary={cardAllergens(p.recipe)} recipe={p.recipe} {members} date={days[i] || ''} />
                 {#each dislikesIn(p.recipe, members, { date: days[i] || null }) as d (d.item)}
                   <span class="why">{$_(d.who.length > 1 ? 'allergen_info.dislikes_many' : 'allergen_info.dislikes', { values: { who: list.format(d.who), item: d.item } })}</span>
                 {/each}

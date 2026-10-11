@@ -505,7 +505,7 @@
                       {/each}
                     {/if}
                   </div>
-                  <AllergenChips summary={cardAllergens(r)} members={cleanHousehold($household)} />
+                  <AllergenChips summary={cardAllergens(r)} recipe={r} members={cleanHousehold($household)} />
                 </div>
               </button>
               </div>

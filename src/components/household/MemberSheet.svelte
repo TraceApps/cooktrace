@@ -1,6 +1,6 @@
 <!--
-  MemberSheet: one person in the household. Name, allergies, diet,
-  dislikes and the days they're home.
+  MemberSheet: one person in the household. Name, allergies (the 14, and
+  other foods by name), diet, dislikes and the days they're home.
 
   Props: open (bindable), member (null for a new one), suggestName (a new
   one's name to start with), firstDay (0 Sunday)
@@ -24,8 +24,10 @@
   let allergies = [];
   let diet = [];
   let dislikes = [];
+  let others = [];
   let days = [];
   let dislikeText = '';
+  let otherText = '';
   let error = '';
   let wasOpen = false;
 
@@ -35,8 +37,10 @@
     allergies = [...(member?.allergies || [])];
     diet = [...(member?.diet || [])];
     dislikes = [...(member?.dislikes || [])];
+    others = [...(member?.other_allergies || [])];
     days = [...(member?.days || [])];
     dislikeText = '';
+    otherText = '';
     error = '';
   }
   $: if (!open) wasOpen = false;
@@ -47,22 +51,37 @@
 
   const toggle = (list, v) => (list.includes(v) ? list.filter(x => x !== v) : [...list, v]);
 
+  const has = (list, w) => list.some(d => d.toLowerCase() === w.toLowerCase());
   function addDislike() {
     const parts = dislikeText.split(',').map(s => s.trim()).filter(Boolean);
-    for (const p of parts) if (!dislikes.some(d => d.toLowerCase() === p.toLowerCase())) dislikes = [...dislikes, p];
+    for (const p of parts) if (!has(dislikes, p) && !has(others, p)) dislikes = [...dislikes, p];
     dislikeText = '';
   }
   function onDislikeKey(e) {
     if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addDislike(); }
   }
+  // A food that's an allergy leaves the dislikes: it's the stricter of the two.
+  function addOther() {
+    const parts = otherText.split(',').map(s => s.trim()).filter(Boolean);
+    for (const p of parts) {
+      if (!has(others, p)) others = [...others, p];
+      dislikes = dislikes.filter(d => d.toLowerCase() !== p.toLowerCase());
+    }
+    otherText = '';
+  }
+  function onOtherKey(e) {
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addOther(); }
+  }
 
   function save() {
+    addOther();
     addDislike();
     if (!name.trim()) { error = $_('household.name_required'); return; }
     dispatch('save', {
       id: member?.id || `m${Date.now().toString(36)}`,
       name: name.trim(),
       allergies: ALLERGENS.filter(c => allergies.includes(c)),
+      other_allergies: others,
       diet: Object.keys(DIETS).filter(d => diet.includes(d)),
       dislikes,
       days: [...days].sort(),
@@ -91,6 +110,22 @@
         {/each}
       </div>
     </fieldset>
+
+    <div class="field">
+      <label class="label" for="member-other-allergies">{$_('household.other_allergies')}</label>
+      {#if others.length}
+        <div class="chips">
+          {#each others as d (d)}
+            <span class="tag warn"><span class="material-symbols-rounded" aria-hidden="true">warning</span>{d}<button type="button" class="tag-x" aria-label={$_('household.remove_other_allergy', { values: { item: d } })}
+              on:click={() => (others = others.filter(x => x !== d))}><span class="material-symbols-rounded" aria-hidden="true">close</span></button></span>
+          {/each}
+        </div>
+      {/if}
+      <input id="member-other-allergies" class="input" type="text" maxlength="60" bind:value={otherText}
+        placeholder={$_('household.other_allergies_placeholder')} on:keydown={onOtherKey} on:blur={addOther}
+        aria-describedby="member-other-allergies-hint" />
+      <span class="hint" id="member-other-allergies-hint">{$_('household.other_allergies_hint')}</span>
+    </div>
 
     <fieldset class="field">
       <legend class="label">{$_('household.diet')}</legend>
@@ -168,6 +203,10 @@
     color: var(--text-2); display: flex; align-items: center; justify-content: center; cursor: pointer;
   }
   .tag-x .material-symbols-rounded { font-size: 16px; }
+  /* An allergy by name: the household's warning color, as on the cards. */
+  .tag.warn { padding-left: 8px; gap: 4px; background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--warning); font-weight: 600; }
+  .tag.warn > .material-symbols-rounded { font-size: 16px; }
+  .tag.warn .tag-x { color: var(--warning); }
   .days { display: flex; gap: 6px; flex-wrap: wrap; }
   .day {
     width: 40px; height: 40px; padding: 0; border-radius: var(--radius-full); border: 1px solid var(--border-strong);

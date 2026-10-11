@@ -51,7 +51,7 @@
   import HistorySheet from '../components/recipe/HistorySheet.svelte';
   import { revisionOf } from '../lib/recipe-content.js';
   import { household } from '../stores/settings.js';
-  import { ALLERGENS, allergenKey, avoids, cleanHousehold, cleanOverrides, itemAllergens } from '../lib/allergens.js';
+  import { ALLERGENS, allergenKey, avoids, cleanHousehold, cleanOverrides, itemAllergens, conflicts } from '../lib/allergens.js';
   import { buildRecipeCardPages, buildRecipeShareText } from '../lib/recipe-card.js';
   import { svgToPngBlob, shareBlobs } from '../lib/shopping-card.js';
 
@@ -580,12 +580,18 @@
   $: householdMembers = cleanHousehold($household);
   $: avoidedCodes = new Set(householdMembers.flatMap(m => [...avoids(m)]));
   $: recipeFix = cleanOverrides(recipe?.allergen_overrides);
+  // Ingredients someone is allergic to by name (other_allergies), by name.
+  $: allergyFoods = new Map(recipe ? conflicts(null, householdMembers, { recipe }).foods.map(f => [f.item, f.who]) : []);
+  $: whoList = new Intl.ListFormat($locale || undefined, { style: 'short', type: 'conjunction' });
   $: ingTag = (ing) => {
     if (!ing?.name) return null;
     const codes = itemAllergens(ing, pantryById).contains
       .filter(c => !recipeFix.remove.includes(c) && (ALLERGENS.includes(c) || avoidedCodes.has(c)));
-    if (!codes.length) return null;
-    return { warn: codes.some(c => avoidedCodes.has(c)), text: codes.map(c => $_(`allergens.${allergenKey(c)}`)).join(', ') };
+    const who = allergyFoods.get(ing.name);
+    const parts = codes.map(c => $_(`allergens.${allergenKey(c)}`));
+    if (who) parts.unshift($_('allergen_info.conflict', { values: { what: $_('allergen_info.allergy'), who: whoList.format(who) } }));
+    if (!parts.length) return null;
+    return { warn: !!who || codes.some(c => avoidedCodes.has(c)), text: parts.join(', ') };
   };
 
   // Mass per serving for the FDA box. Null until pantry is loaded; null

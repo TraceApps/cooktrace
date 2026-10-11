@@ -9,6 +9,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Recipe history** ([#54](https://github.com/TraceApps/cooktrace/issues/54), thanks @DefectiveConsole). Every change to a recipe's ingredients, steps, servings or times keeps a version, and each cook records the one you made, so an old diary entry opens the recipe as it was that day. History on the recipe page lists every version with what changed; compare any two, give one a name, and restore an older one without losing the newer ones. Each version shows when you cooked it and how you rated it, and Trace can read the history too.
+- **Your household, and allergens on every recipe.** Settings > Household lists who you cook for, with their allergies, diets, dislikes and the days they're home. Allergens come from pantry labels (Open Food Facts) and ingredient names, with a correction per recipe. Warnings name who they're for, on recipe cards, the recipe page, the week and the shopping list; Safe for Everyone filters the recipe list, and Build My Week leaves out what someone home that day can't eat. Other Allergies covers foods beyond the 14 major allergens (corn, kiwi), as strictly, found by ingredient name.
+- **All of CookTrace in Spanish**, every screen and message, and messages that read the same way everywhere: "Couldn't save the recipe: the server can't be reached."
 - **Uses Up, in the Week view**: what's in stock and about to expire, how many days each has left and which planned cook uses it, and the recipes you haven't planned that would use the most of it, each with a Plan button that puts it on the week's next free day.
 - **Build My Week**: choose how many dinners and servings, and whether to favor what's expiring, skip what you cooked lately, or keep to 30 minutes. The picks come ranked by what's in your pantry, what they use up, the ingredients they share, and when you last cooked them, each saying why, with a Swap for the next best and the totals updating as you go. Add to Week plans them on the free days (any extra for any day).
 - **Trace can plan with servings, or for any day of a week.**
@@ -35,6 +38,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **A cook logged today says Today**, not "21 Hours Ago", and dates like "3 Days Ago" follow the app's language.
+- **A recipe's Last Cooked shows the day it was cooked**, not the day before, anywhere west of UTC.
 - **A fresh install's welcome screen no longer shows a "Setup required" error.** The recipes page loaded behind it before setup opened, and the server refused it until the first account existed. Setup now opens first, and nothing else asks the server for data until it's done.
 - **Turning update checks on or off in the browser reaches the server.** The setup wizard, Settings and the Updates banner were all refused, so the server kept its old setting.
 - **The Android app says when a server isn't set up yet.** Connecting to a fresh install said the server couldn't be reached (or that only HTTPS works). Now it says to open the server in a browser and create the first account first; Android apps from before this get the same answer when they sign in. `/api/health` answers before setup too, with `setup_required: true`, so a container healthcheck passes from the first start.
