@@ -91,6 +91,8 @@ Third app in the Trace family alongside [NutriTrace](https://github.com/traceapp
 
 Published to two registries with identical tag sets: `ghcr.io/traceapps/cooktrace` (primary) and `traceapps/cooktrace` on [Docker Hub](https://hub.docker.com/r/traceapps/cooktrace) (mirror). The snippet below uses GHCR; swap in `traceapps/cooktrace:latest` if that suits your setup.
 
+**Unraid:** CookTrace is in Community Applications. Search for CookTrace in the Apps tab; the template sets the port, the appdata folders and the settings. Fill in JWT Secret before the first start.
+
 Minimal `docker-compose.yml`:
 
 ```yaml
