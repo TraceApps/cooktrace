@@ -22,7 +22,7 @@
   import { confirmDialog } from '../stores/confirmDialog.js';
   import { buildRecipeCardPages, buildRecipeShareText } from '../lib/recipe-card.js';
   import { svgToPngBlob, shareBlobs } from '../lib/shopping-card.js';
-  import { isNative, getServerUrl, publicRecipeUrl } from '../lib/platform.js';
+  import { isNative, getServerUrl, publicRecipeUrl, resolveAssetUrl } from '../lib/platform.js';
 
   import { foldText } from '../lib/search-text.js';
   import AllergenChips from '../components/allergens/AllergenChips.svelte';
@@ -1513,7 +1513,7 @@
               on:click={() => push(`/cookbooks/${cb.id}`)}>
               <div class="cb-card-cover">
                 {#if cb.cover_image_url}
-                  <img src={cb.cover_image_url} alt="" loading="lazy" />
+                  <img src={resolveAssetUrl(cb.cover_image_url)} alt="" loading="lazy" />
                 {:else}
                   <span class="material-symbols-rounded">auto_stories</span>
                 {/if}
@@ -1541,7 +1541,7 @@
               on:click={() => push(`/cookbooks/${cb.id}`)}>
               <div class="cb-card-cover">
                 {#if cb.cover_image_url}
-                  <img src={cb.cover_image_url} alt="" loading="lazy" />
+                  <img src={resolveAssetUrl(cb.cover_image_url)} alt="" loading="lazy" />
                 {:else}
                   <span class="material-symbols-rounded">auto_stories</span>
                 {/if}

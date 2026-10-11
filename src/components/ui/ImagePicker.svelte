@@ -148,7 +148,7 @@
 <div class="image-picker" class:expand>
   <div class="preview-wrap" style:aspect-ratio={aspect}>
     {#if value}
-      <img class="preview-img" src={value} alt="" />
+      <img class="preview-img" src={resolveAssetUrl(value)} alt="" />
       <button class="preview-clear" on:click={clear} aria-label={$_('image_picker_ui.remove_image')} title={$_('image_picker_ui.remove_image')}>
         <span class="material-symbols-rounded">close</span>
       </button>

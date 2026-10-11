@@ -8,6 +8,7 @@
   import { _ } from 'svelte-i18n';
   import { pageBanners, bannerStyle, pantryView } from '../stores/settings.js';
   import { NtApi } from '../lib/api.js';
+  import { resolveAssetUrl } from '../lib/platform.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { confirmDialog } from '../stores/confirmDialog.js';
   import { push, replace, querystring } from 'svelte-spa-router';
@@ -1160,7 +1161,7 @@
               title={`${x.item.name}: ${_expiryLabel(x.exp)}`}>
               <div class="spotlight-photo">
                 {#if x.item.img_url}
-                  <img src={x.item.img_url} alt="" loading="lazy" />
+                  <img src={resolveAssetUrl(x.item.img_url)} alt="" loading="lazy" />
                 {:else}
                   <span class="material-symbols-rounded">{_catIconBySlug(_itemSlug(x.item))}</span>
                 {/if}
@@ -1260,7 +1261,7 @@
 
               <div class="pcard-photo">
                 {#if it.img_url}
-                  <img src={it.img_url} alt="" loading="lazy" />
+                  <img src={resolveAssetUrl(it.img_url)} alt="" loading="lazy" />
                 {:else}
                   <span class="material-symbols-rounded photo-stub">{_catIconBySlug(_itemSlug(it))}</span>
                 {/if}
@@ -1363,7 +1364,7 @@
                   on:keydown={(e) => { if (e.key === 'Enter') onRowClick(v); }}>
                   <div class="pcard-photo">
                     {#if v.img_url}
-                      <img src={v.img_url} alt="" loading="lazy" />
+                      <img src={resolveAssetUrl(v.img_url)} alt="" loading="lazy" />
                     {:else}
                       <span class="material-symbols-rounded photo-stub">label</span>
                     {/if}
@@ -1417,7 +1418,7 @@
                 role="button" tabindex="0"
                 on:keydown={(e) => { if (e.key === 'Enter') pickExternalResult(r); }}>
                 {#if r.img_url}
-                  <img class="item-thumb" src={r.img_url} alt="" loading="lazy" />
+                  <img class="item-thumb" src={resolveAssetUrl(r.img_url)} alt="" loading="lazy" />
                 {:else if r._source === 'local'}
                   <span class="material-symbols-rounded ext-stub-icon">{_catIconBySlug(_itemSlug(r))}</span>
                 {:else}
@@ -1481,7 +1482,7 @@
                 role="button" tabindex="0"
                 on:keydown={(e) => { if (e.key === 'Enter') pickExternalResult(r); }}>
                 {#if r.img_url}
-                  <img class="item-thumb" src={r.img_url} alt="" loading="lazy" />
+                  <img class="item-thumb" src={resolveAssetUrl(r.img_url)} alt="" loading="lazy" />
                 {:else}
                   <span class="material-symbols-rounded ext-stub-icon">qr_code_scanner</span>
                 {/if}
