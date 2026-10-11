@@ -30,6 +30,8 @@ import { SYNC_SCHEMA } from './sync-fields.js';
 let _syncInFlight = null;
 // A sync that isn't the quiet 30s one was asked for: do the pictures pass.
 let _imagesWanted = false;
+// When the pictures pass last ran.
+let _imagesAt = 0;
 // A sync asked for while one runs (an edit saved, the app coming back):
 // one more runs after it, so what it was asked for isn't left waiting.
 let _syncAgain = false;
@@ -893,8 +895,11 @@ async function _fullSync({ silent, forceCheck, showFailureBanner, token, signal,
     // timer (launch, coming back, Sync Now): the pass reads the whole
     // library from the server, which every idle sync did every 30s.
     try {
-      if (live() && (!silent || _imagesWanted || pull.changed || push.pushed)) {
+      // And every 10 minutes on the quiet timer, for a picture whose
+      // download failed (it isn't in the pull to say so again).
+      if (live() && (!silent || _imagesWanted || pull.changed || push.pushed || Date.now() - _imagesAt > 10 * 60 * 1000)) {
         _imagesWanted = false;
+        _imagesAt = Date.now();
         const { cacheAllImages } = await import('./image-cache.js');
         await cacheAllImages((done, total) => {
           if (total > 0) {
