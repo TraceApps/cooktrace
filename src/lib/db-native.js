@@ -760,6 +760,25 @@ export async function dbGetMeta(key) {
   return res?.values?.[0]?.value ?? null;
 }
 
+// The disabled-units set changed on this phone since its last push: the
+// value says when, so a push clears it only if nothing changed meanwhile.
+const DISABLED_UNITS_CHANGED = 'disabled_units_changed';
+export async function dbMarkDisabledUnitsChanged() {
+  await dbSetMeta(DISABLED_UNITS_CHANGED, `${Date.now()}:${Math.random().toString(36).slice(2, 8)}`);
+}
+/** Forget a change to the set (the server's wins: a Download, a connect). */
+export async function dbForgetDisabledUnitsChange() {
+  if (!isNative) return;
+  const db = await getDb();
+  await db.run(`DELETE FROM sync_meta WHERE key = ?`, [DISABLED_UNITS_CHANGED]);
+}
+/** After a push that carried the set marked `mark`. */
+export async function dbClearDisabledUnitsChanged(mark) {
+  if (!isNative || !mark) return;
+  const db = await getDb();
+  await db.run(`DELETE FROM sync_meta WHERE key = ? AND value = ?`, [DISABLED_UNITS_CHANGED, String(mark)]);
+}
+
 export async function dbSetMeta(key, value) {
   if (!isNative) return;
   const db = await getDb();
@@ -863,24 +882,38 @@ export const SYNC_PARENTS = {
   recipe_revisions: { recipe_id: 'recipes' },
 };
 
+// Each table's columns, read the first time a pull needs them.
+const _tableColumns = new Map();
+
 /** All rows with sync_status='pending' grouped by table. */
 export async function dbGetPendingChanges() {
   if (!isNative) return {};
   const db = await getDb();
   const out = {};
+  // Which tables have anything waiting, in one read: most syncs have
+  // nothing to send, and a query per table is a trip over the plugin
+  // bridge each.
+  const waiting = new Set(((await db.query(
+    SYNC_TABLES.map(t => `SELECT '${t}' AS t WHERE EXISTS (SELECT 1 FROM ${t} WHERE user_id = ? AND sync_status = 'pending')`).join(' UNION ALL '),
+    SYNC_TABLES.map(() => LOCAL_USER_ID)
+  ))?.values || []).map(r => r.t));
   for (const table of SYNC_TABLES) {
+    if (!waiting.has(table)) { out[table] = []; continue; }
     const r = await db.query(
       `SELECT * FROM ${table} WHERE user_id = ? AND sync_status = 'pending'`,
       [LOCAL_USER_ID]
     );
     out[table] = r?.values || [];
   }
-  // disabled_units: no sync_status — push the full set.
-  const dis = await db.query(
-    `SELECT abbr FROM disabled_units WHERE user_id = ?`,
-    [LOCAL_USER_ID]
-  );
-  out.disabled_units = dis?.values || [];
+  // disabled_units has no sync_status: the whole set goes up, and only
+  // when it changed here (dbMarkDisabledUnitsChanged). Sending it every
+  // push made every sync of anyone with a unit turned off a push.
+  const changed = await dbGetMeta(DISABLED_UNITS_CHANGED);
+  if (changed) {
+    const dis = await db.query(`SELECT abbr FROM disabled_units WHERE user_id = ?`, [LOCAL_USER_ID]);
+    out.disabled_units = dis?.values || [];
+    out.disabled_units_changed = changed;
+  }
   // recipe_cookbook_links: the links added or reordered here since the
   // last push. The server keeps the rest.
   const links = await db.query(`SELECT cookbook_id, recipe_id, sort_order FROM recipe_cookbook_links WHERE sync_status = 'pending'`, []);
@@ -980,14 +1013,14 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
   const tablesInOrder = Object.entries(payload.tables).sort((x, y) => order(x[0]) - order(y[0]));
   // The columns each table here has: a server newer than this app may send
   // a table or column it doesn't know yet, which is left out rather than
-  // stopping the pull (and every one after it) on it.
-  const known = new Map();
+  // stopping the pull (and every one after it) on it. Read once per run of
+  // the app (_tableColumns): the tables only change at dbInit.
   async function columnsOf(table) {
-    if (!known.has(table)) {
+    if (!_tableColumns.has(table)) {
       const info = await db.query(`PRAGMA table_info(${table})`, []);
-      known.set(table, new Set((info?.values || []).map(c => c.name)));
+      _tableColumns.set(table, new Set((info?.values || []).map(c => c.name)));
     }
-    return known.get(table);
+    return _tableColumns.get(table);
   }
   for (const [table, rows] of tablesInOrder) {
     if (!Array.isArray(rows)) continue;
@@ -1205,14 +1238,18 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
   }
 
   if (!live()) return false;
-  // disabled_units: replace local set with server set.
-  if (Array.isArray(payload.tables.disabled_units)) {
-    await db.run(`DELETE FROM disabled_units WHERE user_id = ?`, [LOCAL_USER_ID]);
-    for (const r of payload.tables.disabled_units) {
-      await db.run(
-        `INSERT OR IGNORE INTO disabled_units (user_id, abbr) VALUES (?, ?)`,
-        [LOCAL_USER_ID, r.abbr]
-      );
+  // disabled_units: the server's set replaces the one here, unless this
+  // one changed and hasn't gone up yet (the pull runs before the push, and
+  // replacing it undid a unit turned off on the phone). The server sends
+  // the set with every pull, so an unchanged one isn't rewritten.
+  if (Array.isArray(payload.tables.disabled_units) && !(await dbGetMeta(DISABLED_UNITS_CHANGED))) {
+    const theirs = [...new Set(payload.tables.disabled_units.map(r => r?.abbr).filter(Boolean))].sort();
+    const ours = ((await db.query(`SELECT abbr FROM disabled_units WHERE user_id = ?`, [LOCAL_USER_ID]))?.values || []).map(r => r.abbr).sort();
+    if (theirs.join('\n') !== ours.join('\n')) {
+      await db.run(`DELETE FROM disabled_units WHERE user_id = ?`, [LOCAL_USER_ID]);
+      for (const abbr of theirs) {
+        await db.run(`INSERT OR IGNORE INTO disabled_units (user_id, abbr) VALUES (?, ?)`, [LOCAL_USER_ID, abbr]);
+      }
     }
   }
 
@@ -1237,20 +1274,37 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
       }))
       .filter(l => l.cookbook_id && l.recipe_id);
     const known = [...cookbookMap.values()];
-    if (known.length) {
-      const ph = known.map(() => '?').join(',');
-      await db.run(
-        `DELETE FROM recipe_cookbook_links
-          WHERE cookbook_id IN (${ph}) AND COALESCE(sync_status, 'synced') != 'pending'`,
-        known
-      );
-    }
-    for (const l of links) {
-      await db.run(
-        `INSERT OR IGNORE INTO recipe_cookbook_links (cookbook_id, recipe_id, sort_order, sync_status)
-         VALUES (?, ?, ?, 'synced')`,
-        [l.cookbook_id, l.recipe_id, l.sort_order]
-      );
+    // The server sends every link with every pull: when they're the ones
+    // here already, nothing is rewritten (a library in cookbooks was a
+    // delete and an insert per link, every 30s).
+    const ph = known.map(() => '?').join(',');
+    const key = l => `${l.cookbook_id}:${l.recipe_id}:${l.sort_order ?? 0}`;
+    const here = known.length ? ((await db.query(
+      `SELECT cookbook_id, recipe_id, sort_order FROM recipe_cookbook_links
+        WHERE cookbook_id IN (${ph}) AND COALESCE(sync_status, 'synced') != 'pending'`,
+      known
+    ))?.values || []) : [];
+    const pendingHere = new Set(links.length ? ((await db.query(
+      `SELECT cookbook_id, recipe_id FROM recipe_cookbook_links WHERE sync_status = 'pending'`, []
+    ))?.values || []).map(l => `${l.cookbook_id}:${l.recipe_id}`) : []);
+    const wanted = links.filter(l => !pendingHere.has(`${l.cookbook_id}:${l.recipe_id}`));
+    const same = here.length === wanted.length
+      && here.map(key).sort().join('|') === wanted.map(key).sort().join('|');
+    if (!same) {
+      if (known.length) {
+        await db.run(
+          `DELETE FROM recipe_cookbook_links
+            WHERE cookbook_id IN (${ph}) AND COALESCE(sync_status, 'synced') != 'pending'`,
+          known
+        );
+      }
+      for (const l of links) {
+        await db.run(
+          `INSERT OR IGNORE INTO recipe_cookbook_links (cookbook_id, recipe_id, sort_order, sync_status)
+           VALUES (?, ?, ?, 'synced')`,
+          [l.cookbook_id, l.recipe_id, l.sort_order]
+        );
+      }
     }
   }
 
@@ -1308,14 +1362,16 @@ export async function dbMarkTableSynced(table, rows) {
 export async function dbCountUnsynced() {
   if (!isNative) return 0;
   const db = await getDb();
-  const n = async sql => Number((await db.query(sql, []))?.values?.[0]?.n || 0);
-  let total = 0;
-  // A recipe's versions follow its edits: not changes of their own.
-  for (const t of SYNC_TABLES) if (t !== 'recipe_revisions') total += await n(`SELECT COUNT(*) AS n FROM ${t} WHERE sync_status = 'pending'`);
-  total += await n(`SELECT COUNT(*) AS n FROM recipe_cookbook_links WHERE sync_status = 'pending'`);
-  total += await n(`SELECT COUNT(*) AS n FROM sync_deletes`);
-  total += await n(`SELECT COUNT(*) AS n FROM user_settings WHERE sync_status = 'pending'`);
-  return total;
+  // One read for all of them. A recipe's versions follow its edits: not
+  // changes of their own.
+  const parts = SYNC_TABLES.filter(t => t !== 'recipe_revisions')
+    .map(t => `(SELECT COUNT(*) FROM ${t} WHERE sync_status = 'pending')`);
+  parts.push(`(SELECT COUNT(*) FROM recipe_cookbook_links WHERE sync_status = 'pending')`);
+  parts.push(`(SELECT COUNT(*) FROM sync_deletes)`);
+  parts.push(`(SELECT COUNT(*) FROM user_settings WHERE sync_status = 'pending')`);
+  // Units turned on or off here and not sent yet: one change.
+  parts.push(`(SELECT COUNT(*) FROM sync_meta WHERE key = '${DISABLED_UNITS_CHANGED}')`);
+  return Number((await db.query(`SELECT ${parts.join(' + ')} AS n`, []))?.values?.[0]?.n || 0);
 }
 
 // Every account row the phone mirrors, and what the sync knows about the
@@ -1331,6 +1387,7 @@ export async function dbClearUserData() {
   // deletes silently left most tables as they were.
   for (const t of _ACCOUNT_TABLES) await db.run(`DELETE FROM ${t}`, []);
   await db.run(`DELETE FROM sync_meta WHERE key = 'last_pull_at'`, []);
+  await db.run(`DELETE FROM sync_meta WHERE key = ?`, [DISABLED_UNITS_CHANGED]);
   // Read back: a copy that still holds anything is never shown as cleared
   // (lib/local-account.js shows the error screen instead).
   for (const t of _ACCOUNT_TABLES) {
@@ -1366,6 +1423,9 @@ export async function dbKeepForNewServer(uploaded = {}) {
   await db.run(`DELETE FROM sync_deletes`, []);
   await db.run(`DELETE FROM sync_echoes`, []);
   await db.run(`DELETE FROM sync_meta WHERE key = 'last_pull_at'`, []);
+  // The server's disabled units win on connecting, as before: a set marked
+  // here would replace (or, empty, clear) the account's on the first push.
+  await db.run(`DELETE FROM sync_meta WHERE key = ?`, [DISABLED_UNITS_CHANGED]);
 }
 
 /** This install's id: with a row's own id and when it was made, the key

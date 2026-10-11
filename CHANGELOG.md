@@ -35,6 +35,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **A unit turned off in the Android app stays off.** With a server, the sync the change started put it straight back on, and it never reached the server; turning every unit back on didn't reach it either.
+- **The Android app syncs half as often, and does less when nothing changed.** It ran two 30-second syncs at once. Now one runs while the app is on screen, and a sync with nothing new no longer downloads the whole library to look for pictures, sends a push for anyone with a unit turned off, or rewrites cookbook links and settings it already has: 2 requests and about 20 database reads instead of up to 7 and 55.
 - **Ingredient lines import cleanly** ([#57](https://github.com/TraceApps/cooktrace/discussions/57), thanks @tmzhuang). A range like "4 - 5 roma tomatoes" is one amount, and sizes, package sizes and prep ("large", "15-ounce can", "garlic, minced") go to the note, so the pantry gets "Tomatoes" and "Garlic" rather than "- 5 roma tomatoes" or "garlic, minced". A comma inside a name stays ("boneless, skinless chicken").
 - **An ingredient links to the pantry item it names, plural or not.** "tomato" finds "Tomatoes", and an import naming both makes one item.
 - **Importing a recipe in the Android app links its ingredients to the pantry** and adds new items out of stock. It marked them all in stock and left the recipe unlinked, so nothing ever showed as missing.

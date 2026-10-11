@@ -506,10 +506,11 @@ router.post('/push', wrap((req, res) => {
   //
   // Option E guard: only DELETE-then-INSERT when the client has actually
   // sent entries. An empty array from a stale/wiped client used to
-  // silently truncate the user's whole disabled-units set. If the client
-  // genuinely wants to clear the set, the app can add an explicit flag
-  // later — no current UI path does this.
-  if (Array.isArray(tables.disabled_units) && tables.disabled_units.length > 0) {
+  // silently truncate the user's whole disabled-units set. A phone that
+  // turned every unit back on says so with disabled_units_set (1.5+), and
+  // only then does an empty set clear it.
+  const unitsSet = req.body?.disabled_units_set === true;
+  if (Array.isArray(tables.disabled_units) && (tables.disabled_units.length > 0 || unitsSet)) {
     const txn = db.transaction(() => {
       db.prepare(`DELETE FROM disabled_units WHERE ${userClause(u)}`).run(...userArgs(u));
       const ins = db.prepare(`INSERT OR IGNORE INTO disabled_units (user_id, abbr) VALUES (?, ?)`);

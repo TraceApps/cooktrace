@@ -362,6 +362,8 @@ export async function wipeLocalData() {
       touched += r?.changes?.changes || 0;
     } catch { /* table may not exist on older installs */ }
   }
+  // The server's disabled units come down: none of this phone's go up.
+  try { const { dbForgetDisabledUnitsChange } = await import('./db-native.js'); await dbForgetDisabledUnitsChange(); } catch { /* none */ }
   // Blow away local user-scoped settings so the server's win on reload.
   if (typeof localStorage !== 'undefined') {
     const toRemove = [];

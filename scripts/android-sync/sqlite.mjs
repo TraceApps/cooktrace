@@ -36,6 +36,10 @@ function firstStatement(db, sql) {
   return sql;
 }
 
+// Every trip across the bridge, as the plugin would make it: a scenario
+// counts what one sync costs (globalThis.__sqlCalls, when it's an array).
+const note = (kind, sql) => { if (Array.isArray(globalThis.__sqlCalls)) globalThis.__sqlCalls.push({ kind, sql: String(sql).replace(/\s+/g, ' ').trim() }); };
+
 function conn(name) {
   // PHONE_DB: a file, so a later run is the same phone (or a copy of it).
   if (!dbs.has(name)) { const d = new Database(process.env.PHONE_DB ? `${process.env.PHONE_DB}-${name}.db` : ':memory:'); skewed(d); dbs.set(name, d); }
@@ -49,6 +53,7 @@ function conn(name) {
     // only its first statement. Two statements on one line: the second
     // silently never runs.
     async execute(sql) {
+      note('execute', sql);
       const before = db.prepare('SELECT total_changes() AS n').get().n;
       let pieces = String(sql).replace(/end;/g, 'END;').split(';\n').map(x => x.trim());
       for (let i = pieces.indexOf('END'); i > 0; i = pieces.indexOf('END')) pieces.splice(i - 1, 2, pieces[i - 1] + '; END');
@@ -61,6 +66,7 @@ function conn(name) {
       return { changes: { changes: db.prepare('SELECT total_changes() AS n').get().n - before } };
     },
     async query(sql, params) {
+      note('query', sql);
       const st = db.prepare(sql);
       if (!st.reader) { st.run(...norm(params)); return { values: [] }; }
       return { values: st.all(...norm(params)) };
@@ -68,6 +74,7 @@ function conn(name) {
     // Each write waits a turn, as a trip across the native bridge does, so
     // other work (a sign-in, another sync) can run while one is writing.
     async run(sql, params) {
+      note('run', sql);
       await new Promise(r => setImmediate(r));
       const r = db.prepare(sql).run(...norm(params));
       return { changes: { changes: Number(r.changes), lastId: Number(r.lastInsertRowid) } };

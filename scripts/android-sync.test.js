@@ -21,7 +21,7 @@
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, copyFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, copyFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
@@ -548,6 +548,45 @@ test('recipe history: versions and cooks from the phone, a restore and an edit o
 test("a version's name goes up from the phone and comes back changed from the web", { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const r = await run('historyLabel');
   assert.deepEqual(r, { server: 'The base', phone: 'Base, no sugar', rows: 1 });
+});
+
+test('one 30s sync loop, stopped while the app is hidden or paused', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('syncLoop');
+  // Every 400ms for 2s: about five pulls from one loop, ten from two.
+  for (const k of ['visible', 'back', 'resumed']) assert.ok(r[k] >= 3 && r[k] <= 6, `${k}: ${r[k]} pulls in 2s`);
+  assert.equal(r.hidden, 0, 'nothing while hidden');
+  assert.equal(r.paused, 0, 'nothing while paused');
+  assert.equal(r.stopped, 0);
+  // The app has no loop of its own beside it (two synced twice every 30s).
+  const app = readFileSync(new URL('../src/App.svelte', import.meta.url), 'utf8');
+  assert.doesNotMatch(app, /setInterval\([^)]*fullSync/);
+  assert.match(app, /mod\.startSyncLoop\(\)/);
+});
+
+test("connecting with Upload or Merge never replaces the account's disabled units with the phone's", { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('connectKeepsUnits');
+  assert.deepEqual(r, { server: ['cup'], phone: ['cup'] });
+});
+
+test('a sync with nothing new reads little and writes nothing but the pull cursor', { skip, timeout: TEST_TIMEOUT_MS }, async (t) => {
+  const r = await run('idleCost');
+  t.diagnostic(`an idle sync: ${r.calls} database calls, requests ${r.requests.join(', ')}`);
+  // The library is there: five links, one disabled unit.
+  assert.equal(r.links, 5);
+  assert.deepEqual(r.disabled, ['pinch']);
+  // No push, and nothing rewritten: the cookbook links and disabled units
+  // the server sends with every pull are already here.
+  assert.deepEqual(r.requests.filter(x => !/^GET \/api\/(health|sync\/pull)$/.test(x)), [], 'only the pull (and the health check)');
+  assert.deepEqual(r.writes, ['INSERT INTO sync_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'], 'only the pull cursor moves');
+  assert.equal(r.pragmas, 0, 'table layouts are read once per run of the app');
+  assert.ok(r.calls <= 30, `an idle sync costs ${r.calls} database calls`);
+});
+
+test('a unit turned off on the phone stays off and reaches the server; all back on reaches it too', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('disabledUnits');
+  assert.deepEqual(r.afterOff, { phone: ['tsp'], server: ['tsp'] }, 'the sync it starts used to put it back on');
+  assert.deepEqual(r.afterOn, { phone: [], server: [] }, 'an empty set used to be ignored');
+  assert.deepEqual(r.fromWeb, { phone: ['cup'], server: ['cup'] });
 });
 
 test('a pull with a table or column this app does not know yet still goes in', { skip, timeout: TEST_TIMEOUT_MS }, async () => {

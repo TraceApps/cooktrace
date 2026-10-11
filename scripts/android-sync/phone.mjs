@@ -646,7 +646,9 @@ const scenarios = {
     await la.prepareLocalAccount(A, { confirm: async () => true });
     await sync();
     holdFor = (url, init) => (/\/api\/recipes$/.test(url) && (init?.method || 'GET') === 'GET' ? 8000 : 0);
-    const running = fullSync({ silent: true }, true);
+    // Not the quiet 30s sync: with nothing new that one leaves the
+    // pictures be (sync.js), and this is about a sync that fetches them.
+    const running = fullSync({ silent: false }, true);
     await sleep(1500);
     signIn(process.env.CT_TOKEN_B);
     const t0 = Date.now();
@@ -889,6 +891,86 @@ const scenarios = {
     out.phone = (await api.getRecipeRevision(r.id, rev)).label;
     const rows = (await db.query(`SELECT COUNT(*) AS n FROM recipe_revisions WHERE recipe_id = ?`, [r.id])).values[0].n;
     out.rows = rows;
+  },
+  // The 30s sync: one loop however many places start it, stopped while
+  // the app is hidden or paused, back (with a sync) when it returns.
+  async syncLoop() {
+    await sync();
+    const docListeners = {}, appListeners = {};
+    globalThis.document = {
+      hidden: false, visibilityState: 'visible',
+      addEventListener(t, f) { (docListeners[t] ||= []).push(f); }, removeEventListener() {},
+    };
+    const setHidden = h => { document.hidden = h; document.visibilityState = h ? 'hidden' : 'visible'; (docListeners.visibilitychange || []).forEach(f => f()); };
+    const cap = await import('@capacitor/app');
+    cap.App.addListener = async (t, f) => { (appListeners[t] ||= []).push(f); return { remove() {} }; };
+    const { startSyncLoop, stopSyncLoop } = await import('../../src/lib/sync.js');
+    const pulls = () => sent.filter(x => x.url.startsWith('/api/sync/pull')).length;
+    const during = async ms => { await sleep(150); const a = pulls(); await sleep(ms); return pulls() - a; };
+    startSyncLoop(400);
+    startSyncLoop(400); // the cached API starts it too: the same loop
+    await sleep(50);
+    out.visible = await during(2000);
+    setHidden(true);
+    out.hidden = await during(2000);
+    setHidden(false);
+    out.back = await during(2000);
+    (appListeners.pause || []).forEach(f => f());
+    out.paused = await during(2000);
+    (appListeners.resume || []).forEach(f => f());
+    out.resumed = await during(2000);
+    stopSyncLoop();
+    out.stopped = await during(1500);
+  },
+  // What a sync with nothing new costs the phone: a library with a
+  // cookbook, a disabled unit and a few recipes, synced, then synced again
+  // with nothing changed anywhere.
+  async idleCost() {
+    const cb = await web('POST', '/api/cookbooks', { name: 'Weeknights' });
+    for (let i = 0; i < 5; i++) {
+      const id = await newRecipe({ name: `Soup ${i}` });
+      await web('POST', `/api/cookbooks/${cb.id}/recipes`, { recipe_ids: [id] });
+    }
+    await web('PATCH', '/api/units/builtin/pinch', { disabled: true });
+    await sync(); await sync();
+    globalThis.__sqlCalls = [];
+    const before = sent.length;
+    await sync();
+    const calls = globalThis.__sqlCalls; globalThis.__sqlCalls = null;
+    out.calls = calls.length;
+    out.writes = calls.filter(c => c.kind !== 'query' || !/^(SELECT|PRAGMA)/i.test(c.sql)).map(c => c.sql);
+    out.pragmas = calls.filter(c => /^PRAGMA/i.test(c.sql)).length;
+    out.requests = sent.slice(before).map(r => `${r.method} ${r.url.split('?')[0]}`);
+    out.links = (await db.query(`SELECT COUNT(*) AS n FROM recipe_cookbook_links`)).values[0].n;
+    out.disabled = (await db.query(`SELECT abbr FROM disabled_units`)).values.map(r => r.abbr);
+  },
+  // A unit turned off on the phone stays off through the sync it starts,
+  // reaches the server, and turning every unit back on reaches it too; one
+  // turned off on the web comes down when the phone has no change of its own.
+  async disabledUnits() {
+    await sync();
+    await api.toggleBuiltinUnit('tsp', true);
+    await sync();
+    const units = async () => ((await web('GET', '/api/units')).disabled || []).slice().sort();
+    out.afterOff = { phone: (await db.query(`SELECT abbr FROM disabled_units`)).values.map(r => r.abbr), server: await units() };
+    await api.toggleBuiltinUnit('tsp', false);
+    await sync();
+    out.afterOn = { phone: (await db.query(`SELECT abbr FROM disabled_units`)).values.map(r => r.abbr), server: await units() };
+    await web('PATCH', '/api/units/builtin/cup', { disabled: true });
+    await sync();
+    out.fromWeb = { phone: (await db.query(`SELECT abbr FROM disabled_units`)).values.map(r => r.abbr), server: await units() };
+  },
+  // Connecting from Settings with Upload or Merge keeps this phone's rows
+  // for the server: its disabled units, changed or not, don't replace (or,
+  // empty, clear) the account's.
+  async connectKeepsUnits() {
+    await web('PATCH', '/api/units/builtin/cup', { disabled: true });
+    await api.toggleBuiltinUnit('tsp', true);
+    await api.toggleBuiltinUnit('tsp', false);
+    await dbn.dbKeepForNewServer({});
+    await sync();
+    out.server = ((await web('GET', '/api/units')).disabled || []).slice().sort();
+    out.phone = (await db.query(`SELECT abbr FROM disabled_units`)).values.map(r => r.abbr);
   },
   // A pull from a server that knows more than this app: what it doesn't
   // know is left out, not stopping the pull.

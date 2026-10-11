@@ -14,7 +14,7 @@
  * features are no-ops or throw "requires server" in local mode.
  */
 
-import { getDb, LOCAL_USER_ID } from './db-native.js';
+import { getDb, LOCAL_USER_ID, dbMarkDisabledUnitsChanged } from './db-native.js';
 import { resolveAssetUrl } from './platform.js';
 import { cleanSmartFilter, matchesSmartFilter } from './smart-cookbook.js';
 import { recipeContributions, mergeIntoList, parseSources } from './shopping-plan.js';
@@ -1408,6 +1408,10 @@ export const CtApiNative = {
     return { disabled, custom, usage };
   },
   async toggleBuiltinUnit(abbr, disabled) {
+    // The set changes here: the next push sends it, and pulls leave it be
+    // until then (db-native.js dbGetPendingChanges, dbApplyPull). Marked
+    // first, so a pull between the two writes can't put the old set back.
+    await dbMarkDisabledUnitsChanged();
     if (disabled) {
       await _run(`INSERT OR IGNORE INTO disabled_units (user_id, abbr) VALUES (?, ?)`, [LOCAL_USER_ID, abbr]);
     } else {

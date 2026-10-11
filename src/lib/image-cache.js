@@ -102,7 +102,12 @@ async function _downloadImage(serverUrl) {
   }
 }
 
+// The map as last read or written, so a pass that downloaded nothing
+// doesn't write the same map (and version) back every sync.
+let _storedMapJson = null;
+
 async function _loadImageMap() {
+  _storedMapJson = null;
   try {
     const { getDb } = await import('./db-native.js');
     const db = await getDb();
@@ -122,23 +127,30 @@ async function _loadImageMap() {
     }
     const r = await db.query(`SELECT value FROM sync_meta WHERE key = 'image_map'`, []);
     const row = r?.values?.[0];
-    if (row?.value) return JSON.parse(row.value);
+    if (row?.value) {
+      const map = JSON.parse(row.value);
+      _storedMapJson = row.value;
+      return map;
+    }
   } catch {}
   return {};
 }
 
 async function _saveImageMap(map) {
+  const json = JSON.stringify(map);
+  if (json === _storedMapJson) return;
   try {
     const { getDb } = await import('./db-native.js');
     const db = await getDb();
     await db.run(
       `INSERT INTO sync_meta (key, value) VALUES ('image_map', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-      [JSON.stringify(map)]
+      [json]
     );
     await db.run(
       `INSERT INTO sync_meta (key, value) VALUES ('image_cache_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
       [String(CACHE_VERSION)]
     );
+    _storedMapJson = json;
   } catch {}
 }
 
