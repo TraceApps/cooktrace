@@ -11,6 +11,8 @@ docker compose up -d
 # Open http://localhost:3003
 ```
 
+Opening the app from another device at a plain `http://` address (a LAN IP, an Unraid WebUI link)? Signing in only sticks over HTTPS, or with `INSECURE_COOKIES=1` on a trusted LAN; the sign-in and setup screens say so. `http://localhost` on the server itself works in Chrome and Firefox either way. See [Plain-HTTP LAN](https://traceapps.github.io/docs/getting-started/lan-http/).
+
 ## Image tags
 
 Every release publishes a multi-arch (linux/amd64 + linux/arm64) image to
@@ -81,6 +83,10 @@ Recommended:
 - `RECOVERY_TOKEN` — used by the login-page lockout-recovery flow.
 - `TOKEN_ENC_KEY` — at-rest key for OIDC client secrets. Defaults to a
   key derived from `JWT_SECRET`.
+
+Only for plain HTTP:
+
+- `INSECURE_COOKIES`: Set `1` to send the sign-in cookie over plain HTTP too. The cookie is HTTPS-only by default, so at a plain `http://` address other than `localhost` (a LAN IP, an Unraid WebUI link) the browser drops it and signing in loops back to the sign-in page; the sign-in and setup screens say so. Use `1` only on a trusted LAN, and leave it `0` behind HTTPS. See [Plain-HTTP LAN](https://traceapps.github.io/docs/getting-started/lan-http/).
 
 Optional integrations:
 
