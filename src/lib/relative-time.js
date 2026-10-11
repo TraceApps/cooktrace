@@ -6,12 +6,17 @@
  * "just now", "2 weeks ago").
  */
 
-export function relativeTime(input) {
+export function relativeTime(input, now = Date.now()) {
   if (!input) return '';
   const date = _toDate(input);
   if (!date || Number.isNaN(date.getTime())) return '';
 
-  const diffSec = Math.round((Date.now() - date.getTime()) / 1000);
+  // A day ("2026-10-10": a cook's date, when a recipe was last cooked) has
+  // no time of day, so it counts in days: read as midnight and counted in
+  // hours, a cook logged at 9:31 PM said "21 Hours Ago".
+  if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)) return _days(date, now);
+
+  const diffSec = Math.round((now - date.getTime()) / 1000);
   const future = diffSec < 0;
   const sec = Math.abs(diffSec);
 
@@ -26,6 +31,23 @@ export function relativeTime(input) {
   if (sec < 60 * 60 * 24 * 320) return _fmt(Math.round(sec / (86400 * 30)), 'Month', future);
   if (sec < 60 * 60 * 24 * 548) return future ? 'In a Year' : 'A Year Ago';
   return _fmt(Math.round(sec / (86400 * 365)), 'Year', future);
+}
+
+// Whole calendar days between a day and today, by the local calendar.
+function _days(day, now) {
+  const today = new Date(now);
+  const a = Date.UTC(day.getFullYear(), day.getMonth(), day.getDate());
+  const b = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const n = Math.round((b - a) / 86400000);
+  const future = n < 0;
+  const d = Math.abs(n);
+  if (d === 0)   return 'Today';
+  if (d === 1)   return future ? 'Tomorrow' : 'Yesterday';
+  if (d < 26)    return _fmt(d, 'Day', future);
+  if (d < 45)    return future ? 'In a Month' : 'A Month Ago';
+  if (d < 320)   return _fmt(Math.round(d / 30), 'Month', future);
+  if (d < 548)   return future ? 'In a Year' : 'A Year Ago';
+  return _fmt(Math.round(d / 365), 'Year', future);
 }
 
 function _fmt(n, unit, future) {
