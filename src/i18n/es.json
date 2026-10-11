@@ -2444,5 +2444,22 @@
     "button": "Adjuntar imagen",
     "camera": "Cámara",
     "gallery": "Galería"
+  },
+  "when": {
+    "just_now": "Justo ahora",
+    "in_moments": "En un momento",
+    "today": "Hoy",
+    "yesterday": "Ayer",
+    "tomorrow": "Mañana",
+    "minutes_ago": "{n, plural, one {Hace un minuto} other {Hace # minutos}}",
+    "minutes_ahead": "{n, plural, one {En un minuto} other {En # minutos}}",
+    "hours_ago": "{n, plural, one {Hace una hora} other {Hace # horas}}",
+    "hours_ahead": "{n, plural, one {En una hora} other {En # horas}}",
+    "days_ago": "{n, plural, one {Hace # día} other {Hace # días}}",
+    "days_ahead": "{n, plural, one {En # día} other {En # días}}",
+    "months_ago": "{n, plural, one {Hace un mes} other {Hace # meses}}",
+    "months_ahead": "{n, plural, one {En un mes} other {En # meses}}",
+    "years_ago": "{n, plural, one {Hace un año} other {Hace # años}}",
+    "years_ahead": "{n, plural, one {En un año} other {En # años}}"
   }
 }

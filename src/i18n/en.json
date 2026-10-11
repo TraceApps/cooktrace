@@ -2380,5 +2380,22 @@
   },
   "connect": {
     "https_only": "This app only connects over HTTPS. Put the server behind a reverse proxy (Caddy, Tailscale or Cloudflare Tunnel), or use a debug build. DEPLOY.md, Connecting from Android, has the steps."
+  },
+  "when": {
+    "just_now": "Just Now",
+    "in_moments": "In Moments",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "tomorrow": "Tomorrow",
+    "minutes_ago": "{n, plural, one {A Minute Ago} other {# Minutes Ago}}",
+    "minutes_ahead": "{n, plural, one {In a Minute} other {In # Minutes}}",
+    "hours_ago": "{n, plural, one {An Hour Ago} other {# Hours Ago}}",
+    "hours_ahead": "{n, plural, one {In an Hour} other {In # Hours}}",
+    "days_ago": "{n, plural, one {# Day Ago} other {# Days Ago}}",
+    "days_ahead": "{n, plural, one {In # Day} other {In # Days}}",
+    "months_ago": "{n, plural, one {A Month Ago} other {# Months Ago}}",
+    "months_ahead": "{n, plural, one {In a Month} other {In # Months}}",
+    "years_ago": "{n, plural, one {A Year Ago} other {# Years Ago}}",
+    "years_ahead": "{n, plural, one {In a Year} other {In # Years}}"
   }
 }

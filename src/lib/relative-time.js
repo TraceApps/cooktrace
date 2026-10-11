@@ -1,10 +1,13 @@
 /**
  * relative-time.js — short, friendly "x ago" / "in x" formatting.
  *
- * Pure function, no Intl.RelativeTimeFormat dependency (works in older
- * browsers + Capacitor WebView). Output matches NT's tone ("3d ago",
- * "just now", "2 weeks ago").
+ * No Intl.RelativeTimeFormat dependency (works in older browsers and the
+ * Capacitor WebView); the words come from the app's strings ("when.*").
  */
+import { get } from 'svelte/store';
+import { _ } from 'svelte-i18n';
+
+const t = (key, values) => get(_)(key, values ? { values } : undefined);
 
 export function relativeTime(input, now = Date.now()) {
   if (!input) return '';
@@ -20,17 +23,17 @@ export function relativeTime(input, now = Date.now()) {
   const future = diffSec < 0;
   const sec = Math.abs(diffSec);
 
-  if (sec < 45)             return future ? 'In Moments' : 'Just Now';
-  if (sec < 90)             return future ? 'In a Minute' : 'A Minute Ago';
-  if (sec < 60 * 45)        return _fmt(Math.round(sec / 60), 'Minute', future);
-  if (sec < 60 * 90)        return future ? 'In an Hour' : 'An Hour Ago';
-  if (sec < 60 * 60 * 22)   return _fmt(Math.round(sec / 3600), 'Hour', future);
-  if (sec < 60 * 60 * 36)   return future ? 'Tomorrow' : 'Yesterday';
-  if (sec < 60 * 60 * 24 * 26)  return _fmt(Math.round(sec / 86400), 'Day', future);
-  if (sec < 60 * 60 * 24 * 45)  return future ? 'In a Month' : 'A Month Ago';
-  if (sec < 60 * 60 * 24 * 320) return _fmt(Math.round(sec / (86400 * 30)), 'Month', future);
-  if (sec < 60 * 60 * 24 * 548) return future ? 'In a Year' : 'A Year Ago';
-  return _fmt(Math.round(sec / (86400 * 365)), 'Year', future);
+  if (sec < 45)             return t(future ? 'when.in_moments' : 'when.just_now');
+  if (sec < 90)             return _fmt(1, 'minutes', future);
+  if (sec < 60 * 45)        return _fmt(Math.round(sec / 60), 'minutes', future);
+  if (sec < 60 * 90)        return _fmt(1, 'hours', future);
+  if (sec < 60 * 60 * 22)   return _fmt(Math.round(sec / 3600), 'hours', future);
+  if (sec < 60 * 60 * 36)   return t(future ? 'when.tomorrow' : 'when.yesterday');
+  if (sec < 60 * 60 * 24 * 26)  return _fmt(Math.round(sec / 86400), 'days', future);
+  if (sec < 60 * 60 * 24 * 45)  return _fmt(1, 'months', future);
+  if (sec < 60 * 60 * 24 * 320) return _fmt(Math.round(sec / (86400 * 30)), 'months', future);
+  if (sec < 60 * 60 * 24 * 548) return _fmt(1, 'years', future);
+  return _fmt(Math.round(sec / (86400 * 365)), 'years', future);
 }
 
 // Whole calendar days between a day and today, by the local calendar.
@@ -41,20 +44,18 @@ function _days(day, now) {
   const n = Math.round((b - a) / 86400000);
   const future = n < 0;
   const d = Math.abs(n);
-  if (d === 0)   return 'Today';
-  if (d === 1)   return future ? 'Tomorrow' : 'Yesterday';
-  if (d < 26)    return _fmt(d, 'Day', future);
-  if (d < 45)    return future ? 'In a Month' : 'A Month Ago';
-  if (d < 320)   return _fmt(Math.round(d / 30), 'Month', future);
-  if (d < 548)   return future ? 'In a Year' : 'A Year Ago';
-  return _fmt(Math.round(d / 365), 'Year', future);
+  if (d === 0)   return t('when.today');
+  if (d === 1)   return t(future ? 'when.tomorrow' : 'when.yesterday');
+  if (d < 26)    return _fmt(d, 'days', future);
+  if (d < 45)    return _fmt(1, 'months', future);
+  if (d < 320)   return _fmt(Math.round(d / 30), 'months', future);
+  if (d < 548)   return _fmt(1, 'years', future);
+  return _fmt(Math.round(d / 365), 'years', future);
 }
 
+// "3 Days Ago" / "In 3 Days", in the app's language.
 function _fmt(n, unit, future) {
-  // unit is already Title Case ("Minute", "Day", "Year"). Pluralize and
-  // wrap with "Ago" / "In" to keep the whole label in Title Case.
-  const plural = n === 1 ? unit : `${unit}s`;
-  return future ? `In ${n} ${plural}` : `${n} ${plural} Ago`;
+  return t(`when.${unit}_${future ? 'ahead' : 'ago'}`, { n });
 }
 
 /** Short absolute date: "May 4, 2026". */

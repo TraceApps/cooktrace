@@ -5,7 +5,13 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { addMessages, init, locale } from 'svelte-i18n';
 import { relativeTime } from '../src/lib/relative-time.js';
+
+addMessages('en', JSON.parse(readFileSync(new URL('../src/i18n/en.json', import.meta.url), 'utf8')));
+addMessages('es', JSON.parse(readFileSync(new URL('../src/i18n/es.json', import.meta.url), 'utf8')));
+init({ fallbackLocale: 'en', initialLocale: 'en' });
 
 const at = (y, m, d, h = 0, min = 0) => new Date(y, m - 1, d, h, min).getTime();
 
@@ -26,4 +32,15 @@ test('a moment still counts in minutes and hours', () => {
   const now = Date.UTC(2026, 9, 11, 1, 31);
   assert.equal(relativeTime('2026-10-11 01:29:00', now), '2 Minutes Ago');
   assert.equal(relativeTime('2026-10-10 22:31:00', now), '3 Hours Ago');
+});
+
+test('in Spanish too', () => {
+  locale.set('es');
+  try {
+    const late = at(2026, 10, 10, 21, 31);
+    assert.equal(relativeTime('2026-10-10', late), 'Hoy');
+    assert.equal(relativeTime('2026-10-09', late), 'Ayer');
+    assert.equal(relativeTime('2026-10-07', late), 'Hace 3 días');
+    assert.equal(relativeTime(new Date(late - 5 * 60000), late), 'Hace 5 minutos');
+  } finally { locale.set('en'); }
 });
