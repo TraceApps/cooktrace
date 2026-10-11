@@ -1704,7 +1704,8 @@
                       <p class="cook-by">by {c.cooked_by_full_name || c.cooked_by_username}</p>
                     {/if}
                     {#if c.notes}<p class="cook-notes">{c.notes}</p>{/if}
-                    {#if history}
+                    <!-- A planned cook isn't made from a version yet. -->
+                    {#if history && c.kind !== 'planned'}
                       {@const n = c.recipe_rev ? versionNumberOf(c.recipe_rev) : null}
                       {#if n}
                         <a class="cook-version" href={`#/recipes/${recipe.id}/history/${c.recipe_rev}?cook=${c.id}`}>
