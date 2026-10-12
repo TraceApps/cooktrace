@@ -35,8 +35,12 @@
     loading = true;
     loadError = null;
     try {
+      // same-origin, not omit: behind a reverse proxy that asks for a login
+      // (basic auth, Authelia, Authentik), omit drops the browser's proxy
+      // login and the proxy refuses the request (TraceApps/notetrace#22).
+      // The server ignores any session on this route either way.
       const res = await fetch(apiUrl(`/api/r/${encodeURIComponent(token)}`), {
-        credentials: 'omit',
+        credentials: 'same-origin',
         cache: 'no-store',
       });
       if (!res.ok) {

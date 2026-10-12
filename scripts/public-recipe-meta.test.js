@@ -4,6 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import { escapeHtml, publicRecipeDescription, publicRecipeHead, injectPublicHead, publicPageHtml } from '../server/lib/public-recipe-meta.js';
 
 const ctx = { origin: 'https://cook.example.com', basePath: '/ct', pageUrl: 'https://cook.example.com/ct/r/abc' };
@@ -48,4 +49,13 @@ test('the page loads the app from its root and has one title', () => {
   const out = injectPublicHead(page, publicRecipeHead({ name: 'Rice' }, ctx));
   assert.equal((out.match(/<title>/g) || []).length, 1);
   assert.match(out, /<title>Rice<\/title>/);
+});
+
+// TraceApps/notetrace#22, same in CookTrace. Behind a reverse proxy that asks
+// for a login, a fetch with credentials 'omit' goes out without the browser's
+// proxy login and the proxy refuses it.
+test('the public page asks for the recipe with the browser\'s own login, not without it', () => {
+  const page = readFileSync(new URL('../src/routes/PublicRecipe.svelte', import.meta.url), 'utf8');
+  assert.match(page, /fetch\(apiUrl\(`\/api\/r\/[\s\S]{0,80}?credentials: 'same-origin'/);
+  assert.doesNotMatch(page, /credentials: 'omit'/);
 });
