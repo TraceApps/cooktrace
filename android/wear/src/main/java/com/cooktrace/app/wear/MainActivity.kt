@@ -102,8 +102,16 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_ROUTE = "com.cooktrace.app.wear.ROUTE"
     }
 
+    override fun onPause() {
+        WatchUpdate.onScreen = false
+        super.onPause()
+    }
+
     override fun onResume() {
         super.onResume()
+        // An update the phone is already on, asked about now that you're looking.
+        WatchUpdate.onScreen = true
+        WatchUpdate.check(applicationContext, onScreen = true)
         // Coming back from the watch face should show the list as it stands,
         // and is the moment to send anything ticked while there was no signal.
         lifecycleScope.launch { store.refresh() }

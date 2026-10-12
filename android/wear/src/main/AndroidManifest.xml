@@ -4,6 +4,11 @@
 
     <uses-feature android:name="android.hardware.type.watch" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Installed from GitHub, the watch updates itself to the phone's release
+         (WatchUpdate.kt): with a tap, or without one where Android allows an
+         app to update itself. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
     <!-- The buzz at the end of a kitchen timer, which is the point of it. -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- A timer is the difference between a soft-boiled egg and a hard one,
@@ -83,6 +88,11 @@
 
         <!-- The phone hands over the server address and a token once, and takes
              them away again when the account signs out. -->
+        <!-- What Android made of an update the watch installed itself. -->
+        <receiver
+            android:name=".UpdateResultReceiver"
+            android:exported="false" />
+
         <service
             android:name=".PairingService"
             android:exported="true"
