@@ -5,11 +5,13 @@ import { register, init, getLocaleFromNavigator } from 'svelte-i18n';
 // picker in Settings → Appearance shows the new option.
 register('en', () => import('./en.json'));
 register('es', () => import('./es.json'));
+register('fr', () => import('./fr.json'));
 register('sv', () => import('./sv.json'));
 
 export const AVAILABLE_LOCALES = [
   { code: 'en', label: 'English' },
   { code: 'es', label: 'Español' },
+  { code: 'fr', label: 'Français' },
   { code: 'sv', label: 'Svenska' },
 ];
 
