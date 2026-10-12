@@ -89,8 +89,11 @@ public class WearPairingPlugin extends Plugin {
      * the same clock reading rather than by when a write happened.
      */
     private long stampOf(PluginCall call) {
-        Double at = call.getDouble("at", 0d);
-        long stamp = at == null ? 0L : at.longValue();
+        // Read as any number: Capacitor's getDouble answers with the default
+        // for a Long, and a time in milliseconds always arrives as one, so
+        // every stamp read as "now" and a stale republish beat a newer word.
+        Object at = call.getData().opt("at");
+        long stamp = at instanceof Number ? ((Number) at).longValue() : 0L;
         return stamp > 0 ? stamp : System.currentTimeMillis();
     }
 

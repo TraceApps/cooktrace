@@ -40,6 +40,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **A timer or cook changed on the watch is no longer undone by the phone.** The phone's word always counted as the newest, even when it was older than the watch's.
 - **A cook logged today says Today**, not "21 Hours Ago", and dates like "3 Days Ago" follow the app's language.
 - **A recipe's Last Cooked shows the day it was cooked**, not the day before, anywhere west of UTC.
 - **A fresh install's welcome screen no longer shows a "Setup required" error.** The recipes page loaded behind it before setup opened, and the server refused it until the first account existed. Setup now opens first, and nothing else asks the server for data until it's done.

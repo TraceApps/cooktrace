@@ -110,3 +110,13 @@ test('a timer started here after the watch spoke is not stopped by its silence',
   adoptTimers([]);
   assert.equal(get(cookTimers).length, 0);
 });
+
+test("the phone's stamp reaches the watch as sent, not as \"now\"", async () => {
+  // Capacitor's getDouble answers with the default for a Long, and a time in
+  // milliseconds always arrives as one: every stamp read as now, so a stale
+  // republish from the phone beat the watch's newer word.
+  const { readFileSync } = await import('node:fs');
+  const plugin = readFileSync(new URL('../android/app/src/main/java/com/cooktrace/app/WearPairingPlugin.java', import.meta.url), 'utf8');
+  assert.doesNotMatch(plugin, /call\.getDouble\(/);
+  assert.match(plugin, /Object at = call\.getData\(\)\.opt\("at"\);\s*\n\s*long stamp = at instanceof Number \? \(\(Number\) at\)\.longValue\(\) : 0L;/);
+});
