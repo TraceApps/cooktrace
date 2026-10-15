@@ -6,11 +6,15 @@ import { register, init, getLocaleFromNavigator } from 'svelte-i18n';
 register('en', () => import('./en.json'));
 register('es', () => import('./es.json'));
 register('sv', () => import('./sv.json'));
+register('fr', () => import('./fr.json'));
+
 
 export const AVAILABLE_LOCALES = [
   { code: 'en', label: 'English' },
   { code: 'es', label: 'Español' },
   { code: 'sv', label: 'Svenska' },
+  { code: 'fr', label: 'Français' },
+
 ];
 
 export function initI18n(initialLocale) {
