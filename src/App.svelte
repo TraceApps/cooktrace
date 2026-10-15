@@ -433,9 +433,13 @@
         App.addListener('appUrlOpen', async ({ url }) => {
           console.log('[app] deep link received:', url);
           try {
-            const u = new URL(url);
-            const params = u.searchParams;
-            const host = (u.hostname || u.host || '').toLowerCase();
+            // Read by hand (lib/app-link.js): older WebViews leave new URL()'s
+            // host empty for this scheme, so SSO never finished there.
+            const { parseAppLink } = await import('./lib/app-link.js');
+            const link = parseAppLink(url);
+            if (!link) throw new Error('not an app link');
+            const params = link.params;
+            const host = link.host;
             if (host === 'oidc-callback') {
               const errMsg = params.get('error');
               const linked = params.get('linked');
