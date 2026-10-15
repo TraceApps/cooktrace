@@ -8,13 +8,15 @@
     defaultServings, autoCreatePantryFromRecipes, mixSharedIntoRecipes,
     urlImportEngine, urlImportFallback,
     shoppingGroupBy, shoppingCheckedBehavior,
-    aiEnabled, aiKeyVerified,
+    aiEnabled, aiKeyVerified, envLocks,
   } from '../../stores/settings.js';
 
   // Enhanced engine (recipe-scrapers) needs the CookTrace server; smart
-  // engine needs a verified AI key.
+  // engine needs Trace: this person's, tested, or the server's when it is set
+  // by environment variables (AI_ENABLED decides then, as for the Trace
+  // switch; the import runs on the server, which uses that AI).
   $: enhancedAvailable = !isNative || !!getServerUrl();
-  $: smartAvailable    = $aiEnabled && $aiKeyVerified;
+  $: smartAvailable    = $envLocks.ai ? !!$envLocks.ai_enabled : ($aiEnabled && $aiKeyVerified);
 </script>
 
 <div class="section-body">

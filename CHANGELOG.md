@@ -101,6 +101,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **OpenAI Compatible accepts a Base URL with or without `/v1`**, or the whole `/v1/chat/completions` address, in Settings and in `AI_BASE_URL`, for chat and for recipe imports. Given with `/v1`, every request went to `/v1/v1/chat/completions`.
 - **OpenAI Compatible works without an API key**, for servers that need none (Ollama, LM Studio). The connection test asked for one, so the chat button never appeared.
 - **Trace chats when the server turns it on for everyone** (`AI_ENABLED`). The chat button showed, but sending said Trace was turned off, and its switch in Settings was locked by the server.
+- **Smart recipe import can be chosen when the server sets Trace up** (`AI_ENABLED`). It stayed greyed out as "Trace AI required", though the import runs on the server and uses its AI.
 - **When Trace gets no answer from your provider, it says what to check** instead of "Failed to fetch" (or, in Settings, that you're offline): the Base URL, or a server that has to allow this site on every answer, errors included, or an https:// address for a page on HTTPS. A reverse proxy that adds CORS headers only to successful answers hid the provider's real error, such as a model that can't use tools.
 
 ### Security

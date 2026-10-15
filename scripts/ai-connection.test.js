@@ -184,3 +184,11 @@ test('a reworded provider error is never read as "offline", whatever the host is
   assert.equal(isOfflineError(new TypeError('Failed to fetch')), true);
   assert.equal(isOfflineError(Object.assign(new Error('x'), { offline: true })), true);
 });
+
+test('Smart recipe import is available when the server sets Trace up (AI_ENABLED decides)', () => {
+  const c = read('../src/components/settings/SettingsCooking.svelte');
+  // The import runs on the server, which uses its own AI when this person has none.
+  assert.match(c, /\$: smartAvailable\s*= \$envLocks\.ai \? !!\$envLocks\.ai_enabled : \(\$aiEnabled && \$aiKeyVerified\);/);
+  const recipes = read('../server/routes/recipes.js');
+  assert.match(recipes, /importAiConfig\(\{[\s\S]*?\}, process\.env\)/);
+});
