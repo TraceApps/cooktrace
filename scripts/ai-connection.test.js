@@ -148,6 +148,11 @@ test('Settings tests against what was just saved, needs no key for OpenAI Compat
   // A result counts only for the settings it tested; one asked for while a
   // test runs waits its turn; the banner says why it failed.
   assert.equal((s.match(/if \(stale\(\)\) return;/g) || []).length, 2);
+  // A stale result just goes: no test of its own (a provider switch would
+  // send the old key to the new provider; a model being typed would test
+  // half a name).
+  const staleFn = s.match(/const stale = \(\) => \{[\s\S]*?\n {4}\};/)[0];
+  assert.doesNotMatch(staleFn, /_testAgain/);
   assert.match(s, /if \(testing\) \{\s*\/\/[^\n]*\n\s*_testAgain = /);
   assert.match(s, /error=\{testStatus === 'fail' \? testError : ''\}/);
   assert.match(s, /testError = failed\('fail\.ai_test', e\);/);

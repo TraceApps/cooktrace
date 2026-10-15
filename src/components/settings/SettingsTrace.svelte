@@ -162,8 +162,10 @@
   }
 
   // What a test was run with. A result only counts for the settings it
-  // tested: a field changed while it ran makes it stale, and the test runs
-  // again for what is there now (asked for while one runs, it waits its turn).
+  // tested: a field changed while it ran makes it stale, and it goes. What
+  // changed it tests on its own once saved (a field left, a model picked),
+  // waiting its turn; a provider switch doesn't, so the old provider's key
+  // isn't sent to the new one.
   const _testedKey = () => JSON.stringify([envLocks.ai, $aiProvider, $aiApiKey, $aiModel, $aiBaseUrl]);
   let _testAgain = null;
   let testError = '';
@@ -184,7 +186,6 @@
     const tested = _testedKey();
     const stale = () => {
       if (_testedKey() === tested) return false;
-      if (!_testAgain) _testAgain = { silentOk, quietFail };
       return true;
     };
     try {
