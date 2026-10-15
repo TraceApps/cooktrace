@@ -41,6 +41,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Cook streaks count every day east of UTC.** On a server set to a time zone east of UTC (Europe, Asia, Australia), and in the Android app there, a streak skipped every other day, so three days in a row read as 2 or 1 and the longest streak stayed at 1.
 - **Signing in with SSO finishes on phones with an older Android System WebView.** On older WebView versions (seen on 124), the app didn't recognize the sign-in return from the browser, so the sign-in page closed and the app stayed signed out.
 - **A timer or cook changed on the watch is no longer undone by the phone.** The phone's word always counted as the newest, even when it was older than the watch's.
 - **A cook logged today says Today**, not "21 Hours Ago", and dates like "3 Days Ago" follow the app's language.

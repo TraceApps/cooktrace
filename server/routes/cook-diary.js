@@ -70,10 +70,12 @@ router.get('/stats', wrap((req, res) => {
     SELECT DISTINCT cd.date AS d FROM cook_diary cd ${where} ORDER BY cd.date DESC
   `).all(...args).map(r => r.d);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = (() => {
-    const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10);
-  })();
+  // Calendar days: the server's own today, stepped in UTC on the bare
+  // date. Local midnight read back as a UTC date skipped a day per step
+  // east of UTC, and the UTC today was a day off for part of every night.
+  const shift = (iso, n) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const today = new Date().toLocaleDateString('sv-SE');
+  const yesterday = shift(today, -1);
   const dateSet = new Set(dates);
 
   // Current streak: walk back from today (or yesterday if today has
@@ -82,9 +84,7 @@ router.get('/stats', wrap((req, res) => {
   let cursor = dateSet.has(today) ? today : (dateSet.has(yesterday) ? yesterday : null);
   while (cursor && dateSet.has(cursor)) {
     current++;
-    const d = new Date(cursor + 'T00:00:00');
-    d.setDate(d.getDate() - 1);
-    cursor = d.toISOString().slice(0, 10);
+    cursor = shift(cursor, -1);
   }
 
   // Longest streak: scan distinct dates ascending, count consecutive runs.
@@ -92,10 +92,7 @@ router.get('/stats', wrap((req, res) => {
   let longest = 0, run = 0, prev = null;
   for (const d of asc) {
     if (prev) {
-      const p = new Date(prev + 'T00:00:00');
-      p.setDate(p.getDate() + 1);
-      const expected = p.toISOString().slice(0, 10);
-      run = (d === expected) ? run + 1 : 1;
+      run = (d === shift(prev, 1)) ? run + 1 : 1;
     } else {
       run = 1;
     }

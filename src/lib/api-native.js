@@ -1057,23 +1057,23 @@ export const CtApiNative = {
       `SELECT DISTINCT date AS d FROM cook_diary ${where} ORDER BY date DESC`,
       [LOCAL_USER_ID]
     )).map(r => r.d);
-    const today = new Date().toISOString().slice(0, 10);
-    const yest = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); })();
+    // Calendar days, stepped in UTC from the phone's today (as the server).
+    const shift = (iso, n) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+    const today = new Date().toLocaleDateString('sv-SE');
+    const yest = shift(today, -1);
     const set = new Set(dates);
 
     let cur = 0;
     let cursor = set.has(today) ? today : (set.has(yest) ? yest : null);
     while (cursor && set.has(cursor)) {
       cur++;
-      const d = new Date(cursor + 'T00:00:00'); d.setDate(d.getDate() - 1);
-      cursor = d.toISOString().slice(0, 10);
+      cursor = shift(cursor, -1);
     }
     const asc = [...dates].reverse();
     let longest = 0, run = 0, prev = null;
     for (const d of asc) {
       if (prev) {
-        const p = new Date(prev + 'T00:00:00'); p.setDate(p.getDate() + 1);
-        run = d === p.toISOString().slice(0, 10) ? run + 1 : 1;
+        run = d === shift(prev, 1) ? run + 1 : 1;
       } else run = 1;
       if (run > longest) longest = run;
       prev = d;
