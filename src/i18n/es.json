@@ -1023,7 +1023,6 @@
     "enable_assistant": "Activar el asistente Trace",
     "provider": "Proveedor",
     "base_url": "URL base",
-    "base_url_desc": "Endpoint /v1/chat/completions",
     "model": "Modelo",
     "custom_model_id": "ID de modelo personalizado",
     "assistant_name": "Nombre del asistente",

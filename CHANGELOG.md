@@ -96,6 +96,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Trace shows your newest messages when you open it.** It loaded the oldest 100, so once a chat passed 100 messages the latest ones never appeared.
 - **Fractional amounts reach the shopping list.** Adding a recipe or a week's plan to the list dropped amounts like "1/2", "1 1/2" or "½" (the item came in with no amount), and a range like "4-5" now counts as the larger number.
 - **Uploaded pantry photos and cookbook covers show in the Android app.** They were blank in the pantry list, its expiring and variant rows, the cookbook grid, and the photo shown while editing. They also show on the web when CookTrace is served from a subpath (`BASE_URL`). Found while fixing the same bug in LiftTrace ([lifttrace#141](https://github.com/TraceApps/lifttrace/issues/141), reported by @rgpag1).
+- **Trace connects the first time its settings are filled in** (found with [notetrace#18](https://github.com/TraceApps/notetrace/issues/18)). Whichever setting was filled in last (usually the API key) was tested before it counted, so nothing happened, and the chat button stayed hidden until a setting was changed again. **Test Connection** now has its own row, so a test can be run at any time, and the status line says why one failed.
+- **OpenAI Compatible accepts a Base URL with or without `/v1`**, or the whole `/v1/chat/completions` address, in Settings and in `AI_BASE_URL`, for chat and for recipe imports. Given with `/v1`, every request went to `/v1/v1/chat/completions`.
+- **OpenAI Compatible works without an API key**, for servers that need none (Ollama, LM Studio). The connection test asked for one, so the chat button never appeared.
+- **Trace chats when the server turns it on for everyone** (`AI_ENABLED`). The chat button showed, but sending said Trace was turned off, and its switch in Settings was locked by the server.
+- **When Trace gets no answer from your provider, it says what to check** instead of "Failed to fetch" (or, in Settings, that you're offline): the Base URL, or a server that has to allow this site on every answer, errors included, or an https:// address for a page on HTTPS. A reverse proxy that adds CORS headers only to successful answers hid the provider's real error, such as a model that can't use tools.
 
 ### Security
 

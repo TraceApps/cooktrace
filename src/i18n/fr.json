@@ -958,7 +958,6 @@
     "enable_assistant": "Activer l'assistant Trace",
     "provider": "Fournisseur",
     "base_url": "URL de base",
-    "base_url_desc": "point d'accès /v1/chat/completions",
     "model": "Modèle",
     "custom_model_id": "ID de modèle personnalisé",
     "assistant_name": "Nom de l'assistant",

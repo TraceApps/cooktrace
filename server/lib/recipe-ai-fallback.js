@@ -12,6 +12,7 @@
 import * as cheerio from 'cheerio';
 import { logger } from '../logger.js';
 import { fetchChecked, serviceBase } from './ssrf-guard.js';
+import { openAIBase } from './openai-chat-params.js';
 
 // Cap the HTML payload sent to the LLM. Recipes virtually never need
 // more than this; oversized pages get truncated.
@@ -166,7 +167,7 @@ async function _callProvider(cfg, systemPrompt, userText) {
     // 'custom' is the app's name for an OpenAI-compatible endpoint,
     // 'oai-compat' the server's (AI_PROVIDER).
     case 'custom':
-    case 'oai-compat': return _callOpenAI(apiKey || 'no-key', model, systemPrompt, userText, (cfg.baseUrl || '').replace(/\/+$/, ''), cfg);
+    case 'oai-compat': return _callOpenAI(apiKey || 'no-key', model, systemPrompt, userText, openAIBase(cfg.baseUrl), cfg);
     default: throw new Error(`Unknown AI provider: ${provider}`);
   }
 }

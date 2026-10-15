@@ -23,7 +23,7 @@
   import TraceFace from './TraceFace.svelte';
   import TraceFaceChef from './TraceFaceChef.svelte';
   import {
-    aiEnabled, aiEffectivelyEnabled, envLocks, aiAssistantName, aiProvider, aiApiKey, aiModel, aiBaseUrl,
+    aiEffectivelyEnabled, envLocks, aiAssistantName, aiProvider, aiApiKey, aiModel, aiBaseUrl,
     aiKeyVerified, energyUnit, measurementSystem, dateFormat, smartLogEnabled,
     traceChefHat, smartLogVoiceLang,
   } from '../../stores/settings.js';
@@ -186,7 +186,7 @@
         showError($_('trace_ai_ct.toast.voice_unsupported'));
         return;
       }
-      if (!$aiEnabled || (!$aiKeyVerified && !aiEnvLocked)) {
+      if (!$aiEffectivelyEnabled || (!$aiKeyVerified && !aiEnvLocked)) {
         showError($_('trace_ai_ct.toast.configure_ai'));
         return;
       }
@@ -739,7 +739,9 @@ When you write to the user's data, summarise what you did briefly and concretely
   async function send({ smartLog = false } = {}) {
     const text = input.trim();
     if ((!text && !attachedImage) || busy) return;
-    if (!$aiEnabled) {
+    // On for this person, or turned on for everyone by AI_ENABLED (whose
+    // switch in Settings is locked), as the floating button itself checks.
+    if (!$aiEffectivelyEnabled) {
       showError($_('trace_ai_ct.toast.trace_disabled'));
       return;
     }

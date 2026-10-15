@@ -23,6 +23,8 @@ import { SYNC_FIELDS } from './sync-fields.js';
 export function isOfflineError(err) {
   if (!err) return false;
   if (err.offline) return true;
+  // Said to be something else (aiChat.js fetchProvider): believe it.
+  if (err.offline === false) return false;
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
   const msg = String(err.message || err);
   // fetch() rejects with a TypeError when the network is gone; a request the

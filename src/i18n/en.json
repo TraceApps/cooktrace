@@ -959,19 +959,25 @@
   "settings_trace_ct": {
     "toast": {
       "fill_fields":             "Fill in the provider, API key and model first.",
+      "fill_fields_custom":      "Fill in the Base URL and model first.",
       "connected":               "Trace connected"
     },
     "enable_assistant":          "Enable Trace Assistant",
     "provider":                  "Provider",
     "base_url":                  "Base URL",
-    "base_url_desc":             "/v1/chat/completions endpoint",
+    "base_url_desc":             "Your provider's address, with or without /v1",
+    "test_connection":           "Test Connection",
+    "test_connection_desc":      "Checks that Trace can reach your provider. The chat button shows once it passes.",
+    "test_connection_desc_locked": "Checks that Trace can reach the server's AI provider.",
+    "test":                      "Test",
+    "testing":                   "Testing…",
     "model":                     "Model",
     "custom_model_id":           "Custom Model ID",
     "assistant_name":            "Assistant Name",
     "assistant_name_ph":         "Trace",
     "chef_hat":                  "Chef Hat",
     "env_lock_banner":           "Configured via environment variables, changes are disabled.",
-    "enable_desc":               "Floating chat button on every page. Uses your own AI provider key, never shared.",
+    "enable_desc":               "Floating chat button on every page, once the connection test passes. Uses your own AI provider key, never shared.",
     "enable_desc_locked":        "Floating chat button on every page. The server provides the AI.",
     "server_default":            "Server default",
     "smart_log":                 "Smart Log",
@@ -1561,6 +1567,9 @@
     "brand":                     "CookTrace"
   },
   "trace_ai_ct": {
+    "unreachable":               "Couldn't get an answer from {host}. Check the Base URL in Settings > AI Assistant. If it's right, that server has to allow requests from {origin} on every answer, errors included (with nginx, add_header … always), or Trace can be set up on the CookTrace server instead.",
+    "unreachable_insecure":      "This page is on HTTPS, so the browser won't call {host} over plain HTTP. Give your provider an https:// address, or set Trace up on the CookTrace server instead.",
+    "unreachable_official":      "{host} didn't answer. Check this device's connection.",
     "toast": {
       "voice_unsupported":       "This browser doesn't support voice input.",
       "configure_ai":            "Set up Trace in Settings > Trace to use hold-to-talk.",
