@@ -17,6 +17,7 @@ import { titleCaseName as _titleCaseName, aisleForPantry as _aisleForPantry } fr
 import { ownId, linkableRecipeId } from '../lib/link-checks.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
 import { recipeContributions, mergeIntoList, parseSources } from '../lib/shopping-plan.js';
+import { localToday, shiftDay } from '../lib/calendar-day.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -294,13 +295,12 @@ function _inStockSet(u) {
 // on) leaves out ingredients whose pantry item is in stock.
 router.post('/from-plan', wrap((req, res) => {
   const u = uid(req);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  // Calendar days from the server's local today (the UTC date was a day off
+  // for part of every night).
+  const todayIso = localToday();
   const from = /^\d{4}-\d{2}-\d{2}$/.test(req.query.from) ? req.query.from : todayIso;
   let to = /^\d{4}-\d{2}-\d{2}$/.test(req.query.to) ? req.query.to : null;
-  if (!to) {
-    const d = new Date(); d.setDate(d.getDate() + 7);
-    to = d.toISOString().slice(0, 10);
-  }
+  if (!to) to = shiftDay(todayIso, 7);
   const onlyMissing = req.query.only_missing !== '0';
 
   const planned = db.prepare(

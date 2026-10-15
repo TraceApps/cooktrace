@@ -21,6 +21,7 @@ import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { dispatchWebhookEvent } from '../lib/webhooks.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
 import { linkableRecipeId } from '../lib/link-checks.js';
+import { localToday, shiftDay } from '../lib/calendar-day.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -118,9 +119,7 @@ router.get('/heatmap', wrap((req, res) => {
   const u = uid(req);
   const raw = parseInt(req.query.days, 10);
   const days = Math.min(Math.max(Number.isFinite(raw) ? raw : 365, 30), 730);
-  const since = new Date();
-  since.setDate(since.getDate() - (days - 1));
-  const sinceIso = since.toISOString().slice(0, 10);
+  const sinceIso = shiftDay(localToday(), -(days - 1));
   const rows = db.prepare(
     `SELECT date, COUNT(*) AS count
        FROM cook_diary

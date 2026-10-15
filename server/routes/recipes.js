@@ -76,6 +76,7 @@ import {
   buildCategoryMap as _buildCategoryMap,
   buildAllergenPantry as _buildAllergenPantry,
 } from '../lib/recipe-hydrate.js';
+import { localToday } from '../lib/calendar-day.js';
 
 // Tack the creator's current avatar onto a hydrated recipe so the
 // byline can render their photo. Live lookup (cheap PK fetch) keeps
@@ -995,9 +996,10 @@ router.post('/:id/cooked', wrap((req, res) => {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  // Date defaults to today (UTC date). Accept ISO date "YYYY-MM-DD" from
-  // the client, or fall back to today if anything else.
-  const today = new Date().toISOString().slice(0, 10);
+  // Date defaults to today, the server's local calendar day (the UTC date
+  // put a New York evening's cook on tomorrow). Accept ISO date
+  // "YYYY-MM-DD" from the client, or fall back to today if anything else.
+  const today = localToday();
   const date = (typeof req.body?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date))
     ? req.body.date
     : today;

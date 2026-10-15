@@ -49,6 +49,12 @@ function _stringify(v) {
 
 function _bool(v) { return v ? 1 : 0; }
 
+// Calendar days: today by the phone's own clock, moved on the bare date in
+// UTC (as the server's lib/calendar-day.js). The UTC date of "now" put a
+// New York evening's cook on tomorrow.
+function _localToday() { return new Date().toLocaleDateString('sv-SE'); }
+function _shiftDay(date, n) { const d = new Date(`${date}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+
 // Title-case a shopping item name. Mirrors server/routes/shopping.js's
 // _titleCaseName — Mealie food names arrive lowercase, and the shopping
 // list should follow the project's caps rule regardless of source.
@@ -475,7 +481,7 @@ export const CtApiNative = {
   },
 
   async markCooked(id, payload = {}) {
-    const date = payload.date || new Date().toISOString().slice(0, 10);
+    const date = payload.date || _localToday();
     // The version it was made from: the one the page showed, else the current one.
     const recipeRev = _validRev(payload.recipe_rev) || await _recordRevision(id);
     const photos = payload.photos != null ? _stringify(payload.photos) : null;
@@ -1091,8 +1097,7 @@ export const CtApiNative = {
 
   async getCookDiaryHeatmap(days = 365) {
     const cap = Math.min(Math.max(parseInt(days, 10) || 365, 30), 730);
-    const since = new Date(); since.setDate(since.getDate() - (cap - 1));
-    const sinceIso = since.toISOString().slice(0, 10);
+    const sinceIso = _shiftDay(_localToday(), -(cap - 1));
     return _query(
       `SELECT date, COUNT(*) AS count FROM cook_diary
         WHERE user_id = ? AND deleted_at IS NULL AND kind = 'cooked' AND date >= ?
@@ -1250,10 +1255,10 @@ export const CtApiNative = {
   // same range again replaces its cooks' share, and a cook no longer
   // planned takes its share out.
   async shopFromPlan(opts = {}) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = _localToday();
     const from = /^\d{4}-\d{2}-\d{2}$/.test(opts.from) ? opts.from : today;
     let to = /^\d{4}-\d{2}-\d{2}$/.test(opts.to) ? opts.to : null;
-    if (!to) { const d = new Date(); d.setDate(d.getDate() + 7); to = d.toISOString().slice(0, 10); }
+    if (!to) to = _shiftDay(today, 7);
     const onlyMissing = opts.only_missing !== false;
 
     const planned = await _query(

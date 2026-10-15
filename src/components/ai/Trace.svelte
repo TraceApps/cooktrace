@@ -518,8 +518,8 @@
           try {
             const id = parseInt(args?.recipe_id, 10);
             if (!Number.isFinite(id)) return { error: 'recipe_id required' };
-            const payload = {};
-            if (args?.date)      payload.date      = args.date;
+            // No date given: today on this device, not the server's day.
+            const payload = { date: args?.date || isoDay(new Date()) };
             if (args?.notes)     payload.notes     = args.notes;
             if (args?.meal_type) payload.meal_type = args.meal_type;
             if (Number.isFinite(args?.rating)) payload.rating = args.rating;
