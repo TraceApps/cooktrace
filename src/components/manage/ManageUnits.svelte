@@ -216,7 +216,7 @@
       {/if}
     </div>
 
-    <input class="input filter" type="search" placeholder={$_('manage_units_ui.filter_ph')} bind:value={filter} />
+    <input dir="auto" class="input filter" type="search" placeholder={$_('manage_units_ui.filter_ph')} bind:value={filter} />
 
     {#if filteredEmpty}
       <p class="empty">{$_('manage_units_ui.no_match', { values: { filter } })}</p>
@@ -258,8 +258,8 @@
             <li class="row">
               {#if editingId === u.id}
                 <div class="edit-form">
-                  <input class="input edit-input abbr-input" bind:value={editAbbr} placeholder={$_('manage_units_ui.abbr_ph')} />
-                  <input class="input edit-input full-input" bind:value={editFull} placeholder={$_('manage_units_ui.full_name_ph')} />
+                  <input dir="auto" class="input edit-input abbr-input" bind:value={editAbbr} placeholder={$_('manage_units_ui.abbr_ph')} />
+                  <input dir="auto" class="input edit-input full-input" bind:value={editFull} placeholder={$_('manage_units_ui.full_name_ph')} />
                   <select class="input edit-input cat-input" bind:value={editCategory}>
                     {#each CATEGORY_OPTIONS as cat}<option value={cat}>{groupName(cat, $_)}</option>{/each}
                   </select>
@@ -293,9 +293,9 @@
       {/if}
 
       <div class="add-row">
-        <input class="input abbr-input" placeholder={$_('manage_units_ui.new_abbr_ph')} bind:value={newAbbr}
+        <input dir="auto" class="input abbr-input" placeholder={$_('manage_units_ui.new_abbr_ph')} bind:value={newAbbr}
           on:keydown={(e) => { if (e.key === 'Enter') createCustom(); }} />
-        <input class="input full-input" placeholder={$_('manage_units_ui.new_full_name_ph')} bind:value={newFull} />
+        <input dir="auto" class="input full-input" placeholder={$_('manage_units_ui.new_full_name_ph')} bind:value={newFull} />
         <select class="input cat-input" bind:value={newCategory}>
           {#each CATEGORY_OPTIONS as cat}<option value={cat}>{groupName(cat, $_)}</option>{/each}
         </select>

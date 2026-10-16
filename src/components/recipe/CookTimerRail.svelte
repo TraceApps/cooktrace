@@ -31,7 +31,7 @@
       <div class="timer" class:done={t.done}>
         <div class="timer-head">
           <span class="material-symbols-rounded timer-icon">{t.done ? 'notifications_active' : 'timer'}</span>
-          <span class="timer-label">{t.label}</span>
+          <span class="timer-label" dir="auto">{t.label}</span>
         </div>
         <!-- Whole readout is a big tap target once the timer fires.
              Silences + dismisses the alarm. Before that it's inert

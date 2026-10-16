@@ -36,7 +36,7 @@
     >
       <div class="as-handle"></div>
       {#if title}
-        <p class="as-title">{title}</p>
+        <p class="as-title" dir="auto">{title}</p>
       {/if}
       {#each actions as action}
         <button

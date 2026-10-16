@@ -1177,7 +1177,7 @@ When you write to the user's data, summarise what you did briefly and concretely
             {#if m.role === 'assistant'}
               <div class="msg-avatar"><svelte:component this={Mascot} size={24} /></div>
             {/if}
-            <div class="bubble">
+            <div class="bubble" dir="auto">
               {#if m.preview}
                 <img class="msg-img" src={m.preview} alt="" />
               {/if}
@@ -1219,6 +1219,7 @@ When you write to the user's data, summarise what you did briefly and concretely
 
         <textarea
           class="input"
+          dir="auto"
           rows="1"
           bind:value={input}
           placeholder={recording ? $_('trace.listening') : $_('trace.ask_placeholder', { values: { name: assistantName } })}
@@ -1602,6 +1603,8 @@ When you write to the user's data, summarise what you did briefly and concretely
     line-height: 1.45;
     word-wrap: break-word;
     white-space: pre-wrap;
+    /* Each line its own way: Arabic and English lines in one message. */
+    unicode-bidi: plaintext;
   }
   .msg.user .bubble {
     background: var(--accent);

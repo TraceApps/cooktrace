@@ -181,7 +181,7 @@
               <img src={p.recipe.imgUrl || resolveAssetUrl(p.recipe.img_url)} alt="" loading="lazy" />
             {:else}<span class="ph material-symbols-rounded" aria-hidden="true">restaurant</span>{/if}
             <span class="pick-text">
-              <span class="name">{p.recipe.name}</span>
+              <span class="name" dir="auto">{p.recipe.name}</span>
               <span class="why" class:good={p.reason.kind === 'uses'}>{reasonText(p.reason)}</span>
               {#if members.length}
                 <AllergenChips summary={cardAllergens(p.recipe)} recipe={p.recipe} {members} date={days[i] || ''} />

@@ -1,4 +1,5 @@
 <script>
+  import { textDir } from '../../lib/text-dir.js';
   /**
    * KitchenGear — render of recipe.tools as a mise-en-place checklist.
    * Naming nods to "tools" in the data layer (Schema.org `tool`,
@@ -40,7 +41,7 @@
     <h2 class="kg-title">{title}</h2>
     <ul class="kg-list">
       {#each items as it, idx}
-        <li class="kg-item" class:checked={checked.has(idx)}>
+        <li class="kg-item" dir={textDir(it)} class:checked={checked.has(idx)}>
           <button
             class="check-btn"
             on:click={() => toggle(idx)}
@@ -48,7 +49,7 @@
           >
             <span class="material-symbols-rounded">{checked.has(idx) ? 'check_box' : 'check_box_outline_blank'}</span>
           </button>
-          <span class="kg-name">{it}</span>
+          <span class="kg-name" dir="auto">{it}</span>
         </li>
       {/each}
     </ul>

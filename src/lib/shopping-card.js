@@ -14,6 +14,7 @@
 
 import { brandFooter } from './brand-mark.js';
 import { displayQty } from './qty.js';
+import { textDir } from './text-dir.js';
 
 const W = 600;
 const HEAD_H = 160;
@@ -119,18 +120,24 @@ export function buildShoppingCardSvg(items, opts = {}) {
     const unit = it.unit || '';
     const qtyUnit = [qty, unit].filter(Boolean).join(' ');
     const name = clip(it.name || '', qtyUnit ? 30 : 40);
+    // An Arabic or Hebrew item reads from the right: box on the right, the
+    // amount on the left (TraceApps/notetrace#21).
+    const rtl = textDir(it.name) === 'rtl';
+    const boxX = rtl ? W - PAD_X - 22 : PAD_X;
+    const nameAt = rtl ? `x="${W - PAD_X - 36}" direction="rtl"` : `x="${PAD_X + 36}"`;
+    const qtyAt = rtl ? `x="${PAD_X}" direction="rtl"` : `x="${W - PAD_X}"`;
     body += `
       <g>
         <!-- Checkbox -->
-        <rect x="${PAD_X}" y="${y - 12}" width="22" height="22" rx="4" fill="none" stroke="#4FFFB0" stroke-width="2" />
+        <rect x="${boxX}" y="${y - 12}" width="22" height="22" rx="4" fill="none" stroke="#4FFFB0" stroke-width="2" />
         <!-- Name -->
-        <text x="${PAD_X + 36}" y="${baseline}" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+        <text ${nameAt} y="${baseline}" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
           font-size="20" font-weight="600" fill="#FFFFFF">${esc(name)}</text>
         ${qtyUnit ? `
-        <text x="${W - PAD_X}" y="${baseline}" text-anchor="end"
+        <text ${qtyAt} y="${baseline}" text-anchor="end"
           font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
           font-size="18" font-weight="600" fill="#4FFFB0">${esc(qtyUnit)}</text>` : ''}
-        ${i < shown.length - 1 || overflow ? `<line x1="${PAD_X + 36}" y1="${y + ROW_H / 2 - 1}" x2="${W - PAD_X}" y2="${y + ROW_H / 2 - 1}" stroke="#1F2330" stroke-width="1" />` : ''}
+        ${i < shown.length - 1 || overflow ? `<line x1="${rtl ? PAD_X : PAD_X + 36}" y1="${y + ROW_H / 2 - 1}" x2="${rtl ? W - PAD_X - 36 : W - PAD_X}" y2="${y + ROW_H / 2 - 1}" stroke="#1F2330" stroke-width="1" />` : ''}
       </g>
     `;
   });

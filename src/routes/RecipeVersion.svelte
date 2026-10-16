@@ -8,6 +8,7 @@
   Opened from a cook (?cook=<id>): "You made this on ..." comes first.
 -->
 <script>
+  import { textDir } from '../lib/text-dir.js';
   import { failed } from '../lib/messages.js';
   import { _, locale } from 'svelte-i18n';
   import { pop, push, querystring } from 'svelte-spa-router';
@@ -153,7 +154,7 @@
     </button>
     <div class="title-wrap">
       <h2 class="editor-title">{v ? $_('history.version', { values: { n: v.number } }) : $_('history.title')}</h2>
-      {#if recipe}<span class="subtitle">{recipe.name}</span>{/if}
+      {#if recipe}<span class="subtitle" dir="auto">{recipe.name}</span>{/if}
     </div>
   </header>
 
@@ -173,7 +174,7 @@
           <div class="made-text">
             <p class="made-title">{$_('history.made_on', { values: { date: day(cook.date) } })}</p>
             {#if cook.rating}<StarRating value={cook.rating} readOnly size={16} />{/if}
-            {#if cook.notes}<p class="made-notes">{cook.notes}</p>{/if}
+            {#if cook.notes}<p class="made-notes" dir="auto">{cook.notes}</p>{/if}
           </div>
         </section>
       {/if}
@@ -188,7 +189,7 @@
           </form>
         {:else if v.label}
           <div class="name-row">
-            <p class="version-label">{v.label}</p>
+            <p class="version-label" dir="auto">{v.label}</p>
             {#if canEdit}
               <button type="button" class="btn-icon" on:click={startNaming} aria-label={$_('history.rename')} title={$_('history.rename')}>
                 <span class="material-symbols-rounded">edit</span>
@@ -257,10 +258,10 @@
             </dl>
           {/if}
           {#each v.data.ingredients as g, gi (gi)}
-            {#if g.name}<p class="group">{g.name}</p>{/if}
+            {#if g.name}<p class="group" dir="auto">{g.name}</p>{/if}
             <ul class="ings">
               {#each g.items as it, ii (ii)}
-                <li><span class="amt">{amount(it)}</span><span class="ing-name">{it.name}{#if it.note}<span class="note">, {it.note}</span>{/if}</span></li>
+                <li dir={textDir(it.name || it.note)}><span class="amt">{amount(it)}</span><span class="ing-name" dir="auto">{it.name}{#if it.note}, <span class="note" dir="auto">{it.note}</span>{/if}</span></li>
               {/each}
             </ul>
           {:else}
@@ -273,7 +274,7 @@
           {#if v.data.steps.length}
             <ol class="steps">
               {#each v.data.steps as st, si (si)}
-                <li><span class="num" aria-hidden="true">{si + 1}</span><span class="step-text">{#if st.title}<strong>{st.title}</strong> {/if}{st.text}</span></li>
+                <li dir={textDir(st.title || st.text)}><span class="num" aria-hidden="true">{si + 1}</span><span class="step-text" dir="auto">{#if st.title}<strong>{st.title}</strong> {/if}{st.text}</span></li>
               {/each}
             </ol>
           {:else}<p class="more">{$_('history.no_steps')}</p>{/if}
@@ -288,7 +289,7 @@
               <span class="cook-date">{day(c.date)}</span>
               {#if c.rating}<StarRating value={c.rating} readOnly size={14} />{/if}
             </div>
-            {#if c.notes}<p class="cook-notes">{c.notes}</p>{/if}
+            {#if c.notes}<p class="cook-notes" dir="auto">{c.notes}</p>{/if}
             {#if photosOf(c).length}
               <div class="cook-photos">{#each photosOf(c) as p}<img src={resolveAssetUrl(p)} alt="" loading="lazy" />{/each}</div>
             {/if}
@@ -406,7 +407,7 @@
     flex: none; width: 24px; height: 24px; border-radius: var(--radius-full); background: var(--surface-2);
     display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--text-2);
   }
-  .step-text { flex: 1; min-width: 0; white-space: pre-line; }
+  .step-text { flex: 1; min-width: 0; white-space: pre-line; unicode-bidi: plaintext; }
   .cook { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--border); }
   .cook.this { background: color-mix(in srgb, var(--accent) 6%, transparent); border-radius: var(--radius-md); padding: 8px; }
   .cook-head { display: flex; align-items: center; gap: 10px; }

@@ -386,7 +386,7 @@ ${textPayload.text}
                 checked={selected.has(item.id)}
                 on:change={() => _toggle(item.id)} />
               <div class="row-main">
-                <div class="row-name">{_displayName(item)}</div>
+                <div class="row-name" dir="auto">{_displayName(item)}</div>
                 <div class="row-meta">
                   {#if item.aiSavedId}
                     <span class="confidence-pill high">{$_('bulk_import_dialog.saved_via_ai')}</span>

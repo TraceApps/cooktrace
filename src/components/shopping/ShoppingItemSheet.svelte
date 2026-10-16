@@ -153,7 +153,7 @@
                 <li>
                   <button class="cook" on:click={() => { if (c.recipeId != null) { close(); push(`/recipes/${c.recipeId}`); } }} disabled={c.recipeId == null}>
                     {#if c.img}<img src={c.img} alt="" loading="lazy" />{:else}<span class="ph material-symbols-rounded" aria-hidden="true">restaurant</span>{/if}
-                    <span class="cook-name">{c.name}</span>
+                    <span class="cook-name" dir="auto">{c.name}</span>
                     <span class="day">{c.day}</span>
                     <span class="cook-amount">{c.amount}</span>
                   </button>
@@ -170,7 +170,7 @@
             {#if kinds.length}
               <div class="kinds">
                 <span class="muted">{$_('shopping_item.kinds')}</span>
-                {#each kinds as k}<span class="kind">{k}</span>{/each}
+                {#each kinds as k}<span class="kind" dir="auto">{k}</span>{/each}
               </div>
             {/if}
             {#if sizeHint}
@@ -181,7 +181,7 @@
 
         <label class="block note">
           <span class="label">{$_('shopping_item.note')}</span>
-          <input class="input" type="text" maxlength="500" placeholder={$_('shopping_item.note_placeholder')}
+          <input class="input" type="text" dir="auto" maxlength="500" placeholder={$_('shopping_item.note_placeholder')}
             bind:value={note} on:change={saveNote} on:blur={saveNote} />
         </label>
 

@@ -17,6 +17,7 @@
 
 import { brandFooter } from './brand-mark.js';
 import { formatDuration } from './duration.js';
+import { textDir } from './text-dir.js';
 
 const W = 600;
 const HERO_H = 380;
@@ -41,6 +42,12 @@ const MAX_PAGES = 6;
 
 const STEP_CHARS_PER_LINE = 56;
 const STEP_MAX_LINES = 5;       // generous; per-page budget still bounds it
+
+// A line of the recipe's own text, placed from the side it reads from:
+// Arabic or Hebrew from the right edge (direction="rtl" keeps a mixed line
+// in order), anything else from the left (TraceApps/notetrace#21).
+const isRtl = (s) => textDir(s) === 'rtl';
+const startX = (s) => (isRtl(s) ? `x="${W - PAD_X}" direction="rtl"` : `x="${PAD_X}"`);
 
 function esc(s) {
   return String(s ?? '')
@@ -91,6 +98,14 @@ function _wrapName(text, perLine = 22) {
     ? esc(l)
     : `<tspan x="${PAD_X}" dy="46">${esc(l)}</tspan>`
   ).join('');
+}
+
+// A right-to-left name gets one <text> per line from the right edge: WebKit
+// runs the lines of a right-to-left <text> together when a tspan starts a
+// new line.
+function _rtlName(text, y, perLine = 22) {
+  return wrapText(text, perLine, 3).map((l, i) => `<text ${startX(text)} y="${y + i * 46}" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+          font-size="38" font-weight="800" fill="#FFFFFF">${esc(l)}</text>`).join('');
 }
 
 async function _imageToDataUrl(src) {
@@ -154,22 +169,26 @@ function _ingredientBlocks(recipe) {
   for (const row of ings) {
     if (row.kind === 'group') {
       const name = clip(row.name, 40);
+      // Letter spacing pulls Arabic letters apart, and WebKit then draws
+      // them in reverse, so a right-to-left group name goes without it.
       out.push({
         kind: 'ingGroup',
         height: ING_GROUP_H,
-        render: (y) => `<text x="${PAD_X}" y="${y + 24}" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
-          font-size="14" font-weight="700" letter-spacing="1" fill="#4FFFB0" font-style="italic">${esc(name)}</text>`,
+        render: (y) => `<text ${startX(name)} y="${y + 24}" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+          font-size="14" font-weight="700"${isRtl(name) ? '' : ' letter-spacing="1"'} fill="#4FFFB0" font-style="italic">${esc(name)}</text>`,
       });
     } else {
       const qu = [row.qty, row.unit].filter(Boolean).join(' ');
       const name = clip(row.name, qu ? 36 : 50);
+      // An Arabic ingredient reads from the right, its amount on the left.
+      const quAt = isRtl(row.name) ? `x="${PAD_X}" direction="rtl"` : `x="${W - PAD_X}"`;
       out.push({
         kind: 'ingRow',
         height: ING_ROW_H,
         render: (y) => `
-          <text x="${PAD_X}" y="${y + 22}" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+          <text ${startX(row.name)} y="${y + 22}" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
             font-size="17" font-weight="500" fill="#FFFFFF">• ${esc(name)}</text>
-          ${qu ? `<text x="${W - PAD_X}" y="${y + 22}" text-anchor="end"
+          ${qu ? `<text ${quAt} y="${y + 22}" text-anchor="end"
             font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
             font-size="16" font-weight="600" fill="#4FFFB0">${esc(qu)}</text>` : ''}
         `,
@@ -193,6 +212,10 @@ function _stepBlocks(recipe) {
   }];
   steps.forEach((s, idx) => {
     const lines = wrapText(_stepText(s), STEP_CHARS_PER_LINE, STEP_MAX_LINES);
+    // An Arabic step has its number on the right and reads from there.
+    const rtl = isRtl(_stepText(s));
+    const numX = rtl ? W - PAD_X - 14 : PAD_X + 14;
+    const textAt = rtl ? `x="${W - PAD_X - 40}" direction="rtl"` : `x="${PAD_X + 40}"`;
     const blockH = STEP_GAP + lines.length * STEP_LINE_H + 8;
     out.push({
       kind: 'step',
@@ -200,13 +223,13 @@ function _stepBlocks(recipe) {
       render: (y) => {
         const numY = y + 24;
         let svg = `
-          <circle cx="${PAD_X + 14}" cy="${numY - 6}" r="14" fill="rgba(79,255,176,0.15)" stroke="#4FFFB0" stroke-width="1.5" />
-          <text x="${PAD_X + 14}" y="${numY - 1}" text-anchor="middle"
+          <circle cx="${numX}" cy="${numY - 6}" r="14" fill="rgba(79,255,176,0.15)" stroke="#4FFFB0" stroke-width="1.5" />
+          <text x="${numX}" y="${numY - 1}" text-anchor="middle"
             font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
             font-size="13" font-weight="700" fill="#4FFFB0">${idx + 1}</text>
         `;
         lines.forEach((line, li) => {
-          svg += `<text x="${PAD_X + 40}" y="${numY + li * STEP_LINE_H}"
+          svg += `<text ${textAt} y="${numY + li * STEP_LINE_H}"
             font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
             font-size="16" font-weight="500" fill="#FFFFFF">${esc(line)}</text>`;
         });
@@ -325,15 +348,15 @@ export async function buildRecipeCardPages(recipe) {
       head = `
         ${heroSection}
         <rect x="0" y="${HERO_H}" width="${W}" height="${TITLE_H}" fill="#0A0B0F" />
-        <text x="${PAD_X}" y="${HERO_H + 56}" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
-          font-size="38" font-weight="800" fill="#FFFFFF">${_wrapName(r.name || 'Recipe')}</text>
+        ${isRtl(r.name) ? _rtlName(r.name, HERO_H + 56) : `<text x="${PAD_X}" y="${HERO_H + 56}" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+          font-size="38" font-weight="800" fill="#FFFFFF">${_wrapName(r.name || 'Recipe')}</text>`}
         ${subtitle ? `<text x="${PAD_X}" y="${HERO_H + TITLE_H - 30}" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
           font-size="18" fill="#A1A8B8">${esc(subtitle)}</text>` : ''}
       `;
     } else {
       // Continuation: slim header with the recipe name + "(continued)"
       head = `
-        <text x="${PAD_X}" y="42" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+        <text ${startX(r.name)} y="42" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
           font-size="22" font-weight="800" fill="#FFFFFF">${esc(clip(r.name || 'Recipe', 28))}
           <tspan font-weight="400" fill="#A1A8B8" font-size="16"> · continued</tspan>
         </text>

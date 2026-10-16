@@ -219,7 +219,7 @@
             </div>
             <div class="body-col">
               <div class="meta">
-                <span class="author">{displayName(c)}</span>
+                <span class="author" dir="auto">{displayName(c)}</span>
                 <span class="dot">·</span>
                 <span class="when" title={c.created_at}>{relativeTime(c.created_at)}</span>
                 {#if c.updated_at && c.updated_at !== c.created_at}
@@ -234,7 +234,7 @@
                     disabled={!editDraft.trim()}>{$_('recipe_comments.save')}</button>
                 </div>
               {:else}
-                <div class="text">{@html sanitizeRichText(c.body)}</div>
+                <div class="text" dir="auto">{@html sanitizeRichText(c.body)}</div>
                 <div class="row-actions">
                   {#if canPost}
                     <button class="btn-link" on:click={() => { replyingTo = c.id; replyDraft = ''; }}>
@@ -265,7 +265,7 @@
                       </div>
                       <div class="body-col">
                         <div class="meta">
-                          <span class="author">{displayName(r)}</span>
+                          <span class="author" dir="auto">{displayName(r)}</span>
                           <span class="dot">·</span>
                           <span class="when" title={r.created_at}>{relativeTime(r.created_at)}</span>
                           {#if r.updated_at && r.updated_at !== r.created_at}
@@ -280,7 +280,7 @@
                               disabled={!editDraft.trim()}>{$_('recipe_comments.save')}</button>
                           </div>
                         {:else}
-                          <div class="text">{@html sanitizeRichText(r.body)}</div>
+                          <div class="text" dir="auto">{@html sanitizeRichText(r.body)}</div>
                           {#if canEdit(r)}
                             <div class="row-actions">
                               <button class="btn-icon small" on:click={() => startEdit(r)} aria-label={$_('common.edit')} title={$_('common.edit')}>
@@ -477,7 +477,10 @@
   .text :global(p) { margin: 0 0 6px; }
   .text :global(p:last-child) { margin-bottom: 0; }
   .text :global(ul),
-  .text :global(ol) { margin: 4px 0 6px; padding-left: 22px; }
+  .text :global(ol) { margin: 4px 0 6px; padding-inline-start: 22px; }
+  /* Each paragraph its own way: the editor keeps no dir in notes, so an
+     Arabic paragraph and an English one each read from their first letter. */
+  .text :global(p), .text :global(li) { unicode-bidi: plaintext; }
   .text :global(li) { margin: 2px 0; }
 
   .row-actions {

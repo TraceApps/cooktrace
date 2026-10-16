@@ -288,7 +288,7 @@
                 checked={selected.has(item.id)}
                 on:change={() => _toggle(item.id)} />
               <div class="row-main">
-                <div class="row-name">{item.name || item.url}</div>
+                <div class="row-name" dir="auto">{item.name || item.url}</div>
                 <div class="row-meta">
                   {#if item.error}
                     <span class="confidence-pill low">{$_('import_url_dialog.failed')}</span>

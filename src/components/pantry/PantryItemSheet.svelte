@@ -1024,11 +1024,11 @@
             {#if editing}
               <label class="field">
                 <span class="field-label">{$_('pantry_sheet.name')}</span>
-                <input class="input" type="text" bind:value={draft.name} placeholder={$_('pantry_sheet_extra.name_ph')} />
+                <input class="input" type="text" dir="auto" bind:value={draft.name} placeholder={$_('pantry_sheet_extra.name_ph')} />
               </label>
               <label class="field">
                 <span class="field-label">{$_('pantry_sheet.brand')}</span>
-                <input class="input" type="text" bind:value={draft.brand} placeholder={$_('pantry_sheet_extra.brand_ph')} />
+                <input class="input" type="text" dir="auto" bind:value={draft.brand} placeholder={$_('pantry_sheet_extra.brand_ph')} />
               </label>
               <label class="field">
                 <span class="field-label">
@@ -1105,7 +1105,7 @@
                 {/if}
               {/if}
             {:else}
-              {#if item.brand}<div class="brand">{item.brand}</div>{/if}
+              {#if item.brand}<div class="brand" dir="auto">{item.brand}</div>{/if}
               <div class="meta-pills">
                 {#if categoryName}
                   <span class="pill">
@@ -1302,7 +1302,7 @@
         {/if}
         <label class="field full">
           <span class="field-label">{$_('recipe.notes')}</span>
-          <textarea class="input" rows="3" bind:value={draft.notes}
+          <textarea class="input" dir="auto" rows="3" bind:value={draft.notes}
             placeholder={$_('pantry_item_sheet_ui.notes_placeholder')}></textarea>
         </label>
       {:else}
@@ -1326,7 +1326,7 @@
         {#if item.notes}
           <div class="notes">
             <div class="notes-label">{$_('recipe.notes')}</div>
-            <p class="notes-body">{item.notes}</p>
+            <p class="notes-body" dir="auto">{item.notes}</p>
           </div>
         {/if}
       {/if}
@@ -1380,7 +1380,7 @@
                       {:else}
                         <span class="used-in-thumb stub"><span class="material-symbols-rounded">restaurant_menu</span></span>
                       {/if}
-                      <span class="used-in-name">{r.name}</span>
+                      <span class="used-in-name" dir="auto">{r.name}</span>
                       <span class="material-symbols-rounded used-in-chevron">chevron_right</span>
                     </button>
                   </li>
@@ -1411,7 +1411,7 @@
                       {:else}
                         <span class="used-in-thumb stub"><span class="material-symbols-rounded">restaurant_menu</span></span>
                       {/if}
-                      <span class="used-in-name">
+                      <span class="used-in-name" dir="auto">
                         {r.name}
                         {#if !isVariant}<span class="used-in-via">{$_('pantry_item_sheet_ui.used_in_via', { values: { name: _viaName(r.via, variantContext) } })}</span>{/if}
                       </span>
@@ -1454,7 +1454,7 @@
                 {@const vExpStatus = _expiryStatus(v.expires_on)}
                 <li class="variant-row">
                   <span class="material-symbols-rounded variant-row-icon">label</span>
-                  <span class="variant-row-name">{_displayVariantName(v, item, { nested: true })}</span>
+                  <span class="variant-row-name" dir="auto">{_displayVariantName(v, item, { nested: true })}</span>
                   {#if !v.in_stock}
                     <span class="variant-row-chip variant-row-chip-out" title={$_('pantry_item_sheet_ui.out_of_stock')}>{$_('pantry.filters.out')}</span>
                   {/if}
@@ -1504,7 +1504,7 @@
                   {$_('pantry_item_sheet_ui.add_variant_hint')}
                 </p>
                 <div class="variant-add">
-                  <input class="input" type="text" placeholder={$_('pantry_item_sheet_ui.brand_or_store_placeholder')}
+                  <input class="input" type="text" dir="auto" placeholder={$_('pantry_item_sheet_ui.brand_or_store_placeholder')}
                     bind:value={newVariantBrand}
                     on:keydown={e => { if (e.key === 'Enter') _addNewVariant(); }} />
                   {#if addVariantSuggestions.length}
@@ -1513,7 +1513,7 @@
                         <li>
                           <button class="variant-suggest-row" on:click={() => _addExistingAsVariant(s.id)}>
                             <span class="material-symbols-rounded">link</span>
-                            <span class="variant-suggest-name">{s.name}{s.brand ? ' (' + s.brand + ')' : ''}</span>
+                            <span class="variant-suggest-name" dir="auto">{s.name}{s.brand ? ' (' + s.brand + ')' : ''}</span>
                             <span class="variant-suggest-meta">{$_('pantry_sheet_extra.attach_as_variant')}</span>
                           </button>
                         </li>
@@ -1523,7 +1523,7 @@
                     <p class="variant-add-empty">{$_('pantry_item_sheet_ui.no_match_new_variant')}</p>
                   {/if}
                   {#if newVariantNameOverride}
-                    <input class="input variant-add-name" type="text"
+                    <input class="input variant-add-name" dir="auto" type="text"
                       placeholder={$_('pantry_item_sheet_ui.override_name_placeholder')}
                       bind:value={newVariantName}
                       on:keydown={e => { if (e.key === 'Enter') _addNewVariant(); }} />
@@ -1560,7 +1560,7 @@
                   {$_('pantry_item_sheet_ui.add_variant_hint')}
                 </p>
                 <div class="variant-add">
-                  <input class="input" type="text" placeholder={$_('pantry_item_sheet_ui.brand_or_store_placeholder')}
+                  <input class="input" type="text" dir="auto" placeholder={$_('pantry_item_sheet_ui.brand_or_store_placeholder')}
                     bind:value={newVariantBrand}
                     on:keydown={e => { if (e.key === 'Enter') _addNewVariant(); }} />
                   {#if addVariantSuggestions.length}
@@ -1569,7 +1569,7 @@
                         <li>
                           <button class="variant-suggest-row" on:click={() => _addExistingAsVariant(s.id)}>
                             <span class="material-symbols-rounded">link</span>
-                            <span class="variant-suggest-name">{s.name}{s.brand ? ' (' + s.brand + ')' : ''}</span>
+                            <span class="variant-suggest-name" dir="auto">{s.name}{s.brand ? ' (' + s.brand + ')' : ''}</span>
                             <span class="variant-suggest-meta">{$_('pantry_sheet_extra.attach_as_variant')}</span>
                           </button>
                         </li>
@@ -1579,7 +1579,7 @@
                     <p class="variant-add-empty">{$_('pantry_item_sheet_ui.no_match_new_variant')}</p>
                   {/if}
                   {#if newVariantNameOverride}
-                    <input class="input variant-add-name" type="text"
+                    <input class="input variant-add-name" dir="auto" type="text"
                       placeholder={$_('pantry_item_sheet_ui.override_name_placeholder')}
                       bind:value={newVariantName}
                       on:keydown={e => { if (e.key === 'Enter') _addNewVariant(); }} />
@@ -1657,7 +1657,7 @@
 <Sheet bind:open={categoryNewOpen} title={$_('pantry_item_sheet_ui.new_category_title')} height="auto">
   <div class="newcat-body">
     <label class="field-label">{$_('pantry_sheet_extra.name')}</label>
-    <input class="input" type="text" bind:value={categoryNewName} placeholder={$_('pantry_sheet_extra.cat_new_name_ph')} />
+    <input class="input" type="text" dir="auto" bind:value={categoryNewName} placeholder={$_('pantry_sheet_extra.cat_new_name_ph')} />
     <label class="field-label" style="margin-top:10px">{$_('pantry_item_sheet_ui.icon_label')}</label>
     <input class="input" type="text" bind:value={categoryNewIcon} placeholder="kitchen" />
     <p class="field-hint">{@html $_('pantry_sheet_extra.cat_field_hint_html')}</p>
@@ -1678,13 +1678,13 @@
         ? $_('pantry_item_sheet_ui.picker_hint_parent')
         : $_('pantry_item_sheet_ui.picker_hint_child')}
     </p>
-    <input class="input" type="search" placeholder={$_('pantry.search_placeholder')}
+    <input class="input" type="search" dir="auto" placeholder={$_('pantry.search_placeholder')}
       bind:value={variantPickerQuery} autofocus />
     <ul class="variant-picker-list">
       {#each variantPickerResults as r (r.id)}
         <li>
           <button class="variant-picker-row" on:click={() => variantPickerMode === 'set-parent' ? _setGenericParent(r.id) : _addExistingAsVariant(r.id)}>
-            <span class="variant-picker-name">{r.name}</span>
+            <span class="variant-picker-name" dir="auto">{r.name}</span>
             {#if r.brand}<span class="variant-picker-meta">{r.brand}</span>{/if}
           </button>
         </li>
@@ -1877,7 +1877,7 @@
     padding: 12px 14px;
   }
   .notes-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
-  .notes-body { margin: 0; color: var(--text-2); font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+  .notes-body { margin: 0; color: var(--text-2); font-size: 14px; line-height: 1.5; white-space: pre-wrap; unicode-bidi: plaintext; }
 
   .actions {
     display: flex; gap: 8px; justify-content: space-between;

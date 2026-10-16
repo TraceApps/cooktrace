@@ -85,7 +85,7 @@
             <li>
               <button type="button" class="version" class:folded={it.fold} on:click={() => openVersion(v)}>
                 <span class="head">
-                  <span class="name">{versionName($_, v)}</span>
+                  <span class="name" dir="auto">{versionName($_, v)}</span>
                   {#if v.current}<span class="badge">{$_('history.current')}</span>{/if}
                   <span class="date">{when(v.created_at)}{#if v.created_by_name && v.created_by != null && v.created_by !== $currentUser?.id}{' · '}{v.created_by_name}{/if}</span>
                 </span>

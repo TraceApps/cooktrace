@@ -642,7 +642,7 @@
           <button class="stat-tile stat-link"
             on:click={() => push(`/recipes/${stats.top_recipe.id}`)}
             title={$_('diary_entry.actions.open_recipe')}>
-            <span class="stat-value stat-top-name">{stats.top_recipe.name}</span>
+            <span class="stat-value stat-top-name" dir="auto">{stats.top_recipe.name}</span>
             <span class="stat-label">{$_('cook_diary_ui.most_cooked', { values: { count: stats.top_recipe.count } })}</span>
           </button>
         {:else}
@@ -694,7 +694,7 @@
          Applies alongside the recipe + meal-type filters. -->
     <div class="diary-search">
       <span class="material-symbols-rounded search-icon">search</span>
-      <input class="search-input" type="search" placeholder={$_('cook_diary_ui.search_placeholder')}
+      <input class="search-input" dir="auto" type="search" placeholder={$_('cook_diary_ui.search_placeholder')}
         bind:value={diarySearch} />
       {#if diarySearch}
         <button class="search-clear" on:click={() => diarySearch = ''} title={$_('cook_diary_ui.clear_search')} aria-label={$_('cook_diary_ui.clear_search')}>
@@ -709,7 +709,7 @@
       {#if filterRecipeId}
         <span class="filter-chip active" transition:fade={{ duration: 120 }}>
           <span class="material-symbols-rounded">filter_alt</span>
-          <span class="filter-chip-name">{filterRecipeName || $_('cookdiary_page.recipe')}</span>
+          <span class="filter-chip-name" dir="auto">{filterRecipeName || $_('cookdiary_page.recipe')}</span>
           <button class="filter-clear" on:click={clearFilter} aria-label={$_('cook_diary_ui.clear_recipe_filter')}>
             <span class="material-symbols-rounded">close</span>
           </button>
@@ -816,7 +816,7 @@
                 </div>
                 <div class="entry-body">
                   <div class="entry-name-row">
-                    <span class="entry-name">{e.recipe_name || $_('cookdiary_page.recipe')}</span>
+                    <span class="entry-name" dir="auto">{e.recipe_name || $_('cookdiary_page.recipe')}</span>
                     {#if e.meal_type}
                       <span class="entry-meal" title={_mealLabel(e.meal_type)}>
                         <span class="material-symbols-rounded">{_mealIcon(e.meal_type)}</span>
@@ -848,7 +848,7 @@
                   {#if e.cooked_by_full_name || e.cooked_by_username}
                     <div class="entry-by">{$_('cook_diary_ui.cooked_by', { values: { name: e.cooked_by_full_name || e.cooked_by_username } })}</div>
                   {/if}
-                  {#if e.notes}<div class="entry-notes">{e.notes}</div>{/if}
+                  {#if e.notes}<div class="entry-notes" dir="auto">{e.notes}</div>{/if}
                 </div>
                 {#if e.kind === 'planned'}
                   <span class="entry-badge">{$_('cookdiary_page.planned_tag')}</span>
@@ -875,7 +875,7 @@
                 {#if it.meal_type}
                   <span class="material-symbols-rounded cell-pill-meal">{_mealIcon(it.meal_type)}</span>
                 {/if}
-                <span class="cell-pill-name">{it.recipe_name || $_('cookdiary_page.recipe')}</span>
+                <span class="cell-pill-name" dir="auto">{it.recipe_name || $_('cookdiary_page.recipe')}</span>
               </button>
             {/each}
           </div>
@@ -901,7 +901,7 @@
                 on:error={(e) => e.currentTarget?.closest('.photo-tile')?.classList.add('photo-missing')}
               />
               <div class="photo-overlay">
-                <span class="photo-name">{t.entry.recipe_name || $_('cookdiary_page.recipe')}</span>
+                <span class="photo-name" dir="auto">{t.entry.recipe_name || $_('cookdiary_page.recipe')}</span>
                 <span class="photo-date">{shortDate(t.entry.date)}</span>
               </div>
               {#if t.count > 1}
@@ -1003,7 +1003,7 @@
                 <span class="material-symbols-rounded">restaurant</span>
               {/if}
               <span class="recipe-text">
-                <span class="recipe-name">{r.name}</span>
+                <span class="recipe-name" dir="auto">{r.name}</span>
                 {#if householdMembers.length}<AllergenChips summary={cardAllergens(r)} recipe={r} members={householdMembers} date={planAnyDay ? '' : planDate} />{/if}
               </span>
               {#if planRecipeId === r.id}<span class="material-symbols-rounded check">check</span>{/if}
@@ -1045,7 +1045,7 @@
               {:else}
                 <span class="material-symbols-rounded">restaurant</span>
               {/if}
-              <span class="recipe-name">{r.name}</span>
+              <span class="recipe-name" dir="auto">{r.name}</span>
               {#if filterRecipeId === r.id}<span class="material-symbols-rounded check">check</span>{/if}
             </button>
           {:else}
@@ -1092,7 +1092,7 @@
       </div>
       <div class="lightbox-meta">
         <div class="lightbox-title-row">
-          <span class="lightbox-title">{lightboxEntry.recipe_name || $_('cookdiary_page.recipe')}</span>
+          <span class="lightbox-title" dir="auto">{lightboxEntry.recipe_name || $_('cookdiary_page.recipe')}</span>
           {#if lightboxEntry.meal_type}
             <span class="entry-meal">
               <span class="material-symbols-rounded">{_mealIcon(lightboxEntry.meal_type)}</span>
@@ -1114,7 +1114,7 @@
             {/each}
           </div>
         {/if}
-        {#if lightboxEntry.notes}<p class="lightbox-notes">{lightboxEntry.notes}</p>{/if}
+        {#if lightboxEntry.notes}<p class="lightbox-notes" dir="auto">{lightboxEntry.notes}</p>{/if}
         {#if lightboxEntry.recipe_id}
           <button class="btn btn-secondary lightbox-open" on:click={() => { const id = lightboxEntry.recipe_id; closeLightbox(); push(`/recipes/${id}`); }}>
             <span class="material-symbols-rounded">open_in_new</span>
@@ -1932,7 +1932,7 @@
   .lightbox-title { font-size: 17px; font-weight: 700; color: var(--text-1); }
   .lightbox-sub { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-3); }
   .lightbox-sub .dot { opacity: 0.5; }
-  .lightbox-notes { margin: 4px 0 0; color: var(--text-2); font-size: 14px; white-space: pre-wrap; }
+  .lightbox-notes { margin: 4px 0 0; color: var(--text-2); font-size: 14px; white-space: pre-wrap; unicode-bidi: plaintext; }
   .lightbox-open {
     align-self: flex-start;
     margin-top: 6px;

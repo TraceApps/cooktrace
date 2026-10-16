@@ -941,7 +941,7 @@
             <span class="material-symbols-rounded">close</span>
           </button>
         </header>
-        <p class="cb-dialog-sub">{shareDialogRecipe.name}</p>
+        <p class="cb-dialog-sub" dir="auto">{shareDialogRecipe.name}</p>
 
         <!-- Section 1: Per-user grants (only relevant in multi-user mode) -->
         {#if sharePeers.length > 0}
@@ -957,7 +957,7 @@
                   <input type="checkbox"
                     checked={shareGrants.has(p.id)}
                     on:change={() => togglePeerGrant(p)} />
-                  <span class="peer-name">{p.name}</span>
+                  <span class="peer-name" dir="auto">{p.name}</span>
                   {#if p.username && p.username !== p.name}
                     <span class="peer-handle">@{p.username}</span>
                   {/if}
@@ -980,7 +980,7 @@
               {#each shareKitchens as k (k.id)}
                 <li class="peer-row">
                   <span class="material-symbols-rounded" style="font-size:18px;color:var(--accent);">cooking</span>
-                  <span class="peer-name">{k.name}</span>
+                  <span class="peer-name" dir="auto">{k.name}</span>
                   <span class="peer-handle">{$_('recipes_ui.member_count', { values: { count: k.member_count } })}</span>
                   <button class="btn btn-secondary" style="margin-left:auto;height:30px;font-size:12px"
                     on:click={() => shareWithKitchen(k)}
@@ -1048,7 +1048,7 @@
             <span class="material-symbols-rounded">close</span>
           </button>
         </header>
-        <p class="cb-dialog-sub">{cookbookShareTarget.name}</p>
+        <p class="cb-dialog-sub" dir="auto">{cookbookShareTarget.name}</p>
 
         <section class="share-section">
           <h4 class="share-section-title">
@@ -1062,7 +1062,7 @@
             <ul class="peer-list">
               {#each cookbookSharePeers as p (p.user_id)}
                 <li class="peer-row">
-                  <span class="peer-name">{p.full_name || p.username}</span>
+                  <span class="peer-name" dir="auto">{p.full_name || p.username}</span>
                   <span class="peer-handle">@{p.username}</span>
                   <label class="peer-check">
                     <input type="checkbox"
@@ -1088,7 +1088,7 @@
               {#each cookbookShareKitchens as k (k.id)}
                 <li class="peer-row">
                   <span class="material-symbols-rounded" style="font-size:18px;color:var(--accent);">cooking</span>
-                  <span class="peer-name">{k.name}</span>
+                  <span class="peer-name" dir="auto">{k.name}</span>
                   <span class="peer-handle">{$_('recipes_ui.member_count', { values: { count: k.member_count } })}</span>
                   <button class="btn btn-secondary" style="margin-left:auto;height:30px;font-size:12px"
                     on:click={() => shareCookbookWithKitchen(k)}
@@ -1114,7 +1114,7 @@
             <span class="material-symbols-rounded">close</span>
           </button>
         </header>
-        <p class="cb-dialog-sub">{$_('recipes_ui.recipes_selected', { values: { count: selectedIds.size } })}</p>
+        <p class="cb-dialog-sub" dir="auto">{$_('recipes_ui.recipes_selected', { values: { count: selectedIds.size } })}</p>
         <div class="cb-dialog-list">
           {#if cookbooks.length === 0}
             <p class="cb-dialog-empty">
@@ -1127,7 +1127,7 @@
                 <input type="checkbox"
                   checked={bulkCookbookSelected.has(cb.id)}
                   on:change={() => toggleBulkCookbookSelected(cb.id)} />
-                <span class="cb-dialog-name">{cb.name}</span>
+                <span class="cb-dialog-name" dir="auto">{cb.name}</span>
                 <span class="cb-dialog-count">{$_('recipes_ui.recipe_count', { values: { count: cb.recipe_count } })}</span>
               </label>
             {/each}
@@ -1157,7 +1157,7 @@
             <span class="material-symbols-rounded">close</span>
           </button>
         </header>
-        <p class="cb-dialog-sub">{cookbookDialogRecipe.name}</p>
+        <p class="cb-dialog-sub" dir="auto">{cookbookDialogRecipe.name}</p>
         <div class="cb-dialog-list">
           {#if cookbooks.length === 0}
             <p class="cb-dialog-empty">
@@ -1170,7 +1170,7 @@
                 <input type="checkbox"
                   checked={cookbookDialogSelected.has(cb.id)}
                   on:change={() => toggleCookbookSelected(cb.id)} />
-                <span class="cb-dialog-name">{cb.name}</span>
+                <span class="cb-dialog-name" dir="auto">{cb.name}</span>
                 <span class="cb-dialog-count">{$_('recipes_ui.recipe_count', { values: { count: cb.recipe_count } })}</span>
               </label>
             {/each}
@@ -1309,7 +1309,7 @@
       <div class="search-row">
         <span class="material-symbols-rounded search-icon">search</span>
         <input
-          class="search"
+          class="search" dir="auto"
           type="search"
           placeholder={$_('routes.recipes.search_placeholder')}
           bind:value={query}
@@ -1336,14 +1336,14 @@
               </button>
             {/if}
             {#if categories.length > 0}
-              <button class="cat-chip"
+              <button class="cat-chip" dir="auto"
                 class:active={!activeCategorySlug}
                 on:click={() => setCategoryFilter('')}
                 aria-pressed={!activeCategorySlug}
               >{$_('recipes_ui.all')}</button>
               {#each categories as c (c.id)}
                 {@const isActive = activeCategorySlug === c.slug}
-                <button class="cat-chip"
+                <button class="cat-chip" dir="auto"
                   class:active={isActive}
                   style={c.color ? `--cat-color:${c.color}` : ''}
                   on:click={() => setCategoryFilter(c.slug)}
@@ -1403,7 +1403,7 @@
           <div class="search-row">
             <span class="material-symbols-rounded search-icon">search</span>
             <input
-              class="search"
+              class="search" dir="auto"
               type="search"
               placeholder={$_('recipes_ui.search_shared')}
               bind:value={query}
@@ -1412,14 +1412,14 @@
           <div class="filter-row">
             {#if sharedCategories.length > 0}
               <div class="cat-filter" role="radiogroup" aria-label={$_('recipes_ui.filter_shared')}>
-                <button class="cat-chip"
+                <button class="cat-chip" dir="auto"
                   class:active={!sharedCategorySlug}
                   on:click={() => sharedCategorySlug = ''}
                   aria-pressed={!sharedCategorySlug}
                 >{$_('recipes_ui.all')}</button>
                 {#each sharedCategories as c (c.slug)}
                   {@const isActive = sharedCategorySlug === c.slug}
-                  <button class="cat-chip"
+                  <button class="cat-chip" dir="auto"
                     class:active={isActive}
                     style={c.color ? `--cat-color:${c.color}` : ''}
                     on:click={() => sharedCategorySlug = isActive ? '' : c.slug}
@@ -1468,13 +1468,13 @@
               </div>
               <div class="card-body">
                 {#if r.category}
-                  <span class="card-category"
+                  <span class="card-category" dir="auto"
                     style={r.category.color ? `--cat-color:${r.category.color}` : ''}>
                     {r.category.name}
                   </span>
                 {/if}
-                <h3 class="card-name">{r.name}</h3>
-                {#if r.description}<p class="card-desc">{r.description}</p>{/if}
+                <h3 class="card-name" dir="auto">{r.name}</h3>
+                {#if r.description}<p class="card-desc" dir="auto">{r.description}</p>{/if}
                 <div class="card-meta">
                   {#if totalMinutes(r) > 0}
                     <span class="meta-pill">
@@ -1528,8 +1528,8 @@
                   on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCookbookShareDialog(cb); } }}>share</span>
               </div>
               <div class="cb-card-body">
-                <h3 class="cb-card-name">{cb.name}</h3>
-                {#if cb.description}<p class="cb-card-desc">{cb.description}</p>{/if}
+                <h3 class="cb-card-name" dir="auto">{cb.name}</h3>
+                {#if cb.description}<p class="cb-card-desc" dir="auto">{cb.description}</p>{/if}
                 <span class="cb-card-count">
                   {$_('recipes_ui.recipe_count', { values: { count: cb.recipe_count } })}
                 </span>
@@ -1557,8 +1557,8 @@
                 {/if}
               </div>
               <div class="cb-card-body">
-                <h3 class="cb-card-name">{cb.name}</h3>
-                {#if cb.description}<p class="cb-card-desc">{cb.description}</p>{/if}
+                <h3 class="cb-card-name" dir="auto">{cb.name}</h3>
+                {#if cb.description}<p class="cb-card-desc" dir="auto">{cb.description}</p>{/if}
                 <span class="cb-card-count">
                   {$_('recipes_ui.recipe_count', { values: { count: cb.recipe_count } })}
                 </span>
@@ -1623,12 +1623,12 @@
             </div>
             <div class="card-body">
               {#if r.category}
-                <span class="card-category"
+                <span class="card-category" dir="auto"
                   style={r.category.color ? `--cat-color:${r.category.color}` : ''}>
                   {r.category.name}
                 </span>
               {/if}
-              <h3 class="card-name">{r.name}</h3>
+              <h3 class="card-name" dir="auto">{r.name}</h3>
               {#if r.rating}
                 <div class="card-rating" aria-label={$_('recipes_ui.rated', { values: { rating: r.rating } })}>
                   {#each [1,2,3,4,5] as n}
@@ -1637,7 +1637,7 @@
                 </div>
               {/if}
               {#if r.description}
-                <p class="card-desc">{r.description}</p>
+                <p class="card-desc" dir="auto">{r.description}</p>
               {/if}
               <div class="card-meta">
                 {#if totalMinutes(r) > 0}
@@ -1667,7 +1667,7 @@
                 {/if}
                 {#if r.tags?.length}
                   {#each r.tags.slice(0, 2) as tag}
-                    <span class="meta-pill tag">{tag}</span>
+                    <span class="meta-pill tag" dir="auto">{tag}</span>
                   {/each}
                 {/if}
               </div>
@@ -1833,7 +1833,7 @@
     border-radius: var(--radius-lg);
     overflow: hidden;
     cursor: pointer;
-    text-align: left;
+    text-align: start;
     padding: 0;
     display: flex; flex-direction: column;
     transition: transform var(--dur-fast), border-color var(--dur-fast);
@@ -1986,7 +1986,7 @@
     border-radius: var(--radius-lg);
     overflow: hidden;
     cursor: pointer;
-    text-align: left;
+    text-align: start;
     padding: 0;
     display: flex;
     flex-direction: column;

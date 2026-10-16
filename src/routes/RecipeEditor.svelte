@@ -27,6 +27,7 @@
   import Spinner from '../components/ui/Spinner.svelte';
 
   import { foldText } from '../lib/search-text.js';
+  import { textDir } from '../lib/text-dir.js';
 
   // Units where decimal qtys feel awkward — auto-format to fractions
   // (0.25 cup → 1/4 cup, 0.5 tsp → 1/2 tsp). Volume-y units only;
@@ -1011,13 +1012,14 @@
           <!-- Name + description -->
           <label class="field">
             <span class="field-label">{$_('editor.name_required')}</span>
-            <input class="input" type="text" bind:value={name} placeholder={$_('recipe_editor_ct.name_ph')} />
+            <input class="input" type="text" dir="auto" bind:value={name} placeholder={$_('recipe_editor_ct.name_ph')} />
           </label>
 
           <label class="field">
             <span class="field-label">{$_('editor.description')}</span>
             <textarea
               class="input"
+              dir="auto"
               rows="4"
               bind:value={description}
               placeholder={$_('recipe_editor_ui.description_ph')}
@@ -1058,7 +1060,7 @@
 
           <label class="field">
             <span class="field-label">{$_('recipe_editor_ct.yield')} <span class="field-hint">{$_('recipe_editor_ct.yield_hint')}</span></span>
-            <input class="input" type="text" bind:value={yieldText} placeholder="" />
+            <input class="input" type="text" dir="auto" bind:value={yieldText} placeholder="" />
           </label>
 
           <!-- Two-column body on desktop: Ingredients on the left,
@@ -1075,6 +1077,7 @@
                 {#if ingredientGroups.length > 1 || group.name}
                   <div class="ing-group-header">
                     <input
+                      dir="auto"
                       class="input ing-group-name"
                       type="text"
                       bind:value={group.name}
@@ -1088,7 +1091,10 @@
                 {/if}
 
                 {#each group.items as ing, ii (ii)}
+                  <!-- The row reads like its ingredient: an Arabic one has its
+                       amount on the right (TraceApps/notetrace#21). -->
                   <div class="ing-row"
+                    dir={textDir(ing.name || ing.note)}
                     class:dragging={dragSource && dragSource.gi === gi && dragSource.ii === ii}
                     class:drag-over={dragOver && dragOver.gi === gi && dragOver.ii === ii}
                     on:dragover={(e) => _onDragOver(gi, ii, e)}
@@ -1128,7 +1134,7 @@
                         {/if}
                       </span>
                     </div>
-                    <input class="input ing-note" type="text" bind:value={ing.note} placeholder={$_('recipe_editor_ui.note_ph')} />
+                    <input class="input ing-note" type="text" dir="auto" bind:value={ing.note} placeholder={$_('recipe_editor_ui.note_ph')} />
                     <button class="btn-icon small pantry-swap-btn desktop-only-btn"
                       class:linked={!!ing.pantry_item_id}
                       on:click={() => ing.pantry_item_id ? unlinkRowAt(gi, ii) : openPantrySwap(gi, ii)}
@@ -1164,8 +1170,8 @@
                        shown on desktop — the note has its own column
                        in the primary grid there. -->
                   {#if _isNoteOpen(gi, ii, ing)}
-                    <div class="ing-note-row">
-                      <input class="input ing-note-mobile" type="text"
+                    <div class="ing-note-row" dir={textDir(ing.name || ing.note)}>
+                      <input class="input ing-note-mobile" type="text" dir="auto"
                         bind:value={ing.note}
                         placeholder={$_('recipe_editor_ui.note_mobile_ph')}
                         autofocus={notesExpanded.has(_ingKey(gi, ii)) && !(ing.note && ing.note.trim())} />
@@ -1195,6 +1201,7 @@
             <h2 class="section-title">{$_('recipe_editor_ct.steps')}</h2>
             {#each steps as _step, i (i)}
               <div class="step-row"
+                dir={textDir(steps[i].title || steps[i].text)}
                 class:dragging={stepDragSource === i}
                 class:drag-over={stepDragOver === i}
                 on:dragover={(e) => _onStepDragOver(i, e)}
@@ -1213,6 +1220,7 @@
                 <span class="step-num">{i + 1}</span>
                 <div class="step-fields">
                   <input
+                    dir="auto"
                     class="input step-title-input"
                     type="text"
                     bind:value={steps[i].title}
@@ -1221,6 +1229,7 @@
                   <div class="step-text-wrap">
                     <MarkdownToolbar bind:textarea={stepTextareas[i]} onChange={(v) => steps[i].text = v} />
                     <textarea
+                      dir="auto"
                       class="input step-text-input"
                       rows="4"
                       bind:this={stepTextareas[i]}
@@ -1267,7 +1276,7 @@
                               {#if _linked.has(opt.id)}
                                 <span class="material-symbols-rounded">check</span>
                               {/if}
-                              <span class="step-link-chip-name">{opt.name}</span>
+                              <span class="step-link-chip-name" dir="auto">{opt.name}</span>
                             </button>
                           {/each}
                         </div>
@@ -1487,7 +1496,7 @@
             <label class="pp-row" class:on={pantryPickerSelected.has(p.id)}>
               <input type="checkbox" checked={pantryPickerSelected.has(p.id)}
                 on:change={() => togglePantrySelected(p.id)} />
-              <span class="pp-name">{p.name}</span>
+              <span class="pp-name" dir="auto">{p.name}</span>
               {#if p.brand}<span class="pp-brand">{p.brand}</span>{/if}
               {#if !p.in_stock}<span class="pp-out">{$_('recipe_editor_ui.out_of_stock')}</span>{/if}
             </label>
@@ -1511,7 +1520,7 @@
       <h3 class="cat-modal-title">{$_('recipe_editor_ct.cat_modal_title')}</h3>
       <label class="field">
         <span class="field-label">{$_('recipe_editor_ct.name')}</span>
-        <input class="input" type="text" bind:value={categoryNewName} autofocus />
+        <input class="input" type="text" dir="auto" bind:value={categoryNewName} autofocus />
       </label>
       <label class="field">
         <span class="field-label">{$_('recipe_editor_ct.color')}</span>
@@ -1823,7 +1832,7 @@
        as attached to the ingredient rather than a standalone field. */
     display: none;
     grid-column: 1 / -1;
-    padding: 0 6px 6px 34px; /* left-indent past the drag handle */
+    padding-block: 0 6px; padding-inline: 34px 6px; /* indented past the drag handle */
   }
   .ing-note-row .ing-note-mobile { width: 100%; }
   .ing-row.dragging { opacity: 0.4; }

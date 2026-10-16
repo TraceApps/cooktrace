@@ -153,7 +153,7 @@
       {/if}
     </div>
     {#if items.length > 0}
-      <input class="input filter" type="search" placeholder={$_('manage_ui.filter_ph')} bind:value={filter} />
+      <input dir="auto" class="input filter" type="search" placeholder={$_('manage_ui.filter_ph')} bind:value={filter} />
     {/if}
     {#if items.length === 0}
       <p class="empty">{$_('manage_taxonomy_list_ui.empty')}</p>
@@ -165,7 +165,7 @@
           <li class="row">
             {#if editingName === it.name}
               <div class="edit-form">
-                <input class="input edit-name" bind:value={editText}
+                <input dir="auto" class="input edit-name" bind:value={editText}
                   on:keydown={(e) => {
                     if (e.key === 'Enter') saveEdit(it);
                     if (e.key === 'Escape') { cancelEdit(); e.preventDefault(); }
@@ -177,7 +177,7 @@
                 </div>
               </div>
             {:else}
-              <span class="row-name">{it.name}</span>
+              <span class="row-name" dir="auto">{it.name}</span>
               <span class="row-count">{$_('manage_ui.uses', { values: { count: it.count ?? 0 } })}</span>
               <div class="row-actions">
                 <button class="btn-icon small" on:click={() => startEdit(it)} aria-label={$_('history.rename')} title={$_('history.rename')}>

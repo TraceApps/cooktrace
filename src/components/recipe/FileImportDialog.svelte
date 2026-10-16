@@ -483,7 +483,7 @@ ${parseResult.text}
               <span class="pages-meta">{$_('file_import_dialog_ui.pages', { values: { count: parseResult.pages } })}</span>
             {/if}
           </div>
-          <h4 class="parsed-title">{parsedRecipe?.name || $_('file_import_dialog_ui.untitled')}</h4>
+          <h4 class="parsed-title" dir="auto">{parsedRecipe?.name || $_('file_import_dialog_ui.untitled')}</h4>
           <div class="parsed-meta">
             {#if parsedRecipe?.servings}<span>{$_('file_import_dialog_ui.serves', { values: { count: parsedRecipe.servings } })}</span>{/if}
             {#if parsedRecipe?.prep_minutes}<span>{$_('file_import_dialog_ui.prep', { values: { time: formatDuration(parsedRecipe.prep_minutes) } })}</span>{/if}

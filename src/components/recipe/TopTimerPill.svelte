@@ -184,13 +184,13 @@
           on:click={() => jumpToStep(t.stepIndex)}
           title={Number.isFinite(t.stepIndex) ? $_('top_timer_pill_ui.jump_to_step') : t.label}>
           {#if t.recipeName}
-            <span class="pill-recipe">{t.recipeName}</span>
+            <span class="pill-recipe" dir="auto">{t.recipeName}</span>
           {/if}
           <span class="pill-step-row">
             {#if Number.isFinite(t.stepIndex)}
               <span class="pill-step-badge">{$_('top_timer_pill_ui.step_n', { values: { n: t.stepIndex + 1 } })}</span>
             {/if}
-            <span class="pill-step">{t.label}</span>
+            <span class="pill-step" dir="auto">{t.label}</span>
           </span>
         </button>
 

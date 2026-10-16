@@ -108,7 +108,7 @@
           aria-label={$_('cookdiary_page.week.any_day_card', { values: { name: e.recipe_name || 'Recipe' } })}>
           {#if photo(e)}<img src={photo(e)} alt="" loading="lazy" />{:else}<span class="ph material-symbols-rounded" aria-hidden="true">restaurant</span>{/if}
           <span class="tray-text">
-            <span class="name">{e.recipe_name || 'Recipe'}</span>
+            <span class="name" dir="auto">{e.recipe_name || 'Recipe'}</span>
             <span class="sub">{$_('cookdiary_page.servings_count', { values: { count: servingsOf(e) } })}</span>
             {#if members.length}<AllergenChips summary={allergensOf(e)} recipe={recipeOf(e)} {members} />{/if}
           </span>
@@ -135,7 +135,7 @@
               <button class="card-main" on:click={() => dispatch('open', e)}>
                 {#if photo(e)}<img src={photo(e)} alt="" loading="lazy" />{:else}<span class="ph material-symbols-rounded" aria-hidden="true">restaurant</span>{/if}
                 <span class="card-text">
-                  <span class="name">{e.recipe_name || 'Recipe'}</span>
+                  <span class="name" dir="auto">{e.recipe_name || 'Recipe'}</span>
                   <span class="chips">
                     <span class="chip done"><span class="material-symbols-rounded" aria-hidden="true">check_circle</span>{$_('cookdiary_page.week.cooked')}</span>
                     {#if e.rating > 0}
@@ -156,7 +156,7 @@
                 <button class="card-main" on:click={() => dispatch('open', e)}>
                   {#if photo(e)}<img src={photo(e)} alt="" loading="lazy" />{:else}<span class="ph material-symbols-rounded" aria-hidden="true">restaurant</span>{/if}
                   <span class="card-text">
-                    <span class="name">{e.recipe_name || 'Recipe'}</span>
+                    <span class="name" dir="auto">{e.recipe_name || 'Recipe'}</span>
                     {#if e.meal_type}
                       <span class="chips"><span class="chip"><span class="material-symbols-rounded" aria-hidden="true">{MEAL_ICONS[e.meal_type] || 'restaurant'}</span>{$_(`cookdiary_page.week.meal_${e.meal_type}`)}</span></span>
                     {/if}
@@ -198,7 +198,7 @@
     <ul class="soon">
       {#each usesUp.items as x (x.family)}
         <li class="soon-item">
-          <span class="soon-name">{x.name}</span>
+          <span class="soon-name" dir="auto">{x.name}</span>
           <span class="soon-days" class:urgent={x.daysLeft != null && x.daysLeft <= 2}>{$_('cookdiary_page.week.days_left', { values: { n: Math.max(0, x.daysLeft ?? 0) } })}</span>
           {#if x.plannedBy.length}<span class="soon-in">{$_('cookdiary_page.week.in_plan', { values: { names: list.format(x.plannedBy) } })}</span>{/if}
         </li>
@@ -210,7 +210,7 @@
           <img src={idea.recipe.imgUrl || resolveAssetUrl(idea.recipe.img_url)} alt="" loading="lazy" />
         {:else}<span class="ph material-symbols-rounded" aria-hidden="true">restaurant</span>{/if}
         <span class="idea-text">
-          <span class="name">{idea.recipe.name}</span>
+          <span class="name" dir="auto">{idea.recipe.name}</span>
           <span class="sub">{$_('cookdiary_page.week.idea_uses', { values: { items: list.format(idea.uses) } })}</span>
           {#if members.length}<AllergenChips summary={cardAllergens(idea.recipe)} recipe={idea.recipe} {members} />{/if}
         </span>

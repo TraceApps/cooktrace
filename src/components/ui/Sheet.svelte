@@ -99,7 +99,7 @@
 
       {#if title}
         <div class="sheet-header">
-          <h3 class="sheet-title">{title}</h3>
+          <h3 class="sheet-title" dir="auto">{title}</h3>
           <!-- Right-side action group: optional inline action icons
                (Edit, Delete, etc.) sit immediately next to the close
                button so all chrome stays tightly grouped in the top

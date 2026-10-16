@@ -237,7 +237,7 @@
       <header class="cl-header">
         <h2 class="cl-title">
           {editing ? $_('cook_log_dialog_ui.title_edit') : $_('cook_log_dialog_ui.add_to_diary')}
-          {#if recipeName}<span class="cl-subtitle">{recipeName}</span>{/if}
+          {#if recipeName}<span class="cl-subtitle" dir="auto">{recipeName}</span>{/if}
         </h2>
         <button class="icon-btn" on:click={cancel} aria-label={$_('common.close')}>
           <span class="material-symbols-rounded">close</span>
@@ -304,6 +304,7 @@
           <span class="cl-label">{$_('cook_log_dialog.notes')} <span class="cl-hint">{$_('cook_log_dialog.notes_hint')}</span></span>
           <textarea
             class="input"
+            dir="auto"
             rows="3"
             bind:value={notes}
             placeholder={$_('cook_log_dialog_ui.notes_placeholder')}

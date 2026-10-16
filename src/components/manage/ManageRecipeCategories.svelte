@@ -141,7 +141,7 @@
   {:else if categories.length === 0}
     <p class="empty">{$_('manage_ui.empty_categories')}</p>
   {:else}
-    <input class="input filter" type="search" placeholder={$_('manage_ui.filter_ph')} bind:value={filter} />
+    <input dir="auto" class="input filter" type="search" placeholder={$_('manage_ui.filter_ph')} bind:value={filter} />
     {#if filteredEmpty}
       <p class="empty">{$_('manage_ui.no_match', { values: { filter } })}</p>
     {:else}
@@ -163,7 +163,7 @@
           {/if}
           {#if editingId === c.id}
             <div class="edit-form">
-              <input class="input" bind:value={editName} placeholder={$_('manage_recipe_cats.name_ph')} />
+              <input dir="auto" class="input" bind:value={editName} placeholder={$_('manage_recipe_cats.name_ph')} />
               <div class="swatches">
                 {#each SWATCHES as sw}
                   <button class="swatch" class:active={editColor === sw}
@@ -182,7 +182,7 @@
             </div>
           {:else}
             <span class="dot" style={c.color ? `background:${c.color}` : ''}></span>
-            <span class="row-name">{c.name}</span>
+            <span class="row-name" dir="auto">{c.name}</span>
             {#if Number.isFinite(c.recipe_count)}
               {#if c.recipe_count > 0}
                 <button type="button" class="usage-pill linked"
@@ -213,7 +213,7 @@
   {/if}
 
   <div class="add-row">
-    <input class="input" placeholder={$_('manage_ui.new_category_ph')} bind:value={newName}
+    <input dir="auto" class="input" placeholder={$_('manage_ui.new_category_ph')} bind:value={newName}
       on:keydown={(e) => { if (e.key === 'Enter') create(); }} />
     <div class="swatches">
       {#each SWATCHES as sw}

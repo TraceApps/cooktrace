@@ -241,7 +241,7 @@
     {#if cookbooks.length === 0}
       <p class="empty">{$_('manage_cookbooks_ui.empty')}</p>
     {:else}
-      <input class="input filter" type="search" placeholder={$_('manage_ui.filter_ph')} bind:value={filter} />
+      <input dir="auto" class="input filter" type="search" placeholder={$_('manage_ui.filter_ph')} bind:value={filter} />
       {#if filteredEmpty}
         <p class="empty">{$_('manage_ui.no_match', { values: { filter } })}</p>
       {:else}
@@ -269,8 +269,8 @@
                   on:change={(e) => onCoverPicked(cb, e)} />
               </button>
               <div class="edit-form">
-                <input class="input edit-name" bind:value={editName} placeholder={$_('manage_cookbooks.name_ph')} />
-                <input class="input edit-desc" bind:value={editDesc} placeholder={$_('manage_ui.desc_optional_ph')} />
+                <input dir="auto" class="input edit-name" bind:value={editName} placeholder={$_('manage_cookbooks.name_ph')} />
+                <input dir="auto" class="input edit-desc" bind:value={editDesc} placeholder={$_('manage_ui.desc_optional_ph')} />
                 <div class="row-actions">
                   {#if editCover}
                     <button class="btn-icon small" on:click={() => editCover = ''} aria-label={$_('manage_cookbooks_ui.remove_cover')} title={$_('manage_cookbooks_ui.remove_cover')}>
@@ -293,10 +293,10 @@
               </button>
               <div class="meta">
                 <div class="title-row">
-                  <button class="title-btn" on:click={() => open(cb)}>{cb.name}</button>
+                  <button class="title-btn" dir="auto" on:click={() => open(cb)}>{cb.name}</button>
                   {#if cb.is_smart}<span class="smart-badge" title={$_('manage_cookbooks_ui.smart_title')}>{$_('manage_cookbooks.smart_badge')}</span>{/if}
                 </div>
-                {#if cb.description}<p class="desc">{cb.description}</p>{/if}
+                {#if cb.description}<p class="desc" dir="auto">{cb.description}</p>{/if}
                 <span class="count">{$_('manage_ui.recipe_count', { values: { count: cb.recipe_count ?? 0 } })}</span>
               </div>
               <div class="row-actions">
@@ -327,9 +327,9 @@
     {/if}
 
     <div class="add-row">
-      <input class="input add-name" placeholder={$_('manage_cookbooks_ui.new_name_ph')} bind:value={newName}
+      <input dir="auto" class="input add-name" placeholder={$_('manage_cookbooks_ui.new_name_ph')} bind:value={newName}
         on:keydown={(e) => { if (e.key === 'Enter') create(); }} />
-      <input class="input add-desc" placeholder={$_('manage_ui.desc_optional_ph')} bind:value={newDesc} />
+      <input dir="auto" class="input add-desc" placeholder={$_('manage_ui.desc_optional_ph')} bind:value={newDesc} />
       <label class="smart-toggle" title={$_('manage_cookbooks_ui.smart_toggle_title')}>
         <input type="checkbox" bind:checked={newSmart} />
         <span>{$_('manage_cookbooks.smart')}</span>

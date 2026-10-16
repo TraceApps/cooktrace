@@ -151,7 +151,7 @@
   {:else if categories.length === 0}
     <p class="empty">{$_('manage_ui.empty_categories')}</p>
   {:else}
-    <input class="input filter" type="search" placeholder={$_('manage_ui.filter_ph')} bind:value={filter} />
+    <input dir="auto" class="input filter" type="search" placeholder={$_('manage_ui.filter_ph')} bind:value={filter} />
     {#if filteredEmpty}
       <p class="empty">{$_('manage_ui.no_match', { values: { filter } })}</p>
     {:else}
@@ -173,9 +173,9 @@
           {/if}
           {#if editingId === c.id}
             <div class="edit-form">
-              <input class="input name-input" bind:value={editName} placeholder={$_('manage_pantry_cats.name_ph')} />
+              <input dir="auto" class="input name-input" bind:value={editName} placeholder={$_('manage_pantry_cats.name_ph')} />
               <IconPicker bind:value={editIcon} placeholder={$_('manage_pantry_cats.icon_ph')} />
-              <input class="input aisle-input" bind:value={editDefaultAisle} placeholder={$_('manage_pantry_categories_ui.aisle_ph')} maxlength="40" />
+              <input dir="auto" class="input aisle-input" bind:value={editDefaultAisle} placeholder={$_('manage_pantry_categories_ui.aisle_ph')} maxlength="40" />
               <div class="row-actions">
                 <button class="btn btn-secondary tiny" on:click={cancelEdit}>{$_('manage_pantry_cats.cancel')}</button>
                 <button class="btn btn-primary tiny" on:click={() => saveEdit(c)} disabled={!editName.trim()}>{$_('manage_pantry_cats.save')}</button>
@@ -183,7 +183,7 @@
             </div>
           {:else}
             <span class="material-symbols-rounded row-icon">{c.icon || 'kitchen'}</span>
-            <span class="row-name">{c.name}</span>
+            <span class="row-name" dir="auto">{c.name}</span>
             {#if c.default_aisle}
               <span class="aisle-pill" title={$_('manage_pantry_categories_ui.aisle_title')}>
                 <span class="material-symbols-rounded">category</span>{c.default_aisle}
@@ -212,10 +212,10 @@
   {/if}
 
   <div class="add-row">
-    <input class="input name-input" placeholder={$_('manage_ui.new_category_ph')} bind:value={newName}
+    <input dir="auto" class="input name-input" placeholder={$_('manage_ui.new_category_ph')} bind:value={newName}
       on:keydown={(e) => { if (e.key === 'Enter') create(); }} />
     <IconPicker bind:value={newIcon} placeholder={$_('manage_pantry_cats.icon_ph')} />
-    <input class="input aisle-input" bind:value={newDefaultAisle} placeholder={$_('manage_pantry_categories_ui.aisle_ph')} maxlength="40" />
+    <input dir="auto" class="input aisle-input" bind:value={newDefaultAisle} placeholder={$_('manage_pantry_categories_ui.aisle_ph')} maxlength="40" />
     <button class="btn btn-primary" on:click={create} disabled={creating || !newName.trim()}>
       {creating ? $_('foods.adding') : $_('manage_ui.add')}
     </button>

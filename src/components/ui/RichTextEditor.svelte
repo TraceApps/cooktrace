@@ -136,7 +136,7 @@
     </button>
   </div>
   <div
-    class="rte-area"
+    class="rte-area" dir="auto"
     contenteditable="true"
     bind:this={editor}
     on:input={_onInput}
@@ -239,7 +239,10 @@
   .rte-area :global(p) { margin: 0 0 8px; }
   .rte-area :global(p:last-child) { margin-bottom: 0; }
   .rte-area :global(ul),
-  .rte-area :global(ol) { margin: 4px 0 8px; padding-left: 24px; }
+  .rte-area :global(ol) { margin: 4px 0 8px; padding-inline-start: 24px; }
+  /* Each paragraph its own way: the editor keeps no dir in notes, so an
+     Arabic paragraph and an English one each read from their first letter. */
+  .rte-area :global(p), .rte-area :global(li) { unicode-bidi: plaintext; }
   .rte-area :global(li) { margin: 2px 0; }
   .rte-placeholder {
     position: absolute;

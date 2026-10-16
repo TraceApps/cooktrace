@@ -360,7 +360,7 @@ Rules:
           {#each createdRecipes as r}
             <button class="row-saved" on:click={() => openRecipe(r)}>
               <span class="material-symbols-rounded">restaurant_menu</span>
-              <span class="row-saved-name">{r.name}</span>
+              <span class="row-saved-name" dir="auto">{r.name}</span>
               <span class="material-symbols-rounded chev">chevron_right</span>
             </button>
           {/each}

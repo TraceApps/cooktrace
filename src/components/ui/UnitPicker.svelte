@@ -165,7 +165,7 @@
 <div class="unit-picker" bind:this={_wrap}>
   <input
     bind:this={inputEl}
-    class="input unit-input"
+    class="input unit-input" dir="auto"
     type="text"
     placeholder={shownPlaceholder}
     value={value || ''}
@@ -201,7 +201,7 @@
             on:mousedown|preventDefault={() => pick(u)}
             on:mouseenter={() => highlight = idx}
           >
-            <span class="opt-full">{u.full}</span>
+            <span class="opt-full" dir="auto">{u.full}</span>
             <span class="opt-abbr">{u.abbr}</span>
           </button>
         {/each}

@@ -54,6 +54,7 @@
   import { ALLERGENS, allergenKey, avoids, cleanHousehold, cleanOverrides, itemAllergens, conflicts } from '../lib/allergens.js';
   import { buildRecipeCardPages, buildRecipeShareText } from '../lib/recipe-card.js';
   import { svgToPngBlob, shareBlobs } from '../lib/shopping-card.js';
+  import { textDir } from '../lib/text-dir.js';
 
   export let params = {};
 
@@ -1088,7 +1089,7 @@
        Delete / Close are hidden because they don't fit the focused
        cooking task. -->
   <header class="editor-header" class:cook-mode={cookMode} bind:offsetHeight={editorHeaderH}>
-    <h2 class="editor-title">{recipe?.name || $_('recipe_view_ui.recipe_fallback')}</h2>
+    <h2 class="editor-title" dir="auto">{recipe?.name || $_('recipe_view_ui.recipe_fallback')}</h2>
     {#if cookMode}
       <span class="cook-mode-tag" aria-hidden="true">
         <span class="material-symbols-rounded cook-mode-icon">soup_kitchen</span>
@@ -1163,16 +1164,16 @@
           {/if}
           <div class="recipe-meta">
         {#if recipe.category}
-          <button class="category-pill"
+          <button class="category-pill" dir="auto"
             style={recipe.category.color ? `--cat-color:${recipe.category.color}` : ''}
             on:click={() => push(`/recipes?category=${recipe.category.slug}`)}
             title={$_('recipe_view_ui.filter_by_category', { values: { name: recipe.category.name } })}>
             {recipe.category.name}
           </button>
         {/if}
-        <h1 class="recipe-name">{recipe.name}</h1>
+        <h1 class="recipe-name" dir="auto">{recipe.name}</h1>
         {#if recipe.description}
-          <p class="recipe-desc">{recipe.description}</p>
+          <p class="recipe-desc" dir="auto">{recipe.description}</p>
         {/if}
 
         <!-- Provenance subline: who added this, where it came from, and
@@ -1299,7 +1300,7 @@
           {#if recipe.yield_text}
             <div class="meta-stat">
               <span class="material-symbols-rounded meta-icon">scale</span>
-              <div class="meta-text"><span class="meta-label">{$_('recipe_view_ct.yield')}</span><span class="meta-value">{recipe.yield_text}</span></div>
+              <div class="meta-text"><span class="meta-label">{$_('recipe_view_ct.yield')}</span><span class="meta-value" dir="auto">{recipe.yield_text}</span></div>
             </div>
           {/if}
         </div>
@@ -1311,7 +1312,7 @@
             <div class="chip-row">
               <span class="chip-label">{$_('recipe_view_ct.tags')}</span>
               {#each recipe.tags as tag}
-                <span class="chip">{tag}</span>
+                <span class="chip" dir="auto">{tag}</span>
               {/each}
             </div>
           </div>
@@ -1379,12 +1380,14 @@
           {#if recipe.ingredients?.length}
             {#each recipe.ingredients as group, gi}
               {#if group.name && (recipe.ingredients.length > 1 || group.name)}
-                <h3 class="ingredient-group-title">{group.name}</h3>
+                <h3 class="ingredient-group-title" dir="auto">{group.name}</h3>
               {/if}
               <ul class="ingredients">
                 {#each group.items as ing, ii}
                   {@const key = `${gi}-${ii}`}
-                  <li class="ingredient" class:checked={ingChecks.has(key)}>
+                  <!-- Each ingredient reads its own way: an Arabic one has its
+                       amount and box on the right (TraceApps/notetrace#21). -->
+                  <li class="ingredient" dir={textDir(ing.name || ing.note)} class:checked={ingChecks.has(key)}>
                     <button
                       class="check-btn"
                       on:click={() => toggleIng(key)}
@@ -1483,7 +1486,7 @@
                 {@const stepRefIds = (typeof step === 'string' || !Array.isArray(step.refIds)) ? [] : step.refIds}
                 {@const stepIngs = stepRefIds.length > 0 ? _resolveStepIngs(stepRefIds) : []}
                 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
-                <li class="step" class:checked={stepChecks.has(i)} id={`step-${i}`}
+                <li class="step" dir={textDir(title || text)} class:checked={stepChecks.has(i)} id={`step-${i}`}
                   on:click={(e) => {
                     // Whole-row toggle, but bail if the tap landed on
                     // an interactive child (time chip, embedded link).
@@ -1524,7 +1527,7 @@
                       <ul class="step-ings" aria-label={$_('recipe_view_ui.ingredients_for_step', { values: { n: i + 1 } })}>
                         {#each stepIngs as ing (ing.id)}
                           {@const _checked = ingChecks.has(ing.checkKey)}
-                          <li class="step-ing" class:checked={_checked} class:tappable={cookMode}>
+                          <li class="step-ing" dir={textDir(ing.name || ing.note)} class:checked={_checked} class:tappable={cookMode}>
                             {#if cookMode}
                               <button type="button" class="step-ing-btn"
                                 on:click|stopPropagation={() => toggleIng(ing.checkKey)}
@@ -1619,7 +1622,7 @@
                  RichTextEditor component. Re-sanitize here defensively
                  so a notes value that bypasses the editor (server
                  import, JSON paste) can't smuggle in scripts. -->
-            <div class="notes">{@html sanitizeRichText(recipe.notes)}</div>
+            <div class="notes" dir="auto">{@html sanitizeRichText(recipe.notes)}</div>
           </section>
         {/if}
         </div><!-- /.col-mid -->
@@ -1658,7 +1661,7 @@
                 <ul class="skipped-list">
                   {#each recomputeResult.skipped as row (row.name + row.reason)}
                     <li class="skipped-row">
-                      <span class="skip-name">{row.name}</span>
+                      <span class="skip-name" dir="auto">{row.name}</span>
                       <span class="skip-reason">{row.reason}</span>
                       {#if row.pantry_id && row.suggested_density}
                         <button class="btn btn-secondary tiny" on:click={() => fixDensityForSkip(row)}
@@ -1714,7 +1717,7 @@
                     {#if c.cooked_by_full_name || c.cooked_by_username}
                       <p class="cook-by">{$_('history.by', { values: { name: c.cooked_by_full_name || c.cooked_by_username } })}</p>
                     {/if}
-                    {#if c.notes}<p class="cook-notes">{c.notes}</p>{/if}
+                    {#if c.notes}<p class="cook-notes" dir="auto">{c.notes}</p>{/if}
                     <!-- A planned cook isn't made from a version yet. -->
                     {#if history && c.kind !== 'planned'}
                       {@const n = c.recipe_rev ? versionNumberOf(c.recipe_rev) : null}
@@ -1787,7 +1790,7 @@
             {/if}
           </span>
         </div>
-        <p class="version-name">{v.data?.name || ''}</p>
+        <p class="version-name" dir="auto">{v.data?.name || ''}</p>
         {#if parts.length}
           <div class="version-parts">
             <span class="version-parts-label">{$_('recipe_view_ct.versions.differs')}</span>
@@ -1809,15 +1812,15 @@
         </div>
         {#if previewVersionId === v.id}
           <div class="version-preview">
-            <h4>{v.data?.name || ''}</h4>
-            {#if v.data?.description}<p class="version-desc">{v.data.description}</p>{/if}
+            <h4 dir="auto">{v.data?.name || ''}</h4>
+            {#if v.data?.description}<p class="version-desc" dir="auto">{v.data.description}</p>{/if}
             <h5>{$_('recipe_view_ct.versions.ingredients')}</h5>
             {#if (v.data?.ingredients || []).some(g => g.items?.length)}
               {#each v.data.ingredients as g}
-                {#if g.name}<p class="version-group">{g.name}</p>{/if}
+                {#if g.name}<p class="version-group" dir="auto">{g.name}</p>{/if}
                 <ul class="version-ings">
                   {#each g.items || [] as it}
-                    <li>{[displayQty(it.qty, it.unit), it.unit, it.name].filter(Boolean).join(' ')}</li>
+                    <li dir={textDir(it.name)}>{[displayQty(it.qty, it.unit), it.unit, it.name].filter(Boolean).join(' ')}</li>
                   {/each}
                 </ul>
               {/each}
@@ -1827,14 +1830,14 @@
             <h5>{$_('recipe_view_ct.versions.steps')}</h5>
             {#if v.data?.steps?.length}
               <ol class="version-steps">
-                {#each v.data.steps as st}<li>{_stepText(st)}</li>{/each}
+                {#each v.data.steps as st}<li dir={textDir(_stepText(st))}>{_stepText(st)}</li>{/each}
               </ol>
             {:else}
               <p class="version-empty">{$_('recipe_view_ct.versions.no_steps')}</p>
             {/if}
             {#if v.data?.notes}
               <h5>{$_('recipe_view_ct.notes')}</h5>
-              <div class="version-notes">{@html sanitizeRichText(v.data.notes)}</div>
+              <div class="version-notes" dir="auto">{@html sanitizeRichText(v.data.notes)}</div>
             {/if}
           </div>
         {/if}
@@ -1938,7 +1941,7 @@
   .version-preview h5 { margin: 12px 0 4px; font-size: 13px; color: var(--text-2); }
   .version-desc { margin: 0; color: var(--text-2); }
   .version-group { margin: 6px 0 2px; font-weight: 600; }
-  .version-ings, .version-steps { margin: 0; padding-left: 20px; }
+  .version-ings, .version-steps { margin: 0; padding-inline-start: 20px; }
   .version-empty { margin: 0; color: var(--text-3); }
   .version-notes :global(p) { margin: 0 0 6px; }
   .btn-icon.close-btn:hover {
@@ -2813,7 +2816,7 @@
   .ing-qty .qty-fraction {
     font-size: 0.78em;
     vertical-align: 0.12em;
-    margin-left: 1px;
+    margin-inline-start: 1px;
     letter-spacing: -0.02em;
   }
   /* Convertible variant — qty becomes a button. A subtle dotted
@@ -2824,10 +2827,10 @@
     background: transparent;
     border: 0;
     padding: 2px 6px;
-    margin-left: -6px;
+    margin-inline-start: -6px;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    text-align: left;
+    text-align: start;
     font: inherit;
     color: var(--accent);
     text-decoration: underline dotted color-mix(in srgb, var(--accent) 55%, transparent);
@@ -2865,10 +2868,13 @@
     border-radius: var(--radius-md);
     box-shadow: 0 8px 24px rgba(0,0,0,0.35);
   }
+  /* An Arabic ingredient's amount sits on the right, so its menu opens
+     from there, inside the row. */
+  .ingredient[dir="rtl"] .convert-menu { left: auto; right: 0; }
   .convert-menu-item {
     background: transparent;
     border: none;
-    text-align: left;
+    text-align: start;
     padding: 8px 10px;
     border-radius: var(--radius-sm);
     cursor: pointer;
@@ -3021,7 +3027,10 @@
   .notes :global(p) { margin: 0 0 8px; }
   .notes :global(p:last-child) { margin-bottom: 0; }
   .notes :global(ul),
-  .notes :global(ol) { margin: 4px 0 8px; padding-left: 24px; }
+  .notes :global(ol) { margin: 4px 0 8px; padding-inline-start: 24px; }
+  /* Each paragraph its own way: the editor keeps no dir in notes, so an
+     Arabic paragraph and an English one each read from their first letter. */
+  .notes :global(p), .notes :global(li), .version-notes :global(p), .version-notes :global(li) { unicode-bidi: plaintext; }
   .notes :global(li) { margin: 2px 0; }
   .empty-line { color: var(--text-3); margin: 0; font-size: 13px; font-style: italic; }
 
@@ -3137,7 +3146,7 @@
     background: color-mix(in srgb, var(--accent) 14%, transparent);
     color: var(--accent);
     border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-    padding: 1px 8px 1px 4px;
+    padding-block: 1px; padding-inline: 4px 8px;
     border-radius: 999px;
     font-size: inherit;
     font-weight: 600;

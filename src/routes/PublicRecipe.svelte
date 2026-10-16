@@ -21,6 +21,7 @@
   import { scaledStepParts } from '../lib/step-format.js';
   import { startTimer, formatRemaining } from '../stores/cookTimers.js';
   import { apiUrl } from '../lib/platform.js';
+  import { textDir } from '../lib/text-dir.js';
 
   export let params = {};
   $: token = params.token || '';
@@ -96,13 +97,13 @@
 
       <div class="body">
         {#if recipe.category}
-          <span class="cat-pill"
+          <span class="cat-pill" dir="auto"
             style={recipe.category.color ? `--cat-color:${recipe.category.color}` : ''}>
             {recipe.category.name}
           </span>
         {/if}
-        <h1>{recipe.name}</h1>
-        {#if recipe.description}<p class="desc">{recipe.description}</p>{/if}
+        <h1 dir="auto">{recipe.name}</h1>
+        {#if recipe.description}<p class="desc" dir="auto">{recipe.description}</p>{/if}
 
         <p class="byline">
           {#if recipe.created_by_full_name || recipe.created_by_username}
@@ -164,10 +165,10 @@
             {/if}
             {#if recipe.ingredients?.length}
               {#each recipe.ingredients as group}
-                {#if group.name}<h3 class="grp-name">{group.name}</h3>{/if}
+                {#if group.name}<h3 class="grp-name" dir="auto">{group.name}</h3>{/if}
                 <ul class="ing-list">
                   {#each group.items as ing}
-                    <li>
+                    <li dir={textDir(ing.name || ing.note)}>
                       {#if ing.qty || ing.unit}
                         <span class="qty">{displayQty(ing.qty, ing.unit, scale)}{ing.qty && ing.unit ? ' ' : ''}{ing.unit || ''}</span>
                       {/if}
@@ -192,7 +193,7 @@
                   {@const text = typeof step === 'string' ? step : (step.text || '')}
                   {@const title = typeof step === 'string' ? '' : (step.title || '')}
                   {@const parts = splitWithTimes(text)}
-                  <li>
+                  <li dir={textDir(title || text)}>
                     <span class="step-num">{i + 1}</span>
                     <div>
                       {#if title}<strong>{title}: </strong>{/if}
@@ -216,7 +217,7 @@
 
             {#if recipe.notes}
               <h2>{$_('public_recipe_ct.notes')}</h2>
-              <p class="notes">{recipe.notes}</p>
+              <p class="notes" dir="auto">{recipe.notes}</p>
             {/if}
           </section>
 
@@ -373,7 +374,7 @@
 
   .ing-list { list-style: none; padding: 0; margin: 0 0 16px; display: flex; flex-direction: column; gap: 6px; }
   .ing-list li { font-size: 14px; line-height: 1.4; color: var(--text-1); }
-  .qty { font-weight: 700; margin-right: 4px; color: var(--accent); }
+  .qty { font-weight: 700; margin-inline-end: 4px; color: var(--accent); }
   .note { color: var(--text-3); font-style: italic; }
 
   .scale-row {
@@ -401,7 +402,7 @@
     color: var(--accent);
   }
 
-  .steps { padding-left: 0; margin: 0; list-style: none; display: flex; flex-direction: column; gap: 14px; }
+  .steps { padding-inline-start: 0; margin: 0; list-style: none; display: flex; flex-direction: column; gap: 14px; }
   .steps li { display: flex; gap: 12px; font-size: 14px; line-height: 1.55; color: var(--text-1); }
   /* An amount in the step scaled with the servings. */
   .step-amount { color: var(--accent); font-weight: 600; }
@@ -423,7 +424,7 @@
     background: color-mix(in srgb, var(--accent) 14%, transparent);
     color: var(--accent);
     border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-    padding: 1px 8px 1px 4px;
+    padding-block: 1px; padding-inline: 4px 8px;
     border-radius: 999px;
     font-size: inherit;
     font-weight: 600;
@@ -433,7 +434,8 @@
   .time-chip:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
   .time-chip .material-symbols-rounded { font-size: 14px; line-height: 1; }
 
-  .notes { color: var(--text-2); font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+  /* Each line its own way: Arabic and English lines in the same notes. */
+  .notes { color: var(--text-2); font-size: 14px; line-height: 1.5; white-space: pre-wrap; unicode-bidi: plaintext; }
   .empty { color: var(--text-3); font-size: 13px; font-style: italic; }
 
   .footer {

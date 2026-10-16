@@ -297,7 +297,7 @@
     <button class="btn-icon" on:click={() => push('/recipes?view=cookbooks')} aria-label={$_('common.back')} title={$_('common.back')}>
       <span class="material-symbols-rounded">arrow_back</span>
     </button>
-    <h2 class="editor-title">{cookbook?.name || $_('cookbook_view_ui.cookbook')}</h2>
+    <h2 class="editor-title" dir="auto">{cookbook?.name || $_('cookbook_view_ui.cookbook')}</h2>
     {#if cookbook}
       {#if cookbook.shared_with_me}
         <span class="shared-chip" title={cookbook.shared_by ? (cookbook.via_kitchen_name ? $_('cookbook_view_ui.shared_by_via', { values: { name: cookbook.shared_by, kitchen: cookbook.via_kitchen_name } }) : $_('cookbook_view_ui.shared_by', { values: { name: cookbook.shared_by } })) : $_('cookbook_view_ui.shared_read_only')}>
@@ -353,20 +353,20 @@
         {/if}
         <div class="cb-meta">
           <div class="cb-name-row">
-            <h1 class="cb-name">{cookbook.name}</h1>
+            <h1 class="cb-name" dir="auto">{cookbook.name}</h1>
             {#if cookbook.is_smart}<span class="smart-badge" title={$_('cookbook_view_ui.smart_tooltip')}>{$_('cookbook_view_ct.smart_badge')}</span>{/if}
           </div>
           {#if cookbook.description}
-            <p class="cb-desc">{cookbook.description}</p>
+            <p class="cb-desc" dir="auto">{cookbook.description}</p>
           {/if}
           <span class="cb-count">
             {$_('cookbook_view_ui.recipe_count', { values: { count: cookbook.recipes.length } })}
             {#if cookbook.is_smart && cookbook.smart_filter}
               {@const f = cookbook.smart_filter}
               {@const bits = []}
-              {#if f.favorites_only}<span class="filter-tag">{$_('cookbook_view_ct.favorites_filter')}</span>{/if}
+              {#if f.favorites_only}<span class="filter-tag" dir="auto">{$_('cookbook_view_ct.favorites_filter')}</span>{/if}
               {#if Array.isArray(f.tags) && f.tags.length > 0}
-                {#each f.tags as t}<span class="filter-tag">#{t}</span>{/each}
+                {#each f.tags as t}<span class="filter-tag" dir="auto">#{t}</span>{/each}
               {/if}
             {/if}
           </span>
@@ -398,7 +398,7 @@
           <div class="cb-search-row">
             <div class="cb-search">
               <span class="material-symbols-rounded">search</span>
-              <input type="search" placeholder={$_('cookbook_view_ui.search_placeholder')} bind:value={cbQuery} />
+              <input type="search" dir="auto" placeholder={$_('cookbook_view_ui.search_placeholder')} bind:value={cbQuery} />
               {#if cbQuery}
                 <button class="cb-search-clear" on:click={() => cbQuery = ''} aria-label={$_('cookbook_view_ui.clear_search')}>
                   <span class="material-symbols-rounded">close</span>
@@ -441,7 +441,7 @@
                   <span class="material-symbols-rounded card-image-fallback">lock</span>
                 </div>
                 <div class="card-body">
-                  <h3 class="card-name">{r.name}</h3>
+                  <h3 class="card-name" dir="auto">{r.name}</h3>
                   <p class="card-desc locked-hint">{$_('cookbook_view_ui.locked_hint')}</p>
                 </div>
               </div>
@@ -471,12 +471,12 @@
                        tags/pantry_match. See server/lib/
                        recipe-hydrate.js. -->
                   {#if r.category}
-                    <span class="card-category"
+                    <span class="card-category" dir="auto"
                       style={r.category.color ? `--cat-color:${r.category.color}` : ''}>
                       {r.category.name}
                     </span>
                   {/if}
-                  <h3 class="card-name">{r.name}</h3>
+                  <h3 class="card-name" dir="auto">{r.name}</h3>
                   {#if r.rating}
                     <div class="card-rating" aria-label={$_('cookbook_view_ui.rated', { values: { rating: r.rating } })}>
                       {#each [1,2,3,4,5] as n}
@@ -484,7 +484,7 @@
                       {/each}
                     </div>
                   {/if}
-                  {#if r.description}<p class="card-desc">{r.description}</p>{/if}
+                  {#if r.description}<p class="card-desc" dir="auto">{r.description}</p>{/if}
                   <div class="card-meta">
                     {#if totalMinutes(r) > 0}
                       <span class="meta-pill"><span class="material-symbols-rounded">schedule</span>{formatDuration(totalMinutes(r))}</span>
@@ -501,7 +501,7 @@
                     {/if}
                     {#if r.tags?.length}
                       {#each r.tags.slice(0, 2) as tag}
-                        <span class="meta-pill tag">{tag}</span>
+                        <span class="meta-pill tag" dir="auto">{tag}</span>
                       {/each}
                     {/if}
                   </div>
@@ -606,7 +606,7 @@
         </button>
       </header>
       <div class="modal-search">
-        <input class="input" type="search" placeholder={$_('cookbook_view_ui.search_library')} bind:value={addQuery} autofocus />
+        <input class="input" type="search" dir="auto" placeholder={$_('cookbook_view_ui.search_library')} bind:value={addQuery} autofocus />
       </div>
       <div class="modal-list">
         {#if allRecipesLoading}
@@ -625,7 +625,7 @@
                   <span class="material-symbols-rounded">restaurant</span>
                 {/if}
               </div>
-              <span class="add-name">{r.name}</span>
+              <span class="add-name" dir="auto">{r.name}</span>
             </label>
           {/each}
         {/if}
@@ -949,7 +949,7 @@
   .card-drag-wrap { display: contents; }
   .card-clickable {
     background: none; border: none; padding: 0; width: 100%;
-    text-align: left; cursor: pointer; color: inherit;
+    text-align: start; cursor: pointer; color: inherit;
     display: flex; flex-direction: column;
   }
   .card-image {

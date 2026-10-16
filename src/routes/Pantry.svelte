@@ -987,7 +987,7 @@
       <div class="toolbar sticky-controls">
         <div class="search-row">
           <span class="material-symbols-rounded search-icon">search</span>
-          <input class="search" type="search" placeholder={$_('routes.pantry.search_placeholder')} bind:value={query} />
+          <input class="search" dir="auto" type="search" placeholder={$_('routes.pantry.search_placeholder')} bind:value={query} />
           <button class="search-scan" on:click={() => scannerOpen = true} aria-label={$_('pantry.scan_barcode')} title={$_('pantry.scan_barcode')}>
             <span class="material-symbols-rounded">barcode_scanner</span>
           </button>
@@ -1167,7 +1167,7 @@
                 {/if}
               </div>
               <div class="spotlight-body">
-                <span class="spotlight-name">{x.item.name}</span>
+                <span class="spotlight-name" dir="auto">{x.item.name}</span>
                 <span class="spotlight-days">{_expiryLabel(x.exp)}</span>
               </div>
             </button>
@@ -1284,9 +1284,9 @@
               </div>
 
               <div class="pcard-body">
-                <div class="pcard-name">{it.name}</div>
+                <div class="pcard-name" dir="auto">{it.name}</div>
                 {#if it.brand}
-                  <div class="pcard-brand">{it.brand}</div>
+                  <div class="pcard-brand" dir="auto">{it.brand}</div>
                 {/if}
                 {#if it._standaloneVariantParent}
                   <div class="pcard-variant-of">{$_('pantry_ui.variant_of', { values: { name: it._standaloneVariantParent.name } })}</div>
@@ -1379,7 +1379,7 @@
                     {/if}
                   </div>
                   <div class="pcard-body">
-                    <div class="pcard-name">{displayVariantName(v, it, { nested: true })}</div>
+                    <div class="pcard-name" dir="auto">{displayVariantName(v, it, { nested: true })}</div>
                     <div class="pcard-meta">
                       {#if v.quantity != null || v.unit}
                         <span class="pcard-qty">
@@ -1444,7 +1444,7 @@
                       <span class="usda-type-badge" title={$_('pantry_ui.usda_data_type', { values: { type: r.dataType } })}>{r.dataType}</span>
                     {/if}
                   </div>
-                  {#if r.brand}<div class="item-notes">{r.brand}</div>{/if}
+                  {#if r.brand}<div class="item-notes" dir="auto">{r.brand}</div>{/if}
                   {#if r.barcode}<div class="item-qty" style="font-size:11px">{r.barcode}</div>{/if}
                 </div>
                 <span class="material-symbols-rounded ext-add">{r._source === 'local' ? 'chevron_right' : 'add_circle'}</span>
@@ -1505,7 +1505,7 @@
                       <span class="usda-type-badge" title={$_('pantry_ui.usda_data_type', { values: { type: r.dataType } })}>{r.dataType}</span>
                     {/if}
                   </div>
-                  {#if r.brand}<div class="item-notes">{r.brand}</div>{/if}
+                  {#if r.brand}<div class="item-notes" dir="auto">{r.brand}</div>{/if}
                   {#if r.barcode}<div class="item-qty" style="font-size:11px">{r.barcode}</div>{/if}
                 </div>
                 <span class="material-symbols-rounded ext-add">add_circle</span>

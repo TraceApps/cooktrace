@@ -39,7 +39,7 @@
       aria-labelledby="dlg-title"
     >
       {#if title}
-        <h3 class="dialog-title" id="dlg-title">{title}</h3>
+        <h3 class="dialog-title" dir="auto" id="dlg-title">{title}</h3>
       {/if}
       {#if message}
         <p class="dialog-msg">{message}</p>

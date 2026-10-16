@@ -52,7 +52,7 @@
     <article class="member">
       <div class="top">
         <span class="avatar" data-tone={i % 4} aria-hidden="true">{initial(m.name)}</span>
-        <span class="name">{m.name}</span>
+        <span class="name" dir="auto">{m.name}</span>
         <button class="icon-btn" aria-label={$_('household.edit', { values: { name: m.name } })} on:click={() => openEdit(m)}>
           <span class="material-symbols-rounded" aria-hidden="true">edit</span>
         </button>

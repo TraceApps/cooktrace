@@ -478,11 +478,11 @@
         <div class="editor-card-title">{$_('pantry_editor_ct.basic_info')}</div>
         <div class="form-group">
           <label class="form-label">{$_('pantry_editor_ct.name')} *</label>
-          <input class="input" type="text" placeholder={$_('pantry_editor.fields.name_placeholder')} bind:value={item.name} />
+          <input class="input" type="text" dir="auto" placeholder={$_('pantry_editor.fields.name_placeholder')} bind:value={item.name} />
         </div>
         <div class="form-group">
           <label class="form-label">{$_('pantry_editor_ct.brand')}</label>
-          <input class="input" type="text" placeholder={$_('pantry_editor.fields.brand_placeholder')} bind:value={item.brand} />
+          <input class="input" type="text" dir="auto" placeholder={$_('pantry_editor.fields.brand_placeholder')} bind:value={item.brand} />
         </div>
         <div class="form-row" style="align-items:flex-end">
           <div class="form-group" style="flex:1">
@@ -620,7 +620,7 @@
            FoodEditor (Photo / Basic info / Categories / Notes / Nutrition). -->
       <div class="card editor-card">
         <div class="editor-card-title">{$_('pantry_editor_ct.notes')}</div>
-        <textarea class="input textarea" rows="3" placeholder={$_('pantry_editor.fields.notes_placeholder')}
+        <textarea class="input textarea" dir="auto" rows="3" placeholder={$_('pantry_editor.fields.notes_placeholder')}
           bind:value={item.notes}></textarea>
       </div>
 

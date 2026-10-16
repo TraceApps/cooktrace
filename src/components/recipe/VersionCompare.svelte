@@ -7,6 +7,8 @@
   Props: from, to (recipe-content.js cookContent), fromLabel, toLabel
 -->
 <script>
+  import { textDir } from '../../lib/text-dir.js';
+
   import { _ } from 'svelte-i18n';
   import { compareContent, diffWords, lineText } from '../../lib/recipe-content.js';
   import { formatDuration } from '../../lib/duration.js';
@@ -46,7 +48,7 @@
             {#each diff.details as d (d.field)}
               <li class="row changed">
                 <span class="mark material-symbols-rounded" aria-hidden="true">edit</span>
-                <span class="text">{detailLabel($_, d.field)}: <del>{val(d.field, d.from)}</del> <ins>{val(d.field, d.to)}</ins></span>
+                <span class="text" dir="auto">{detailLabel($_, d.field)}: <del>{val(d.field, d.from)}</del> <ins>{val(d.field, d.to)}</ins></span>
               </li>
             {/each}
           </ul>
@@ -58,16 +60,16 @@
         {#if ings.length}
           <ul class="rows">
             {#each ings as x, i (i)}
-              <li class="row {x.kind}">
+              <li class="row {x.kind}" dir={textDir((x.to || x.from).name || (x.to || x.from).note)}>
                 <span class="mark material-symbols-rounded" aria-hidden="true">{x.kind === 'added' ? 'add' : x.kind === 'removed' ? 'remove' : x.kind === 'changed' ? 'edit' : 'check'}</span>
                 {#if x.kind === 'changed'}
-                  <span class="text"><del>{lineText(x.from)}</del> <ins>{lineText(x.to)}</ins></span>
+                  <span class="text" dir="auto"><del>{lineText(x.from)}</del> <ins>{lineText(x.to)}</ins></span>
                 {:else if x.kind === 'removed'}
-                  <span class="text"><del>{lineText(x.from)}</del><span class="sr">{$_('history.sr_removed')}</span></span>
+                  <span class="text" dir="auto"><del>{lineText(x.from)}</del><span class="sr">{$_('history.sr_removed')}</span></span>
                 {:else if x.kind === 'added'}
-                  <span class="text"><ins>{lineText(x.to)}</ins><span class="sr">{$_('history.sr_added')}</span></span>
+                  <span class="text" dir="auto"><ins>{lineText(x.to)}</ins><span class="sr">{$_('history.sr_added')}</span></span>
                 {:else}
-                  <span class="text">{lineText(x.to)}</span>
+                  <span class="text" dir="auto">{lineText(x.to)}</span>
                 {/if}
               </li>
             {/each}
@@ -81,18 +83,18 @@
         {#if steps.length}
           <ol class="rows">
             {#each steps as x, i (i)}
-              <li class="row {x.kind}">
+              <li class="row {x.kind}" dir={textDir(stepText(x.to || x.from))}>
                 <span class="num" aria-hidden="true">{x.to?.n ?? x.from?.n}</span>
                 {#if x.kind === 'changed'}
-                  <span class="text">
+                  <span class="text" dir="auto">
                     {#each diffWords(stepText(x.from), stepText(x.to)) as w}{#if w.kind === 'added'}<ins>{w.text}</ins>{:else if w.kind === 'removed'}<del>{w.text}</del>{:else}{w.text}{/if}{/each}
                   </span>
                 {:else if x.kind === 'removed'}
-                  <span class="text"><del>{stepText(x.from)}</del><span class="sr">{$_('history.sr_removed')}</span></span>
+                  <span class="text" dir="auto"><del>{stepText(x.from)}</del><span class="sr">{$_('history.sr_removed')}</span></span>
                 {:else if x.kind === 'added'}
-                  <span class="text"><ins>{stepText(x.to)}</ins><span class="sr">{$_('history.sr_added')}</span></span>
+                  <span class="text" dir="auto"><ins>{stepText(x.to)}</ins><span class="sr">{$_('history.sr_added')}</span></span>
                 {:else}
-                  <span class="text">{stepText(x.to)}</span>
+                  <span class="text" dir="auto">{stepText(x.to)}</span>
                 {/if}
               </li>
             {/each}

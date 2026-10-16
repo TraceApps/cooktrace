@@ -244,7 +244,7 @@
   {#if mode === 'chips'}
     <div class="chips">
       {#each (value || []) as v}
-        <span class="chip">
+        <span class="chip" dir="auto">
           {v}
           <button class="chip-x" on:click={() => removeChip(v)} aria-label={`Remove ${v}`} type="button">
             <span class="material-symbols-rounded">close</span>
@@ -253,6 +253,7 @@
       {/each}
       <input
         bind:this={inputEl}
+        dir="auto"
         class="cb-input chip-input"
         type="text"
         placeholder={(value && value.length) ? '' : placeholder}
@@ -266,6 +267,7 @@
   {:else}
     <input
       bind:this={inputEl}
+      dir="auto"
       class="cb-input"
       type="text"
       {placeholder}
@@ -294,7 +296,7 @@
         {:else if opt.icon}
           <span class="material-symbols-rounded cb-icon">{opt.icon}</span>
         {/if}
-        <span class="cb-name">{opt.name}</span>
+        <span class="cb-name" dir="auto">{opt.name}</span>
         {#if opt.count != null}
           <span class="cb-count">{opt.count}</span>
         {/if}
@@ -305,7 +307,7 @@
         on:mousedown|preventDefault={fireCreate}
         on:mouseenter={() => highlightIndex = filtered.length}>
         <span class="material-symbols-rounded cb-icon">add</span>
-        <span class="cb-name">{createLabel} "<strong>{typed.trim()}</strong>"</span>
+        <span class="cb-name" dir="auto">{createLabel} "<strong>{typed.trim()}</strong>"</span>
       </button>
     {/if}
   </div>

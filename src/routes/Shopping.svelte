@@ -1,4 +1,5 @@
 <script>
+  import { textDir } from '../lib/text-dir.js';
   import { failed } from '../lib/messages.js';
   import { closeOnBack } from '../lib/back-stack.js';
   import { onSyncChanges } from '../lib/sync-refresh.js';
@@ -966,7 +967,7 @@
                   {:else if $shoppingGroupBy === 'aisle'}
                     <span class="material-symbols-rounded head-icon">category</span>
                   {/if}
-                  <span class="group-title-text">{g.title}</span>
+                  <span class="group-title-text" dir="auto">{g.title}</span>
                   <span class="group-count" class:done={checkedCt === realRows.length}>
                     {String(checkedCt).padStart(2, '0')}/{String(realRows.length).padStart(2, '0')}
                   </span>
@@ -1010,7 +1011,7 @@
                 {#if it?.isDndShadowItem}
                   <li class="row row-shadow" aria-hidden="true">&nbsp;</li>
                 {:else}
-                <li class="row" class:done={it.checked} use:longpress on:longpress={() => onRowLongPress(it)}>
+                <li class="row" dir={textDir(it.name)} class:done={it.checked} use:longpress on:longpress={() => onRowLongPress(it)}>
                   <span class="drag-handle" use:dragHandle aria-label={$_('shopping_ui.drag_reorder')} title={$_('shopping_ui.drag_reorder')}>
                     <span class="material-symbols-rounded">drag_indicator</span>
                   </span>
@@ -1023,17 +1024,17 @@
                       <span class="row-qty">{displayQty(it.quantity, it.unit)}{it.quantity != null && it.unit ? ' ' : ''}{it.unit ?? ''}</span>
                     {/if}
                     {#if $shoppingGroupBy !== 'aisle' && it.aisle}
-                      <span class="row-aisle-pill" title={$_('shopping_ui.aisle')}>{it.aisle}</span>
+                      <span class="row-aisle-pill" dir="auto" title={$_('shopping_ui.aisle')}>{it.aisle}</span>
                     {/if}
                     {#if $shoppingGroupBy === 'aisle'}
                       {#each (it.recipe_names || (it.recipe_name ? [it.recipe_name] : [])) as rn}
-                        <span class="row-recipe-pill" title={$_('shopping_item.recipe')}>
+                        <span class="row-recipe-pill" dir="auto" title={$_('shopping_item.recipe')}>
                           <span class="material-symbols-rounded">menu_book</span>{rn}
                         </span>
                       {/each}
                     {/if}
                     {#if (it.members || [it])[0].notes}
-                      <span class="row-note">{(it.members || [it])[0].notes}</span>
+                      <span class="row-note" dir="auto">{(it.members || [it])[0].notes}</span>
                     {/if}
                   </button>
                   <button class="btn-icon small" on:click={() => openAislePicker(it)}
@@ -1095,7 +1096,7 @@
                 <li class="restock-row" class:off={!r.enabled}>
                   <label class="restock-check">
                     <input type="checkbox" bind:checked={r.enabled} />
-                    <span class="restock-name">{r.label}</span>
+                    <span class="restock-name" dir="auto">{r.label}</span>
                   </label>
                   {#if r.options}
                     <select class="input restock-select" bind:value={r.selectedId}
@@ -1151,7 +1152,7 @@
       <div class="modal-body">
         <label class="field">
           <span class="field-label">{$_('shopping_page.name')}</span>
-          <input class="input" type="text" bind:value={editName}
+          <input class="input" type="text" dir="auto" bind:value={editName}
                  on:keydown={(e) => { if (e.key === 'Enter') commitEdit(); }} />
         </label>
         <div class="edit-qty-row">
@@ -1188,7 +1189,7 @@
       <div class="modal-body">
         <p class="aisle-help">{$_('routes.shopping.aisle_help')}</p>
         <div class="aisle-input-row">
-          <input class="input" type="text"
+          <input class="input" type="text" dir="auto"
                  maxlength="40"
                  placeholder={$_('routes.shopping.aisle_placeholder')}
                  bind:value={aisleInput}
@@ -1221,7 +1222,7 @@
         <button class="btn-icon" on:click={() => pickerOpen = false} aria-label={$_('common.close')}><span class="material-symbols-rounded">close</span></button>
       </header>
       <div class="modal-body">
-        <input class="input" type="search" placeholder={$_('routes.recipes.search_placeholder')} bind:value={pickerSearch} />
+        <input class="input" type="search" dir="auto" placeholder={$_('routes.recipes.search_placeholder')} bind:value={pickerSearch} />
         <label class="check-row">
           <input type="checkbox" bind:checked={pickerOnlyMissing} />
           <span>{$_('shopping_ui.only_missing')}</span>
@@ -1235,7 +1236,7 @@
                 <span class="material-symbols-rounded">restaurant</span>
               {/if}
               <div class="recipe-meta">
-                <span class="recipe-name">{r.name}</span>
+                <span class="recipe-name" dir="auto">{r.name}</span>
                 {#if r.pantry_match}
                   <span class="recipe-match">{$_('shopping_ui.pantry_match', { values: { have: r.pantry_match.have, need: r.pantry_match.need } })}</span>
                 {/if}
@@ -1642,7 +1643,7 @@
     display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
     /* A button that opens the item: no button look of its own. */
     background: none; border: none; padding: 6px 0; margin: 0; min-height: 40px;
-    font: inherit; color: inherit; text-align: left; cursor: pointer;
+    font: inherit; color: inherit; text-align: start; cursor: pointer;
   }
   .row-note { flex-basis: 100%; font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row-name { font-weight: 500; color: var(--text-1); }

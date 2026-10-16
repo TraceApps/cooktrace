@@ -67,7 +67,7 @@
   <button class="cooking-now" on:click={open}
     aria-label={$_('cooking_now.label')}>
     <span class="cn-icon material-symbols-rounded">skillet</span>
-    <span class="cn-text">
+    <span class="cn-text" dir="auto">
       {#if showing.length > 1}
         <b>{$_('cooking_now.label_many', { values: { n: showing.length } })}</b>
         <span class="cn-sub">{first.name || $_('cooking_now.untitled')}</span>

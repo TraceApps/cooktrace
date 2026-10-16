@@ -130,6 +130,7 @@
 
 <div class="ing-name-field" bind:this={wrapEl}>
   <input
+    dir="auto"
     bind:this={inputEl}
     class="input ing-name"
     type="text"
@@ -155,7 +156,7 @@
     {#each filtered as name, i}
       <button
         type="button"
-        class="opt"
+        class="opt" dir="auto"
         class:active={highlight === i}
         role="option"
         aria-selected={_norm(value) === _norm(name)}
@@ -202,7 +203,7 @@
     cursor: pointer;
     font-size: 13px;
     color: var(--text-1);
-    text-align: left;
+    text-align: start;
   }
   .opt:hover, .opt.active { background: var(--accent-dim); color: var(--accent); }
 </style>
