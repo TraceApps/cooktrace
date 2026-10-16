@@ -41,6 +41,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Turning on user accounts keeps the admin's email** (found with [nutritrace#269](https://github.com/TraceApps/nutritrace/issues/269)). Settings > Users registered the new admin with the email you entered, then saved the rest of your profile in a way that cleared it. A profile save now leaves alone any field it doesn't include. Thanks @jsapede.
 - **Saving your Profile in the browser no longer depends on the browser's storage** (found with [nutritrace#269](https://github.com/TraceApps/nutritrace/issues/269)). When the browser refused this site storage, every save failed before reaching the server; when something else was waiting to go up, a profile save waited behind it, and failed if storage then stopped working. With a connection it now goes straight up, an earlier profile save still waiting is replaced rather than sent after it, and with neither a connection nor storage the message says so. A save kept for later no longer makes the app forget who is signed in. Thanks @jsapede.
 - **A cook Trace logs with no date goes on today.** It took the date in UTC, so on a New York evening it went on tomorrow, and on a Sydney morning on yesterday. Trace now sends your device's date.
 - **Cook streaks count every day east of UTC.** On a server set to a time zone east of UTC (Europe, Asia, Australia), and in the Android app there, a streak skipped every other day, so three days in a row read as 2 or 1 and the longest streak stayed at 1.

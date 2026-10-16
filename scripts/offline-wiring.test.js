@@ -122,7 +122,7 @@ test('your profile and its picture work the same way here as in the sibling apps
   assert.match(profile, /await NtApi\.put\('\/api\/auth\/profile'/);
   assert.ok(!/fetch\(apiUrl\('\/api\/auth\/profile'\)/.test(profile), 'no raw fetch around the API layer');
   const auth = read('../server/routes/auth.js');
-  assert.match(auth, /localizeDataUrl\(req\.body\?\.avatar_url\)/);
+  assert.match(auth, /localizeDataUrl\(body\.avatar_url\)/);
 });
 
 test('nothing the offline path needs is fetched at the moment it is needed', () => {
