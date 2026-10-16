@@ -30,16 +30,18 @@ CookTrace uses [svelte-i18n](https://github.com/kaisermann/svelte-i18n) with one
 
 ### Two ways to contribute (pick either)
 
-**A. Weblate (preferred, no code required).** CookTrace is hosted at [hosted.weblate.org/projects/cooktrace/](https://hosted.weblate.org/projects/cooktrace/). Pick a language, translate strings in the web UI, and pull requests to `dev` are opened automatically. If your language isn't in the list, click **Add new translation** and it'll be approved. If you already have a completed JSON file from prior work, seed the language with **Files → Upload translation → Add as translation** on the language page.
+**A. Weblate (preferred, no code required).** CookTrace is hosted at [hosted.weblate.org/projects/cooktrace/](https://hosted.weblate.org/projects/cooktrace/). Pick a language and translate strings in the web UI; Weblate commits your work to `dev`. If your language isn't in the list, click **Add new translation**. If you already have a completed JSON file, seed the language with **Files → Upload translation → Add as translation** on the language page.
+
+[![Translation status](https://hosted.weblate.org/widget/cooktrace/multi-auto.svg)](https://hosted.weblate.org/engage/cooktrace/)
 
 **B. Direct JSON PR.** Follow the steps below. This still works and Weblate will pick up the file on its next sync.
 
-Full guidance for both paths (Weblate gotchas, glossary conventions, tone rules): [traceapps.github.io/docs/contribute/translations/](https://traceapps.github.io/docs/contribute/translations/).
+Full guidance for both paths: [traceapps.github.io/docs/contribute/translations/](https://traceapps.github.io/docs/contribute/translations/).
 
 ### Adding a new language via direct PR
 
-1. Copy `src/i18n/en.json` to `src/i18n/<code>.json` where `<code>` is a BCP-47 short code (`fr`, `de`, `nl`, `es`, `pt`, `ja`, `zh_Hans`, `zh_Hant`, etc.).
-2. Translate the values. Leave the keys exactly as they are. Keep `{placeholder}` tokens and any HTML tags (`<strong>`, `<code>`, `<br>`) intact and in the right grammatical position for your language.
+1. Copy `src/i18n/en.json` to `src/i18n/<code>.json` where `<code>` is a BCP-47 short code (`fr`, `de`, `nl`, `es`, `pt_BR`, `ja`, `zh_Hans`, `zh_Hant`, etc.).
+2. Translate the values. Leave the keys exactly as they are. Keep `{placeholder}` tokens, plural blocks (`{count, plural, one {...} other {...}}`) and any HTML tags (`<strong>`, `<code>`, `<br>`) intact, with the placeholders in the right grammatical position for your language.
 3. In `src/i18n/index.js`, register the new locale and add it to `AVAILABLE_LOCALES`:
    ```js
    register('fr', () => import('./fr.json'));
@@ -71,7 +73,7 @@ The English source text may also change occasionally without renaming the key. T
 - **Length awareness.** Some buttons are tight on small screens. If your translation is significantly longer than the English, test on a phone-sized viewport.
 - **Do not translate proper nouns or product names.** `CookTrace`, `Trace` (the AI assistant), `Open Food Facts`, `OFF`, `USDA`, `Mealie`, `Paprika`, `Tandoor`, `Kitchen`, `Cookbook` stay as-is.
 
-### For code contributors — instrumenting new strings
+### For code contributors: instrumenting new strings
 
 Every user-facing string added to the app should be extracted into `en.json` and rendered through `svelte-i18n`'s `$_()` helper. Hardcoded English literals in templates are the reason translation coverage lags the codebase; please prevent them at PR time rather than retrofit them later.
 
@@ -89,12 +91,14 @@ The pattern:
 Then in `src/i18n/en.json`:
 
 ```json
-"routes": {
-  "recipes": {
-    "title": "Recipes"
-  },
-  "pantry": {
-    "search_placeholder": "Search pantry…"
+{
+  "routes": {
+    "recipes": {
+      "title": "Recipes"
+    },
+    "pantry": {
+      "search_placeholder": "Search pantry…"
+    }
   }
 }
 ```
@@ -102,7 +106,7 @@ Then in `src/i18n/en.json`:
 Guidelines:
 
 - **Group by area**, not by page. `settings.notifications.section` is better than `settings_notifications_section`.
-- **Only add English** in your PR. Do not machine-translate or hand-translate into other languages you don't natively speak; that misrepresents contributor work. The `en.json` addition is enough; translators fill in their locale files in follow-up PRs. `svelte-i18n`'s `fallbackLocale: 'en'` renders English until a translation lands.
+- **Only add English** in your PR. Do not machine-translate or hand-translate into other languages you don't natively speak; that misrepresents contributor work. The `en.json` addition is enough; translators fill in the other languages through Weblate. `svelte-i18n`'s `fallbackLocale: 'en'` renders English until a translation lands.
 - **Skip developer-facing strings.** Error stacks, log messages, JSON payload keys, class names. Only pull out what a user reads on screen.
 - **Interpolation** uses `{$_('key', { values: { name: user.name } })}` and `{name}` in the JSON value. Prefer this over string concatenation so translators can reorder words.
 - **Run `npm run i18n:check`** before opening the PR. It flags orphaned keys and missing translations across every locale file, catching typos and stale entries.
@@ -118,6 +122,8 @@ Do not add translations for locales you don't natively speak, and do not merge m
 The full client-side string surface is extracted as of v1.1.0: navigation, all Settings sections, Recipes, Pantry, Cook Diary, Shopping, Cookbooks, Kitchens, Manage, the wizard, auth flow, the Trace AI assistant, action sheets, toasts, dialog copy. Any new user-facing string added to the app is expected to land as a key in `en.json` in the same commit (see instrumenting guidance above); hardcoded English literals get flagged in review. `npm run i18n:check` runs against every locale file to catch missing translations and orphaned keys.
 
 Server-side strings (email subject lines, push notification bodies, AI system prompts) are not currently translatable and stay English.
+
+The Wear OS watch app isn't on Weblate yet, so its text stays English.
 
 ## Screenshots
 

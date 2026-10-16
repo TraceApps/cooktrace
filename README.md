@@ -183,6 +183,14 @@ Part of the **TraceApps** family. Sister apps: [NutriTrace](https://github.com/t
 
 ---
 
+## Translations
+
+CookTrace is translated with [Weblate](https://weblate.org/), a free web platform for libre translation projects. No coding required: pick your language, translate the strings, submit. Missing strings fall back to English, so a partial translation is safe to use.
+
+Start translating at [hosted.weblate.org/projects/cooktrace/](https://hosted.weblate.org/projects/cooktrace/). See [CONTRIBUTING.md](CONTRIBUTING.md#translations) for guidance (cooking terms and units, proper nouns, tone).
+
+---
+
 ## More
 
 [ROADMAP.md](ROADMAP.md) · [CHANGELOG.md](CHANGELOG.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [PRIVACY.md](PRIVACY.md) · [Full documentation](https://traceapps.github.io/docs/cooktrace/)
