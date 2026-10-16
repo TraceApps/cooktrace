@@ -2183,6 +2183,7 @@
     "because": "{what}: {why}.",
     "plain": "{what}.",
     "offline": "the server can't be reached",
+    "not_kept": "this browser couldn't keep it to send later (check that it has free space and allows this site to store data)",
     "sign_in": "Couldn't sign in",
     "voice": "Couldn't use voice input",
     "mic": "Couldn't start the microphone",

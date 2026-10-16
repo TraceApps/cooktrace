@@ -25,6 +25,8 @@ const HTTP_ONLY = /^((http|api error|server responded)\s*)?\d{3}(\s+[a-z ]+)?$/i
 /** An error as a reason: lowercase, no closing period, or '' when it adds nothing. */
 export function reasonOf(err) {
   if (!err) return '';
+  // This device couldn't keep it to send later (TraceApps/nutritrace#269).
+  if (err?.storage) return t('fail.not_kept');
   if (isOfflineError(err)) return t('fail.offline');
   let s = String(err?.message ?? err ?? '').trim().replace(/^error:\s*/i, '').replace(/[.\s]+$/, '');
   if (!s || EMPTY.test(s) || HTTP_ONLY.test(s)) return '';
