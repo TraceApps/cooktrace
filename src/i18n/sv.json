@@ -7,11 +7,21 @@
     "settings": "Inställningar"
   },
   "routes": {
-    "recipes": { "title": "Recept"  },
-    "pantry": { "title": "Skafferi" },
-    "diary": {  "title": "Dagbok"   },
-    "shopping": { "title": "Shopping"  },
-    "settings": { "title": "Inställningar"   }
+    "recipes": {
+      "title": "Recept"
+    },
+    "pantry": {
+      "title": "Skafferi"
+    },
+    "diary": {
+      "title": "Dagbok"
+    },
+    "shopping": {
+      "title": "Shopping"
+    },
+    "settings": {
+      "title": "Inställningar"
+    }
   },
   "common": {
     "sign_out": "Logga ut",
@@ -50,24 +60,52 @@
       "section": "Regionala enheter",
       "language": "Språk"
     },
-    "diary": { "section": "Dagbok" },
-    "water": { "section": "Vatten" },
-    "foods": { "section": "Livsmedel" },
-    "categories": { "section": "Kategorier" },
-    "nutrients": { "section": "Näringsämnen" },
-    "goals": { "section": "Mål" },
-    "body_stats": { "section": "Kroppsstatistik" },
-    "statistics": { "section": "Statistik" },
-    "connected_services": { "section": "Matkällor" },
-    "ai": { "section": "AI-assistent" },
-    "notifications": { "section": "Aviseringar" },
-    "wellness": { "section": "Välbefinnande" },
-    "sharing": { "section": "Matdelning" },
+    "diary": {
+      "section": "Dagbok"
+    },
+    "water": {
+      "section": "Vatten"
+    },
+    "foods": {
+      "section": "Livsmedel"
+    },
+    "categories": {
+      "section": "Kategorier"
+    },
+    "nutrients": {
+      "section": "Näringsämnen"
+    },
+    "goals": {
+      "section": "Mål"
+    },
+    "body_stats": {
+      "section": "Kroppsstatistik"
+    },
+    "statistics": {
+      "section": "Statistik"
+    },
+    "connected_services": {
+      "section": "Matkällor"
+    },
+    "ai": {
+      "section": "AI-assistent"
+    },
+    "notifications": {
+      "section": "Aviseringar"
+    },
+    "wellness": {
+      "section": "Välbefinnande"
+    },
+    "sharing": {
+      "section": "Matdelning"
+    },
     "profile_hero": {
       "label_fallback": "Min profil",
       "subtitle_empty": "Tryck för att lägga till ditt namn och foto"
     },
-    "authentication": { "section": "Autentisering" },
+    "authentication": {
+      "section": "Autentisering"
+    },
     "users": {
       "section": "Användare",
       "users_heading": "Användare",
@@ -146,11 +184,21 @@
       "err_could_not_reset_password": "Kunde inte återställa lösenordet",
       "err_could_not_reach_server": "Kunde inte nå servern"
     },
-    "email": { "section": "E-post (SMTP)" },
-    "backup": { "section": "Säkerhetskopiering och återställning" },
-    "server": { "section": "Serveranslutning" },
-    "diagnostics": { "section": "Diagnostik" },
-    "about": { "section": "Om" }
+    "email": {
+      "section": "E-post (SMTP)"
+    },
+    "backup": {
+      "section": "Säkerhetskopiering och återställning"
+    },
+    "server": {
+      "section": "Serveranslutning"
+    },
+    "diagnostics": {
+      "section": "Diagnostik"
+    },
+    "about": {
+      "section": "Om"
+    }
   },
   "login": {
     "subtitle": "Logga in på ditt konto",
@@ -380,7 +428,7 @@
     "scan_barcode": "Skanna streckkod",
     "add_new": "Lägg till ny",
     "n_selected": "{n} vald",
-    "add_n": "Lägg till",
+    "add_n": "Lägg till {n}",
     "adding": "Lägger till…",
     "add_selected_to_diary": "Lägg till markerade i dagboken",
     "search_in": "Sök {source}",
@@ -397,7 +445,7 @@
   },
   "trace": {
     "panel_label": "AI-coachchatt",
-    "ask_placeholder": "Fråga mig vad som helst…",
+    "ask_placeholder": "Fråga {name}…",
     "clear_conversation": "Rensa konversationen",
     "attach_image": "Bifoga bild"
   },
@@ -537,7 +585,9 @@
     }
   },
   "settings_added": {
-    "food_sources": { "section": "Matkällor" },
+    "food_sources": {
+      "section": "Matkällor"
+    },
     "off": {
       "section": "Open Food Facts",
       "enable": "Aktivera Open Food Facts",
@@ -564,7 +614,9 @@
       "flashlight": "Automatisk aktivering av ficklampa",
       "flashlight_desc": "Slå på den bakre kamerans ficklampa automatiskt när skannern öppnas (endast webb – native använder operativsystemets kameragränssnittskontroller)."
     },
-    "federation": { "section": "NutriTrace Federation" }
+    "federation": {
+      "section": "NutriTrace Federation"
+    }
   },
   "accept_invite": {
     "title": "Skapa konto",
