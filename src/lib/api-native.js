@@ -20,7 +20,7 @@ import { cleanSmartFilter, matchesSmartFilter } from './smart-cookbook.js';
 import { recipeContributions, mergeIntoList, parseSources } from './shopping-plan.js';
 import { ingredientKey } from './quantity.js';
 import { allergenSummary, cleanCodes, cleanOverrides, knownCodes } from './allergens.js';
-import { revisionOf, parseRevision, restoreValues } from './recipe-content.js';
+import { revisionOf, revOf, parseRevision, restoreValues } from './recipe-content.js';
 import { usageCounts, recipesUsing } from './pantry-usage.js';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
@@ -1941,7 +1941,20 @@ async function _recordRevision(recipeId) {
   const r = (await _query(`SELECT * FROM recipes WHERE id = ?`, [recipeId]))[0];
   if (!r) return null;
   const { rev, data } = revisionOf(r);
-  const v = (await _query(`SELECT id, deleted_at FROM recipe_revisions WHERE recipe_id = ? AND rev = ?`, [recipeId, rev]))[0];
+  let v = (await _query(`SELECT id, deleted_at FROM recipe_revisions WHERE recipe_id = ? AND rev = ?`, [recipeId, rev]))[0];
+  // The same content here under a key from before amounts were exact (a
+  // server not updated yet sent it so): that's this version, given its key.
+  if (!v) {
+    for (const x of await _query(`SELECT id, rev, data, deleted_at FROM recipe_revisions WHERE recipe_id = ?`, [recipeId])) {
+      let same = false;
+      try { same = revOf(parseRevision(x.data)) === rev; } catch { /* unreadable */ }
+      if (!same) continue;
+      await _run(`UPDATE recipe_revisions SET rev = ? WHERE id = ?`, [rev, x.id]);
+      await _run(`UPDATE cook_diary SET recipe_rev = ? WHERE recipe_id = ? AND recipe_rev = ?`, [rev, recipeId, x.rev]);
+      v = x;
+      break;
+    }
+  }
   if (!v) {
     await _runInsert(
       `INSERT INTO recipe_revisions (user_id, recipe_id, rev, data, created_at, updated_at, sync_status)

@@ -11,6 +11,7 @@
   import { showError } from '../../stores/toast.js';
   import { isNative } from '../../lib/platform.js';
   import DateInput from '../ui/DateInput.svelte';
+  import { versionOn } from '../../lib/recipe-content.js';
 
   /** Dialog open/closed. Two-way bind. */
   export let open = false;
@@ -62,21 +63,17 @@
     revPicked = !!editing;
   }
 
-  // A cook logged for an earlier day: the version the recipe had then
-  // (the last one saved by that day; the first one kept for a day before
-  // any), until another is picked.
-  function _versionOn(day) {
-    if (!versions.length) return currentRev;
-    if (day >= _todayIso()) return currentRev || versions[versions.length - 1].rev;
-    const localDay = at => {
-      const raw = String(at || '');
-      const d = new Date(raw.replace(' ', 'T') + (/[zZ]$|[+-]\d\d:?\d\d$/.test(raw) ? '' : 'Z'));
-      return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    };
-    const then = versions.filter(v => localDay(v.created_at) <= day);
-    return (then[then.length - 1] || versions[0]).rev;
-  }
-  $: if (open && !revPicked && versions.length) recipeRev = _versionOn(date);
+  // A cook logged for an earlier day: the version the recipe had then,
+  // until another is picked; none when that can't be told (an older
+  // version restored since), and the cook says which (lib/recipe-content.js).
+  const _localDay = at => {
+    const raw = String(at || '');
+    const d = new Date(raw.replace(' ', 'T') + (/[zZ]$|[+-]\d\d:?\d\d$/.test(raw) ? '' : 'Z'));
+    return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  $: if (open && !revPicked && versions.length) recipeRev = versionOn(versions, currentRev, date, _todayIso(), _localDay);
+  // A new cook with more than one version says which it was made from.
+  $: needsVersion = !editing && versions.length > 1 && !recipeRev;
   $: versionDate = v => {
     const raw = String(v.created_at || '');
     const d = new Date(raw.replace(' ', 'T') + (/[zZ]$|[+-]\d\d:?\d\d$/.test(raw) ? '' : 'Z'));
@@ -290,13 +287,14 @@
           <label class="cl-field">
             <span class="cl-label">{$_('cook_log_dialog.version')} <span class="cl-hint">{$_('cook_log_dialog.version_hint')}</span></span>
             <select class="input" bind:value={recipeRev} on:change={() => (revPicked = true)}>
-              {#if !recipeRev}<option value={null}>{$_('cook_log_dialog.version_unknown')}</option>{/if}
+              {#if !recipeRev}<option value={null}>{editing ? $_('cook_log_dialog.version_unknown') : $_('cook_log_dialog.version_choose')}</option>{/if}
               {#each [...versions].reverse() as v (v.rev)}
                 <option value={v.rev}>{v.rev === currentRev
                   ? $_('cook_log_dialog.version_current', { values: { n: v.number } })
                   : $_('cook_log_dialog.version_option', { values: { n: v.number, date: versionDate(v) } })}{v.label ? `: ${v.label}` : ''}</option>
               {/each}
             </select>
+            {#if needsVersion}<span class="cl-hint">{$_('cook_log_dialog.version_choose_why')}</span>{/if}
           </label>
         {/if}
 
@@ -366,7 +364,7 @@
 
       <footer class="cl-footer">
         <button class="btn btn-secondary" on:click={cancel} disabled={busy}>{$_('cook_log_dialog.cancel')}</button>
-        <button class="btn btn-primary" on:click={save} disabled={busy || photoUploading}>
+        <button class="btn btn-primary" on:click={save} disabled={busy || photoUploading || needsVersion}>
           <span class="material-symbols-rounded">restaurant</span>
           {photoUploading ? $_('cook_log_dialog_ui.uploading_photo') : busy ? $_('common.saving') : (editing ? $_('cook_log_dialog_ui.save_changes') : $_('cook_log_dialog_ui.add_to_diary'))}
         </button>

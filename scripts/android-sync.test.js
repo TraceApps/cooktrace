@@ -554,6 +554,49 @@ test('recipe history: versions and cooks from the phone, a restore and an edit o
   assert.deepEqual(r.end, { refused: 'used', numbers: [1, 2], current: 2 }, 'a cooked version stays; the uncooked one went');
 });
 
+test('recipe history is in a local backup, and a restore leaves no versions of recipes it does not have', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('historyBackup');
+  assert.deepEqual(r.before, { versions: 2, cooks: [1, 0], unversioned: 0 });
+  assert.equal(r.inBackup, 2, 'both versions are in the backup');
+  assert.deepEqual(r.after, r.before, 'restored as they were, the cook with its version');
+  assert.equal(r.orphans, 0, 'a backup from before the history clears the versions it replaces');
+});
+
+test("versions the phone keyed before amounts were exact get their exact keys at start, cooks and all", { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('historyRekey');
+  assert.equal(r.changed, true);
+  assert.deepEqual(r.after, { versions: 1, rev: true, cooks: 1, unversioned: 0 });
+});
+
+test('a phone and a server a version apart while amounts became exact: one row per version, cooks kept, pulls never stop', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('historyKeyMix');
+  assert.equal(r.pull, 'ok');
+  assert.deepEqual(r.merged, { rows: [true], cookRev: [true] });
+  assert.deepEqual(r.labels, { phone: ['Mine'], server: ['Mine'] }, 'a name given here and not sent yet stays, and goes up');
+  assert.deepEqual(r.adopted, { rows: [true], versions: 1, cooks: 1 });
+  assert.deepEqual(r.migrated, { rows: 1, versions: 1, cooks: 1, unversioned: 0 });
+  assert.equal(r.after, 'ok');
+  assert.equal(r.other, 'ok');
+  assert.deepEqual(r.otherServer, [['0.10', []], ['0.15', [5]]], 'a different version stays its own, with its cook');
+  assert.deepEqual(r.otherPhone, r.otherServer);
+});
+
+for (const [clock, skew] of [['right', 0], ['2 hours slow', -120 * MIN], ['2 hours fast', 120 * MIN]]) {
+  test(`a version named on the phone before it syncs keeps its date and number on the server (clock ${clock})`, { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+    const r = await run('historyNameBeforeSync', { PHONE_SKEW_MS: String(skew) });
+    assert.deepEqual(r.server, [[1, 'The base', '300'], [2, null, '250']]);
+    assert.deepEqual(r.phone, r.server);
+    assert.equal(r.knowsClock, true);
+    assert.ok(r.minutesOff.every(m => m <= 2), `dated on the server's clock: ${r.minutesOff}`);
+  });
+}
+
+test('a cook from the phone of a version the web deleted meanwhile brings the version back', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('historyCookKeepsVersion');
+  assert.deepEqual(r.server, { numbers: [1, 2], cooks: [1, 0], unversioned: 0 });
+  assert.deepEqual(r.phone, r.server);
+});
+
 test("a version's name goes up from the phone and comes back changed from the web", { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const r = await run('historyLabel');
   assert.deepEqual(r, { server: 'The base', phone: 'Base, no sugar', rows: 1 });

@@ -21,6 +21,8 @@ export function safeJson(text, fallback) {
   try { return JSON.parse(text); } catch { return fallback; }
 }
 
+const _list = v => (Array.isArray(v) ? v : []);
+
 export function normaliseIngredientGroups(raw) {
   if (!Array.isArray(raw) || raw.length === 0) return [];
   // Detect old flat shape: items have qty/unit/name at the top level
@@ -51,9 +53,10 @@ export function hydrateRecipe(row, categoryMap = null) {
   return {
     ...row,
     ingredients: normaliseIngredientGroups(safeJson(row.ingredients, [])),
-    steps:       safeJson(row.steps, []),
-    tags:        safeJson(row.tags, []),
-    tools:       safeJson(row.tools, []),
+    // Lists, whatever a row from before the sync checked them holds.
+    steps:       _list(safeJson(row.steps, [])),
+    tags:        _list(safeJson(row.tags, [])),
+    tools:       _list(safeJson(row.tools, [])),
     nutrition:   safeJson(row.nutrition, {}),
     favorite:    !!row.favorite,
     category,

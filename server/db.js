@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { foldText } from './lib/search-text.js';
 import { SYNC_FIELDS } from './lib/sync-fields.js';
-import { revisionOf } from './lib/recipe-content.js';
+import { revisionOf, revOf, parseRevision } from './lib/recipe-content.js';
 
 const dbPath = process.env.DB_PATH || './cooktrace.db';
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -1049,13 +1049,64 @@ export function backfillRevisions() {
   const setRev = db.prepare(`UPDATE recipes SET rev = ? WHERE id = ?`);
   db.transaction(() => {
     for (const r of rows) {
-      const { rev, data } = revisionOf(r);
-      const at = r.updated_at || r.created_at || null;
-      ins.run(r.id, r.user_id ?? null, rev, JSON.stringify(data), r.last_edited_by ?? r.user_id ?? null, at, at);
-      setRev.run(rev, r.id);
+      // One recipe that can't be read as a version never stops the start.
+      try {
+        const { rev, data } = revisionOf(r);
+        const at = r.updated_at || r.created_at || null;
+        ins.run(r.id, r.user_id ?? null, rev, JSON.stringify(data), r.last_edited_by ?? r.user_id ?? null, at, at);
+        setRev.run(rev, r.id);
+      } catch (e) { console.warn(`[history] recipe ${r.id}: no version (${e?.message})`); }
     }
   })();
   return rows.length;
+}
+
+/**
+ * Versions known by a key from before amounts were compared exactly (#54):
+ * one whose amounts were rounded (0.10 and 0.15 were both "1/8") gets its
+ * exact key, and the cooks and the recipe pointing at it follow. A recipe
+ * changed by such an amount then still pointed at the version before the
+ * change: it gets the version it has now. Every change goes out to devices
+ * on their next sync. Once at start, and after a restore.
+ */
+export function rekeyRevisions() {
+  const moves = [];
+  for (const v of db.prepare(`SELECT id, recipe_id, rev, data FROM recipe_revisions`).all()) {
+    try {
+      const rev = revOf(parseRevision(v.data));
+      if (rev !== v.rev) moves.push({ ...v, to: rev });
+    } catch { /* not readable: left as it is */ }
+  }
+  if (!moves.length) return 0;
+  const taken = db.prepare(`SELECT 1 FROM recipe_revisions WHERE recipe_id = ? AND rev = ?`);
+  const touched = new Set();
+  db.transaction(() => {
+    for (const m of moves) {
+      if (taken.get(m.recipe_id, m.to)) continue;
+      db.prepare(`UPDATE recipe_revisions SET rev = ? WHERE id = ?`).run(m.to, m.id);
+      db.prepare(`UPDATE cook_diary SET recipe_rev = ? WHERE recipe_id = ? AND recipe_rev = ?`).run(m.to, m.recipe_id, m.rev);
+      db.prepare(`UPDATE recipes SET rev = ? WHERE id = ? AND rev = ?`).run(m.to, m.recipe_id, m.rev);
+      touched.add(m.recipe_id);
+    }
+    // The recipe's current version is never a deleted one.
+    const ins = db.prepare(
+      `INSERT INTO recipe_revisions (recipe_id, user_id, rev, data, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(recipe_id, rev) DO UPDATE SET deleted_at = NULL WHERE recipe_revisions.deleted_at IS NOT NULL`
+    );
+    for (const id of touched) {
+      try {
+        const r = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(id);
+        if (!r) continue;
+        const { rev, data } = revisionOf(r);
+        if (rev === r.rev) continue;
+        const at = r.updated_at || r.created_at || null;
+        ins.run(r.id, r.user_id ?? null, rev, JSON.stringify(data), r.last_edited_by ?? r.user_id ?? null, at, at);
+        db.prepare(`UPDATE recipes SET rev = ? WHERE id = ?`).run(rev, r.id);
+      } catch (e) { console.warn(`[history] recipe ${id}: ${e?.message}`); }
+    }
+  })();
+  return moves.length;
 }
 
 // When each synced field of a row last changed here: field_stamps holds
@@ -1107,7 +1158,18 @@ for (const t of Object.keys(SYNC_FIELDS)) {
   for (const [k, v] of seeds) ins.run(k, v);
 }
 
+// A recipe's steps, tags and tools are lists. A sync from before it checked
+// could store something else ("{}"), which every reader of them trips on:
+// those become empty lists. Text that isn't JSON is left as it is.
+for (const col of ['steps', 'tags', 'tools']) {
+  db.prepare(`UPDATE recipes SET ${col} = '[]' WHERE ${col} IS NOT NULL AND json_valid(${col}) AND json_type(${col}) != 'array'`).run();
+}
+
 // Recipes from before the history, or restored from a backup without it.
 backfillRevisions();
+if (!db.prepare(`SELECT 1 FROM app_config WHERE key = 'history_exact_amounts'`).get()) {
+  rekeyRevisions();
+  db.prepare(`INSERT OR IGNORE INTO app_config (key, value) VALUES ('history_exact_amounts', '1')`).run();
+}
 
 export default db;

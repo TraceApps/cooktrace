@@ -246,3 +246,30 @@ test('a queued answer is shaped like the route it stands in for', () => {
   assert.deepEqual(queuedReply({ kind: 'profile' }, { nickname: 'Alex' }, null).user, { nickname: 'Alex' });
   assert.equal(queuedReply({ kind: 'setting' }, { key: 'a', value: 1 }, null).ok, true);
 });
+
+test("offline, a recipe's history shows the version its waiting saves make, as the current one (#54)", async () => {
+  const { revisionOf, cookVersion } = await import('../src/lib/recipe-content.js');
+  const flour = q => [{ name: '', items: [{ id: 'i1', qty: q, unit: 'g', name: 'flour' }] }];
+  const v1 = revisionOf({ ingredients: flour('300'), steps: [{ text: 'Bake' }] });
+  const v2 = revisionOf({ ingredients: flour('280'), steps: [{ text: 'Bake' }] });
+  const kept = { current: v2.rev, revisions: [
+    { rev: v1.rev, number: 1, data: v1.data, current: false, cooks: [] },
+    { rev: v2.rev, number: 3, data: v2.data, current: true, cooks: [] },
+  ], unversioned: [] };
+  const path = '/api/recipes/7/revisions';
+  assert.equal(answerWithOps(path, kept, []), kept, 'nothing waiting: as kept');
+  assert.equal(answerWithOps(path, kept, [op(1, 'PUT', '/api/recipes/7', { name: 'New Name' })]), kept, 'a new name is no new version');
+  const stale = { name: 'Scones', ingredients: flour('300'), steps: [{ title: '', text: 'Bake' }], rating: 5 };
+  assert.equal(answerWithOps(path, kept, [op(1, 'PUT', '/api/recipes/7', stale, { sync: { changed: ['rating'] } })]), kept, 'a rating sent with an older copy changes no version');
+  const page = { name: 'Scones', ingredients: flour('250'), steps: [{ title: '', text: 'Bake' }], servings: null };
+  const shown = answerWithOps(path, kept, [op(1, 'PUT', '/api/recipes/7', page), op(2, 'PUT', '/api/recipes/8', { ...page, ingredients: flour('1') })]);
+  assert.equal(shown.current, cookVersion(page).recipe_rev, "the page's version is current: a cook now is of it");
+  assert.deepEqual(shown.revisions.map(v => [v.number, v.current, !!v._pending]), [[1, false, false], [3, false, false], [4, true, true]]);
+  assert.equal(shown.revisions[2].data.ingredients[0].items[0].qty, '250');
+  // A save back to a version it has: that one is current, nothing added.
+  const back = answerWithOps(path, kept, [op(1, 'PUT', '/api/recipes/7', { ...page, ingredients: flour('300') })]);
+  assert.deepEqual(back.revisions.map(v => v.current), [true, false]);
+  // One version, with names given offline still applied.
+  const one = answerWithOps(`${path}/${v1.rev}`, kept.revisions[0], [op(1, 'PUT', `${path}/${v1.rev}`, { label: 'Base' })]);
+  assert.equal(one.label, 'Base');
+});

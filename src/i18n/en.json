@@ -1351,6 +1351,8 @@
     "version": "Made From",
     "version_hint": "(which version of the recipe)",
     "version_unknown": "Not known (made before history was kept)",
+    "version_choose": "Choose the version you made",
+    "version_choose_why": "An older version was restored since then, so the date doesn't say which one this was.",
     "version_current": "Version {n} (current)",
     "version_option": "Version {n}, saved {date}",
     "date":                      "Date",

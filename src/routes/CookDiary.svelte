@@ -23,7 +23,8 @@
   import { firstDayOfWeek, weekStartOf, weekDays, weekdayNames, weekRangeLabel, weekNeeds, planHorizon, isoDay, fromIso } from '../lib/week.js';
   import CookHeatmap from '../components/diary/CookHeatmap.svelte';
   import { longpress } from '../lib/long-press.js';
-  import { resolveAssetUrl } from '../lib/platform.js';
+  import { resolveAssetUrl, isNative } from '../lib/platform.js';
+  import { cookVersion } from '../lib/recipe-content.js';
 
   import { foldText } from '../lib/search-text.js';
 
@@ -530,6 +531,13 @@
         const start = entry.date;
         const end = isoDay(new Date(fromIso(start).getFullYear(), fromIso(start).getMonth(), fromIso(start).getDate() + 6));
         if (todayIso >= start && todayIso <= end) patch.date = todayIso;
+      }
+      // Made from the recipe as it is here (#54), with its content: offline,
+      // a save of it may still be on its way up. The Android app records
+      // the version itself.
+      if (!isNative && entry.recipe_id) {
+        const recipe = await NtApi.getRecipe(entry.recipe_id).catch(() => null);
+        if (recipe?.ingredients) Object.assign(patch, cookVersion(recipe));
       }
       await NtApi.updateDiaryEntry(entry.id, patch);
       showSuccess($_('cookdiary_page.toast.marked_cooked'));

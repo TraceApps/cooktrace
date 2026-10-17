@@ -56,7 +56,7 @@ import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-key
 import { ownIngredientLinks, ownId, linkableRecipeId } from '../lib/link-checks.js';
 import { cleanSourceIds } from '../lib/shopping-plan.js';
 import { localizeRowPhotos } from '../lib/inline-photos.js';
-import { recordRevision, revisionUsed, cleanLabel } from '../lib/recipe-history.js';
+import { recordRevision, revisionUsed, cleanLabel, cookedVersion } from '../lib/recipe-history.js';
 import { revisionOf, parseRevision } from '../lib/recipe-content.js';
 
 // Unique per account (server/db.js), so one made on two devices is one row.
@@ -290,8 +290,25 @@ router.post('/push', wrap((req, res) => {
         // An ingredient links only to the account's own pantry items
         // (lib/link-checks.js): the app sends the server's ids for them.
         if (name === 'recipes') {
+          // Lists and the nutrition object, as the REST routes keep them:
+          // anything else a device sends (steps as "{}") is none, so nothing
+          // that reads a recipe, its history at start included, trips on it.
+          for (const [c, list] of [['ingredients', true], ['steps', true], ['tags', true], ['tools', true], ['nutrition', false]]) {
+            const i = spec.cols.indexOf(c);
+            if (i < 0 || values[i] == null) continue;
+            let v;
+            try { v = typeof values[i] === 'string' ? JSON.parse(values[i]) : values[i]; } catch { v = undefined; }
+            if (list ? !Array.isArray(v) : !(v && typeof v === 'object' && !Array.isArray(v))) values[i] = list ? '[]' : '{}';
+          }
           const at = spec.cols.indexOf('ingredients');
           if (at > -1 && values[at] != null) values[at] = ownIngredientLinks(values[at], u);
+        }
+        // The version a cook was made from stays, even one deleted elsewhere
+        // before this cook was heard of, and an older app's key is the
+        // version it meant (lib/recipe-history.js).
+        if (name === 'cook_diary' && translated.kind === 'cooked' && translated.deleted_at == null && translated.recipe_id != null) {
+          const at = spec.cols.indexOf('recipe_rev');
+          if (at > -1 && values[at] != null) values[at] = cookedVersion(translated.recipe_id, values[at], { u });
         }
         // Where a list row's amount came from: recipes and planned cooks of
         // this account (lib/shopping-plan.js), sent with the server's ids.
@@ -766,17 +783,23 @@ function _pushRevision(row, translated, u, offsetMs) {
   recipe.rev = revisionOf(recipe).rev;
   const { rev, data } = revisionOf(parseRevision(translated.data));
   const at = editTime(translated.updated_at, row.edit_clock === 'server' ? 0 : offsetMs) || new Date().toISOString().replace('T', ' ').slice(0, 19);
+  // When it was made, for one the server hasn't had: the device's own date
+  // for it, on the device's clock (the app moves only updated_at onto the
+  // server's). Naming it since moved its updated_at, which would otherwise
+  // date it, and reorder the history.
+  const madeAt = !row.server_id && Number.isFinite(utcMs(row.created_at)) ? editTime(row.created_at, offsetMs) : at;
+  const createdAt = madeAt < at ? madeAt : at;
   let v = row.server_id ? db.prepare(`SELECT * FROM recipe_revisions WHERE id = ? AND recipe_id = ?`).get(row.server_id, recipe.id) : null;
   if (!v) v = db.prepare(`SELECT * FROM recipe_revisions WHERE recipe_id = ? AND rev = ?`).get(recipe.id, rev);
   if (!v) {
     const info = db.prepare(
       `INSERT INTO recipe_revisions (recipe_id, user_id, rev, data, label, created_by, created_at, updated_at, deleted_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(recipe.id, recipe.user_id ?? null, rev, JSON.stringify(data), cleanLabel(translated.label), u ?? null, at, at, translated.deleted_at ?? null);
+    ).run(recipe.id, recipe.user_id ?? null, rev, JSON.stringify(data), cleanLabel(translated.label), u ?? null, createdAt, at, translated.deleted_at ?? null);
     setCreateKey('recipe_revisions', info.lastInsertRowid, row.server_id ? null : cleanCreateKey(row.client_key));
     return db.prepare(`SELECT * FROM recipe_revisions WHERE id = ?`).get(info.lastInsertRowid);
   }
-  if (at < String(v.created_at || '')) db.prepare(`UPDATE recipe_revisions SET created_at = ? WHERE id = ?`).run(at, v.id);
+  if (createdAt < String(v.created_at || '')) db.prepare(`UPDATE recipe_revisions SET created_at = ? WHERE id = ?`).run(createdAt, v.id);
   // Its name: the newer of the two edits. A device from before names
   // nothing (no label sent), which leaves it.
   if ('label' in translated) {

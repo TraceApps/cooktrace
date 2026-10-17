@@ -21,6 +21,7 @@ import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { dispatchWebhookEvent } from '../lib/webhooks.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
 import { linkableRecipeId } from '../lib/link-checks.js';
+import { cookedVersion } from '../lib/recipe-history.js';
 import { localToday, shiftDay } from '../lib/calendar-day.js';
 
 const router = Router();
@@ -188,7 +189,8 @@ router.post('/', wrap((req, res) => {
   const anyDay   = kind === 'planned' && body.any_day ? 1 : 0;
   // The version a cook was made from, when the app says; else the recipe's
   // current one (db.js). A planned cook has none until it's cooked.
-  const recipeRev = kind === 'cooked' ? _rev(body.recipe_rev) : null;
+  const recipeRev = kind === 'cooked' && _rev(body.recipe_rev)
+    ? cookedVersion(recipeId, body.recipe_rev, { version: body.recipe_version, u }) : null;
 
   const result = db.prepare(
     `INSERT INTO cook_diary (user_id, recipe_id, date, kind, servings, notes, photo_url, meal_type, rating, any_day, recipe_rev)
@@ -236,7 +238,12 @@ router.put('/:id', wrap((req, res) => {
   // being marked cooked without one gets the recipe's current (db.js).
   let recipeRev = existing.recipe_rev;
   if (body.recipe_rev !== undefined) {
-    const want = _rev(body.recipe_rev);
+    let want = _rev(body.recipe_rev);
+    // A version deleted elsewhere comes back for its cook, and one still on
+    // its way up with a page's save is kept (lib/recipe-history.js).
+    if (want && kindIn === 'cooked' && existing.recipe_id != null) {
+      want = cookedVersion(existing.recipe_id, want, { version: body.recipe_version, u });
+    }
     // Choosing another version for a cook: one this recipe has.
     if (want && existing.kind === 'cooked' && existing.recipe_id != null && !_isRevisionOf(existing.recipe_id, want)) {
       return res.status(400).json({ error: "That version isn't one of this recipe's." });

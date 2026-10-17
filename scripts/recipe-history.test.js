@@ -40,9 +40,9 @@ async function boot(dir) {
   const base = `http://127.0.0.1:${port}`;
   for (let i = 0; ; i++) {
     try { await fetch(base + '/api/auth/me'); break; } catch { await new Promise(r => setTimeout(r, 100)); }
-    if (i > 150) { proc.kill(); throw new Error('server did not start: ' + errors.slice(-500)); }
+    if (i > 150 || proc.exitCode != null) { proc.kill(); throw new Error('server did not start: ' + errors.slice(-500)); }
   }
-  return { base, stop: () => new Promise(r => { proc.on('exit', r); proc.kill(); }) };
+  return { base, stop: () => new Promise(r => { if (proc.exitCode != null || proc.signalCode != null) return r(); proc.on('exit', r); proc.kill(); }) };
 }
 
 async function start() {
@@ -54,10 +54,25 @@ async function start() {
   });
   const token = reg.headers.getSetCookie().map(c => c.split(';')[0].split('=')[1]).find(v => v?.startsWith('eyJ'));
   assert.ok(token, 'signed in');
-  const call = async (method, path, body) => {
-    const r = await fetch(srv.base + path, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: body ? JSON.stringify(body) : undefined });
+  const callAs = tok => async (method, path, body) => {
+    const r = await fetch(srv.base + path, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: body ? JSON.stringify(body) : undefined });
     const t = await r.text();
     return { status: r.status, body: t ? JSON.parse(t) : null };
+  };
+  const call = callAs(token);
+  // Another account, made by the first (the admin): its own call().
+  const another = async username => {
+    const made = await fetch(srv.base + '/api/auth/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ username, password: 'Str0ng-Pass-77!z' }),
+    });
+    assert.ok(made.status < 300, `register ${username}: ${made.status}`);
+    const login = await fetch(srv.base + '/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password: 'Str0ng-Pass-77!z' }),
+    });
+    const tok = login.headers.getSetCookie().map(c => c.split(';')[0].split('=')[1]).find(v => v?.startsWith('eyJ'));
+    assert.ok(tok, `${username} signed in`);
+    return callAs(tok);
   };
   const ok = async (method, path, body) => {
     const r = await call(method, path, body);
@@ -65,7 +80,7 @@ async function start() {
     return r.body;
   };
   return {
-    call, ok, dbPath: join(dir, 'app.db'),
+    call, ok, another, dbPath: join(dir, 'app.db'),
     restart: async () => { await srv.stop(); srv = await boot(dir); },
     stop: async () => { await srv.stop(); try { rmSync(dir, { recursive: true, force: true }); } catch { /* closing */ } },
   };
@@ -220,5 +235,155 @@ test('a version can be named, renamed and unnamed; the name is trimmed and kept 
     await s.ok('PUT', `/api/recipes/${r.id}/revisions/${v1}`, { label: '' });
     assert.equal((await s.ok('GET', `/api/recipes/${r.id}/revisions/${v1}`)).label, null);
     assert.equal((await s.call('PUT', `/api/recipes/${r.id}/revisions/vffffffffffffff`, { label: 'x' })).status, 404);
+  } finally { await s.stop(); }
+});
+
+// Reported on #54 by @DefectiveConsole, with reproductions.
+
+test('a recipe pushed with steps that are not a list is kept, and the server still starts', { skip, timeout: 60_000 }, async () => {
+  const s = await start();
+  try {
+    const pushed = await s.ok('POST', '/api/sync/push', { fk_ids: 'server', client_now: new Date().toISOString(),
+      tables: { recipes: [{ client_id: 1, name: 'Odd', visibility: 'private', favorite: 0, cook_count: 0, rating: null, ingredients: '[]', steps: '{}', tags: '{"a":1}', tools: '[]', nutrition: '{}', updated_at: '2030-01-01 00:00:00' }] } });
+    assert.ok(Array.isArray(pushed.tables.recipes), JSON.stringify(pushed.tables.recipes));
+    const id = pushed.tables.recipes[0].server_id;
+    assert.ok(id, 'kept');
+    // A row left this way before the fix: the next start still runs.
+    const db = new Database(s.dbPath);
+    db.prepare(`UPDATE recipes SET steps = '{}', rev = NULL WHERE id = ?`).run(id);
+    db.close();
+    await s.restart();
+    const h = await s.ok('GET', `/api/recipes/${id}/revisions`);
+    assert.equal(h.revisions.length, 1, 'it has its version');
+    const r = await s.ok('GET', `/api/recipes/${id}`);
+    assert.deepEqual([r.steps, r.tags], [[], []], 'read as no steps and no tags');
+    const after = new Database(s.dbPath);
+    assert.equal(after.prepare(`SELECT steps FROM recipes WHERE id = ?`).get(id).steps, '[]', 'repaired where it is kept');
+    after.close();
+  } finally { await s.stop(); }
+});
+
+test('an amount changed by less than an eighth is a new version; the same amount written another way is not', { skip, timeout: 60_000 }, async () => {
+  const s = await start();
+  try {
+    const salt = q => ({ ...scones(), ingredients: [{ name: '', items: [{ id: 'i1', qty: q, unit: 'g', name: 'salt' }] }] });
+    const r = await s.ok('POST', '/api/recipes', salt('0.10'));
+    await s.ok('PUT', `/api/recipes/${r.id}`, salt('0.15'));
+    await s.ok('POST', `/api/recipes/${r.id}/cooked`, { date: '2030-02-01' });
+    let h = await s.ok('GET', `/api/recipes/${r.id}/revisions`);
+    assert.equal(h.revisions.length, 2);
+    const cooked = h.revisions.find(v => v.cooks.length);
+    assert.equal(cooked.data.ingredients[0].items[0].qty, '0.15', 'the cook shows the amount it was made with');
+    await s.ok('PUT', `/api/recipes/${r.id}`, salt('1/2'));
+    await s.ok('PUT', `/api/recipes/${r.id}`, salt('0.5'));
+    await s.ok('PUT', `/api/recipes/${r.id}`, salt('½'));
+    h = await s.ok('GET', `/api/recipes/${r.id}/revisions`);
+    assert.equal(h.revisions.length, 3, '1/2, 0.5 and ½ are one version');
+  } finally { await s.stop(); }
+});
+
+test('a cook queued offline between two saves keeps the version it was made from', { skip, timeout: 60_000 }, async () => {
+  const s = await start();
+  try {
+    const { writeOp, collapseOps, withSaveBase, recipeSaveBase, recipeBaseOf } = await import('../src/lib/offline-edits.js');
+    const content = await import('../src/lib/recipe-content.js');
+    const r = await s.ok('POST', '/api/recipes', scones('300'));
+    await s.ok('POST', `/api/recipes/${r.id}/cooked`, { date: '2030-03-31' });
+    const earlier = (await s.ok('GET', '/api/cook-diary?from=2030-03-31&to=2030-03-31'))[0];
+    const page0 = await s.ok('GET', `/api/recipes/${r.id}`);
+    // Offline: 250 g saved, a cook of it logged and an earlier cook said to
+    // be of it, then 200 g saved.
+    let seq = 0;
+    const queue = (method, path, body) => ({ ...writeOp(method, path, body), seq: ++seq, method, path, body: { ...body, _sync: undefined }, sync: body._sync });
+    const save = (page, flour) => {
+      const body = { ...page, ingredients: scones(flour).ingredients, _base: recipeBaseOf(page0) };
+      return queue('PUT', `/api/recipes/${r.id}`, { ...body, _sync: recipeSaveBase(body, null, new Date().toISOString()) });
+    };
+    const page250 = { ...page0, ingredients: scones('250').ingredients };
+    const cookBody = { date: '2030-04-01', ...(content.cookVersion ? content.cookVersion(page250) : { recipe_rev: content.revisionOf(page250).rev }) };
+    const editBody = { rating: 4, ...(content.cookVersion ? content.cookVersion(page250) : { recipe_rev: content.revisionOf(page250).rev }) };
+    const ops = [save(page0, '250'), queue('POST', `/api/recipes/${r.id}/cooked`, cookBody),
+      queue('PUT', `/api/recipes/${r.id}/cooks/${earlier.id}`, editBody), save(page250, '200')];
+    for (const op of collapseOps(ops)) {
+      const res = await s.call(op.method, op.path, withSaveBase(op.body, op.sync));
+      assert.ok(res.status < 400, `${op.method} ${op.path} ${res.status}`);
+    }
+    const h = await s.ok('GET', `/api/recipes/${r.id}/revisions`);
+    assert.equal(h.unversioned.length, 0, 'the cook has its version');
+    const v = h.revisions.find(x => x.cooks.length);
+    assert.equal(v.data.ingredients[0].items[0].qty, '250');
+    assert.equal(v.cooks.length, 2, 'the new cook and the one edited to say so');
+    assert.equal(v.cooks.find(c => c.id === earlier.id).rating, 4, 'the edit went in');
+    assert.deepEqual(h.revisions.map(x => x.data.ingredients[0].items[0].qty), ['300', '250', '200'], 'in the order they were made');
+    assert.equal((await s.ok('GET', `/api/recipes/${r.id}`)).ingredients[0].items[0].qty, '200');
+  } finally { await s.stop(); }
+});
+
+test('versions keyed before amounts were exact get their exact keys at start, and their cooks follow', { skip, timeout: 60_000 }, async () => {
+  const s = await start();
+  try {
+    const { legacyRevOf, revOf, parseRevision } = await import('../src/lib/recipe-content.js');
+    const salt = q => ({ ...scones(), ingredients: [{ name: '', items: [{ id: 'i1', qty: q, unit: 'g', name: 'salt' }] }] });
+    const r = await s.ok('POST', '/api/recipes', salt('0.10'));
+    await s.ok('POST', `/api/recipes/${r.id}/cooked`, { date: '2030-05-01', rating: 4 });
+    // As a server from before left it: the version under its rounded key,
+    // and the recipe since changed to 0.15 g with no version of its own.
+    const db = new Database(s.dbPath);
+    const v = db.prepare(`SELECT id, rev, data FROM recipe_revisions WHERE recipe_id = ?`).get(r.id);
+    const old = legacyRevOf(parseRevision(v.data));
+    assert.notEqual(old, v.rev, 'the key changed');
+    db.prepare(`UPDATE recipe_revisions SET rev = ? WHERE id = ?`).run(old, v.id);
+    db.prepare(`UPDATE cook_diary SET recipe_rev = ? WHERE recipe_id = ?`).run(old, r.id);
+    db.prepare(`UPDATE recipes SET rev = ?, ingredients = ? WHERE id = ?`).run(old, JSON.stringify(salt('0.15').ingredients), r.id);
+    db.prepare(`DELETE FROM app_config WHERE key = 'history_exact_amounts'`).run();
+    db.close();
+    await s.restart();
+    const h = await s.ok('GET', `/api/recipes/${r.id}/revisions`);
+    assert.deepEqual(h.revisions.map(x => [x.data.ingredients[0].items[0].qty, x.cooks.map(c => c.rating), x.current]), [['0.10', [4], false], ['0.15', [], true]]);
+    assert.equal(h.unversioned.length, 0);
+    assert.equal(h.revisions[0].rev, v.rev, 'the exact key');
+    // Cooks from an app that still makes old keys: the version it had.
+    await s.ok('POST', '/api/sync/push', { fk_ids: 'server', client_now: new Date().toISOString(),
+      tables: { cook_diary: [{ client_id: 9, recipe_id: r.id, date: '2030-05-02', kind: 'cooked', rating: 2, recipe_rev: old, updated_at: '2030-01-01 00:00:00' }] } });
+    await s.ok('POST', `/api/recipes/${r.id}/cooked`, { date: '2030-05-03', rating: 5, recipe_rev: old });
+    const after = await s.ok('GET', `/api/recipes/${r.id}/revisions`);
+    assert.deepEqual(after.revisions.map(x => x.cooks.map(c => c.rating).sort()), [[4], [2, 5]], 'of the version the recipe has now, as that app had it');
+    assert.equal(after.unversioned.length, 0);
+    assert.equal(revOf(after.revisions[1].data), after.current);
+  } finally { await s.stop(); }
+});
+
+test("a cook adds a version it brings only to a history its cook may change", { skip, timeout: 60_000 }, async () => {
+  const s = await start();
+  try {
+    const { cookVersion } = await import('../src/lib/recipe-content.js');
+    const r = await s.ok('POST', '/api/recipes', { ...scones(), visibility: 'group' });
+    const pat = await s.another('pat');
+    const made = cookVersion(scones('1'));
+    const res = await pat('POST', `/api/recipes/${r.id}/cooked`, { date: '2030-06-01', ...made });
+    assert.equal(res.status < 300, true, `cooked: ${res.status}`);
+    const h = await s.ok('GET', `/api/recipes/${r.id}/revisions`);
+    assert.equal(h.revisions.length, 1, "another account's cook adds nothing to the owner's history");
+    // The owner's own does.
+    await s.ok('POST', `/api/recipes/${r.id}/cooked`, { date: '2030-06-02', ...made });
+    assert.equal((await s.ok('GET', `/api/recipes/${r.id}/revisions`)).revisions.length, 2);
+    // A version whose content isn't what it says is not kept.
+    await s.ok('POST', `/api/recipes/${r.id}/cooked`, { date: '2030-06-03', recipe_rev: 'v0000000000000a', recipe_version: made.recipe_version });
+    assert.equal((await s.ok('GET', `/api/recipes/${r.id}/revisions`)).revisions.length, 2);
+  } finally { await s.stop(); }
+});
+
+test("only someone who may change a recipe's history brings back a deleted version with a cook", { skip, timeout: 60_000 }, async () => {
+  const s = await start();
+  try {
+    const r = await s.ok('POST', '/api/recipes', { ...scones(), visibility: 'group' });
+    const v1 = (await s.ok('GET', `/api/recipes/${r.id}/revisions`)).current;
+    await s.ok('PUT', `/api/recipes/${r.id}`, { ...scones('250'), visibility: 'group' });
+    await s.ok('DELETE', `/api/recipes/${r.id}/revisions/${v1}`);
+    const pat = await s.another('pat');
+    assert.ok((await pat('POST', `/api/recipes/${r.id}/cooked`, { date: '2030-07-01', recipe_rev: v1 })).status < 300);
+    assert.deepEqual((await s.ok('GET', `/api/recipes/${r.id}/revisions`)).revisions.map(v => v.number), [2], "another account's cook doesn't bring it back");
+    await s.ok('POST', `/api/recipes/${r.id}/cooked`, { date: '2030-07-02', recipe_rev: v1 });
+    assert.deepEqual((await s.ok('GET', `/api/recipes/${r.id}/revisions`)).revisions.map(v => v.number), [1, 2], "the owner's does");
   } finally { await s.stop(); }
 });

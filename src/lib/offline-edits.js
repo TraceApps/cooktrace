@@ -18,6 +18,7 @@
  */
 
 import { SYNC_FIELDS } from './sync-fields.js';
+import { COOK_FIELDS, revisionOf } from './recipe-content.js';
 
 /** Was this the server being unreachable, rather than a real answer? */
 export function isOfflineError(err) {
@@ -370,6 +371,29 @@ function _withQueued(mirrored, ops, { create, update, remove, patches = [] }) {
     .concat(made.map(op => ({ ...op.body, id: op.tempId, _pending: true })));
 }
 
+// The history with the version queued saves of recipe `id` make: the
+// cooking fields each save changed (all it sends, when it can't say) over
+// what the current version holds. A rating or a favorite sends the whole
+// recipe but changes neither.
+const _cookFieldsOf = op => COOK_FIELDS.filter(f => f in op.body && (!Array.isArray(op.sync?.changed) || op.sync.changed.includes(f)));
+function _withQueuedVersion(mirrored, ops, id) {
+  const saves = (ops || []).filter(op => op.kind === 'recipe-update' && Number(op.id) === id && op.body && _cookFieldsOf(op).length);
+  const list = Array.isArray(mirrored.revisions) ? mirrored.revisions : null;
+  if (!saves.length || !list) return mirrored;
+  const cur = list.find(v => v.rev === mirrored.current) || list[list.length - 1];
+  const content = { ...(cur?.data || {}) };
+  for (const op of saves) for (const f of _cookFieldsOf(op)) content[f] = op.body[f];
+  const { rev, data } = revisionOf(content);
+  if (rev === mirrored.current) return mirrored;
+  const known = list.some(v => v.rev === rev);
+  const revisions = list.map(v => ({ ...v, current: v.rev === rev }));
+  if (!known) {
+    const number = list.reduce((n, v) => Math.max(n, v.number || 0), 0) + 1;
+    revisions.push({ rev, number, label: null, data, created_at: new Date(saves[saves.length - 1].at || Date.now()).toISOString(), current: true, used: false, cooks: [], _pending: true });
+  }
+  return { ...mirrored, current: rev, revisions };
+}
+
 /**
  * The kept answer with queued work applied, so a list ticked off in a shop
  * shows what you ticked rather than what the server last knew.
@@ -407,13 +431,16 @@ export function answerWithOps(url, mirrored, ops) {
     if (!edit && !fix) return mirrored;
     return { ...mirrored, ...(edit?.body || {}), ...(fix?.body || {}), _pending: true };
   }
-  // A recipe's history, with names given offline.
+  // A recipe's history, with names given offline, and the version its
+  // saves still waiting to go up make, as the current one: a cook logged
+  // now is of what the page shows.
   const history = path.match(/^\/api\/recipes\/(-?\d+)\/revisions(?:\/(v[0-9a-f]{14}))?$/);
   if (history && mirrored) {
     const named = new Map((ops || []).filter(op => op.kind === 'revision-label' && Number(op.id) === Number(history[1])).map(op => [op.rev, op.body?.label ?? null]));
-    if (!named.size) return mirrored;
     const name = v => (named.has(v.rev) ? { ...v, label: named.get(v.rev) || null } : v);
-    return history[2] ? name(mirrored) : { ...mirrored, revisions: (mirrored.revisions || []).map(name) };
+    if (history[2]) return named.size ? name(mirrored) : mirrored;
+    const out = _withQueuedVersion(mirrored, ops, Number(history[1]));
+    return named.size ? { ...out, revisions: (out.revisions || []).map(name) } : out;
   }
   const comments = path.match(/^\/api\/recipes\/(-?\d+)\/comments$/);
   if (comments) {

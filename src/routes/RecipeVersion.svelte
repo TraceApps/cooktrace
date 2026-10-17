@@ -139,7 +139,8 @@
   async function logCook(e) {
     busy = true;
     try {
-      await NtApi.markCooked(id, { ...e.detail, recipe_rev: v.rev });
+      // With its content: offline, the save that made it may still be on its way up.
+      await NtApi.markCooked(id, { ...e.detail, recipe_rev: v.rev, recipe_version: { data: v.data, at: new Date().toISOString() } });
       showSuccess($_('history.cook_logged', { values: { n: v.number } }));
       await load();
     } catch (err) { showError(failed('fail.log_cook', err)); }

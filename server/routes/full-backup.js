@@ -18,7 +18,7 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import AdmZip from 'adm-zip';
 import multer from 'multer';
-import db, { backfillRevisions } from '../db.js';
+import db, { backfillRevisions, rekeyRevisions } from '../db.js';
 import { logger } from '../logger.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
@@ -377,8 +377,10 @@ function restoreFromZip(zip) {
     } catch {} // tables don't exist — skip silently
   })();
   // A backup from before the recipe history (or without it): each recipe
-  // starts its history with what it holds now.
+  // starts its history with what it holds now. One from before amounts
+  // were compared exactly: its versions get their exact keys.
   backfillRevisions();
+  rekeyRevisions();
 
   // Restore images — guard against zip-slip and zip-bomb attacks
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });

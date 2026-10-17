@@ -32,7 +32,7 @@ const TABLES = [
   'recipes', 'pantry_items', 'cook_diary', 'shopping_list',
   'recipe_categories', 'pantry_categories', 'custom_units', 'disabled_units',
   'cookbooks', 'recipe_cookbook_links', 'recipe_comments',
-  'user_settings', 'ai_chat_history',
+  'user_settings', 'ai_chat_history', 'recipe_revisions',
 ];
 
 async function _selectAll(db, table) {
@@ -217,6 +217,13 @@ export async function importLocalSnapshot(snapshot) {
   // references inside the snapshot remain valid after import.
   for (const t of TABLES) {
     const rows = snapshot.tables?.[t];
+    // A backup from before the recipe history: the versions here are of
+    // the recipes it replaces, so they go too, and each recipe starts its
+    // history again with what it holds.
+    if (t === 'recipe_revisions' && !Array.isArray(rows) && Array.isArray(snapshot.tables?.recipes)) {
+      await db.run(`DELETE FROM recipe_revisions`, []);
+      continue;
+    }
     if (!Array.isArray(rows)) continue;
     await db.run(`DELETE FROM ${t}`, []);
     for (const row of rows) {

@@ -21,6 +21,7 @@ import { CapacitorSQLite, SQLiteConnection } from '@capacitor-community/sqlite';
 import { isNative } from './platform.js';
 import { mapSmartFilterCategory } from './smart-cookbook.js';
 import { mapSourceIds } from './shopping-plan.js';
+import { revOf, parseRevision } from './recipe-content.js';
 
 export const LOCAL_USER_ID = 1;
 const DB_NAME = 'cooktrace_local';
@@ -409,6 +410,39 @@ export async function dbInit() {
   await _migrateShoppingAisle();
   await _backfillShoppingNames();
   await _migrateIngredientLinks();
+  await _migrateRevisionKeys();
+}
+
+// Once: versions known by a key from before amounts were compared exactly
+// (#54; 0.10 and 0.15 were both "1/8") get their exact keys, and the cooks
+// pointing at them follow, as the server does for its own (server/db.js
+// rekeyRevisions). Nothing is sent: the server makes the same change.
+async function _migrateRevisionKeys() {
+  try {
+    if (await dbGetMeta('history_exact_amounts')) return;
+    const db = await getDb();
+    const rows = (await db.query(`SELECT id, recipe_id, rev, data, server_id, label, sync_status, updated_at FROM recipe_revisions`, []))?.values || [];
+    for (const v of rows) {
+      let rev;
+      try { rev = revOf(parseRevision(v.data)); } catch { continue; }
+      if (rev === v.rev) continue;
+      await db.run(`UPDATE cook_diary SET recipe_rev = ? WHERE recipe_id = ? AND recipe_rev = ?`, [rev, v.recipe_id, v.rev]);
+      // Already here under its exact key (an app from before made a second
+      // copy of a version the server had re-keyed): one row, keeping a link.
+      const taken = (await db.query(`SELECT id, server_id, label FROM recipe_revisions WHERE recipe_id = ? AND rev = ?`, [v.recipe_id, rev]))?.values?.[0];
+      if (taken) {
+        await db.run(`DELETE FROM recipe_revisions WHERE id = ?`, [v.id]);
+        if (taken.server_id == null && v.server_id != null) await db.run(`UPDATE recipe_revisions SET server_id = ? WHERE id = ?`, [v.server_id, taken.id]);
+        // Its name, given here and not sent yet, stays and goes up.
+        if (v.sync_status === 'pending' && v.label != null && taken.label == null) {
+          await db.run(`UPDATE recipe_revisions SET label = ?, updated_at = ?, sync_status = 'pending' WHERE id = ?`, [v.label, v.updated_at, taken.id]);
+        }
+      } else {
+        await db.run(`UPDATE recipe_revisions SET rev = ? WHERE id = ?`, [rev, v.id]);
+      }
+    }
+    await dbSetMeta('history_exact_amounts', '1');
+  } catch (e) { console.warn('[db-native] version keys:', e?.message); }
 }
 
 /**
@@ -1195,6 +1229,39 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
           if (i > -1) values[i] = `${translated[key]}~s${row.id}`;
         }
       }
+      // One version, one row (#54). Rows here tied to this server version,
+      // or holding its key, with the same content are the same version: one
+      // row stays, the cooks follow its key, and a name or a delete made
+      // here and not sent yet goes up on it. One of other content (a server
+      // not updated yet matched it by a rounded key) is its own version
+      // again, to go up as one. So the unique key never stops a pull.
+      let carry = null;
+      if (existing && table === 'recipe_revisions' && row.rev) {
+        const keyOf = d => { try { return revOf(parseRevision(d)); } catch { return null; } };
+        const want = keyOf(row.data);
+        const rid = existing.recipe_id;
+        const linked = (await db.query(
+          `SELECT * FROM recipe_revisions WHERE recipe_id = ? AND (server_id = ? OR rev = ? OR id = ?)`,
+          [rid, row.id, row.rev, existing.id]
+        ))?.values || [];
+        const same = linked.filter(d => keyOf(d.data) === want);
+        for (const d of linked.filter(x => !same.includes(x))) {
+          const own = keyOf(d.data);
+          const held = own && (await db.query(`SELECT id FROM recipe_revisions WHERE recipe_id = ? AND rev = ? AND id != ?`, [rid, own, d.id]))?.values?.[0];
+          if (own && d.rev !== own && d.rev !== row.rev) await db.run(`UPDATE cook_diary SET recipe_rev = ? WHERE recipe_id = ? AND recipe_rev = ?`, [own, rid, d.rev]);
+          if (held) await db.run(`DELETE FROM recipe_revisions WHERE id = ?`, [d.id]);
+          else await db.run(`UPDATE recipe_revisions SET rev = ?, server_id = NULL, sync_status = 'pending' WHERE id = ?`, [own || d.rev, d.id]);
+        }
+        existing = same.find(d => d.id === existing.id) || same[0] || null;
+        for (const d of same) {
+          if (d.rev !== row.rev) await db.run(`UPDATE cook_diary SET recipe_rev = ? WHERE recipe_id = ? AND recipe_rev = ?`, [row.rev, rid, d.rev]);
+        }
+        // (Only from a copy that goes: the row that stays met the server's
+        // edit already, and the newer of the two won.)
+        const mine = same.filter(d => d.id !== existing?.id && d.sync_status === 'pending').sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))[0];
+        if (mine) carry = { label: mine.label ?? null, deleted_at: mine.deleted_at ?? null, updated_at: mine.updated_at };
+        for (const d of same) if (d.id !== existing?.id) await db.run(`DELETE FROM recipe_revisions WHERE id = ?`, [d.id]);
+      }
       if (existing) {
         // When a row here was made stays as it is: for a row this phone
         // made, the server's is when it got there. It's part of the key
@@ -1217,6 +1284,10 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
       if (SYNC_FIELDS[table]) {
         const here = (await db.query(`SELECT * FROM ${table} WHERE server_id = ? LIMIT 1`, [row.id]))?.values?.[0];
         if (here) await db.run(`UPDATE ${table} SET server_base = ?, edit_clock = NULL WHERE id = ?`, [rowBase(table, here), here.id]);
+      }
+      if (carry) {
+        await db.run(`UPDATE recipe_revisions SET label = ?, deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE server_id = ?`,
+          [carry.label, carry.deleted_at, carry.updated_at, row.id]);
       }
       if (existing) await db.run(`DELETE FROM sync_echoes WHERE table_name = ? AND row_id = ?`, [table, existing.id]);
     }

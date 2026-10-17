@@ -49,7 +49,7 @@
   import Sheet from '../components/ui/Sheet.svelte';
   import RecipeAllergens from '../components/allergens/RecipeAllergens.svelte';
   import HistorySheet from '../components/recipe/HistorySheet.svelte';
-  import { revisionOf } from '../lib/recipe-content.js';
+  import { cookVersion } from '../lib/recipe-content.js';
   import { household } from '../stores/settings.js';
   import { ALLERGENS, allergenKey, avoids, cleanHousehold, cleanOverrides, itemAllergens, conflicts } from '../lib/allergens.js';
   import { buildRecipeCardPages, buildRecipeShareText } from '../lib/recipe-card.js';
@@ -875,15 +875,26 @@
     cookDialogOpen = true;
   }
 
+  // The version a cook says it was made from (#54), with its content when
+  // the server may not have it yet: the page's own, or one a save still on
+  // its way up makes (offline, History lists it as pending).
+  function madeFrom(rev) {
+    const shown = cookVersion(recipe);
+    if (!rev || rev === shown.recipe_rev) return shown;
+    const v = (history?.revisions || []).find(x => x.rev === rev);
+    return v?._pending ? { recipe_rev: rev, recipe_version: { data: v.data, at: new Date().toISOString() } } : { recipe_rev: rev };
+  }
+
   async function onCookLogSave(e) {
     cookBusy = true;
     try {
       if (editingCook) {
-        await NtApi.updateCook(recipe.id, editingCook.id, { ...e.detail, _base: editingCook });
+        const made = e.detail.recipe_rev ? madeFrom(e.detail.recipe_rev) : {};
+        await NtApi.updateCook(recipe.id, editingCook.id, { ...e.detail, ...made, _base: editingCook });
         showSuccess($_('recipe_view_ct.toast.diary_updated'));
       } else {
-        // Made from the recipe as this page shows it (#54).
-        recipe = await NtApi.markCooked(recipe.id, { ...e.detail, recipe_rev: e.detail.recipe_rev || revisionOf(recipe).rev });
+        // Made from the recipe as this page shows it, unless another was picked.
+        recipe = await NtApi.markCooked(recipe.id, { ...e.detail, ...madeFrom(e.detail.recipe_rev) });
         showSuccess($_('recipe_view_ct.toast.logged_cooked'));
         // "I made this" is the natural end of a cook session — clear
         // checks + drop out of cook mode so the next visit is fresh.

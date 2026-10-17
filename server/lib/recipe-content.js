@@ -53,7 +53,9 @@ export function cookContent(recipe) {
       return out;
     }).filter(i => i.qty || i.unit || i.name || i.note),
   })).filter(g => g.name || g.items.length);
-  const steps = (_json(recipe?.steps, []) || []).map(st => {
+  // Steps are a list; anything else a device or a backup sent is none.
+  const rawSteps = _json(recipe?.steps, []);
+  const steps = (Array.isArray(rawSteps) ? rawSteps : []).map(st => {
     if (typeof st === 'string') return { title: '', text: _text(st) };
     const out = { title: _text(st?.title), text: _text(st?.text) };
     if (Array.isArray(st?.refIds) && st.refIds.length) out.refIds = st.refIds.map(String);
@@ -69,13 +71,21 @@ export function cookContent(recipe) {
 // "0.5", "cups" and "cup"), words without case or extra spaces. Ids, linked
 // ingredients and step photos aside.
 const _words = s => _text(s).replace(/\s+/g, ' ').toLowerCase();
+// An amount as it's written when that's exactly it ("1/2" for 0.5 and ½),
+// else as its number: 0.10 and 0.15 both look like 1/8, but aren't.
 function _amount(qty) {
   const n = parseQty(qty);
-  return n != null ? formatQty(n) : _words(qty);
+  if (n == null) return _words(qty);
+  const f = formatQty(n);
+  return Math.abs(parseQty(f) - n) < 1e-9 ? f : String(Number(n.toFixed(6)));
 }
-function _hashable(c) {
+// How versions were known before (#54 follow-up): amounts rounded to the
+// nearest common fraction. Kept so a key an older app or server made can
+// still be matched to its version.
+const _legacyAmount = qty => { const n = parseQty(qty); return n != null ? formatQty(n) : _words(qty); };
+function _hashable(c, amount = _amount) {
   return {
-    i: c.ingredients.map(g => [_words(g.name), g.items.map(i => [_amount(i.qty), normalizeUnit(i.unit) || _words(i.unit), _words(i.name), _words(i.note)])]),
+    i: c.ingredients.map(g => [_words(g.name), g.items.map(i => [amount(i.qty), normalizeUnit(i.unit) || _words(i.unit), _words(i.name), _words(i.note)])]),
     s: c.steps.map(st => [_words(st.title), _words(st.text)]),
     d: DETAIL_FIELDS.map(f => (f === 'yield_text' ? _words(c[f]) : c[f])),
   };
@@ -100,6 +110,11 @@ export function revOf(content) {
   return 'v' + _hash(JSON.stringify(_hashable(content)));
 }
 
+/** The key a version had before amounts were compared exactly. */
+export function legacyRevOf(content) {
+  return 'v' + _hash(JSON.stringify(_hashable(content, _legacyAmount)));
+}
+
 /** A recipe's current version: { rev, data } (data is cookContent()). */
 export function revisionOf(recipe) {
   const data = cookContent(recipe);
@@ -109,6 +124,37 @@ export function revisionOf(recipe) {
 /** A stored version's data (JSON text or an object), as cookContent(). */
 export function parseRevision(data) {
   return cookContent(_json(data, {}) || {});
+}
+
+/**
+ * What a cook of the recipe as it is says about its version: the key, and
+ * the content, so a server that doesn't have that version yet (a save still
+ * waiting to go up from an offline page) keeps it rather than losing the link.
+ */
+export function cookVersion(recipe, at = new Date().toISOString()) {
+  const { rev, data } = revisionOf(recipe);
+  return { recipe_rev: rev, recipe_version: { data, at } };
+}
+
+/**
+ * The version a cook logged for `day` was most likely made from, or null
+ * when that can't be told and the cook should say. `versions` oldest first
+ * ({ rev, created_at }), `currentRev` the recipe's now, `today` and `day`
+ * as YYYY-MM-DD, `localDay(created_at)` the local day a version was saved.
+ *
+ * Today's cook is of the current version. An earlier day's is of the last
+ * version saved by then, unless an older version was restored since the
+ * newest was saved: the history doesn't say when, so from the day the newest
+ * was saved, the cook could be of either.
+ */
+export function versionOn(versions, currentRev, day, today, localDay) {
+  if (!versions?.length) return currentRev || null;
+  const newest = versions[versions.length - 1];
+  if (day >= today) return currentRev || newest.rev;
+  const cur = versions.findIndex(v => v.rev === currentRev);
+  if (cur > -1 && cur < versions.length - 1 && day >= localDay(newest.created_at)) return null;
+  const then = versions.filter(v => localDay(v.created_at) <= day);
+  return (then[then.length - 1] || versions[0]).rev;
 }
 
 // ── What changed ────────────────────────────────────────────────────────

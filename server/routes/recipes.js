@@ -59,7 +59,7 @@ import { autoShareNewRecipe as _autoShareNewRecipe } from '../lib/auto-share.js'
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
 import { ownId, ownIngredientLinks } from '../lib/link-checks.js';
 import { allergenSummary, cleanOverrides } from '../lib/allergens.js';
-import { recordRevision, listRevisions, getRevision, revisionUsed, restoreColumns, cleanLabel } from '../lib/recipe-history.js';
+import { recordRevision, listRevisions, getRevision, revisionUsed, restoreColumns, cleanLabel, cookedVersion } from '../lib/recipe-history.js';
 import { revisionOf, parseRevision } from '../lib/recipe-content.js';
 
 // Recipe row -> API-shape hydration lives in server/lib/recipe-hydrate.js
@@ -1034,9 +1034,11 @@ router.post('/:id/cooked', wrap((req, res) => {
     return Math.max(0, Math.min(5, n)) || null;
   })();
 
-  // The version it was made from, when the page says (the one it shows);
-  // else the recipe's current one (db.js).
-  const recipeRev = _REV_RX.test(String(req.body?.recipe_rev || '')) ? req.body.recipe_rev : null;
+  // The version it was made from, when the page says (the one it shows,
+  // and its content in case its save hasn't arrived yet); else the recipe's
+  // current one (db.js).
+  const recipeRev = _REV_RX.test(String(req.body?.recipe_rev || ''))
+    ? cookedVersion(id, req.body.recipe_rev, { version: req.body.recipe_version, u }) : null;
   db.prepare(
     `INSERT INTO cook_diary (user_id, recipe_id, date, kind, notes, photo_url, photos, meal_type, rating, recipe_rev)
      VALUES (?, ?, ?, 'cooked', ?, ?, ?, ?, ?, ?)`
@@ -1141,7 +1143,8 @@ router.put('/:id/cooks/:cookId', wrap((req, res) => {
   // Which version it was made from (#54): one of this recipe's.
   let recipeRev = existing.recipe_rev;
   if (req.body?.recipe_rev !== undefined && existing.kind === 'cooked') {
-    const want = _REV_RX.test(String(req.body.recipe_rev || '')) ? req.body.recipe_rev : null;
+    const want = _REV_RX.test(String(req.body.recipe_rev || ''))
+      ? cookedVersion(id, req.body.recipe_rev, { version: req.body.recipe_version, u }) : null;
     if (want && !getRevision(id, want)) return res.status(400).json({ error: "That version isn't one of this recipe's." });
     if (want) recipeRev = want;
   }

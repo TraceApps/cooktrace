@@ -1403,6 +1403,8 @@
     "version": "Hecha con",
     "version_hint": "(qué versión de la receta)",
     "version_unknown": "No se sabe (hecha antes de guardar el historial)",
+    "version_choose": "Elige la versión que hiciste",
+    "version_choose_why": "Desde entonces se restauró una versión anterior, así que la fecha no indica cuál fue.",
     "version_current": "Versión {n} (actual)",
     "version_option": "Versión {n}, guardada el {date}",
     "date": "Fecha",

@@ -876,6 +876,148 @@ const scenarios = {
     const end = await web('GET', `/api/recipes/${sid}/revisions`);
     out.end = { refused, numbers: end.revisions.map(v => v.number), current: end.revisions.find(v => v.current)?.number };
   },
+  // Reported on #54: a backup keeps the history, and a restore leaves no
+  // versions of recipes it doesn't have.
+  async historyBackup() {
+    const { exportLocalSnapshot, importLocalSnapshot } = await import('../../src/lib/local-backup.js');
+    const flour = q => [{ name: '', items: [{ id: 'i1', qty: q, unit: 'g', name: 'flour' }] }];
+    const r = await api.createRecipe({ name: 'Scones', steps: [{ title: '', text: 'Bake' }], ingredients: flour('300') });
+    await api.markCooked(r.id, { date: '2030-01-02', rating: 3 });
+    await api.updateRecipe(r.id, { ...(await api.getRecipe(r.id)), ingredients: flour('250') });
+    const shape = h => ({ versions: h.revisions.length, cooks: h.revisions.map(v => v.cooks.length), unversioned: h.unversioned.length });
+    out.before = shape(await api.getRecipeRevisions(r.id));
+    const snap = await exportLocalSnapshot({ includeImages: false });
+    out.inBackup = Array.isArray(snap.tables.recipe_revisions) ? snap.tables.recipe_revisions.length : null;
+    // A new phone: nothing here, then the backup.
+    for (const t of ['recipe_revisions', 'cook_diary', 'recipes']) await db.run(`DELETE FROM ${t}`);
+    await importLocalSnapshot(snap);
+    out.after = shape(await api.getRecipeRevisions(r.id));
+    // A backup from before the history, over a phone with a recipe it doesn't have.
+    const other = await api.createRecipe({ name: 'Bread', steps: [{ title: '', text: 'Knead' }], ingredients: flour('500') });
+    await api.updateRecipe(other.id, { ...(await api.getRecipe(other.id)), ingredients: flour('450') });
+    const old = { ...snap, tables: { ...snap.tables } };
+    delete old.tables.recipe_revisions;
+    await importLocalSnapshot(old);
+    out.orphans = (await db.query(`SELECT COUNT(*) AS n FROM recipe_revisions WHERE recipe_id NOT IN (SELECT id FROM recipes)`)).values[0].n;
+  },
+  // Reported on #54: a version named on the phone before it first syncs
+  // keeps its own date (and its place) on the server.
+  async historyNameBeforeSync() {
+    const flour = q => [{ name: '', items: [{ id: 'i1', qty: q, unit: 'g', name: 'flour' }] }];
+    // A phone that has synced an edit before: it knows the server's clock,
+    // and puts its edits' times on it.
+    await api.createRecipe({ name: 'Warm-up', steps: [{ title: '', text: 'x' }], ingredients: flour('1') });
+    await sync();
+    out.knowsClock = (await db.query(`SELECT 1 FROM sync_meta WHERE key = 'clock_offset_ms'`)).values.length === 1;
+    const r = await api.createRecipe({ name: 'Scones', steps: [{ title: '', text: 'Bake' }], ingredients: flour('300') });
+    await sleep(1100);
+    await api.updateRecipe(r.id, { ...(await api.getRecipe(r.id)), ingredients: flour('250') });
+    await sleep(1100);
+    const here = await api.getRecipeRevisions(r.id);
+    await api.setRecipeRevisionLabel(r.id, here.revisions[0].rev, 'The base');
+    await sync();
+    const sid = (await db.query(`SELECT server_id FROM recipes WHERE id = ?`, [r.id])).values[0].server_id;
+    const h = await web('GET', `/api/recipes/${sid}/revisions`);
+    out.server = h.revisions.map(v => [v.number, v.label, v.data.ingredients[0].items[0].qty]);
+    out.phone = (await api.getRecipeRevisions(r.id)).revisions.map(v => [v.number, v.label, v.data.ingredients[0].items[0].qty]);
+    // Dated on the server's clock, whatever the phone's says.
+    const serverNow = Date.parse((await realFetch(server + '/api/auth/me')).headers.get('date'));
+    out.minutesOff = h.revisions.map(v => Math.round(Math.abs(serverNow - Date.parse(v.created_at.replace(' ', 'T') + 'Z')) / 60000));
+  },
+  // Reported on #54: a cook logged on the phone of a version the web
+  // deleted before it heard of the cook brings the version back.
+  async historyCookKeepsVersion() {
+    const flour = q => [{ name: '', items: [{ id: 'i1', qty: q, unit: 'g', name: 'flour' }] }];
+    const sid = (await web('POST', '/api/recipes', { name: 'Scones', steps: [{ title: '', text: 'Bake' }], ingredients: flour('300') })).id;
+    await webSave(sid, { ingredients: flour('250') });
+    await sync();
+    const lid = (await local(sid)).id;
+    const v1 = (await api.getRecipeRevisions(lid)).revisions[0].rev;
+    await api.markCooked(lid, { date: '2030-01-05', recipe_rev: v1 });
+    await web('DELETE', `/api/recipes/${sid}/revisions/${v1}`);
+    await sync();
+    const shape = h => ({ numbers: h.revisions.map(v => v.number), cooks: h.revisions.map(v => v.cooks.length), unversioned: h.unversioned.length });
+    out.server = shape(await web('GET', `/api/recipes/${sid}/revisions`));
+    await sync();
+    out.phone = shape(await api.getRecipeRevisions(lid));
+  },
+  // Versions the phone keyed before amounts were exact (#54) get their
+  // exact keys when the app starts, and their cooks follow.
+  async historyRekey() {
+    const { legacyRevOf, parseRevision } = await import('../../src/lib/recipe-content.js');
+    const salt = q => [{ name: '', items: [{ id: 'i1', qty: q, unit: 'g', name: 'salt' }] }];
+    const r = await api.createRecipe({ name: 'Brine', steps: [{ title: '', text: 'Stir' }], ingredients: salt('0.10') });
+    await api.markCooked(r.id, { date: '2030-01-02', rating: 4 });
+    const v = (await db.query(`SELECT id, rev, data FROM recipe_revisions WHERE recipe_id = ?`, [r.id])).values[0];
+    const old = legacyRevOf(parseRevision(v.data));
+    await db.run(`UPDATE recipe_revisions SET rev = ? WHERE id = ?`, [old, v.id]);
+    await db.run(`UPDATE cook_diary SET recipe_rev = ? WHERE recipe_id = ?`, [old, r.id]);
+    await db.run(`DELETE FROM sync_meta WHERE key = 'history_exact_amounts'`);
+    await dbInit();
+    const h = await api.getRecipeRevisions(r.id);
+    out.changed = old !== v.rev;
+    out.after = { versions: h.revisions.length, rev: h.revisions[0].rev === v.rev, cooks: h.revisions[0].cooks.length, unversioned: h.unversioned.length };
+    out.pending = (await db.query(`SELECT COUNT(*) AS n FROM cook_diary WHERE recipe_id = ? AND sync_status = 'pending'`, [r.id])).values[0].n;
+  },
+  // A phone and a server a version apart while amounts became exact (#54):
+  // copies of one version under the old and the new key become one row,
+  // the cooks follow, and a pull never stops on the unique key.
+  async historyKeyMix() {
+    const { legacyRevOf, parseRevision } = await import('../../src/lib/recipe-content.js');
+    const salt = q => [{ name: '', items: [{ id: 'i1', qty: q, unit: 'g', name: 'salt' }] }];
+    const rowsOf = async lid => (await db.query(`SELECT rev, server_id FROM recipe_revisions WHERE recipe_id = ? ORDER BY id`, [lid])).values;
+    // 1. The old and the new copy both linked to one server version (a new
+    // app on a server not updated yet), then the server's version changes.
+    const sid = (await web('POST', '/api/recipes', { name: 'Brine', steps: [{ title: '', text: 'Stir' }], ingredients: salt('0.10') })).id;
+    await sync();
+    const lid = (await local(sid)).id;
+    const a = (await db.query(`SELECT * FROM recipe_revisions WHERE recipe_id = ?`, [lid])).values[0];
+    const old = legacyRevOf(parseRevision(a.data));
+    await web('PUT', `/api/recipes/${sid}/revisions/${a.rev}`, { label: 'Base' });
+    await sleep(1100);
+    await db.run(`UPDATE recipe_revisions SET rev = ? WHERE id = ?`, [old, a.id]);
+    // The copy here was named since, and that hasn't gone up.
+    await db.run(`INSERT INTO recipe_revisions (server_id, user_id, recipe_id, rev, data, label, created_at, updated_at, sync_status) VALUES (?, ?, ?, ?, ?, 'Mine', ?, datetime('now'), 'pending')`,
+      [a.server_id, a.user_id, lid, a.rev, a.data, a.created_at]);
+    await db.run(`INSERT INTO cook_diary (user_id, recipe_id, date, kind, recipe_rev, sync_status) VALUES (?, ?, '2030-01-01', 'cooked', ?, 'synced')`, [a.user_id, lid, old]);
+    let pulled = 'ok';
+    try { await sync(); } catch (e) { pulled = String(e.message || e); }
+    out.pull = pulled;
+    out.merged = { rows: (await rowsOf(lid)).map(r => r.rev === a.rev), cookRev: (await db.query(`SELECT recipe_rev FROM cook_diary WHERE recipe_id = ?`, [lid])).values.map(c => c.recipe_rev === a.rev) };
+    out.labels = { phone: (await db.query(`SELECT label FROM recipe_revisions WHERE recipe_id = ?`, [lid])).values.map(x => x.label), server: (await web('GET', `/api/recipes/${sid}/revisions`)).revisions.map(v => v.label) };
+    // 2. Only the old copy here: opening History gives it its key, no second copy.
+    await db.run(`UPDATE recipe_revisions SET rev = ? WHERE recipe_id = ?`, [old, lid]);
+    const h = await api.getRecipeRevisions(lid);
+    out.adopted = { rows: (await rowsOf(lid)).map(r => r.rev === a.rev), versions: h.revisions.length, cooks: h.revisions[0].cooks.length };
+    // 3. An app from before added an old-key copy beside the re-keyed one:
+    // the re-keying at start makes them one.
+    await db.run(`INSERT INTO recipe_revisions (user_id, recipe_id, rev, data, created_at, updated_at, sync_status) VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
+      [a.user_id, lid, old, a.data, a.created_at, a.updated_at]);
+    await db.run(`UPDATE cook_diary SET recipe_rev = ? WHERE recipe_id = ?`, [old, lid]);
+    await db.run(`DELETE FROM sync_meta WHERE key = 'history_exact_amounts'`);
+    await dbInit();
+    const h2 = await api.getRecipeRevisions(lid);
+    out.migrated = { rows: (await rowsOf(lid)).length, versions: h2.revisions.length, cooks: h2.revisions[0].cooks.length, unversioned: h2.unversioned.length };
+    try { await sync(); out.after = 'ok'; } catch (e) { out.after = String(e.message || e); }
+    // 4. A different version tied to the same server version (a server not
+    // updated yet matched 0.15 g to 0.10 g by the rounded key): kept as its
+    // own, with its cook, and it goes up as one.
+    const sid2 = (await web('POST', '/api/recipes', { name: 'Brine 2', steps: [{ title: '', text: 'Stir' }], ingredients: salt('0.10') })).id;
+    await sync();
+    const lid2 = (await local(sid2)).id;
+    const a2 = (await db.query(`SELECT * FROM recipe_revisions WHERE recipe_id = ?`, [lid2])).values[0];
+    const { revOf } = await import('../../src/lib/recipe-content.js');
+    const e = parseRevision(a2.data); e.ingredients[0].items[0].qty = '0.15';
+    const eRev = revOf(e);
+    await db.run(`INSERT INTO recipe_revisions (server_id, user_id, recipe_id, rev, data, created_at, updated_at, sync_status) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 'synced')`,
+      [a2.server_id, a2.user_id, lid2, eRev, JSON.stringify(e)]);
+    await db.run(`INSERT INTO cook_diary (user_id, recipe_id, date, kind, recipe_rev, rating, sync_status) VALUES (?, ?, '2030-02-01', 'cooked', ?, 5, 'pending')`, [a2.user_id, lid2, eRev]);
+    await web('PUT', `/api/recipes/${sid2}/revisions/${a2.rev}`, { label: 'Base' });
+    try { await sync(); await sync(); out.other = 'ok'; } catch (err) { out.other = String(err.message || err); }
+    const h3 = await web('GET', `/api/recipes/${sid2}/revisions`);
+    out.otherServer = h3.revisions.map(v => [v.data.ingredients[0].items[0].qty, v.cooks.map(c => c.rating)]);
+    out.otherPhone = (await api.getRecipeRevisions(lid2)).revisions.map(v => [v.data.ingredients[0].items[0].qty, v.cooks.map(c => c.rating)]);
+  },
   // A row made on a phone whose clock is off, once it knows the server's:
   // its edit time goes on the server's clock once, not twice.
   async newRowClock() {

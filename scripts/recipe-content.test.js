@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   cookContent, revisionOf, revOf, parseRevision, compareContent, changeSummary, diffWords, numberRevisions,
+  legacyRevOf, cookVersion, versionOn,
 } from '../src/lib/recipe-content.js';
 import { historyForTrace } from '../src/lib/version-text.js';
 
@@ -122,4 +123,46 @@ test("Trace reads a recipe's history worked out: changes in words, the best vers
   assert.deepEqual(out.best_rated_version, { version: 2, name: 'Less flour', average_rating: 4.5 });
   assert.deepEqual(out.changes_from_best_to_now, ['Added sugar']);
   assert.equal(out.cooks_before_history, 1);
+});
+
+test('amounts: written another way is the same version; a little more or less is not (#54)', () => {
+  const salt = q => revisionOf({ ingredients: [{ items: [{ qty: q, unit: 'g', name: 'salt' }] }] }).rev;
+  assert.equal(new Set(['1/2', '0.5', '½', '.5'].map(salt)).size, 1);
+  for (const [a, b] of [['0.10', '0.15'], ['2.1', '2.15'], ['1.1', '1 1/8'], ['0.33', '1/3']]) assert.notEqual(salt(a), salt(b), `${a} and ${b}`);
+  assert.equal(salt('0.10'), salt('0.1'));
+  assert.equal(compareContent(parseRevision({ ingredients: [{ items: [{ qty: '0.10', name: 'salt' }] }] }), parseRevision({ ingredients: [{ items: [{ qty: '0.15', name: 'salt' }] }] })).ingredients[0].kind, 'changed');
+  // An amount that was exact keeps its key; only rounded ones changed.
+  const c = q => cookContent({ ingredients: [{ items: [{ qty: q, unit: 'g', name: 'salt' }] }] });
+  for (const q of ['300', '1/2', '2 1/4', '1/3', '']) assert.equal(revOf(c(q)), legacyRevOf(c(q)), q);
+  assert.notEqual(revOf(c('0.10')), legacyRevOf(c('0.10')));
+  assert.equal(legacyRevOf(c('0.10')), legacyRevOf(c('0.15')), 'the old key could not tell them apart');
+});
+
+test('steps that are not a list are none (#54)', () => {
+  for (const steps of ['{}', { a: 1 }, '"text"', 7]) assert.deepEqual(cookContent({ steps }).steps, []);
+});
+
+test("a cook says the version it was made from, with its content", () => {
+  const made = cookVersion(scones, '2030-01-01T10:00:00.000Z');
+  assert.equal(made.recipe_rev, revisionOf(scones).rev);
+  assert.deepEqual(made.recipe_version, { data: revisionOf(scones).data, at: '2030-01-01T10:00:00.000Z' });
+  assert.equal(revOf(parseRevision(made.recipe_version.data)), made.recipe_rev);
+});
+
+test('the version a cook logged for a day was made from, or none when an older one was restored since (#54)', () => {
+  const day = at => at.slice(0, 10);
+  const A = { rev: 'vA', created_at: '2030-10-01 09:00:00' };
+  const B = { rev: 'vB', created_at: '2030-10-02 09:00:00' };
+  const C = { rev: 'vC', created_at: '2030-10-05 09:00:00' };
+  const today = '2030-10-12';
+  // No restore: by the day, and today's is the current one.
+  assert.equal(versionOn([A, B, C], 'vC', '2030-10-03', today, day), 'vB');
+  assert.equal(versionOn([A, B, C], 'vC', '2030-09-01', today, day), 'vA', 'before any: the first');
+  assert.equal(versionOn([A, B, C], 'vC', today, today, day), 'vC');
+  // A restored on Oct 9 (when isn't kept): before C was saved it was B; from then it could be C or A.
+  assert.equal(versionOn([A, B, C], 'vA', '2030-10-03', today, day), 'vB');
+  assert.equal(versionOn([A, B, C], 'vA', '2030-10-05', today, day), null);
+  assert.equal(versionOn([A, B, C], 'vA', '2030-10-10', today, day), null);
+  assert.equal(versionOn([A, B, C], 'vA', today, today, day), 'vA', "today's is the current one");
+  assert.equal(versionOn([], 'vA', '2030-10-03', today, day), 'vA');
 });
