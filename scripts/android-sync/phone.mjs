@@ -876,6 +876,22 @@ const scenarios = {
     const end = await web('GET', `/api/recipes/${sid}/revisions`);
     out.end = { refused, numbers: end.revisions.map(v => v.number), current: end.revisions.find(v => v.current)?.number };
   },
+  // A row made on a phone whose clock is off, once it knows the server's:
+  // its edit time goes on the server's clock once, not twice.
+  async newRowClock() {
+    await api.createRecipe({ name: 'Warm-up', steps: [{ title: '', text: 'x' }], ingredients: [] });
+    await sync();
+    const r = await api.createRecipe({ name: 'Fresh', steps: [{ title: '', text: 'x' }], ingredients: [] });
+    const here = (await db.query(`SELECT updated_at, edit_clock FROM recipes WHERE id = ?`, [r.id])).values[0];
+    await sync();
+    const sid = (await db.query(`SELECT server_id FROM recipes WHERE id = ?`, [r.id])).values[0].server_id;
+    const s = await web('GET', `/api/recipes/${sid}`);
+    const serverNow = Date.parse((await realFetch(server + '/api/auth/me')).headers.get('date'));
+    const off = t => Math.round(Math.abs(serverNow - Date.parse(String(t).replace(' ', 'T') + (/Z$/.test(t) ? '' : 'Z'))) / 60000);
+    out.phoneMinutesOff = off(here.updated_at);
+    out.serverMinutesOff = off(s.updated_at);
+    out.editClock = here.edit_clock;
+  },
   // A version's name, given on the phone and changed on the web, both ways;
   // the newer of two names stays.
   async historyLabel() {

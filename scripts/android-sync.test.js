@@ -537,6 +537,15 @@ test('"any day" plans and list notes sync both ways, and an app from before leav
   } finally { srv.stop(); }
 });
 
+for (const [clock, skew] of [['2 hours slow', -120 * MIN], ['2 hours fast', 120 * MIN]]) {
+  test(`a row made on the phone is dated on the server's clock once, not twice (clock ${clock})`, { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+    const r = await run('newRowClock', { PHONE_SKEW_MS: String(skew) });
+    assert.equal(r.editClock, 'server');
+    assert.ok(r.phoneMinutesOff <= 2, `on the phone: ${r.phoneMinutesOff} minutes off`);
+    assert.ok(r.serverMinutesOff <= 2, `on the server: ${r.serverMinutesOff} minutes off`);
+  });
+}
+
 test('recipe history: versions and cooks from the phone, a restore and an edit on the web, one row per version', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const r = await run('history');
   assert.deepEqual(r.phone, { versions: 2, cooks: [[3], [5]] });

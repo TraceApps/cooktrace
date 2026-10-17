@@ -554,7 +554,9 @@ async function _migrateServerCopy() {
       }
       // An edit made here (the row goes pending with a new time, or is
       // deleted) is stamped with the server's clock, by the offset the
-      // server last measured, when there is one.
+      // server last measured, when there is one. Once: the insert trigger's
+      // own stamping (it sets edit_clock) isn't an edit to stamp again, and
+      // a time already on the server's clock stays.
       const soft = (SYNC_FIELDS[table] || []).includes('deleted_at');
       const at = soft ? `CASE WHEN NEW.deleted_at IS NOT OLD.deleted_at AND NEW.deleted_at IS NOT NULL THEN NEW.deleted_at ELSE NEW.updated_at END` : 'NEW.updated_at';
       const shift = `printf('%+.3f seconds', CAST((SELECT value FROM sync_meta WHERE key = 'clock_offset_ms') AS REAL) / 1000.0)`;
@@ -562,14 +564,14 @@ async function _migrateServerCopy() {
       await db.execute(`
         DROP TRIGGER IF EXISTS trg_${table}_edit_clock_upd;
         CREATE TRIGGER trg_${table}_edit_clock_upd AFTER UPDATE ON ${table}
-        FOR EACH ROW WHEN NEW.sync_status = 'pending' AND ${has}
+        FOR EACH ROW WHEN NEW.sync_status = 'pending' AND ${has} AND NEW.edit_clock IS OLD.edit_clock
           AND (NEW.updated_at IS NOT OLD.updated_at${soft ? ' OR NEW.deleted_at IS NOT OLD.deleted_at' : ''})
         BEGIN
           UPDATE ${table} SET updated_at = strftime('%Y-%m-%d %H:%M:%S', ${at}, ${shift}), edit_clock = 'server' WHERE id = NEW.id;
         END;
         DROP TRIGGER IF EXISTS trg_${table}_edit_clock_ins;
         CREATE TRIGGER trg_${table}_edit_clock_ins AFTER INSERT ON ${table}
-        FOR EACH ROW WHEN NEW.sync_status = 'pending' AND ${has}
+        FOR EACH ROW WHEN NEW.sync_status = 'pending' AND ${has} AND NEW.edit_clock IS NOT 'server'
         BEGIN
           UPDATE ${table} SET updated_at = strftime('%Y-%m-%d %H:%M:%S', COALESCE(NEW.updated_at, datetime('now')), ${shift}), edit_clock = 'server' WHERE id = NEW.id;
         END;
