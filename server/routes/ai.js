@@ -4,6 +4,7 @@ import { wrap } from '../logger.js';
 import { getAiConfig } from '../ai.js';
 import { makeRateLimiter } from '../middleware/rate-limit.js';
 import { getOpenAIChatParams, openAIBase } from '../lib/openai-chat-params.js';
+import { REPLY_MAX_TOKENS, sendWithLengthFallback, stoppedShort, stoppedShortError } from '../lib/trace-reply.js';
 import db from '../db.js';
 
 const router = Router();
@@ -128,12 +129,19 @@ router.post('/chat', requireAuth, aiChatLimit, wrap(async (req, res) => {
   }
 
   let text;
-  switch (provider) {
-    case 'claude':     text = await _callClaude(apiKey, model, messages, systemPrompt); break;
-    case 'openai':     text = await _callOpenAI(apiKey, model, messages, systemPrompt, 'https://api.openai.com'); break;
-    case 'gemini':     text = await _callGemini(apiKey, model, messages, systemPrompt); break;
-    case 'oai-compat': text = await _callOpenAI(apiKey || 'no-key', model, messages, systemPrompt, baseUrl.replace(/\/+$/, '')); break;
-    default: return res.status(400).json({ error: `Unknown provider: ${provider}` });
+  try {
+    switch (provider) {
+      case 'claude':     text = await _callClaude(apiKey, model, messages, systemPrompt); break;
+      case 'openai':     text = await _callOpenAI(apiKey, model, messages, systemPrompt, 'https://api.openai.com'); break;
+      case 'gemini':     text = await _callGemini(apiKey, model, messages, systemPrompt); break;
+      case 'oai-compat': text = await _callOpenAI(apiKey || 'no-key', model, messages, systemPrompt, baseUrl.replace(/\/+$/, '')); break;
+      default: return res.status(400).json({ error: `Unknown provider: ${provider}` });
+    }
+  } catch (e) {
+    // A reply that stopped short: said, with a code the app says in its
+    // language (422, not 5xx: a proxy may put its own page in place of those).
+    if (/^trace_stopped_/.test(e?.code || '')) return res.status(422).json({ error: e.message, code: e.code });
+    throw e;
   }
   res.json({ text });
 }));
@@ -143,41 +151,51 @@ export default router;
 // ── Provider implementations (server-side) ────────────────────────────────────
 
 async function _callClaude(apiKey, model, messages, systemPrompt) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages,
-    }),
+  // The app's limit (it was 1,024 here, which cut a long rewrite off); a
+  // model that can't write that many is asked again as before (lib/trace-reply.js).
+  const body = { model, max_tokens: REPLY_MAX_TOKENS, system: systemPrompt, messages };
+  const { ok, status, data } = await sendWithLengthFallback(body, async (b) => {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify(b),
+    });
+    return { ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) };
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error?.message || `Claude API error ${res.status}`);
+  if (!ok) throw new Error(data.error?.message || `Claude API error ${status}`);
+  const short = stoppedShort('claude', data);
+  if (short) throw stoppedShortError(short);
   return data.content[0].text;
 }
 
+// The app's limit (it was 1,024 here, which cut a long rewrite off); a
+// server or model that won't take that many is asked again as before
+// (lib/trace-reply.js).
 async function _callOpenAI(apiKey, model, messages, systemPrompt, baseUrl = 'https://api.openai.com') {
-  const res = await fetch(`${baseUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      ...getOpenAIChatParams({ baseUrl, model, hasTools: false, maxTokens: 1024 }),
-    }),
+  const body = {
+    model,
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    ...getOpenAIChatParams({ baseUrl, model, hasTools: false, maxTokens: REPLY_MAX_TOKENS }),
+  };
+  const { ok, status, data } = await sendWithLengthFallback(body, async (b) => {
+    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(b),
+    });
+    return { ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) };
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error?.message || `OpenAI API error ${res.status}`);
+  if (!ok) throw new Error(data.error?.message || data.message || `OpenAI API error ${status}`);
+  const short = stoppedShort('openai', data);
+  if (short) throw stoppedShortError(short);
   return data.choices[0].message.content;
 }
 
@@ -198,5 +216,7 @@ async function _callGemini(apiKey, model, messages, systemPrompt) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error?.message || `Gemini API error ${res.status}`);
+  const short = stoppedShort('gemini', data);
+  if (short) throw stoppedShortError(short);
   return data.candidates[0].content.parts[0].text;
 }

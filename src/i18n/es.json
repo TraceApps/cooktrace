@@ -1620,6 +1620,10 @@
   "sidebar_ct": {
     "brand": "CookTrace"
   },
+  "trace_reply": {
+    "stopped_length": "La respuesta se cortó antes del final, así que no se usó. Inténtalo de nuevo o pide menos a la vez.",
+    "stopped_thinking": "El modelo dio su razonamiento pero ninguna respuesta. Inténtalo de nuevo o baja su razonamiento."
+  },
   "trace_ai_ct": {
     "toast": {
       "voice_unsupported": "Este navegador no admite la entrada de voz.",
