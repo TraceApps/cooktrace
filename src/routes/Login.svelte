@@ -12,6 +12,7 @@
   import { apiUrl, isNative, getServerUrl, setAuthToken, resolveAssetUrl, iconUrl } from '../lib/platform.js';
 
   import { get } from 'svelte/store';
+  import { responseJson, discoverSignIn, openSso } from '../lib/server-signin.js';
 
   let username = '';
   let password = '';
@@ -61,6 +62,7 @@
   let oidcProviders = [];
   let passwordLoginEnabled = true;
   let authStatus = null;
+  let optionsError = '';  // the sign-in options couldn't be read: said, with Retry (TraceApps/notetrace#36)
   onMount(async () => {
     if (isNative && !getServerUrl()) return; // standalone — skip
     // Probe biometric concurrently with the auth-status fetch.
@@ -71,34 +73,47 @@
         _biometricReady = available && !!saved;
       } catch {}
     }
-    try {
-      const r = await fetch(apiUrl('/api/auth/status'), { credentials: 'include' });
-      if (r.ok) {
-        const data = await r.json();
-        authStatus = data;
-        // Plain HTTP with an HTTPS-only cookie: say so before anyone signs
-        // in (lib/cookie-check.js).
-        if (cookieBlockedByHttp(data, { native: isNative })) signInProblem.set('http');
-        if (data?.oidc) {
-          oidcProviders = Array.isArray(data.oidc.providers) ? data.oidc.providers : [];
-          passwordLoginEnabled = data.oidc.enable_email_password_login !== false;
-        }
-      }
-    } catch {}
+    await loadSignInOptions();
   });
 
+  async function loadSignInOptions() {
+    try {
+      // The app asks natively (no CORS, so a sign-in proxy's page is said as
+      // such, not "Failed to fetch"); the web page asks its own origin.
+      let data;
+      if (isNative) data = (await discoverSignIn(getServerUrl())).status;
+      else {
+        const r = await fetch(apiUrl('/api/auth/status'), { credentials: 'include' });
+        data = await responseJson(r);
+        if (!r.ok) throw Object.assign(new Error(`status ${r.status}`), { status: r.status });
+      }
+      authStatus = data;
+      // Plain HTTP with an HTTPS-only cookie: say so before anyone signs
+      // in (lib/cookie-check.js).
+      if (cookieBlockedByHttp(data, { native: isNative })) signInProblem.set('http');
+      if (data?.oidc) {
+        oidcProviders = Array.isArray(data.oidc.providers) ? data.oidc.providers : [];
+        passwordLoginEnabled = data.oidc.enable_email_password_login !== false;
+      }
+      optionsError = '';
+    } catch (e) {
+      console.warn('[login] sign-in options:', e?.status || e?.message);
+      optionsError = e?.webPage ? e.message : $_('server_signin.options_failed');
+    }
+  }
+
+  let _ssoOpening = false;
   async function startOidc(providerId) {
     const ret = encodeURIComponent(window.location.hash || '#/');
     if (isNative) {
       // Capacitor: open in @capacitor/browser. The mobile=1 flag tells
       // the server to redirect via the cooktrace://oidc-callback deep
       // link instead of setting an HttpOnly cookie + SPA hash redirect.
-      const { Browser } = await import('@capacitor/browser');
-      const { appChallengeParam } = await import('../lib/oidc-app-handoff.js');
-      await Browser.open({
-        url: apiUrl(`/api/auth/oidc/login/${providerId}?mobile=1&return=${ret}${await appChallengeParam()}`),
-        presentationStyle: 'popover',
-      });
+      // One browser at a time: a second tap would replace the first one's
+      // secret (lib/oidc-app-handoff.js).
+      if (_ssoOpening) return;
+      _ssoOpening = true;
+      try { await openSso(getServerUrl(), providerId); } finally { _ssoOpening = false; }
       return;
     }
     window.location.href = apiUrl(`/api/auth/oidc/login/${providerId}?return=${ret}`);
@@ -114,7 +129,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password }),
       });
-      const data = await res.json();
+      const data = await responseJson(res);
       if (!res.ok) { showError(failed('login.errors.failed', data.error)); return; }
       // Store auth token for native server mode
       if (isNative && data.token) setAuthToken(data.token);
@@ -153,7 +168,8 @@
       await loadServerSettings();
       push('/');
     } catch(e) {
-      showError($_('common.errors.cant_reach_server'));
+      // A sign-in proxy's web page in place of the server: said as such.
+      showError(e?.webPage ? e.message : $_('common.errors.cant_reach_server'));
     } finally {
       loading = false;
     }
@@ -168,14 +184,14 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: recoveryToken.trim() }),
       });
-      const data = await res.json();
+      const data = await responseJson(res);
       if (!res.ok) { showError(failed('login.recovery.failed', data.error)); return; }
       localStorage.removeItem('wl:userId');
       await loadAuthState();
       recoveryDone = true;
       showSuccess($_('login.recovery.success'));
     } catch(e) {
-      showError($_('common.errors.cant_reach_server'));
+      showError(e?.webPage ? e.message : $_('common.errors.cant_reach_server'));
     } finally {
       recovering = false;
     }
@@ -197,6 +213,12 @@
     {/if}
 
     {#if !recoveryDone}
+      {#if optionsError}
+        <div class="options-error" role="alert">
+          <span>{optionsError}</span>
+          <button class="btn btn-secondary options-retry" type="button" on:click={loadSignInOptions}>{$_('server_signin.retry')}</button>
+        </div>
+      {/if}
       {#if oidcProviders.length}
         <div class="sso-row">
           {#each oidcProviders as p (p.id)}
@@ -336,6 +358,12 @@
     line-height: 1.5;
   }
   .sso-row { display: flex; flex-direction: column; gap: 8px; }
+  .options-error {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+    padding: 10px 12px; border-radius: 8px; font-size: 13px; color: var(--text-2);
+    background: color-mix(in srgb, var(--danger) 8%, transparent);
+  }
+  .options-retry { height: 32px; padding: 0 14px; font-size: 13px; }
   .sso-btn { display: flex; align-items: center; gap: 10px; justify-content: center; width: 100%; }
   .sso-logo { width: 18px; height: 18px; object-fit: contain; }
   .sso-icon { font-size: 18px; }

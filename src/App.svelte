@@ -447,10 +447,24 @@
               let idTokenHint = params.get('id_token_hint');
               let providerId  = params.get('provider_id');
               const code = params.get('code');
-              if (code && !errMsg) {
+              // Signed in from Settings > Server Connection, with the phone
+              // still in local mode: the token goes back to that screen, which
+              // moves the phone's data over as a password sign-in does
+              // (TraceApps/notetrace#36). That sign-in takes only the
+              // single-use code it asked for, never a bare token another app
+              // could hand over (lib/server-signin.js).
+              const { pendingSsoConnect, forgetSsoConnect, ssoConnectResult, ssoCallbackAction } = await import('./lib/server-signin.js');
+              const { redeemHandoff, challengeSent } = await import('./lib/oidc-app-handoff.js');
+              const connecting = pendingSsoConnect(getNativeMode());
+              const action = ssoCallbackAction({ code, token, error: errMsg, connecting, challengeSent: challengeSent() });
+              if (connecting && action.do !== 'none') forgetSsoConnect();
+              if (action.do === 'refuse') {
+                import('./stores/toast.js').then(({ showError }) => showError($_('server_signin.token_refused')));
+                return;
+              }
+              if (action.do === 'redeem') {
                 try {
-                  const { redeemHandoff } = await import('./lib/oidc-app-handoff.js');
-                  const data = await redeemHandoff(code);
+                  const data = await redeemHandoff(code, action.server);
                   token = data.token;
                   idTokenHint = data.id_token_hint || null;
                   providerId = data.provider_id != null ? String(data.provider_id) : null;
@@ -459,7 +473,10 @@
                   return;
                 }
               }
-              if (errMsg) {
+              if (connecting && token && !errMsg) {
+                ssoConnectResult.set({ url: connecting.url, token, idTokenHint, providerId });
+                window.location.hash = '#/settings/serverconn';
+              } else if (errMsg) {
                 import('./stores/toast.js').then(({ showError }) => showError(failed('fail.sign_in', decodeURIComponent(errMsg))));
               } else if (linked) {
                 import('./stores/toast.js').then(({ showSuccess }) => showSuccess($_('done.linked')));

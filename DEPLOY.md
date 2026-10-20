@@ -109,6 +109,15 @@ when the container listened on 3001? See [Updating](#updating).
 If hosting at a subpath (e.g. `https://example.com/cooktrace/`), set
 `BASE_URL=/cooktrace` in the environment.
 
+**A sign-in proxy in front (an Authentik or Authelia outpost, VoidAuth, Cloudflare
+Access):** the Android app can't get past its login page, and says so
+("something other than CookTrace answered with a web page"). Let `/api/*`
+through to CookTrace without the proxy's sign-in (CookTrace checks every
+request itself), and keep the proxy for the web pages if you like. Single
+Sign-On still works in the app through CookTrace's own OIDC (`OIDC_*` above),
+which can use the same provider. The same message also shows when the address
+in the app isn't the server's (a wrong subpath, for one).
+
 ## Updating
 
 ```bash

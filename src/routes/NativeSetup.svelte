@@ -1,6 +1,7 @@
 <script>
   import { _ } from 'svelte-i18n';
-  import { setNativeMode, setServerUrl, setAuthToken, resolveAssetUrl, iconUrl, explainConnectError, healthNeedsSetup } from '../lib/platform.js';
+  import { setNativeMode, setServerUrl, setAuthToken, resolveAssetUrl, iconUrl } from '../lib/platform.js';
+  import { checkServer, discoverSignIn, passwordSignIn, openSso, explainSignInError } from '../lib/server-signin.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { DB } from '../lib/db.js';
 
@@ -21,6 +22,7 @@
   let validatedUrl = '';        // set after successful step-1 validation
   let providers = [];            // OIDC providers array from /api/auth/status
   let passwordLoginEnabled = true;
+  let optionsError = '';         // why the sign-in options couldn't be read (shown with Retry)
   let username = '';
   let password = '';
   let showPw = false;
@@ -42,43 +44,44 @@
     step = 'server-url';
   }
 
-  // Step 1 → step 2: validate server reachability + discover which auth
-  // methods the server supports. Uses CapacitorHttp to bypass WebView CORS.
+  // Step 1 → step 2: check it's the server (a sign-in proxy's web page in
+  // the way is said plainly, TraceApps/notetrace#36), then ask which sign-in
+  // options it has. Uses CapacitorHttp to bypass WebView CORS.
   async function validateAndNext() {
     if (!serverUrl.trim()) { showError($_('native_setup_ct.toast.enter_url')); return; }
     const url = serverUrl.trim().replace(/\/$/, '');
     connecting = true;
     try {
-      const { CapacitorHttp } = await import('@capacitor/core');
-      const healthRes = await CapacitorHttp.get({ url: `${url}/api/health` });
-      if (healthNeedsSetup(healthRes)) { showError($_('connect.needs_setup')); return; }
-      if (healthRes.status < 200 || healthRes.status >= 300) {
-        throw new Error('Server not reachable');
-      }
-      // Discover auth methods. /api/auth/status returns { oidc: { providers, enable_email_password_login } }.
-      // If the endpoint fails or returns nothing OIDC-shaped, fall back to
-      // password-only rendering (safe default; matches pre-fix behaviour).
-      let discoveredProviders = [];
-      let discoveredPasswordEnabled = true;
-      try {
-        const statusRes = await CapacitorHttp.get({ url: `${url}/api/auth/status` });
-        if (statusRes.status >= 200 && statusRes.status < 300) {
-          const data = typeof statusRes.data === 'string' ? JSON.parse(statusRes.data) : statusRes.data;
-          if (data?.oidc) {
-            discoveredProviders = Array.isArray(data.oidc.providers) ? data.oidc.providers : [];
-            discoveredPasswordEnabled = data.oidc.enable_email_password_login !== false;
-          }
-        }
-      } catch { /* leave defaults — safe fallback */ }
+      await checkServer(url);
       validatedUrl = url;
-      providers = discoveredProviders;
-      passwordLoginEnabled = discoveredPasswordEnabled;
+      await loadOptions();
       step = 'server-auth';
     } catch (e) {
-      showError(explainConnectError(e, url));
+      validatedUrl = '';
+      showError(explainSignInError(e, url));
     } finally {
       connecting = false;
     }
+  }
+
+  // Which ways the server offers to sign in (/api/auth/status). When they
+  // can't be read, the sign-in step says so with Retry, and keeps the
+  // password form: the server may well take one.
+  async function loadOptions() {
+    try {
+      ({ providers, passwordLoginEnabled } = await discoverSignIn(validatedUrl));
+      optionsError = '';
+    } catch (e) {
+      providers = [];
+      passwordLoginEnabled = true;
+      console.warn('[setup] sign-in options:', e?.status || e?.message);
+      optionsError = e?.webPage ? e.message : $_('server_signin.options_failed');
+    }
+  }
+
+  async function retryOptions() {
+    connecting = true;
+    try { await loadOptions(); } finally { connecting = false; }
   }
 
   // Step 2 (password branch): traditional username+password sign-in. Unchanged
@@ -88,14 +91,7 @@
     if (!username.trim() || !password.trim()) { showError($_('native_setup_ct.toast.enter_credentials')); return; }
     connecting = true;
     try {
-      const { CapacitorHttp } = await import('@capacitor/core');
-      const loginRes = await CapacitorHttp.post({
-        url: `${validatedUrl}/api/auth/login`,
-        headers: { 'Content-Type': 'application/json' },
-        data: { username: username.trim(), password },
-      });
-      const loginData = typeof loginRes.data === 'string' ? JSON.parse(loginRes.data) : loginRes.data;
-      if (loginRes.status < 200 || loginRes.status >= 300) throw new Error(loginData.error || $_('native_setup_ui.login_failed'));
+      const loginData = await passwordSignIn(validatedUrl, username.trim(), password);
 
       setServerUrl(validatedUrl);
       setAuthToken(loginData.token);
@@ -104,7 +100,7 @@
       showSuccess($_('native_setup_ct.toast.connected_to_server'));
       window.location.reload();
     } catch (e) {
-      showError(explainConnectError(e, validatedUrl));
+      showError(explainSignInError(e, validatedUrl));
     } finally {
       connecting = false;
     }
@@ -119,22 +115,22 @@
   // token" state and next launch lands on Login.svelte which correctly
   // renders the OIDC button now that getServerUrl() is populated.
   async function loginWithOidc(providerId) {
+    // One browser at a time: a second tap would replace the first one's
+    // secret (lib/oidc-app-handoff.js) and that sign-in would fail.
+    if (connecting) return;
+    connecting = true;
     setServerUrl(validatedUrl);
     setNativeMode('server');
     DB.setSetting('setupComplete', true);
     try {
-      const ret = encodeURIComponent('#/');
-      const { Browser } = await import('@capacitor/browser');
-      const { appChallengeParam } = await import('../lib/oidc-app-handoff.js');
-      await Browser.open({
-        url: `${validatedUrl}/api/auth/oidc/login/${providerId}?mobile=1&return=${ret}${await appChallengeParam()}`,
-        presentationStyle: 'popover',
-      });
+      await openSso(validatedUrl, providerId);
       // Deep-link callback (cooktrace://oidc-callback?token=…) handled by
       // App.svelte's appUrlOpen listener — it sets the token, calls
       // loadAuthState, redirects to '#/', and the main app renders.
     } catch (e) {
       showError($_('native_setup_ct.toast.cant_open_signin'));
+    } finally {
+      connecting = false;
     }
   }
 
@@ -144,6 +140,7 @@
     validatedUrl = '';
     providers = [];
     passwordLoginEnabled = true;
+    optionsError = '';
     username = '';
     password = '';
   }
@@ -153,6 +150,7 @@
     validatedUrl = '';
     providers = [];
     passwordLoginEnabled = true;
+    optionsError = '';
     username = '';
     password = '';
   }
@@ -214,6 +212,14 @@
           <span class="server-url">{validatedUrl}</span>
         </p>
 
+        {#if optionsError}
+          <div class="options-failed" role="alert">
+            <span class="material-symbols-rounded">error</span>
+            <div class="options-failed-text">{optionsError}</div>
+            <button class="btn btn-secondary options-retry" on:click={retryOptions} disabled={connecting}>{$_('server_signin.retry')}</button>
+          </div>
+        {/if}
+
         <!-- OIDC providers first — for OIDC-only servers this is the only
              option; for mixed servers it's the recommended flow anyway. -->
         {#if providers.length}
@@ -273,7 +279,7 @@
         <!-- Edge case: server has neither password nor OIDC configured.
              Should be rare (server is misconfigured) but rendering a helpful
              message beats a blank form. -->
-        {#if !providers.length && !passwordLoginEnabled}
+        {#if !providers.length && !passwordLoginEnabled && !optionsError}
           <div class="no-auth-warning">
             <span class="material-symbols-rounded">warning</span>
             <div>{$_('native_setup_ui.no_auth_methods')}</div>
@@ -451,6 +457,16 @@
     height: 1px;
     background: var(--border);
   }
+  .options-failed {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 10px 12px;
+    border-radius: var(--radius-md, 10px);
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+    color: var(--text-1);
+    font-size: 13px; line-height: 1.4;
+  }
+  .options-failed .material-symbols-rounded { color: var(--danger); font-size: 20px; }
+  .options-failed-text { flex: 1; min-width: 160px; }
   .no-auth-warning {
     display: flex;
     gap: 10px;

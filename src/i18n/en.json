@@ -2395,6 +2395,13 @@
     "https_only": "This app only connects over HTTPS. Put the server behind a reverse proxy (Caddy, Tailscale or Cloudflare Tunnel), or use a debug build. DEPLOY.md, Connecting from Android, has the steps.",
     "needs_setup": "This server isn't set up yet. Open it in a browser to create the first account, then connect here."
   },
+  "server_signin": {
+    "web_page": "Something other than CookTrace answered with a web page: often a sign-in proxy (Authentik, Authelia, Cloudflare Access), or this isn't your server's address. Let the app reach /api on your server.",
+    "options_failed": "Couldn't load this server's sign-in options. Retry, or sign in with your password if the server allows it.",
+    "token_refused": "This sign-in couldn't be checked, so it was stopped. Update your CookTrace server, or connect with your password.",
+    "retry": "Retry",
+    "checking": "Checking sign-in options…"
+  },
   "when": {
     "just_now": "Just Now",
     "in_moments": "In Moments",
