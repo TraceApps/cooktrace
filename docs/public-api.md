@@ -71,7 +71,7 @@ A bad request (an invalid date, a recipe id with no match) returns
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/api/v1/cook-diary?date_from=&date_to=&kind=&limit=` | Cook diary entries (logged and planned cooks), newest first. Optionally bound by a date range or `kind` (`cooked`/`planned`). |
+| GET | `/api/v1/cook-diary?date_from=&date_to=&kind=&limit=&offset=` | Cook diary entries (logged and planned cooks), newest first. Optionally bound by a date range or `kind` (`cooked`/`planned`). The reply's `count` is the entries on this page, `total` every match, `next_offset` where the next page starts (null on the last), `complete`, and `more` says it in words. |
 | GET | `/api/v1/shopping?include_checked=` | The current shopping list, unchecked items only by default. |
 
 ### Write (require `mcp:write` and `PUBLIC_API_WRITE_ENABLED=1`)

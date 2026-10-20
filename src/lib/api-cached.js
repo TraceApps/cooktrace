@@ -88,7 +88,8 @@ wrapped.getRecipe = async function (id) {
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
   const res = await fetch(apiUrl(`/api/recipes/${id}`), { headers, credentials: 'include' });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  // The status rides along, so a recipe that's gone reads as not found (Trace's read_recipes).
+  if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
   const row = await res.json();
   if (!row) return null;
   // Same shape _imgFromApi produces so RecipeView renders correctly.

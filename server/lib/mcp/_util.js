@@ -76,3 +76,24 @@ export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export function validateDate(s) {
   return typeof s === 'string' && DATE_RE.test(s) ? s : null;
 }
+
+/** A page's start: 0 when missing or nonsense. */
+export function pageOffset(offset) {
+  return Math.max(0, Math.floor(Number(offset) || 0));
+}
+
+/**
+ * Where a page sits in the whole list, so an agent (or a REST client) can go
+ * through all of it (TraceApps/notetrace#34): total (every match),
+ * next_offset (null on the last page), complete, and the same said in words.
+ */
+export function pageFields(total, offset, returned) {
+  const next = offset + returned < total ? offset + returned : null;
+  return {
+    total,
+    offset,
+    next_offset: next,
+    complete: next == null,
+    ...(next != null ? { more: `This is ${offset + 1} to ${offset + returned} of ${total}: ask again with offset ${next} for the rest.` } : {}),
+  };
+}

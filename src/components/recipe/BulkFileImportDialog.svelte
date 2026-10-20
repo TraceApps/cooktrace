@@ -27,7 +27,7 @@
   } from '../../stores/settings.js';
   import { showSuccess, showError } from '../../stores/toast.js';
   import { portal } from '../../lib/portal.js';
-  import { callAI, TOOLS, AI_DEFAULT_MODELS } from '../../lib/aiChat.js';
+  import { callAI, TOOLS, AI_DEFAULT_MODELS, OUT_OF_ROUNDS_CODE } from '../../lib/aiChat.js';
   import { mutatingAuthHeaders } from '../../lib/api.js';
 
   export let open = false;
@@ -243,8 +243,11 @@ ${textPayload.text}
       });
     } catch (e) {
       aiBusyId = null;
-      _aiError(item.id, toolsUnsupported ? $_('trace_ai_ct.tools_unsupported_import') : (e.message || $_('bulk_file_import_dialog_ui.reparse_failed')));
-      return;
+      // Saved, then out of rounds (the model kept going): the recipe is there.
+      if (!(aiSaved && e?.code === OUT_OF_ROUNDS_CODE)) {
+        _aiError(item.id, toolsUnsupported ? $_('trace_ai_ct.tools_unsupported_import') : (e.message || $_('bulk_file_import_dialog_ui.reparse_failed')));
+        return;
+      }
     }
 
     aiBusyId = null;

@@ -47,6 +47,7 @@
   import { callAI, callAIProxy, TOOLS, setToolHandler, AI_DEFAULT_MODELS } from '../../lib/aiChat.js';
 
   import { foldText } from '../../lib/search-text.js';
+  import { listRecipes, readRecipes, summariseRecipe as _summariseRecipe, fullRecipe as _fullRecipe } from '../../lib/trace-recipes.js';
   import { isoDay, weekStartOf, fromIso } from '../../lib/week.js';
   import { historyForTrace } from '../../lib/version-text.js';
 
@@ -314,20 +315,13 @@
         // ── Read tools ───────────────────────────────────────────────
         case 'get_recipes': {
           try {
-            const all = await NtApi.getRecipes();
-            const q   = foldText(args?.query).trim();
-            const cat = foldText(args?.category).trim();
-            const favOnly = !!args?.favorite;
-            let filtered = all;
-            if (q) filtered = filtered.filter(r =>
-              foldText(r.name).includes(q) ||
-              foldText(r.description).includes(q) ||
-              (r.tags || []).some(t => foldText(t).includes(q)));
-            if (cat) filtered = filtered.filter(r =>
-              foldText(r.category?.name) === cat ||
-              foldText(r.category?.slug) === cat);
-            if (favOnly) filtered = filtered.filter(r => !!r.favorite);
-            return filtered.slice(0, 100).map(_summariseRecipe);
+            // A page at a time, found by name, description, tag or ingredient (lib/trace-recipes.js).
+            return listRecipes(await NtApi.getRecipes(), args || {});
+          } catch (e) { return { error: e.message || 'Failed' }; }
+        }
+        case 'read_recipes': {
+          try {
+            return await readRecipes(args?.ids, (id) => NtApi.getRecipe(id));
           } catch (e) { return { error: e.message || 'Failed' }; }
         }
         case 'list_recipe_categories': {
@@ -652,39 +646,6 @@
     });
   });
 
-  function _summariseRecipe(r) {
-    return {
-      id: r.id,
-      name: r.name,
-      description: r.description || null,
-      servings: r.servings,
-      prep_minutes: r.prep_minutes,
-      cook_minutes: r.cook_minutes,
-      rest_minutes: r.rest_minutes,
-      total_minutes: r.total_minutes != null ? r.total_minutes : (r.prep_minutes || 0) + (r.cook_minutes || 0) + (r.rest_minutes || 0),
-      rating: r.rating,
-      favorite: !!r.favorite,
-      last_cooked_at: r.last_cooked_at,
-      cook_count: r.cook_count,
-      category: r.category?.name || null,
-      tags: r.tags || [],
-      pantry_match: r.pantry_match || null,
-    };
-  }
-
-  function _fullRecipe(r) {
-    return {
-      ..._summariseRecipe(r),
-      yield_text: r.yield_text,
-      ingredients: r.ingredients || [],
-      steps: r.steps || [],
-      tools: r.tools || [],
-      source_url: r.source_url,
-      notes: r.notes,
-      nutrition: r.nutrition || null,
-    };
-  }
-
   // Who the user cooks for (Settings > Household), worked out here so the
   // model doesn't have to: allergies, diets, dislikes and days home.
   function _householdLine() {
@@ -732,6 +693,9 @@ You have tool access to the user's recipe library, pantry, cook diary, shopping 
 - "Plan tacos for Friday" → call get_recipes to find the recipe, then plan_cook with that date
 - "What are my favorites?" / "Pick a favorite for tonight" → call get_recipes and filter where favorite is true
 - "What did I change since my best batch of scones?" / "Which version did I like most?" → call get_recipes to find it, then get_recipe_history
+- "Which of my recipes use cilantro?" → call get_recipes with query "cilantro" (it finds ingredients too, in matched_ingredients)
+
+To go through the whole library (every recipe with an ingredient, every dessert, a check of each recipe), page through get_recipes with offset until complete is true, read the recipes you need in full with read_recipes in batches, and say whether you covered everything.
 
 When you write to the user's data, summarise what you did briefly and concretely (e.g. "Logged 'Spaghetti Bolognese' as cooked today, count is now 7"). Keep replies short and actionable. Use the user's preferred units. If a tool returns { error: ... }, tell the user what went wrong and how to fix it.`;
   }

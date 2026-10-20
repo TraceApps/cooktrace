@@ -1570,7 +1570,9 @@
   },
   "trace_reply": {
     "stopped_length": "The reply was cut off before the end, so it wasn't used. Try again, or ask for less at once.",
-    "stopped_thinking": "The model gave its reasoning but no answer. Try again, or turn its reasoning down."
+    "stopped_thinking": "The model gave its reasoning but no answer. Try again, or turn its reasoning down.",
+    "out_of_rounds": "That took more steps than one answer allows, and nothing came back. Ask for less at once, such as one category or a narrower search.",
+    "out_of_rounds_import": "That took more steps than one request allows. Try a smaller part at a time."
   },
   "trace_ai_ct": {
     "unreachable":               "Couldn't get an answer from {host}. Check the Base URL in Settings > AI Assistant. If it's right, that server has to allow requests from {origin} on every answer, errors included (with nginx, add_header … always), or Trace can be set up on the CookTrace server instead.",

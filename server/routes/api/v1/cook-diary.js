@@ -58,6 +58,7 @@ router.get('/', requireScope('mcp:read'), core(req =>
     date_to: req.query.date_to,
     kind: req.query.kind,
     limit: req.query.limit,
+    offset: req.query.offset,
   })
 ));
 

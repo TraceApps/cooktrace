@@ -8,7 +8,7 @@
  */
 import { z } from 'zod';
 import db from '../../../db.js';
-import { toolResult } from '../_util.js';
+import { toolResult, pageOffset, pageFields } from '../_util.js';
 import { foldText } from '../../search-text.js';
 
 const MAX_LIMIT = 100;
@@ -22,15 +22,18 @@ export function registerListPantry(server, { userId }) {
       description:
         "List the user's pantry items, optionally filtered by a text query (name or " +
         'brand) and/or in-stock state. Returns id, name, brand, in_stock, quantity, unit, ' +
-        'category, and expires_on for each item. Default limit 50, max 100.',
+        'category, and expires_on for each item, a page at a time: total is every match, ' +
+        'next_offset where the next page starts (null on the last). Default limit 50, max 100.',
       inputSchema: {
         query: z.string().optional(),
         in_stock_only: z.boolean().optional(),
         limit: z.number().int().min(1).max(MAX_LIMIT).optional(),
+        offset: z.number().int().min(0).optional(),
       },
     },
-    async ({ query, in_stock_only, limit }) => {
+    async ({ query, in_stock_only, limit, offset }) => {
       const cap = Math.min(MAX_LIMIT, Math.max(1, Number(limit) || DEFAULT_LIMIT));
+      const start = pageOffset(offset);
       const q = String(query || '').trim();
       const clauses = ['user_id = ?', 'deleted_at IS NULL'];
       const args = [userId];
@@ -41,16 +44,17 @@ export function registerListPantry(server, { userId }) {
         args.push(like, like);
       }
       if (in_stock_only) clauses.push('in_stock = 1');
-      args.push(cap);
+      const total = db.prepare(`SELECT COUNT(*) AS n FROM pantry_items WHERE ${clauses.join(' AND ')}`).get(...args).n;
+      // Ties go by id, so pages never skip or repeat an item.
       const rows = db.prepare(
         `SELECT id, name, brand, in_stock, quantity, unit, category, expires_on, notes
            FROM pantry_items
           WHERE ${clauses.join(' AND ')}
-          ORDER BY name COLLATE NOCASE ASC
-          LIMIT ?`
-      ).all(...args);
+          ORDER BY name COLLATE NOCASE ASC, id ASC
+          LIMIT ? OFFSET ?`
+      ).all(...args, cap, start);
       const items = rows.map(r => ({ ...r, in_stock: !!r.in_stock }));
-      return toolResult({ count: items.length, limit: cap, items });
+      return toolResult({ count: items.length, limit: cap, ...pageFields(total, start, items.length), items });
     }
   );
 }
