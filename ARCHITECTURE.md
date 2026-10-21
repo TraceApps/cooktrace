@@ -146,6 +146,16 @@ can't clobber a newer server value. Client `updatePantryItem` only
 writes the fields the payload contains; writing every column on
 every partial update silently wiped FKs.
 
+### Only the app's own addresses get CORS
+
+`server/lib/cors.js` (identical in all four Trace apps) decides which pages
+on another address may call the API with the person's sign-in. Allowed: the
+Android app's WebView (`https://app.cooktrace.local`, and
+`https://localhost` from versions before it) and the address in
+`PUBLIC_URL`, each compared whole: scheme, host and port. Anything else gets
+no CORS headers. The web app calls its own address, which needs none;
+the API, MCP and the watch app send no Origin.
+
 ## Android Local Mode
 
 CookTrace on Android runs **standalone (offline-only)** or

@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { rememberAdminOrigin } from './lib/public-url.js';
+import { corsOrigin } from './lib/cors.js';
 // Forward-proxy support (#177). Self-installs an undici
 // EnvHttpProxyAgent as the global fetch dispatcher when
 // HTTP_PROXY / HTTPS_PROXY / NO_PROXY (or lowercase equivalents)
@@ -104,22 +105,15 @@ router.use('/api/mcp', express.json({ limit: '18mb' }));
 router.use(express.json({ limit: '1mb' }));
 router.use(cookieParser());
 
-// CORS — allow cross-origin requests from the Android app + same-origin.
-// Capacitor WebView origins accepted:
-//   https://localhost              — legacy default (kept for older APKs)
-//   http://localhost               — legacy http scheme
-//   https://app.cooktrace.local    — current app identity (see
-//                                    capacitor.config.ts for why)
-// Same-host origins (PWA served from this instance) always allowed.
+// CORS: the Android app's WebView (https://app.cooktrace.local, see
+// capacitor.config.ts, and https://localhost from versions before it) and
+// PUBLIC_URL, each compared exactly (lib/cors.js). The web app calls its own
+// address and needs none. The answer depends on Origin, so caches are told.
 router.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    const host = req.headers.host;
-    const isCapacitor = origin === 'https://localhost'
-      || origin === 'http://localhost'
-      || origin === 'https://app.cooktrace.local';
-    const isSameHost = host && origin.includes(host);
-    if (isCapacitor || isSameHost) {
+  res.vary('Origin');
+  if (req.headers.origin) {
+    const origin = corsOrigin(req, { appOrigins: ['https://app.cooktrace.local', 'https://localhost'] });
+    if (origin) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
