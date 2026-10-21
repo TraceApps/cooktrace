@@ -40,12 +40,15 @@ services:
       # - INSECURE_COOKIES=${INSECURE_COOKIES:-}
       # Optional — mount at a subpath instead of root (for reverse-proxy setups)
       # - BASE_URL=/cooktrace
+      # Optional: the full address people open the app at, subpath included.
+      # Links in reset, invite, sharing and weekly summary emails use it.
+      # - PUBLIC_URL=${PUBLIC_URL:-}
       # Optional — log level: error | warn | info (default) | debug
       - LOG_LEVEL=${LOG_LEVEL:-info}
       # Optional — cap the upload size for bulk recipe-zip imports (Mealie,
-      # Tandoor, Paprika full-backup archives). Default 256 MB, which fits
+      # Tandoor, Paprika full-backup archives). Default 512 MB, which fits
       # typical multi-hundred-recipe libraries with embedded photos.
-      # - IMPORT_ZIP_MAX_MB=${IMPORT_ZIP_MAX_MB:-256}
+      # - IMPORT_ZIP_MAX_MB=${IMPORT_ZIP_MAX_MB:-512}
       # Optional — SMTP email (for password reset & invites). Can also be set in Settings UI.
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}

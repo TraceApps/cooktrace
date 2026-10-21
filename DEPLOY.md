@@ -83,6 +83,12 @@ Recommended:
 - `RECOVERY_TOKEN` — used by the login-page lockout-recovery flow.
 - `TOKEN_ENC_KEY` — at-rest key for OIDC client secrets. Defaults to a
   key derived from `JWT_SECRET`.
+- `PUBLIC_URL`: the full address people open the app at, subpath included
+  (e.g. `https://recipes.example.com`). Links in password reset, invite,
+  recipe sharing and weekly summary emails use it. Unset, they use an
+  address an admin has opened the app at; until an admin has opened it once,
+  only an admin's own request sends an email. Never taken from request
+  headers, so a forged Host can't point a reset link at someone else's site.
 
 Only for plain HTTP:
 

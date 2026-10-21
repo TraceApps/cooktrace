@@ -55,18 +55,19 @@ Third app in the Trace family alongside [NutriTrace](https://github.com/traceapp
 ## Features
 
 ### Cooking
-- **Recipe library.** Full recipe model, cook mode, cook log, live scaling with fraction-aware ingredient math, per-step photos, inline unit converter, FDA-style 34-nutriment Nutrition Facts box. → [full guide](https://traceapps.github.io/docs/cooktrace/recipes/)
+- **Recipe library.** Full recipe model, every version kept in History (compare, name, restore), cook mode, cook log, live scaling with fraction-aware ingredient math, per-step photos, inline unit converter, FDA-style 34-nutriment Nutrition Facts box. → [full guide](https://traceapps.github.io/docs/cooktrace/recipes/)
 - **Pantry.** Variants, expiration digests, barcode scanning (ML Kit native, QuaggaJS web), OFF + USDA quality signals, pantry-match pill on every recipe card. → [full guide](https://traceapps.github.io/docs/cooktrace/pantry/)
-- **Cook Diary + Meal Planner.** List and month-calendar views, plan-then-cook flow, drag to re-plan. → [full guide](https://traceapps.github.io/docs/cooktrace/diary/)
-- **Shopping list.** Generate from a recipe (skips stocked items), aisle grouping, cross-recipe dedup. → [full guide](https://traceapps.github.io/docs/cooktrace/shopping/)
+- **Cook Diary + Meal Planner.** List, Week, Month and Photos views, plan-then-cook flow with servings, drag to re-plan. Build My Week picks a week of dinners from what's in your pantry, and Uses Up shows what's about to expire and the recipes that would use it. → [full guide](https://traceapps.github.io/docs/cooktrace/diary/)
+- **Shopping list.** Generate from a recipe (skips stocked items) or a whole week's plan, scaled to the servings planned and added up across recipes, aisle grouping.
+- **Household and allergens.** Who you cook for, with allergies, diets and the days they're home; allergen warnings on every recipe, Safe for Everyone filtering. → [full guide](https://traceapps.github.io/docs/cooktrace/shopping/)
 
 ### Organizing
 - **Cookbooks + Kitchens.** Named collections, per-user and public-link shares, Kitchens for household-wide fanout with Auto-Share. → [Cookbooks](https://traceapps.github.io/docs/cooktrace/cookbooks/) · [Kitchens](https://traceapps.github.io/docs/cooktrace/kitchens/)
-- **Recipe import.** URL (Standard / Enhanced / Smart tiers), file, photo, and bulk Mealie / Paprika / Tandoor zip archives. → [full guide](https://traceapps.github.io/docs/cooktrace/import/)
+- **Recipe import.** URL (Standard / Enhanced / Smart tiers), file, photo, and bulk Mealie / Mealime / Paprika / Tandoor archives. → [full guide](https://traceapps.github.io/docs/cooktrace/import/)
 - **Manage catalog.** Categories (with color dots), tags, kitchen gear, pantry categories, units, cookbooks; drag-to-reorder with per-row recipe counts.
 
 ### AI + Federation
-- **Trace AI.** Reads your recipes, pantry, diary, and cookbooks; can log a cook, plan a meal, add to shopping, or import a recipe from a URL, all conversationally. 19 tools total. Multi-provider (Claude / OpenAI / Gemini / any OpenAI-compatible endpoint). Smart Log voice, image attach, cook-mode voice control. → [full guide](https://traceapps.github.io/docs/cooktrace/trace/)
+- **Trace AI.** Reads your recipes, pantry, diary, and cookbooks; can log a cook, plan a meal, add to shopping, or import a recipe from a URL, all conversationally. 21 tools total. Multi-provider (Claude / OpenAI / Gemini / any OpenAI-compatible endpoint). Smart Log voice, image attach, cook-mode voice control. → [full guide](https://traceapps.github.io/docs/cooktrace/trace/)
 - **NutriTrace federation.** Pull food data from NutriTrace into your pantry, per user, with a Bearer token. → [full guide](https://traceapps.github.io/docs/cooktrace/nt-federation/)
 - **Model Context Protocol (MCP).** Expose your recipes, pantry, shopping list, and cook diary to external AI agents (Claude Desktop, Cursor, Codex) via the standard MCP Streamable HTTP transport. Off by default; opt in with `MCP_ENABLED=1`. Read, write, and destructive tool tiers, each independently gated by its own env flag and token scope. → [full guide](https://traceapps.github.io/docs/cooktrace/mcp/)
 
