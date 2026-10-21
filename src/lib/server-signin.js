@@ -16,6 +16,10 @@ import { _ } from 'svelte-i18n';
 import { healthNeedsSetup, explainConnectError } from './platform.js';
 
 const WEB_PAGE = "Something other than CookTrace answered with a web page: often a sign-in proxy (Authentik, Authelia, Cloudflare Access), or this isn't your server's address. Let the app reach /api on your server.";
+const UNREACHABLE = "Can't reach your server right now. Check that it's running, then Retry.";
+const PROXY_SIGN_IN = "Something in front of your server is asking you to sign in. Sign in there, then reload this page.";
+const SERVER_ERROR = "Your server answered with an error. Try again in a moment.";
+const OPTIONS_FAILED = "Couldn't load this server's sign-in options. Retry, or sign in with your password if the server allows it.";
 
 /** A translated string, or the English one when i18n isn't loaded. */
 function _say(key, english) {
@@ -30,6 +34,27 @@ function _say(key, english) {
 /** The error for a web page where the server's JSON should be. */
 export function webPageError() {
   return Object.assign(new Error(_say('server_signin.web_page', WEB_PAGE)), { webPage: true });
+}
+
+/** No answer at all: offline, the server down, a timeout, a gateway's error page. */
+function _noAnswer(e) {
+  return !!(e?.unreachable || e?.network || e instanceof TypeError || e?.name === 'TimeoutError' || e?.name === 'AbortError');
+}
+
+/**
+ * The one line the sign-in page says when the server couldn't be read, at
+ * startup (who is signed in) or for its sign-in options: never two. A web
+ * page in the way: in a browser, a sign-in proxy to sign in to first (the
+ * browser can, the app can't); in the app, #36's line. The server's own
+ * error answer says so, no answer is the server out of reach, and anything
+ * else unreadable is `otherwise`: out of reach at startup, the options line
+ * for the sign-in options.
+ */
+export function serverProblemText(e, { native = false, otherwise = 'unreachable' } = {}) {
+  if (e?.webPage) return native ? e.message : _say('server_signin.proxy_sign_in', PROXY_SIGN_IN);
+  if (e?.serverError) return _say('server_signin.server_error', SERVER_ERROR);
+  if (_noAnswer(e) || otherwise !== 'options') return _say('server_signin.unreachable', UNREACHABLE);
+  return _say('server_signin.options_failed', OPTIONS_FAILED);
 }
 
 /**
@@ -120,11 +145,12 @@ export async function checkServer(url) {
  */
 export async function discoverSignIn(url) {
   const http = await _http();
-  const res = await http.get({ url: `${url}/api/auth/status` });
+  const res = await http.get({ url: `${url}/api/auth/status` }).catch((err) => { throw Object.assign(err, { network: true }); });
   const data = serverJson(res);
   if (!_ok(res)) {
     console.warn('[server-signin] sign-in options: status', res.status);
-    throw _unreachable(res.status);
+    // The server's own error answer (JSON), or nothing readable (an empty body).
+    throw Object.keys(data).length ? Object.assign(new Error(`status ${res.status}`), { status: res.status, serverError: true }) : _unreachable(res.status);
   }
   return {
     providers: Array.isArray(data?.oidc?.providers) ? data.oidc.providers : [],
@@ -205,7 +231,7 @@ export function createSignInOptions({ discover = discoverSignIn, delay = 700 } =
       if (mine !== asked) return;
       if (quiet) { store.set({ ...blank, url }); return; }
       store.set({ ...blank, state: 'failed', url,
-        error: e?.webPage ? e.message : _say('server_signin.options_failed', "Couldn't load this server's sign-in options. Retry, or sign in with your password if the server allows it.") });
+        error: serverProblemText(e, { native: true, otherwise: 'options' }) });
     }
   }
 

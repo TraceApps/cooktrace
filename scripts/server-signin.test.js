@@ -95,7 +95,8 @@ test('sign-in options: what the server has, or an error to say with Retry, never
   S._useHttpForTests(status(undefined));
   assert.deepEqual((await S.discoverSignIn(URL_)).providers, [], 'a server without SSO');
   S._useHttpForTests(fakeHttp({ '/api/auth/status': { status: 500, data: { error: 'boom' } } }));
-  await assert.rejects(S.discoverSignIn(URL_), isUnreachable(500));
+  // The server's own error answer is said as one (not out of reach, not "couldn't load").
+  await assert.rejects(S.discoverSignIn(URL_), (e) => e.serverError === true && e.status === 500 && !e.webPage);
   S._useHttpForTests(fakeHttp({}));
   await assert.rejects(S.discoverSignIn(URL_), /Unable to resolve host/);
   S._useHttpForTests(proxy());
@@ -206,7 +207,7 @@ test('the screens use it: setup, Settings, the sign-in page and the app link', (
   const setup = read('../src/routes/NativeSetup.svelte');
   assert.doesNotMatch(setup, /leave defaults|JSON\.parse/, 'no silent fallback, no raw parse');
   assert.match(setup, /await checkServer\(url\);/);
-  assert.match(setup, /optionsError = e\?\.webPage \? e\.message : \$_\('server_signin\.options_failed'\);/);
+  assert.match(setup, /optionsError = serverProblemText\(e, \{ native: true, otherwise: 'options' \}\);/);
   assert.match(setup, /\{#if optionsError\}[\s\S]*?on:click=\{retryOptions\}/);
   assert.match(setup, /if \(connecting\) return;\s*connecting = true;\s*setServerUrl\(validatedUrl\);/, 'one browser at a time');
 
@@ -223,7 +224,7 @@ test('the screens use it: setup, Settings, the sign-in page and the app link', (
 
   const login = read('../src/routes/Login.svelte');
   assert.match(login, /if \(isNative\) data = \(await discoverSignIn\(getServerUrl\(\)\)\)\.status;/);
-  assert.match(login, /\{#if optionsError\}[\s\S]*?on:click=\{loadSignInOptions\}/);
+  assert.match(login, /\{[#:](?:else )?if optionsError\}[\s\S]*?on:click=\{loadSignInOptions\}/);
   assert.doesNotMatch(login, /\.json\(\)/, 'every reply through the web-page check');
   assert.doesNotMatch(login, /\} catch \{\}\s*\}\);/, 'no silent catch on the options');
 

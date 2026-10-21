@@ -1,6 +1,7 @@
 import { writable, get as getStore } from 'svelte/store';
 import { loadServerSettings } from './settings.js';
 import { isNative, getServerUrl, getAuthToken, apiUrl as _apiUrl } from '../lib/platform.js';
+import { readAuth, startState, failureKind } from '../lib/auth-load.js';
 
 function _authHeaders() {
   const h = {};
@@ -24,6 +25,12 @@ export const setupRequired = writable(false);
 // is torn down and rebuilt when the user flips on and back off. See
 // lib/cookie-check.js.
 export const signInProblem = writable(null);
+/** Why the server couldn't say who is signed in at startup, or null. The
+ *  sign-in page says it with Retry, never the app with nobody signed in
+ *  (lib/auth-load.js). */
+export const authUnreachable = writable(null);
+// Whoever signs in (any path) is past it: a later sign-out never shows it again.
+currentUser.subscribe((u) => { if (u) authUnreachable.set(null); });
 
 // Synthetic local user for native standalone mode (no server configured).
 // full_name is overridden at load time from the localUserName setting (set
@@ -110,7 +117,7 @@ export async function loadAuthState() {
     // No account to show yet on a server with accounts: sign-in first
     // (offline included), never the copy with no account. A server
     // without accounts (single-user) said so before, and shows the app.
-    if (getStore(currentUser) == null && localStorage.getItem('ct:cachedUserMgmt') !== '0') userMgmtActive.set(true);
+    if (getStore(currentUser) == null && startState({ cachedUserMgmt: localStorage.getItem('ct:cachedUserMgmt') }).state === 'sign_in') userMgmtActive.set(true);
     // Refresh auth from server in the background (non-blocking)
     _refreshAuthFromServer();
     return;
@@ -123,16 +130,21 @@ export async function loadAuthState() {
 /** Fetch auth state from server — used by PWA (blocking) and as background refresh for native */
 async function _fetchAuthFromServer() {
   try {
-    const [statusRes, meRes] = await Promise.all([
-      fetch(_apiUrl('/api/auth/status'), { credentials: 'include', headers: _authHeaders(), signal: AbortSignal.timeout(8000) }),
-      fetch(_apiUrl('/api/auth/me'),     { credentials: 'include', headers: _authHeaders(), signal: AbortSignal.timeout(8000) }),
-    ]);
-    const statusData = await statusRes.json();
-    const meData     = await meRes.json();
+    // Redirects not followed on the web: the server never sends one, so a
+    // redirect is a sign-in proxy's (lib/auth-load.js).
+    const { status: statusData, me: meData } = await readAuth(fetch, _apiUrl, {
+      credentials: 'include', headers: _authHeaders(), signal: AbortSignal.timeout(8000),
+      ...(isNative ? {} : { redirect: 'manual' }),
+    });
     const user       = meData.user || null;
     const active     = !!statusData.active;
+    authUnreachable.set(null);
     userMgmtActive.set(active);
     setupRequired.set(!!statusData.setup_required);
+    // The server's word on accounts, kept for a load that can't ask it: a
+    // single-user server opens offline too, one with accounts never does
+    // without an account.
+    if (!statusData.setup_required) localStorage.setItem('ct:cachedUserMgmt', active ? '1' : '0');
 
     // PWA single-user mode (server reachable, user mgmt off): hydrate the
     // synthetic LOCAL_USER from local settings so $currentUser is never
@@ -163,20 +175,36 @@ async function _fetchAuthFromServer() {
       localStorage.setItem('ct:cachedUserMgmt', active ? '1' : '0');
     }
     if (user) await loadServerSettings();
-  } catch {
-    // Offline fallback for PWA (native uses cached auth above)
-    const cached = localStorage.getItem('ct:cachedUser');
-    if (cached) {
-      try {
-        const user = JSON.parse(cached);
-        currentUser.set(user);
-        userMgmtActive.set(localStorage.getItem('ct:cachedUserMgmt') === '1');
-        localStorage.setItem('wl:userId', String(user.id));
-        return;
-      } catch {}
+  } catch (e) {
+    // Setting up a fresh server: the wizard stays, and says its own errors.
+    if (getStore(setupRequired)) return;
+    // Offline fallback for PWA (native uses cached auth above): the account
+    // this browser last had, or the app for a single-user server. Otherwise
+    // never the app with no account: the sign-in page, saying why.
+    const start = startState({ cachedUser: localStorage.getItem('ct:cachedUser'), cachedUserMgmt: localStorage.getItem('ct:cachedUserMgmt'), failure: failureKind(e) });
+    if (start.state !== 'sign_in') authUnreachable.set(null);
+    if (start.state === 'cached') {
+      currentUser.set(start.user);
+      userMgmtActive.set(start.userMgmtActive);
+      localStorage.setItem('wl:userId', String(start.user.id));
+      return;
     }
-    userMgmtActive.set(false);
+    if (start.state === 'single_user') {
+      userMgmtActive.set(false);
+      await _hydrateLocalUser({ setUserId: false });
+      return;
+    }
+    if (start.state === 'as_before') {
+      // Never asked since this version, and no answer: as it always opened.
+      userMgmtActive.set(false);
+      currentUser.set(null);
+      return;
+    }
+    console.warn('[auth] could not read who is signed in:', e?.status || e?.message || e);
     currentUser.set(null);
+    userMgmtActive.set(true);
+    const { serverProblemText } = await import('../lib/server-signin.js');
+    authUnreachable.set(serverProblemText(e, { native: isNative }));
   }
 }
 

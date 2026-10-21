@@ -1,7 +1,7 @@
 <script>
   import { _ } from 'svelte-i18n';
   import { setNativeMode, setServerUrl, setAuthToken, resolveAssetUrl, iconUrl } from '../lib/platform.js';
-  import { checkServer, discoverSignIn, passwordSignIn, openSso, explainSignInError } from '../lib/server-signin.js';
+  import { checkServer, discoverSignIn, passwordSignIn, openSso, explainSignInError, serverProblemText } from '../lib/server-signin.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { DB } from '../lib/db.js';
 
@@ -75,7 +75,7 @@
       providers = [];
       passwordLoginEnabled = true;
       console.warn('[setup] sign-in options:', e?.status || e?.message);
-      optionsError = e?.webPage ? e.message : $_('server_signin.options_failed');
+      optionsError = serverProblemText(e, { native: true, otherwise: 'options' });
     }
   }
 

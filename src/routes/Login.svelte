@@ -1,7 +1,7 @@
 <script>
   import { failed } from '../lib/messages.js';
   import { onMount } from 'svelte';
-  import { currentUser, userMgmtActive, loadAuthState, signInProblem } from '../stores/auth.js';
+  import { currentUser, userMgmtActive, loadAuthState, signInProblem, authUnreachable } from '../stores/auth.js';
   import { cookieBlockedByHttp, droppedCookieReason } from '../lib/cookie-check.js';
   import CookieWarning from '../components/ui/CookieWarning.svelte';
   import { loadServerSettings } from '../stores/settings.js';
@@ -12,7 +12,7 @@
   import { apiUrl, isNative, getServerUrl, setAuthToken, resolveAssetUrl, iconUrl } from '../lib/platform.js';
 
   import { get } from 'svelte/store';
-  import { responseJson, discoverSignIn, openSso } from '../lib/server-signin.js';
+  import { responseJson, discoverSignIn, openSso, serverProblemText, webPageError } from '../lib/server-signin.js';
 
   let username = '';
   let password = '';
@@ -76,6 +76,27 @@
     await loadSignInOptions();
   });
 
+  // The server couldn't say who is signed in when the app opened (stores/
+  // auth.js): Retry asks again, and a session that's still good opens the
+  // app; otherwise the sign-in options load as usual. Coming back online
+  // asks again by itself (an event, nothing repeating).
+  let retrying = false;
+  async function retryServer() {
+    if (retrying) return;
+    retrying = true;
+    try {
+      await loadAuthState();
+      if (!get(authUnreachable)) await loadSignInOptions();
+    } finally {
+      retrying = false;
+    }
+  }
+  onMount(() => {
+    const backOnline = () => { if (get(authUnreachable)) retryServer(); };
+    window.addEventListener('online', backOnline);
+    return () => window.removeEventListener('online', backOnline);
+  });
+
   async function loadSignInOptions() {
     try {
       // The app asks natively (no CORS, so a sign-in proxy's page is said as
@@ -83,9 +104,12 @@
       let data;
       if (isNative) data = (await discoverSignIn(getServerUrl())).status;
       else {
-        const r = await fetch(apiUrl('/api/auth/status'), { credentials: 'include' });
+        // Redirects not followed: the server never sends one, a sign-in proxy does (lib/auth-load.js).
+        const r = await fetch(apiUrl('/api/auth/status'), { credentials: 'include', redirect: 'manual' })
+          .catch((err) => { throw Object.assign(err, { network: true }); });
+        if (r.type === 'opaqueredirect') throw webPageError();
         data = await responseJson(r);
-        if (!r.ok) throw Object.assign(new Error(`status ${r.status}`), { status: r.status });
+        if (!r.ok) throw Object.assign(new Error(`status ${r.status}`), { status: r.status, serverError: true });
       }
       authStatus = data;
       // Plain HTTP with an HTTPS-only cookie: say so before anyone signs
@@ -98,7 +122,8 @@
       optionsError = '';
     } catch (e) {
       console.warn('[login] sign-in options:', e?.status || e?.message);
-      optionsError = e?.webPage ? e.message : $_('server_signin.options_failed');
+      // The same one line the startup check says (lib/server-signin.js), never a second.
+      optionsError = serverProblemText(e, { native: isNative, otherwise: 'options' });
     }
   }
 
@@ -213,7 +238,12 @@
     {/if}
 
     {#if !recoveryDone}
-      {#if optionsError}
+      {#if $authUnreachable}
+        <div class="options-error" role="alert" data-auth-unreachable>
+          <span>{$authUnreachable}</span>
+          <button class="btn btn-secondary options-retry" type="button" on:click={retryServer} disabled={retrying}>{$_('server_signin.retry')}</button>
+        </div>
+      {:else if optionsError}
         <div class="options-error" role="alert">
           <span>{optionsError}</span>
           <button class="btn btn-secondary options-retry" type="button" on:click={loadSignInOptions}>{$_('server_signin.retry')}</button>

@@ -4,7 +4,7 @@ import { settingPrefix } from '../lib/setting-key.js';
 // Whose settings: the account (and server) they're kept for.
 const _userKey = () => settingPrefix();
 
-const _dlog = import.meta.env.DEV
+const _dlog = import.meta.env?.DEV
   ? console.log
   : (...a) => { try { if (localStorage.getItem('ct:verboseLogging') === '1') console.log(...a); } catch {} };
 
