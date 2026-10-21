@@ -29,6 +29,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **Trace's model lists are current.** Claude Haiku 5.5 and Gemini 3.8 Flash are the new defaults, Claude Sonnet 5.5 and Opus 5.5, GPT-6 Luna, GPT-5.6 Sol, and Gemini 3.1 Flash Lite are added, Gemini 3.1 Pro is listed as the preview it is, and Gemini 2.5 leaves the list (open to existing Google users only). A model you already chose keeps working, in Trace and in recipe imports; shut-down Gemini models switch to the default. The same lists as NutriTrace, LiftTrace and NoteTrace.
 - **The Diary's Month calendar starts the week on your locale's first day** (Monday in most of Europe) instead of always Sunday.
 - **Amounts in a recipe's steps follow the servings.** Scale a recipe and the cups, spoons, grams and other measures written in its steps change with it, tinted so you can see which, as do the ingredients listed under each step. Times, temperatures, pan sizes, and amounts for each piece ("2 tbsp per pancake") stay as written.
 - **Plan a Cook asks for servings**, starting at the recipe's own. The Diary shows them on each planned cook, and the shopping list scales to them.

@@ -13,6 +13,7 @@ import * as cheerio from 'cheerio';
 import { logger } from '../logger.js';
 import { fetchChecked, serviceBase } from './ssrf-guard.js';
 import { openAIBase } from './openai-chat-params.js';
+import { AI_DEFAULT_MODELS, modelFor } from './ai-models.js';
 
 // Cap the HTML payload sent to the LLM. Recipes virtually never need
 // more than this; oversized pages get truncated.
@@ -159,7 +160,9 @@ function _parseJsonish(text) {
 async function _callProvider(cfg, systemPrompt, userText) {
   const provider = cfg.provider;
   const apiKey   = cfg.apiKey;
-  const model    = cfg.model || _defaultModel(provider);
+  // Renamed models go out under their new name, shut-down Gemini ones as
+  // the default, the same as Trace (lib/ai-models.js).
+  const model    = modelFor(provider, cfg.model || _defaultModel(provider));
   switch (provider) {
     case 'claude': return _callClaude(apiKey, model, systemPrompt, userText);
     case 'openai': return _callOpenAI(apiKey, model, systemPrompt, userText);
@@ -229,12 +232,7 @@ export function importAiConfig(user, env) {
   return null;
 }
 function _defaultModel(provider) {
-  return ({
-    claude: 'claude-haiku-4-5-20251001',
-    openai: 'gpt-5.6-luna',
-    gemini: 'gemini-3.6-flash',
-    custom: 'gpt-5.6-luna',
-  })[provider] || '';
+  return ({ ...AI_DEFAULT_MODELS, custom: 'gpt-5.6-luna' })[provider] || '';
 }
 
 async function _callClaude(apiKey, model, systemPrompt, userText) {

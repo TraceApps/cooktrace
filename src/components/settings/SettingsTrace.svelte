@@ -2,7 +2,7 @@
   import { failed } from '../../lib/messages.js';
   import { _ } from 'svelte-i18n';
   import { aiEnabled, aiProvider, aiApiKey, aiModel, aiBaseUrl, aiAssistantName, aiKeyVerified, smartLogEnabled, smartLogVoiceLang, traceChefHat, envLocks as envLocksStore } from '../../stores/settings.js';
-  import { AI_PROVIDERS, AI_DEFAULT_MODELS, AI_MODELS, AI_MODEL_CUSTOM, callAI, callAIProxy } from '../../lib/aiChat.js';
+  import { AI_PROVIDERS, AI_DEFAULT_MODELS, AI_MODELS, AI_MODEL_CUSTOM, renamedModel, callAI, callAIProxy } from '../../lib/aiChat.js';
   import { showError, showSuccess } from '../../stores/toast.js';
   import ConnectionStatus from './ConnectionStatus.svelte';
 
@@ -94,6 +94,12 @@
   let aiModelSelectVal;
   let aiCustomModelVal = '';
   {
+    // A model saved under a name that has since changed shows (and is kept)
+    // under its new name. Not for OpenAI Compatible: its names are the
+    // server's own.
+    if ($aiProvider !== 'custom' && $aiProvider !== 'oai-compat' && $aiModel && renamedModel($aiModel) !== $aiModel) {
+      aiModel.set(renamedModel($aiModel));
+    }
     const saved = $aiModel;
     const _pm = AI_MODELS[$aiProvider] || [];
     const isPreset = _pm.includes(saved) && saved !== AI_MODEL_CUSTOM;
@@ -324,7 +330,7 @@
       <div class="setting-row">
         <span class="setting-label">{$_('settings_trace_ct.custom_model_id')}</span>
         <input class="input" type="text" style="width:220px"
-          placeholder={$aiProvider === 'gemini' ? 'gemini-3.5-flash' : $aiProvider === 'claude' ? 'claude-sonnet-5' : 'gpt-4o'}
+          placeholder={$aiProvider === 'gemini' ? 'gemini-3.8-flash' : $aiProvider === 'claude' ? 'claude-sonnet-5-5' : 'gpt-5.6-terra'}
           bind:value={aiCustomModelVal} on:input={_syncModelFromSelect} on:change={_autoTest} />
       </div>
       <div style="padding:8px 16px 12px;display:flex;gap:8px;align-items:flex-start">

@@ -4,6 +4,7 @@ import { wrap } from '../logger.js';
 import { getAiConfig } from '../ai.js';
 import { makeRateLimiter } from '../middleware/rate-limit.js';
 import { getOpenAIChatParams, openAIBase } from '../lib/openai-chat-params.js';
+import { AI_DEFAULT_MODELS, geminiModelFor, modelFor } from '../lib/ai-models.js';
 import { REPLY_MAX_TOKENS, sendWithLengthFallback, stoppedShort, stoppedShortError } from '../lib/trace-reply.js';
 import db from '../db.js';
 
@@ -51,20 +52,6 @@ router.delete('/history', requireAuth, wrap((req, res) => {
   }
   res.json({ ok: true });
 }));
-
-const AI_DEFAULT_MODELS = {
-  claude: 'claude-haiku-4-5-20251001',
-  openai: 'gpt-5.6-luna',
-  gemini: 'gemini-3.6-flash',
-};
-
-// Models Google has shut down (404) or scheduled for shutdown.
-// Saved env-locked configs pointing at any of these are remapped to the
-// current default so the proxy doesn't 404 against a dead endpoint.
-const GEMINI_RETIRED = new Set([
-  'gemini-1.5-flash', 'gemini-1.5-pro',
-  'gemini-2.0-flash', 'gemini-2.0-flash-lite',
-]);
 
 /**
  * POST /api/ai/chat
@@ -114,7 +101,9 @@ router.post('/chat', requireAuth, aiChatLimit, wrap(async (req, res) => {
 
   const cfg = getAiConfig();
   const provider = cfg.ai_provider || 'claude';
-  const model    = cfg.ai_model    || AI_DEFAULT_MODELS[provider] || '';
+  // Renamed models go out under their new name, shut-down Gemini ones as
+  // the default (lib/ai-models.js); an OpenAI-compatible server's as set.
+  const model    = modelFor(provider, cfg.ai_model || AI_DEFAULT_MODELS[provider] || '');
   const apiKey   = cfg.ai_api_key;
   const baseUrl  = openAIBase(cfg.ai_base_url);
 
@@ -200,7 +189,7 @@ async function _callOpenAI(apiKey, model, messages, systemPrompt, baseUrl = 'htt
 }
 
 async function _callGemini(apiKey, model, messages, systemPrompt) {
-  const m = GEMINI_RETIRED.has(model) ? AI_DEFAULT_MODELS.gemini : (model || AI_DEFAULT_MODELS.gemini);
+  const m = geminiModelFor(model);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`;
   const contents = messages.map(msg => ({
     role: msg.role === 'assistant' ? 'model' : 'user',
