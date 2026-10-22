@@ -178,26 +178,149 @@ object Kitchen {
 
     // ── Timers a step asks for ───────────────────────────────────────────
 
-    private val DURATION = Regex(
-        """(\d+(?:[.,]\d+)?)\s*(?:-\s*\d+\s*)?(hours?|hrs?|minutes?|mins?|seconds?|secs?)\b""",
-        RegexOption.IGNORE_CASE,
-    )
-
     /**
      * The times a step mentions, in seconds. "Simmer for 20 minutes" is a
      * timer waiting to be offered, and asking the wearer to dial 20 minutes
      * by hand when the step already says so is work for nothing.
      */
-    fun timesIn(text: String): List<Int> = DURATION.findAll(text).mapNotNull { m ->
-        val value = m.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return@mapNotNull null
-        val unit = m.groupValues[2].lowercase()
-        val seconds = when {
-            unit.startsWith("h") -> value * 3600
-            unit.startsWith("m") -> value * 60
-            else -> value
+    fun timesIn(text: String): List<Int> = stepTimes(text).map { it.second }.distinct().take(3)
+
+    /**
+     * Every time a step mentions, as written and in seconds, in every language
+     * in time-words.json at once: a recipe is written in its cook's language,
+     * whatever language the phone is in. The phone finds the same ones
+     * (src/lib/parseTimes.js), and scripts/step-times.json holds what both
+     * must find; KitchenTest runs the watch against it.
+     */
+    fun stepTimes(text: String): List<Pair<String, Int>> {
+        if (text.isBlank()) return emptyList()
+        val w = words
+        // Java's \s is ASCII, and French sets a unit off with a no-break
+        // space ("20 min"). One character for one, so where a time sits in
+        // the text is still where it sits in the step.
+        val plain = text.replace('\u00A0', ' ').replace('\u202F', ' ').replace('\u2009', ' ')
+        val out = mutableListOf<Pair<String, Int>>()
+        var from = 0
+        while (from <= plain.length) {
+            val m = w.pattern.find(plain, from) ?: break
+            val at = m.range.first
+            // A time starts its own word: not the "0 min" inside "20 min".
+            if (at > 0 && BEFORE.matches(plain[at - 1].toString())) {
+                from = at + 1
+                continue
+            }
+            from = m.range.last + 1
+            val seconds = w.seconds(m.value.lowercase())
+            if (seconds in 1..86_400) out.add(text.substring(at, m.range.last + 1) to seconds)
         }
-        seconds.toInt().takeIf { it in 1..86_400 }
-    }.distinct().take(3).toList()
+        return out
+    }
+
+    private val BEFORE = Regex("""[\p{L}\p{N}.,/]""")
+
+    private val words: TimeWords by lazy {
+        val raw = Kitchen::class.java.getResourceAsStream("/time-words.json")
+            ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+        TimeWords(runCatching { JSONObject(raw.orEmpty()) }.getOrElse { JSONObject() })
+    }
+
+    /** The patterns for the words of every language, as the phone builds them. */
+    private class TimeWords(json: JSONObject) {
+        private val langs = json.keys().asSequence()
+            .filterNot { it.startsWith("_") }
+            .mapNotNull { json.optJSONObject(it) }
+            .toList()
+
+        /** Every language's words of a kind, longest first, as one alternation. */
+        private fun any(kind: String): String {
+            val all = langs.flatMap { l ->
+                val a = l.optJSONArray(kind) ?: return@flatMap emptyList()
+                (0 until a.length()).map { a.optString(it).lowercase() }
+            }.filter { it.isNotEmpty() }.distinct()
+            return if (all.isEmpty()) "(?!)"
+            else all.sortedByDescending { it.length }.joinToString("|", "(?:", ")") { Regex.escape(it) }
+        }
+
+        private val phrases: Map<String, Int> = langs.flatMap { l ->
+            val p = l.optJSONObject("phrases") ?: return@flatMap emptyList()
+            p.keys().asSequence().map { it.lowercase() to p.optInt(it) }.toList()
+        }.toMap()
+
+        private val num = """(?:\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?)"""
+        private val hour = any("hour")
+        // An abbreviation can take a dot before its minutes ("1 Std. 30 Min."),
+        // where a whole word's dot ends the sentence.
+        private val hourAbbr = any("hour_abbr")
+        private val min = any("minute")
+        private val sec = any("second")
+        private val one = any("one")
+        private val end = """(?!\p{L})"""
+        private val join = """(?:\s*(?:,|${any("and")}(?!\p{L}))\s*|\s*)"""
+        private val hourOf = """(?:$hour$end|$hourAbbr\.)"""
+        private val range = """\s*(?:-|\u2013|\u2014|${any("to")}(?!\p{L}))\s*"""
+        private val andHalf = """\s*${any("and_half")}(?!\p{L})"""
+        private val phrase = if (phrases.isEmpty()) "(?!)"
+            else phrases.keys.sortedByDescending { it.length }.joinToString("|", "(?:", ")(?!\\p{L})") { Regex.escape(it) }
+
+        val pattern = Regex(
+            listOf(
+                phrase,
+                "(?:$num\\s*|$one\\s+)$hour$end$andHalf",
+                "$num\\s*$hourOf$join$num\\s*$min$end",
+                // French "1h30", "2 h 15".
+                """\d+\s*h(?:\d{1,2}|\s+\d{2})(?![\d\p{L}]|[.,]\d)""",
+                "$num$range$num\\s*(?:$hour|$min|$sec)$end",
+                "$num\\s*(?:$hour|$min|$sec)$end",
+                "$one\\s+$hour$end",
+            ).joinToString("|", "(?:", ")"),
+            RegexOption.IGNORE_CASE,
+        )
+
+        private val halfRe = Regex("^($num|$one)\\s*$hour$end$andHalf$")
+        private val hourMinRe = Regex("^($num)\\s*$hourOf$join($num)\\s*$min$")
+        private val frenchRe = Regex("""^(\d+)\s*h\s*(\d{1,2})$""")
+        private val rangeRe = Regex("^($num)$range($num)\\s*(\\p{L}+)$")
+        private val singleRe = Regex("^($num|$one)\\s*(\\p{L}+)$")
+        private val oneRe = Regex("^$one$")
+        private val hourRe = Regex("^$hour$")
+        private val minRe = Regex("^$min$")
+
+        private fun number(s: String): Double {
+            val t = s.trim()
+            Regex("""^(\d+)\s+(\d+)/(\d+)$""").find(t)?.let { m ->
+                val (w, n, d) = m.destructured
+                if (d.toDouble() > 0) return w.toDouble() + n.toDouble() / d.toDouble()
+            }
+            Regex("""^(\d+)/(\d+)$""").find(t)?.let { m ->
+                val (n, d) = m.destructured
+                if (d.toDouble() > 0) return n.toDouble() / d.toDouble()
+            }
+            if (oneRe.matches(t)) return 1.0
+            return t.replace(',', '.').toDoubleOrNull() ?: Double.NaN
+        }
+
+        private fun unit(u: String): Int = when {
+            hourRe.matches(u) -> 3600
+            minRe.matches(u) -> 60
+            else -> 1
+        }
+
+        /** What a matched time comes to, from its lowercased text. */
+        fun seconds(text: String): Int {
+            phrases[text]?.let { return it }
+            halfRe.find(text)?.let { return Math.round((number(it.groupValues[1]) + 0.5) * 3600).toInt() }
+            hourMinRe.find(text)?.let {
+                return Math.round(number(it.groupValues[1]) * 3600 + number(it.groupValues[2]) * 60).toInt()
+            }
+            frenchRe.find(text)?.let { return it.groupValues[1].toInt() * 3600 + it.groupValues[2].toInt() * 60 }
+            rangeRe.find(text)?.let {
+                val low = minOf(number(it.groupValues[1]), number(it.groupValues[2]))
+                return Math.round(low * unit(it.groupValues[3])).toInt()
+            }
+            singleRe.find(text)?.let { return Math.round(number(it.groupValues[1]) * unit(it.groupValues[2])).toInt() }
+            return 0
+        }
+    }
 
     /** Counting down, as a watch shows it: 20:00, 1:05:00. */
     fun clock(seconds: Int): String {

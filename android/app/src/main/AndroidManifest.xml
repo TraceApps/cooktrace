@@ -48,6 +48,18 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
+        <!-- Cook timers rung by the phone (KitchenTimers): each timer's end,
+             and +1 Min and Stop on its notification. Not exported: only this
+             app's own PendingIntents reach it, and the system's boot and
+             app-updated broadcasts, which take its alarms away. -->
+        <receiver
+            android:name=".KitchenTimerReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <!-- Permissions -->

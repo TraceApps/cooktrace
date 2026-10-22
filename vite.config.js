@@ -54,6 +54,8 @@ export default defineConfig({
         navigateFallback: null,
         navigateFallbackDenylist: [/.*/],
         cleanupOutdatedCaches: true,
+        // Tapping a cook timer's "Timer done" opens the app (#77).
+        importScripts: ['sw-timers.js'],
         skipWaiting: true,
         clientsClaim: true,
         runtimeCaching: [

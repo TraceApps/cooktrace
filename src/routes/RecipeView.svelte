@@ -40,6 +40,7 @@
   import { splitWithTimes } from '../lib/parseTimes.js';
   import { formatStepText, scaleStepText, scaledAmountHtml } from '../lib/step-format.js';
   import { startTimer, formatRemaining } from '../stores/cookTimers.js';
+  import TimerSheet from '../components/recipe/TimerSheet.svelte';
   import { cookModeActive } from '../stores/cookMode.js';
   import { currentUser } from '../stores/auth.js';
   import { onDestroy, onMount, tick } from 'svelte';
@@ -338,6 +339,13 @@
   }
   let wakeLockSentinel = null;
   $: cookModeActive.set(cookMode);
+
+  // A timer for any length (#77): Cook Mode's Timer, or a step's own, which
+  // starts on the step's first time and is named for it.
+  let timerSheet = { open: false, label: '', stepIndex: null, seconds: 0 };
+  function openTimer(stepIndex = null, label = '', seconds = 0) {
+    timerSheet = { open: true, label, stepIndex, seconds };
+  }
   onDestroy(() => cookModeActive.set(false));
   $: ingChecks = _loadChecks(id, 'ing');
   $: stepChecks = _loadChecks(id, 'step');
@@ -1162,6 +1170,9 @@
         <span class="material-symbols-rounded cook-mode-icon">soup_kitchen</span>
         <span class="cook-mode-label">{$_('recipe.cook_mode')}</span>
       </span>
+      <button class="btn-icon cook-timer-btn" on:click={() => openTimer()} aria-label={$_('cook_timers.start_a_timer')} title={$_('cook_timers.start_a_timer')}>
+        <span class="material-symbols-rounded">timer</span>
+      </button>
       <button class="btn-icon close-btn" on:click={endCookMode} aria-label={$_('recipe_view_ui.exit_cook_mode')} title={$_('recipe_view_ui.exit_cook_mode')}>
         <span class="material-symbols-rounded">close</span>
       </button>
@@ -1656,6 +1667,14 @@
                         {/each}
                       </span>
                     {/if}
+                    {#if cookMode}
+                      {@const firstTime = parts.find(p => p.type === 'time')}
+                      <button type="button" class="step-timer-btn"
+                        on:click|stopPropagation={() => openTimer(i, title || $_('recipe_view_ui.step_n', { values: { n: i + 1 } }), firstTime?.durationSec || 0)}
+                        title={$_('cook_timers.timer_for_step', { values: { n: i + 1 } })}>
+                        <span class="material-symbols-rounded">more_time</span>{$_('cook_timers.timer')}
+                      </button>
+                    {/if}
                   </div>
                 </li>
               {/each}
@@ -1847,6 +1866,9 @@
 <HistorySheet bind:open={historyOpen} recipeId={recipe?.id} {history} conflicts={versions.length} on:conflicts={openConflicts} />
 
 <PlanCookDialog bind:open={planOpen} {recipe} on:planned={loadCooks} />
+
+<TimerSheet bind:open={timerSheet.open} label={timerSheet.label} stepIndex={timerSheet.stepIndex}
+  seconds={timerSheet.seconds} recipeId={recipe?.id ?? null} recipeName={recipe?.name ?? null} />
 
 <CookLogDialog
   bind:open={cookDialogOpen}
@@ -3284,6 +3306,27 @@
     font-size: 14px;
     line-height: 1;
   }
+  /* A step's own Timer, in Cook Mode: any length, starting on the step's
+     first time. Quiet, under the step, so it doesn't compete with the text. */
+  .step-timer-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    align-self: flex-start;
+    margin-top: 6px;
+    min-height: 32px;
+    padding: 4px 10px 4px 8px;
+    background: transparent;
+    color: var(--text-2);
+    border: 1px dashed var(--border);
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color var(--dur-fast), border-color var(--dur-fast);
+  }
+  .step-timer-btn:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .step-timer-btn .material-symbols-rounded { font-size: 16px; }
 
   /* ── Print stylesheet ─────────────────────────────────────────────────
      Cmd-P / Ctrl-P → a clean recipe card prints to one or two pages.
@@ -3316,13 +3359,20 @@
     .convert-menu,
     .step-check,
     .star-btn,
-    .time-chip,
+    .time-chip .material-symbols-rounded,
+    .step-timer-btn,
     .cook-actions-row,
     .planned-line,
     .cook-list,
     .comments-section,
     .last-updated,
     .editor-page > header { display: none !important; }
+    /* A step's times are part of the step: on paper, plain text. */
+    .time-chip {
+      all: unset;
+      color: inherit !important;
+      font: inherit !important;
+    }
     /* Hero image: small thumbnail above the title, not a banner. */
     .hero-img,
     .recipe-img,

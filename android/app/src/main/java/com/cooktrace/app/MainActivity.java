@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(WearPairingPlugin.class);
         registerPlugin(FoldPlugin.class);
         registerPlugin(InstallMarkerPlugin.class);
+        registerPlugin(KitchenTimersPlugin.class);
         super.onCreate(savedInstanceState);
     }
 

@@ -19,8 +19,18 @@
  *
  * iOS needs a user-gesture-resumed AudioContext; we attempt resume on
  * each play and live with silent fallbacks (the Notification covers it).
+ *
+ * On time in a background tab: each timer also has a one-shot timeout for
+ * its exact end. A browser slows a hidden tab's once-a-second ticker to as
+ * little as once a minute, and a one-shot timeout set when the timer starts
+ * is not slowed that way (#77).
+ *
+ * In the Android app the phone rings it instead (native-timers.js), through
+ * the lock screen and with the app closed, so the page plays no alarm of its
+ * own there: one alarm, not two.
  */
 import { writable, get } from 'svelte/store';
+import { tr } from '../lib/messages.js';
 
 const STORAGE_KEY = 'ct:timers';
 
@@ -54,6 +64,16 @@ let _audioCtx = null;
 // warnings (good — we don't want a re-fired 3-2-1 beep on refresh).
 const _lastSecondsLeft = new Map(); // timerId -> int seconds remaining last tick
 const _alarmLoops      = new Map(); // timerId -> intervalId
+const _endTimeouts     = new Map(); // timerId -> { at, handle }
+
+// The Android app rings timers itself (native-timers.js).
+let _ringsNatively = false;
+
+/** The phone rings timers from now on: the page's own alarm stands down. */
+export function ringNatively(on = true) {
+  _ringsNatively = !!on;
+  if (_ringsNatively) for (const id of [..._alarmLoops.keys()]) _stopAlarmLoop(id);
+}
 
 function _ensureAudio() {
   if (typeof window === 'undefined') return null;
@@ -147,53 +167,98 @@ function _vibrate(pattern) {
 
 function _ensureTicker() {
   if (_tickInterval || typeof window === 'undefined') return;
-  _tickInterval = setInterval(() => {
-    const list = get(cookTimers);
-    if (list.length === 0) return;
-    const now = Date.now();
-    let mutated = false;
-    const next = list.map(t => {
-      if (!t.done) {
-        // Pre-warn at 3 / 2 / 1 seconds remaining — beep + short
-        // vibration on each transition. Use Math.ceil so we fire when
-        // the displayed seconds-left flips, not when the underlying
-        // millis pass through the boundary.
-        const secondsLeft = Math.max(0, Math.ceil((t.endsAt - now) / 1000));
-        const last = _lastSecondsLeft.get(t.id);
-        if (last !== secondsLeft) {
-          _lastSecondsLeft.set(t.id, secondsLeft);
-          if (secondsLeft === 3 || secondsLeft === 2 || secondsLeft === 1) {
-            _playWarnBeep();
-            _vibrate(140);
-          }
-        }
-        if (now >= t.endsAt) {
-          mutated = true;
-          _onComplete(t);
-          return { ...t, done: true };
+  _tickInterval = setInterval(_tick, 1000);
+}
+
+function _tick() {
+  const list = get(cookTimers);
+  if (list.length === 0) return;
+  const now = Date.now();
+  let mutated = false;
+  const next = list.map(t => {
+    if (!t.done) {
+      // Pre-warn at 3 / 2 / 1 seconds remaining — beep + short
+      // vibration on each transition. Use Math.ceil so we fire when
+      // the displayed seconds-left flips, not when the underlying
+      // millis pass through the boundary.
+      const secondsLeft = Math.max(0, Math.ceil((t.endsAt - now) / 1000));
+      const last = _lastSecondsLeft.get(t.id);
+      if (last !== secondsLeft) {
+        _lastSecondsLeft.set(t.id, secondsLeft);
+        if (secondsLeft === 3 || secondsLeft === 2 || secondsLeft === 1) {
+          _playWarnBeep();
+          _vibrate(140);
         }
       }
-      return t;
-    });
-    // Always emit so live remaining-time labels update; only persist on
-    // structural changes.
-    cookTimers.set(next);
-    if (mutated) _save(next);
-  }, 1000);
+      if (now >= t.endsAt) {
+        mutated = true;
+        _onComplete(t);
+        return { ...t, done: true };
+      }
+    }
+    return t;
+  });
+  // Always emit so live remaining-time labels update; only persist on
+  // structural changes.
+  cookTimers.set(next);
+  if (mutated) _save(next);
+}
+
+/**
+ * A one-shot timeout at each running timer's end, moved when the end moves
+ * (+1 min, the watch) and dropped with the timer. It runs the same tick, so
+ * a timer that ends while the ticker is being held back still rings on time.
+ */
+function _armEnds(list) {
+  const live = new Set();
+  for (const t of list) {
+    if (t.done || t.dismissed || !Number.isFinite(t.endsAt)) continue;
+    live.add(t.id);
+    const had = _endTimeouts.get(t.id);
+    if (had && had.at === t.endsAt) continue;
+    if (had) clearTimeout(had.handle);
+    // Just past the end, so the tick finds it over.
+    const handle = setTimeout(_tick, Math.max(0, t.endsAt - Date.now()) + 25);
+    _endTimeouts.set(t.id, { at: t.endsAt, handle });
+  }
+  for (const [id, had] of _endTimeouts) {
+    if (live.has(id)) continue;
+    clearTimeout(had.handle);
+    _endTimeouts.delete(id);
+  }
 }
 
 function _onComplete(timer) {
+  if (_ringsNatively) return;
   _startAlarmLoop(timer.id);
+  _notifyDone(timer);
+}
 
-  // Browser notification (best-effort; user may not have granted permission).
+/**
+ * "Timer done" outside the page, when notifications are allowed. Through the
+ * service worker where there is one: Chrome on Android has no other way to
+ * show one, and its click brings the app back (public/sw-timers.js).
+ */
+async function _notifyDone(timer) {
   try {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      new Notification('Timer done', {
-        body: timer.label || 'Cook timer finished',
-        tag: timer.id,
-        silent: false,
-      });
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const title = tr('cook_timers.done_title', 'Timer Done');
+    const body = [timer.label, timer.recipeName].filter(Boolean).join(' \u00b7 ');
+    const opts = { body, tag: timer.id, renotify: true, requireInteraction: true, icon: 'icons/icon-192.png' };
+    const reg = await navigator.serviceWorker?.getRegistration?.();
+    if (reg?.active && reg.showNotification) {
+      try { await reg.showNotification(title, opts); return; } catch { /* the page's own, below */ }
     }
+    const n = new Notification(title, opts);
+    n.onclick = () => { try { window.focus(); n.close(); } catch {} };
+  } catch {}
+}
+
+/** Takes down a "Timer done" the timer no longer needs. */
+async function _clearNotice(id) {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration?.();
+    for (const n of (await reg?.getNotifications?.({ tag: id })) || []) n.close();
   } catch {}
 }
 
@@ -234,6 +299,7 @@ export function startTimer({ label, durationSec, recipeId = null, recipeName = n
 export function dismissTimer(id) {
   _stopAlarmLoop(id);
   _lastSecondsLeft.delete(id);
+  _clearNotice(id);
   const next = get(cookTimers).filter(t => t.id !== id);
   cookTimers.set(next);
   _save(next);
@@ -244,6 +310,7 @@ export function dismissAllDone() {
     if (t.done) {
       _stopAlarmLoop(t.id);
       _lastSecondsLeft.delete(t.id);
+      _clearNotice(t.id);
     }
   }
   const next = get(cookTimers).filter(t => !t.done);
@@ -258,6 +325,7 @@ export function addOneMinute(id) {
   // the new 60s window plays out.
   _stopAlarmLoop(id);
   _lastSecondsLeft.delete(id);
+  _clearNotice(id);
   const list = get(cookTimers);
   const next = list.map(t => {
     if (t.id !== id) return t;
@@ -327,6 +395,52 @@ export function adoptTimers(list, since = 0) {
   _save(next);
 }
 
+/**
+ * The phone's word on the timers (native-timers.js), after a notification's
+ * +1 Min or Stop. It holds every timer this device has told it of, so what it
+ * lacks was stopped, a deadline it moved was moved, and one past its end has
+ * rung. `isNew(timer)` is true for one the phone hasn't been told of yet,
+ * which is kept.
+ */
+export function adoptNativeTimers(list, isNew = () => false) {
+  if (!Array.isArray(list)) return;
+  const now = Date.now();
+  const theirs = new Map(list.filter(t => t && t.id).map(t => [String(t.id), t]));
+  const mine = get(cookTimers);
+  const next = [];
+  for (const t of mine) {
+    if (t.dismissed) continue;
+    const match = theirs.get(t.id);
+    theirs.delete(t.id);
+    if (!match) {
+      // Not yet told to the phone: not in its list, and not stopped.
+      if (isNew(t)) { next.push(t); continue; }
+      _stopAlarmLoop(t.id);
+      _lastSecondsLeft.delete(t.id);
+      continue;
+    }
+    const endsAt = Number(match.endsAt);
+    if (!Number.isFinite(endsAt) || endsAt === t.endsAt) { next.push(t); continue; }
+    _lastSecondsLeft.delete(t.id);
+    next.push({ ...t, endsAt, done: endsAt <= now });
+  }
+  // Not here (this device's own list was lost): kept as the phone has them.
+  for (const [id, t] of theirs) {
+    const endsAt = Number(t.endsAt);
+    if (!Number.isFinite(endsAt)) continue;
+    const total = Number(t.total) || Math.max(1, Math.round((endsAt - now) / 1000));
+    next.push({
+      id, label: t.label || 'Timer', recipeName: t.recipe || null, recipeId: null, stepIndex: null,
+      durationSec: total, startedAt: endsAt - total * 1000, endsAt, done: endsAt <= now, dismissed: false,
+    });
+  }
+  const changed = next.length !== mine.length || next.some((t, i) => t !== mine[i]);
+  if (!changed) return;
+  if (next.some(t => !t.done)) _ensureTicker();
+  cookTimers.set(next);
+  _save(next);
+}
+
 /** Format a remaining duration as "MM:SS" (or "H:MM:SS" past 1 hour). */
 export function formatRemaining(ms) {
   const sec = Math.max(0, Math.round(ms / 1000));
@@ -339,4 +453,7 @@ export function formatRemaining(ms) {
 }
 
 // Boot the ticker if any timers are already alive at load time.
-if (typeof window !== 'undefined' && get(cookTimers).length > 0) _ensureTicker();
+if (typeof window !== 'undefined') {
+  if (get(cookTimers).length > 0) _ensureTicker();
+  cookTimers.subscribe(_armEnds);
+}

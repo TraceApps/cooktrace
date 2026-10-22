@@ -1566,6 +1566,31 @@
   "cook_timer_rail": {
     "snooze":                    "Snooze"
   },
+  "cook_timers": {
+    "timer":                     "Timer",
+    "start_a_timer":             "Start a Timer",
+    "timer_for_step":            "Timer for Step {n}",
+    "start":                     "Start",
+    "name":                      "Name",
+    "optional":                  "(optional)",
+    "name_placeholder":          "What it's for, like Pasta",
+    "quick_picks":               "Quick Picks",
+    "keypad":                    "Keypad",
+    "backspace":                 "Delete Last Digit",
+    "length_aria":               "{h, plural, one {# hour} other {# hours}}, {m, plural, one {# minute} other {# minutes}}, {s, plural, one {# second} other {# seconds}}",
+    "unit_h":                    "h",
+    "unit_m":                    "m",
+    "unit_s":                    "s",
+    "minutes_short":             "{n} min",
+    "hours_short":               "{n} hr",
+    "hours_minutes_short":       "{h} hr {m} min",
+    "too_long":                  "A timer can run for up to 24 hours.",
+    "done_title":                "Timer Done",
+    "add_minute":                "+1 Min",
+    "stop":                      "Stop",
+    "channel":                   "Cook Timers",
+    "alarm_channel":             "Timer Alarms"
+  },
   "sidebar_ct": {
     "brand":                     "CookTrace"
   },

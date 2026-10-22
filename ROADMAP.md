@@ -75,6 +75,12 @@ Avoid header overlap on certain viewport heights.
 ### Cook Mode reflow verification
 Single-column kitchen view stays; verify on narrow tablets in landscape.
 
+### ~~Cook timers that ring when you've walked away~~ *(done on dev, next minor release, #77)*
+The Android app rings timers natively (lock screen, app closed, +1 Min and Stop in the shade); step times are read in seven languages from one word list shared with the watch; Cook Mode and each step have a Timer for any length; browsers ring on time in a background tab.
+
+### Cook timers from the server (Web Push)
+A browser that has put a backgrounded tab to sleep (a phone's browser after a while) can't ring a timer until the tab is back. The server could send a push at each timer's end to a subscribed browser, which rings it from the service worker. Needs VAPID keys on the server, a subscription per browser, and the timer's end sent to the server when it starts.
+
 ---
 
 ## Recipe Sharing

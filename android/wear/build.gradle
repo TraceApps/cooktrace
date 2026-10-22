@@ -80,6 +80,12 @@ android {
     kotlinOptions {
         jvmTarget = '21'
     }
+
+    // The words a step uses for a time, in every language, shared with the
+    // phone app (src/lib/parseTimes.js) so both offer the same timers.
+    sourceSets {
+        main.resources.srcDirs += ['../../src/lib/time-words']
+    }
 }
 
 dependencies {

@@ -1,0 +1,292 @@
+{
+  "_about": "The words a recipe step uses for a time, by language (hour_abbr: the hour words that are abbreviations, which may take a dot before their minutes, as in 1 Std. 30 Min.), for the timers in Cook Mode (#77). Read by src/lib/parseTimes.js and by the watch (android/wear Kitchen.kt). scripts/step-times.test.js fails when the app gains a language that has no entry here.",
+  "en": {
+    "hour": [
+      "hours",
+      "hour",
+      "hrs",
+      "hr",
+      "h"
+    ],
+    "hour_abbr": [
+      "hrs",
+      "hr",
+      "h"
+    ],
+    "minute": [
+      "minutes",
+      "minute",
+      "mins",
+      "min",
+      "m"
+    ],
+    "second": [
+      "seconds",
+      "second",
+      "secs",
+      "sec",
+      "s"
+    ],
+    "one": [
+      "an",
+      "one"
+    ],
+    "to": [
+      "to",
+      "or"
+    ],
+    "and": [
+      "and"
+    ],
+    "and_half": [
+      "and a half"
+    ],
+    "phrases": {
+      "half an hour": 1800,
+      "an hour and a half": 5400
+    }
+  },
+  "es": {
+    "hour": [
+      "horas",
+      "hora",
+      "hrs",
+      "h"
+    ],
+    "hour_abbr": [
+      "hrs",
+      "h"
+    ],
+    "minute": [
+      "minutos",
+      "minuto",
+      "min"
+    ],
+    "second": [
+      "segundos",
+      "segundo",
+      "seg"
+    ],
+    "one": [
+      "una",
+      "un"
+    ],
+    "to": [
+      "a",
+      "o"
+    ],
+    "and": [
+      "y"
+    ],
+    "and_half": [
+      "y media"
+    ],
+    "phrases": {
+      "media hora": 1800
+    }
+  },
+  "fr": {
+    "hour": [
+      "heures",
+      "heure",
+      "h"
+    ],
+    "hour_abbr": [
+      "h"
+    ],
+    "minute": [
+      "minutes",
+      "minute",
+      "min",
+      "mn"
+    ],
+    "second": [
+      "secondes",
+      "seconde",
+      "sec",
+      "s"
+    ],
+    "one": [
+      "une",
+      "un"
+    ],
+    "to": [
+      "à",
+      "a",
+      "ou"
+    ],
+    "and": [
+      "et"
+    ],
+    "and_half": [
+      "et demie"
+    ],
+    "phrases": {
+      "une demi-heure": 1800,
+      "demi-heure": 1800
+    }
+  },
+  "it": {
+    "hour": [
+      "ore",
+      "ora",
+      "h"
+    ],
+    "hour_abbr": [
+      "h"
+    ],
+    "minute": [
+      "minuti",
+      "minuto",
+      "min"
+    ],
+    "second": [
+      "secondi",
+      "secondo",
+      "sec"
+    ],
+    "one": [
+      "un",
+      "una"
+    ],
+    "to": [
+      "a",
+      "o"
+    ],
+    "and": [
+      "e"
+    ],
+    "and_half": [
+      "e mezza",
+      "e mezzo"
+    ],
+    "phrases": {
+      "mezz'ora": 1800,
+      "mezz’ora": 1800,
+      "mezzora": 1800
+    }
+  },
+  "de": {
+    "hour": [
+      "stunden",
+      "stunde",
+      "std",
+      "h"
+    ],
+    "hour_abbr": [
+      "std",
+      "h"
+    ],
+    "minute": [
+      "minuten",
+      "minute",
+      "min"
+    ],
+    "second": [
+      "sekunden",
+      "sekunde",
+      "sek"
+    ],
+    "one": [
+      "eine",
+      "ein"
+    ],
+    "to": [
+      "bis",
+      "oder"
+    ],
+    "and": [
+      "und"
+    ],
+    "and_half": [
+      "und eine halbe"
+    ],
+    "phrases": {
+      "eine halbe stunde": 1800,
+      "halbe stunde": 1800,
+      "eineinhalb stunden": 5400,
+      "anderthalb stunden": 5400
+    }
+  },
+  "sv": {
+    "hour": [
+      "timmar",
+      "timme",
+      "tim",
+      "h"
+    ],
+    "hour_abbr": [
+      "tim",
+      "h"
+    ],
+    "minute": [
+      "minuter",
+      "minut",
+      "min"
+    ],
+    "second": [
+      "sekunder",
+      "sekund",
+      "sek"
+    ],
+    "one": [
+      "en",
+      "ett"
+    ],
+    "to": [
+      "till",
+      "eller"
+    ],
+    "and": [
+      "och"
+    ],
+    "and_half": [
+      "och en halv"
+    ],
+    "phrases": {
+      "en halvtimme": 1800,
+      "en halv timme": 1800,
+      "halvtimme": 1800
+    }
+  },
+  "ru": {
+    "hour": [
+      "часов",
+      "часа",
+      "час",
+      "ч"
+    ],
+    "hour_abbr": [
+      "ч"
+    ],
+    "minute": [
+      "минуты",
+      "минут",
+      "минуту",
+      "минута",
+      "мин"
+    ],
+    "second": [
+      "секунды",
+      "секунд",
+      "секунду",
+      "секунда",
+      "сек"
+    ],
+    "one": [],
+    "to": [
+      "до",
+      "или"
+    ],
+    "and": [
+      "и"
+    ],
+    "and_half": [
+      "с половиной"
+    ],
+    "phrases": {
+      "полчаса": 1800,
+      "полтора часа": 5400
+    }
+  }
+}

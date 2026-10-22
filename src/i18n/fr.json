@@ -1445,6 +1445,31 @@
   "cook_timer_rail": {
     "snooze": "Répéter"
   },
+  "cook_timers": {
+    "timer": "Minuteur",
+    "start_a_timer": "Lancer un Minuteur",
+    "timer_for_step": "Minuteur de l'Étape {n}",
+    "start": "Lancer",
+    "name": "Nom",
+    "optional": "(facultatif)",
+    "name_placeholder": "À quoi il sert, comme Pâtes",
+    "quick_picks": "Durées Rapides",
+    "keypad": "Pavé Numérique",
+    "backspace": "Effacer le Dernier Chiffre",
+    "length_aria": "{h, plural, one {# heure} other {# heures}}, {m, plural, one {# minute} other {# minutes}}, {s, plural, one {# seconde} other {# secondes}}",
+    "unit_h": "h",
+    "unit_m": "min",
+    "unit_s": "s",
+    "minutes_short": "{n} min",
+    "hours_short": "{n} h",
+    "hours_minutes_short": "{h} h {m}",
+    "too_long": "Un minuteur peut durer jusqu'à 24 heures.",
+    "done_title": "Minuteur Terminé",
+    "add_minute": "+1 Min",
+    "stop": "Arrêter",
+    "channel": "Minuteurs de Cuisine",
+    "alarm_channel": "Alarmes des Minuteurs"
+  },
   "sidebar_ct": {
     "brand": "CookTrace"
   },

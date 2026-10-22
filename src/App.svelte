@@ -353,6 +353,10 @@
       import('./lib/wear-timers.js').then(({ watchTimers }) => watchTimers())
         .catch(() => { /* ignore */ });
 
+      // Cook timers ring from the phone itself, locked or closed (#77).
+      import('./lib/native-timers.js').then(({ phoneTimers }) => phoneTimers())
+        .catch(() => { /* ignore */ });
+
       // Clean stale APKs from Directory.Data/updates/ on boot.
       import('./lib/updates.js').then(({ cleanUpdateCache }) => {
         cleanUpdateCache();

@@ -5,6 +5,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.json.JSONObject
+import java.io.File
 
 /**
  * The decisions the watch makes on its own: what a shopping row says, how a
@@ -90,6 +92,20 @@ class KitchenTest {
         assertEquals(listOf(30), Kitchen.timesIn("Blitz for 30 seconds"))
         // A temperature is not a time.
         assertTrue(Kitchen.timesIn("Heat the oven to 220C").isEmpty())
+    }
+
+    @Test
+    fun `a step's times are the ones the phone finds, in every language`() {
+        // The phone's own cases (scripts/step-times.test.js), so the wrist and
+        // the counter offer the same timers for the same step.
+        val cases = JSONObject(File("../../scripts/step-times.json").readText()).getJSONArray("cases")
+        assertTrue(cases.length() > 0)
+        for (i in 0 until cases.length()) {
+            val case = cases.getJSONObject(i)
+            val times = case.getJSONArray("times")
+            val want = (0 until times.length()).map { times.getJSONArray(it).let { t -> t.getString(0) to t.getInt(1) } }
+            assertEquals(case.getString("text"), want, Kitchen.stepTimes(case.getString("text")))
+        }
     }
 
     @Test

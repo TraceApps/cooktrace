@@ -1618,6 +1618,31 @@
   "cook_timer_rail": {
     "snooze": "Posponer"
   },
+  "cook_timers": {
+    "timer": "Temporizador",
+    "start_a_timer": "Iniciar un Temporizador",
+    "timer_for_step": "Temporizador del Paso {n}",
+    "start": "Iniciar",
+    "name": "Nombre",
+    "optional": "(opcional)",
+    "name_placeholder": "Para qué es, como Pasta",
+    "quick_picks": "Tiempos Rápidos",
+    "keypad": "Teclado",
+    "backspace": "Borrar Último Dígito",
+    "length_aria": "{h, plural, one {# hora} other {# horas}}, {m, plural, one {# minuto} other {# minutos}}, {s, plural, one {# segundo} other {# segundos}}",
+    "unit_h": "h",
+    "unit_m": "m",
+    "unit_s": "s",
+    "minutes_short": "{n} min",
+    "hours_short": "{n} h",
+    "hours_minutes_short": "{h} h {m} min",
+    "too_long": "Un temporizador puede durar hasta 24 horas.",
+    "done_title": "Temporizador Terminado",
+    "add_minute": "+1 Min",
+    "stop": "Detener",
+    "channel": "Temporizadores de Cocina",
+    "alarm_channel": "Alarmas de Temporizador"
+  },
   "sidebar_ct": {
     "brand": "CookTrace"
   },
