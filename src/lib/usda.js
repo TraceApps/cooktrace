@@ -93,9 +93,14 @@ const _USDA_NUTRIENT_MAP = {
   1185: 'vitamin-k',        // mcg
 };
 
-function _mapProduct(item, servingSize) {
-  // Normalise nutrients to per-100g.
-  const factor = (servingSize && servingSize > 0) ? (100 / servingSize) : 1;
+// FoodData Central gives every nutrient per 100 g (or 100 ml), for every data
+// type: the search's `value` and the detail's `amount`, Branded included. For
+// Branded foods USDA works them out from the label's per-serving numbers, and
+// `servingSize` only notes the label's serving. They were once scaled by
+// 100 / servingSize as if per serving (TraceApps/nutritrace#290). Sources:
+// https://fdc.nal.usda.gov/GBFPD_Documentation and food_nutrient.amount in
+// https://fdc.nal.usda.gov/docs/Download_Field_Descriptions_Oct2020.pdf
+export function mapUsdaFood(item) {
   const nutrition = {};
 
   for (const fn of (item.foodNutrients || [])) {
@@ -103,7 +108,7 @@ function _mapProduct(item, servingSize) {
     const key = _USDA_NUTRIENT_MAP[nid];
     const raw = fn.value != null ? fn.value : fn.amount;
     if (key && raw != null) {
-      nutrition[key] = Math.round(raw * factor * 10000) / 10000;
+      nutrition[key] = Math.round(raw * 10000) / 10000;
     }
   }
   // Derive kJ from kcal if missing.
@@ -120,8 +125,9 @@ function _mapProduct(item, servingSize) {
     nutrition.carbohydrates = Math.round(corrected * 10000) / 10000;
   }
 
+  // Branded liquids are per 100 ml. USDA writes the unit as "ml" or "MLT".
   const rawUnit = (item.servingSizeUnit || 'g').toLowerCase();
-  const unit = rawUnit === 'ml' ? 'ml' : 'g';
+  const unit = (rawUnit === 'ml' || rawUnit === 'mlt') ? 'ml' : 'g';
 
   return {
     name:         (item.description || '').trim(),
@@ -149,10 +155,7 @@ export async function searchByName(query, page = 1, apiKey) {
     const res = await _extFetch(url);
     if (!res.ok) return [];
     const data = await res.json();
-    const items = (data.foods || []).map(f => {
-      const ss = (f.servingSize && !isNaN(f.servingSize)) ? f.servingSize : 100;
-      return _mapProduct(f, ss);
-    }).filter(f => f.name);
+    const items = (data.foods || []).map(f => mapUsdaFood(f)).filter(f => f.name);
     return _rankUSDAResults(items);
   } catch (e) {
     console.warn('[usda] search failed:', e);
@@ -172,10 +175,33 @@ export async function lookupBarcode(barcode, apiKey) {
       f.gtinUpc && (f.gtinUpc === barcode || f.gtinUpc === barcode.replace(/^0+/, ''))
     );
     if (!match) return null;
-    const ss = (match.servingSize && !isNaN(match.servingSize)) ? match.servingSize : 100;
-    return _mapProduct(match, ss);
+    return mapUsdaFood(match);
   } catch (e) {
     console.warn('[usda] barcode lookup failed:', e);
     return null;
   }
+}
+
+/** The fdcId in a barcode ("fdcId_171688"), or null. */
+export function usdaFdcId(barcode) {
+  const m = /^fdcId_(\d+)$/.exec(String(barcode || '').trim());
+  return m ? m[1] : null;
+}
+
+/**
+ * Refresh from USDA in the pantry sheet (TraceApps/nutritrace#290): the item
+ * again: by its fdcId_ barcode, or by GTIN for a Branded item (those are kept
+ * under their GTIN). Returns null when USDA does not have it. An fdcId_ lookup
+ * throws when the request fails; a GTIN one reads that as not found, as
+ * lookupBarcode always has.
+ */
+export async function lookupForRefresh(barcode, apiKey) {
+  if (!apiKey || !barcode) return null;
+  const fdcId = usdaFdcId(barcode);
+  if (!fdcId) return lookupBarcode(barcode, apiKey);
+  const res = await _extFetch(`${USDA_BASE}/food/${encodeURIComponent(fdcId)}?api_key=${encodeURIComponent(apiKey)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('USDA ' + res.status);
+  const item = await res.json();
+  return item && item.fdcId ? mapUsdaFood(item) : null;
 }

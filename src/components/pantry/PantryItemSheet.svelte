@@ -52,7 +52,9 @@
   import { displayVariantName as _sharedDisplayVariantName, isItemInStock, stockAfterToggle, stockAfterStep } from '../../lib/pantry-variants.js';
   import { isOfflineError } from '../../lib/offline-edits.js';
   import { foldText } from '../../lib/search-text.js';
-  import { visibleNutriments, offEnabled, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks } from '../../stores/settings.js';
+  import { lookupForRefresh as usdaLookupForRefresh, usdaFdcId } from '../../lib/usda.js';
+  import { offlineState } from '../../lib/offline-api.js';
+  import { visibleNutriments, offEnabled, usdaEnabled, usdaApiKey, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks } from '../../stores/settings.js';
   import { scanNutritionLabel } from '../../lib/scan-nutrition.js';
   import PantryAllergens from './PantryAllergens.svelte';
   import { household } from '../../stores/settings.js';
@@ -166,6 +168,8 @@
   // OFF state
   let downloading = false;
   let downloadSuccess = false;
+  let refreshSource = 'off';  // which Refresh button the state above belongs to
+  let nutritionRev = 0;       // bumped when a refresh replaces the nutrition
   let contributing = false;
   let offSuccess = false;
   // No Open Food Facts login: ask for it here, without leaving (TraceApps/nutritrace#284).
@@ -705,28 +709,54 @@
 
   async function downloadFromOFF() {
     if (!draft.barcode) { showError($_('pantry_sheet_extra.toast.enter_barcode')); return; }
-    downloading = true; downloadSuccess = false;
+    refreshSource = 'off'; downloading = true; downloadSuccess = false;
     try {
       const result = await lookupBarcode(draft.barcode);
       if (!result) { showError($_('pantry_sheet_extra.toast.not_found_off')); return; }
-      if (!draft.name) draft.name = result.name || '';
-      if (!draft.brand) draft.brand = result.brand || '';
-      draft.serving_size = result.serving_size ?? draft.serving_size;
-      draft.serving_unit = result.serving_unit || draft.serving_unit;
-      draft.nutrition = deriveSodiumSalt({ ...(draft.nutrition || {}), ...(result.nutrition || {}) });
-      if (result.img_url && !draft.img_url) draft.img_url = result.img_url;
-      // The label's allergens, unless they were set by hand here.
-      if (result.allergens != null && draft.allergens_source !== 'user') {
-        draft.allergens = result.allergens;
-        draft.traces = result.traces || [];
-        draft.allergens_source = 'label';
-      }
-      _lastServingSize = draft.serving_size;
-      draft = { ...draft };
-      downloadSuccess = true;
-      setTimeout(() => downloadSuccess = false, 2000);
+      _applyRefresh(result);
     } catch (e) { showError(failed('fail.off_lookup', e)); }
     finally { downloading = false; }
+  }
+
+  // Refresh from USDA (TraceApps/nutritrace#290): Refresh from OFF with the
+  // item looked up on USDA instead, by its fdcId_ barcode or its GTIN. Items
+  // added from USDA before #290 were scaled by 100 / serving size, and this
+  // is how one gets USDA's real values back without re-adding it.
+  $: usdaId = usdaFdcId(draft?.barcode);
+  $: showUsdaRefresh = !!draft?.barcode && !!(usdaId || ($usdaEnabled && $usdaApiKey));
+  async function downloadFromUSDA() {
+    if (!draft.barcode) return;
+    if (!$usdaEnabled || !$usdaApiKey) { showError($_('pantry_sheet_extra.toast.usda_needs_key')); return; }
+    if ($offlineState.online === false) { showError($_('pantry_sheet_extra.toast.usda_offline')); return; }
+    refreshSource = 'usda'; downloading = true; downloadSuccess = false;
+    try {
+      const result = await usdaLookupForRefresh(draft.barcode, $usdaApiKey);
+      if (!result) { showError($_('pantry_sheet_extra.toast.not_found_usda')); return; }
+      _applyRefresh(result);
+    } catch (e) { showError(failed('fail.usda_lookup', e)); }
+    finally { downloading = false; }
+  }
+
+  // What both refreshes do with the result: nutrition and serving from the
+  // source, name, brand and photo only when empty.
+  function _applyRefresh(result) {
+    if (!draft.name) draft.name = result.name || '';
+    if (!draft.brand) draft.brand = result.brand || '';
+    draft.serving_size = result.serving_size ?? draft.serving_size;
+    draft.serving_unit = result.serving_unit || draft.serving_unit;
+    draft.nutrition = deriveSodiumSalt({ ...(draft.nutrition || {}), ...(result.nutrition || {}) });
+    if (result.img_url && !draft.img_url) draft.img_url = result.img_url;
+    // The label's allergens, unless they were set by hand here.
+    if (result.allergens != null && draft.allergens_source !== 'user') {
+      draft.allergens = result.allergens;
+      draft.traces = result.traces || [];
+      draft.allergens_source = 'label';
+    }
+    _lastServingSize = draft.serving_size;
+    draft = { ...draft };
+    nutritionRev++;
+    downloadSuccess = true;
+    setTimeout(() => downloadSuccess = false, 2000);
   }
 
   async function _refreshOffPresence() {
@@ -1077,8 +1107,9 @@
                   </button>
                 </div>
               </label>
-              {#if $offEnabled && draft.barcode}
+              {#if ($offEnabled || showUsdaRefresh) && draft.barcode}
                 <div class="off-actions">
+                  {#if $offEnabled}
                   <button type="button" class="btn btn-secondary off-btn"
                     on:click={shareOrViewOnOFF} disabled={contributing}
                     title={offProductExists ? $_('pantry_item_sheet_ui.off_open_title') : !draft.name ? $_('pantry_item_sheet_ui.off_name_required') : $_('pantry_item_sheet_ui.off_submit_title')}>
@@ -1087,12 +1118,23 @@
                     </span>
                     {contributing ? $_('pantry_editor.actions.uploading') : offSuccess ? $_('pantry_item_sheet_ui.off_submitted') : offProductExists ? $_('pantry_item_sheet_ui.off_view') : $_('pantry_editor.actions.share_to_off')}
                   </button>
+                  {#if !usdaId}
                   <button type="button" class="btn btn-secondary off-btn"
                     on:click={downloadFromOFF} disabled={downloading}
                     title={$_('pantry_item_sheet_ui.off_pull_title')}>
                     <span class="material-symbols-rounded off-btn-ico">download</span>
-                    {downloading ? $_('common.loading') : downloadSuccess ? $_('pantry_item_sheet_ui.off_updated') : $_('pantry_editor.actions.refresh_off')}
+                    {downloading && refreshSource === 'off' ? $_('common.loading') : downloadSuccess && refreshSource === 'off' ? $_('pantry_item_sheet_ui.off_updated') : $_('pantry_editor.actions.refresh_off')}
                   </button>
+                  {/if}
+                  {/if}
+                  {#if showUsdaRefresh}
+                  <button type="button" class="btn btn-secondary off-btn"
+                    on:click={downloadFromUSDA} disabled={downloading}
+                    title={$_('pantry_item_sheet_ui.usda_pull_title')}>
+                    <span class="material-symbols-rounded off-btn-ico">download</span>
+                    {downloading && refreshSource === 'usda' ? $_('common.loading') : downloadSuccess && refreshSource === 'usda' ? $_('pantry_item_sheet_ui.off_updated') : $_('pantry_editor.actions.refresh_usda')}
+                  </button>
+                  {/if}
                 </div>
                 {#if offNeedsAccount}
                   <OffAccountInline on:saved={() => { offNeedsAccount = false; shareOrViewOnOFF(); }} />
@@ -1273,6 +1315,8 @@
               <input type="file" accept="image/*" capture="environment"
                 bind:this={scanLabelFileInput} style="display:none" />
               <div class="nutrient-grid">
+                <!-- A refresh replaces the numbers: the inputs read them only when drawn. -->
+                {#key nutritionRev}
                 {#each visibleInlineNutriments as n}
                   {@const derived = (n.id === 'sodium' || n.id === 'salt') && isDerived(draft.nutrition, n.id)}
                   <label class="nutrient-row">
@@ -1292,6 +1336,7 @@
                     </span>
                   </label>
                 {/each}
+                {/key}
               </div>
               <!-- Full-width ghost button under the nutrient grid,
                    matching NT FoodEditor's "Show all nutrients" spot.
