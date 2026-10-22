@@ -53,6 +53,11 @@ const endpoint = http.createServer((req, res) => {
   req.on('end', () => {
     const b = JSON.parse(raw || '{}');
     seen.push({ path: req.url, body: b });
+    // Gemini takes only a JSON object as a tool's answer (TraceApps/lifttrace#147).
+    const notObject = (r) => r === null || typeof r !== 'object' || Array.isArray(r);
+    if (req.url.startsWith('/gemini') && (b.contents || []).some((c) => c.parts?.some((p) => p.functionResponse && notObject(p.functionResponse.response)))) {
+      return res.writeHead(400, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: { code: 400, message: 'functionResponse.response must be a JSON object.', status: 'INVALID_ARGUMENT' } }));
+    }
     const n = toolRounds(b, req.url);
     let out;
     if (req.url.startsWith('/claude')) {
