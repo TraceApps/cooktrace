@@ -911,6 +911,8 @@
     "monthly":                  "Monthly",
     "time":                     "Time",
     "keep_last":                "Keep Last",
+    "zone_differs":             "Backups run at {time} in {zone}, which is {local} where you are. Use My Time Zone runs them at {time} on your clock.",
+    "use_my_zone":              "Use My Time Zone",
     "col_name":                 "Name",
     "col_created":              "Created",
     "col_size":                 "Size",
