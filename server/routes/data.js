@@ -27,6 +27,8 @@ const TABLES_HARD = [
   'pantry_categories',
   'custom_units',
   'disabled_units',
+  // Earlier versions of the user's recipes.
+  'recipe_versions',
 ];
 
 router.delete('/', wrap((req, res) => {

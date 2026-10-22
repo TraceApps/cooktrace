@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { foldText } from './lib/search-text.js';
+import { SYNC_FIELDS } from './lib/sync-fields.js';
 
 const dbPath = process.env.DB_PATH || './cooktrace.db';
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -851,6 +852,139 @@ db.exec(`
     });
     tx();
   }
+}
+
+// ── Sync cursor ────────────────────────────────────────────────────────────
+// synced_at is the SERVER's clock time of the last write to a row, stamped
+// by triggers so every write path (REST routes, sync push, restore) is
+// covered. /api/sync/pull filters on it. updated_at can't serve as the
+// pull cursor: a device stamps updated_at when the user edits, which may
+// be long before the edit reaches the server, so an offline edit could
+// land behind another device's last pull and never be sent to it.
+// Rows that predate the column get the time it was added, so every
+// device pulls everything once and picks up edits it missed before.
+{
+  const STAMP = `strftime('%Y-%m-%d %H:%M:%f', 'now')`;
+  for (const t of ['recipe_categories', 'pantry_categories', 'custom_units', 'cookbooks', 'recipes',
+                   'pantry_items', 'cook_diary', 'shopping_list', 'recipe_comments', 'ai_chat_history']) {
+    if (!columnExists(t, 'synced_at')) {
+      db.exec(`ALTER TABLE ${t} ADD COLUMN synced_at TEXT`);
+      db.exec(`UPDATE ${t} SET synced_at = ${STAMP} WHERE synced_at IS NULL`);
+    }
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_${t}_synced ON ${t}(synced_at)`);
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS trg_${t}_synced_ins AFTER INSERT ON ${t}
+      BEGIN UPDATE ${t} SET synced_at = ${STAMP} WHERE id = NEW.id; END;
+      CREATE TRIGGER IF NOT EXISTS trg_${t}_synced_upd AFTER UPDATE ON ${t}
+      BEGIN UPDATE ${t} SET synced_at = ${STAMP} WHERE id = NEW.id; END;
+    `);
+  }
+  if (!columnExists('user_settings', 'synced_at')) {
+    db.exec(`ALTER TABLE user_settings ADD COLUMN synced_at TEXT`);
+    db.exec(`UPDATE user_settings SET synced_at = ${STAMP} WHERE synced_at IS NULL`);
+  }
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS trg_user_settings_synced_ins AFTER INSERT ON user_settings
+    BEGIN UPDATE user_settings SET synced_at = ${STAMP} WHERE user_id IS NEW.user_id AND key = NEW.key; END;
+    CREATE TRIGGER IF NOT EXISTS trg_user_settings_synced_upd AFTER UPDATE ON user_settings
+    BEGIN UPDATE user_settings SET synced_at = ${STAMP} WHERE user_id IS NEW.user_id AND key = NEW.key; END;
+  `);
+  // Tables without a deleted_at column lose rows outright. Each delete
+  // is noted here so /api/sync/pull can tell devices to drop the row too.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sync_deletions (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      table_name TEXT NOT NULL,
+      row_id     INTEGER NOT NULL,
+      synced_at  TEXT NOT NULL DEFAULT (${STAMP})
+    );
+    CREATE INDEX IF NOT EXISTS idx_sync_deletions_user ON sync_deletions(user_id, synced_at);
+  `);
+  // Only while the account is there: deleting an account removes its
+  // rows too, and there's no device left to tell.
+  for (const t of ['recipe_categories', 'pantry_categories', 'custom_units', 'ai_chat_history']) {
+    db.exec(`
+      CREATE TRIGGER IF NOT EXISTS trg_${t}_sync_del AFTER DELETE ON ${t}
+      FOR EACH ROW WHEN OLD.user_id IS NULL OR EXISTS (SELECT 1 FROM users WHERE id = OLD.user_id)
+      BEGIN INSERT INTO sync_deletions (user_id, table_name, row_id) VALUES (OLD.user_id, '${t}', OLD.id); END;
+    `);
+  }
+  // A year is far longer than any device stays offline between syncs.
+  db.exec(`DELETE FROM sync_deletions WHERE synced_at < strftime('%Y-%m-%d %H:%M:%f', 'now', '-365 days')`);
+
+  // The chat's updated_at trigger above fires on any update that leaves
+  // updated_at alone, which the stamp itself is; it would overwrite a
+  // device's edit time with the server's. Only a write to the message
+  // itself counts.
+  db.exec(`
+    DROP TRIGGER IF EXISTS trg_ai_chat_history_updated_at_upd;
+    CREATE TRIGGER trg_ai_chat_history_updated_at_upd
+    AFTER UPDATE OF role, content ON ai_chat_history
+    FOR EACH ROW WHEN NEW.updated_at IS OLD.updated_at
+    BEGIN
+      UPDATE ai_chat_history SET updated_at = datetime('now') WHERE id = NEW.id;
+    END;
+  `);
+}
+
+// ── Earlier versions of a recipe ──────────────────────────────────────────
+// When a sync meets two edits of one recipe, the newer stays and the other
+// is kept here (server/lib/recipe-versions.js), as is the copy a restore
+// replaces. `seen` is whether the owner has looked since it was kept;
+// `edited_by` whose edit it was (the owner, or a kitchen member).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS recipe_versions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipe_id  INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+    user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    data       TEXT NOT NULL,
+    reason     TEXT NOT NULL DEFAULT 'conflict',
+    created_at TEXT DEFAULT (datetime('now')),
+    seen       INTEGER NOT NULL DEFAULT 0,
+    edited_by  INTEGER REFERENCES users(id) ON DELETE SET NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_recipe_versions_recipe ON recipe_versions(recipe_id, id);
+`);
+
+// When each synced field of a row last changed here: field_stamps holds
+// { field: [synced_at, updated_at] } of the write that changed it. Two
+// edits of a row meet field by field (lib/field-merge.js): a field changed
+// here since a device's copy is one the device's edit competes with, and
+// one that wasn't is simply the device's to change. Logging a cook or making
+// a share link changes none of a recipe's fields an edit competes with, and
+// reordering a list changes only sort_order. Kept by triggers, so every
+// write path counts. Rows from before have none: every field then counts as
+// changed at the row's own times.
+{
+  const STAMP = `strftime('%Y-%m-%d %H:%M:%f', 'now')`;
+  for (const [t, fields] of Object.entries(SYNC_FIELDS)) {
+    if (!columnExists(t, 'field_stamps')) db.exec(`ALTER TABLE ${t} ADD COLUMN field_stamps TEXT`);
+    // Rows from before the stamps: a baseline, the last write known now, for
+    // every field without a stamp of its own (lib/field-merge.js fieldStamps).
+    db.exec(`UPDATE ${t} SET field_stamps = json_object('_base', json_array(COALESCE(synced_at, ''), COALESCE(updated_at, ''))) WHERE field_stamps IS NULL`);
+    const all = fields.map(f => `'${f}', json_array(${STAMP}, NEW.updated_at)`).join(', ');
+    db.exec(`
+      DROP TRIGGER IF EXISTS trg_${t}_fields_ins;
+      CREATE TRIGGER trg_${t}_fields_ins AFTER INSERT ON ${t}
+      BEGIN UPDATE ${t} SET field_stamps = json_object(${all}) WHERE id = NEW.id; END;
+    `);
+    for (const f of fields) {
+      db.exec(`
+        DROP TRIGGER IF EXISTS trg_${t}_field_${f};
+        CREATE TRIGGER trg_${t}_field_${f} AFTER UPDATE OF ${f} ON ${t}
+        FOR EACH ROW WHEN OLD.${f} IS NOT NEW.${f}
+        BEGIN UPDATE ${t} SET field_stamps = json_set(COALESCE(field_stamps, json_object('_base', json_array(COALESCE(OLD.synced_at, ''), COALESCE(OLD.updated_at, '')))), '$.${f}', json_array(${STAMP}, NEW.updated_at)) WHERE id = NEW.id; END;
+      `);
+    }
+  }
+}
+
+// The Android app's key for a row it made (lib/create-keys.js), so the same
+// create sent twice (a retry, two syncs at once, an answer lost) makes one row.
+for (const t of Object.keys(SYNC_FIELDS)) {
+  if (!columnExists(t, 'client_key')) db.exec(`ALTER TABLE ${t} ADD COLUMN client_key TEXT DEFAULT NULL`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_${t}_client_key ON ${t}(user_id, client_key)`);
 }
 
 // ── Seed default app_config rows ───────────────────────────────────────────

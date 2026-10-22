@@ -15,9 +15,12 @@
 import { Router } from 'express';
 import { localizeDataUrl } from '../lib/image-localizer.js';
 import db from '../db.js';
+import { saveRow } from '../lib/rest-merge.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { dispatchWebhookEvent } from '../lib/webhooks.js';
+import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
+import { linkableRecipeId } from '../lib/link-checks.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -160,13 +163,21 @@ router.get('/', wrap((req, res) => {
 // ── POST / — create a planned cook ─────────────────────────────────────
 router.post('/', wrap((req, res) => {
   const u = uid(req);
+  // Sent before (Connect > Upload again, or an answer lost): the row made
+  // then, not a second one (lib/create-keys.js).
+  const createKey = cleanCreateKey(req.body?.client_key);
+  const made = findByCreateKey('cook_diary', u, createKey);
+  if (made) return res.json(made);
   const body = req.body || {};
   const recipeId = parseInt(body.recipe_id, 10);
   if (!Number.isFinite(recipeId)) return res.status(400).json({ error: 'recipe_id required' });
   const date = (typeof body.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) ? body.date : null;
   if (!date) return res.status(400).json({ error: 'date (YYYY-MM-DD) required' });
 
-  const recipe = db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(recipeId);
+  // The account's own recipe, or one shared with it (lib/link-checks.js):
+  // another account's recipe is not found, and its cook count untouched.
+  const recipe = linkableRecipeId(recipeId, u) != null
+    ? db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(recipeId) : null;
   if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
 
   const kind = body.kind === 'cooked' ? 'cooked' : 'planned';
@@ -183,6 +194,7 @@ router.post('/', wrap((req, res) => {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(u, recipeId, date, kind, servings, notes, photoUrl, mealType, rating);
 
+  setCreateKey('cook_diary', result.lastInsertRowid, createKey);
   if (kind === 'cooked') recomputeRecipeAggregates(recipeId);
 
   const row = db.prepare(`SELECT * FROM cook_diary WHERE id = ?`).get(result.lastInsertRowid);
@@ -210,18 +222,17 @@ router.put('/:id', wrap((req, res) => {
   }
   const body = req.body || {};
   const date = (typeof body.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) ? body.date : existing.date;
-  const kind = body.kind === 'cooked' || body.kind === 'planned' ? body.kind : existing.kind;
+  const kindIn = body.kind === 'cooked' || body.kind === 'planned' ? body.kind : existing.kind;
   const notes = body.notes !== undefined ? (body.notes ? String(body.notes).trim() || null : null) : existing.notes;
   const photoUrl = body.photo_url !== undefined ? localizeDataUrl(body.photo_url ?? null) : existing.photo_url;
   const servings = body.servings !== undefined ? (body.servings === '' || body.servings == null ? null : Number(body.servings)) : existing.servings;
   const mealType = body.meal_type !== undefined ? _coerceMealType(body.meal_type) : existing.meal_type;
   const rating   = body.rating    !== undefined ? _coerceRating(body.rating)      : existing.rating;
 
-  db.prepare(
-    `UPDATE cook_diary SET date = ?, kind = ?, notes = ?, photo_url = ?, servings = ?,
-        meal_type = ?, rating = ?, updated_at = datetime('now')
-     WHERE id = ?`
-  ).run(date, kind, notes, photoUrl, servings, mealType, rating, id);
+  // With _sync, merged with changes made elsewhere (lib/rest-merge.js):
+  // what stays may not be all of this save.
+  saveRow('cook_diary', id, existing, { date, kind: kindIn, notes, photo_url: photoUrl, servings, meal_type: mealType, rating }, body._sync);
+  const kind = db.prepare(`SELECT kind FROM cook_diary WHERE id = ?`).get(id).kind;
 
   // Recompute aggregates if cooked-state or recipe changed.
   if (existing.kind !== kind || existing.recipe_id) recomputeRecipeAggregates(existing.recipe_id);

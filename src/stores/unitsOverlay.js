@@ -13,25 +13,39 @@ const EMPTY = { disabled: [], custom: [] };
 let _loaded = false;
 let _inflight = null;
 
-export const unitsOverlay = writable(EMPTY);
+// Loads when the first component subscribes (a UnitPicker on screen), not
+// when the module is imported: importing the app pulled this in on the
+// sign-in screen, where the request could only be refused.
+export const unitsOverlay = writable(EMPTY, () => {
+  if (!_loaded && !_inflight) refreshUnitsOverlay();
+});
 
+// Moves when the account changes: a read started before doesn't land.
+let _gen = 0;
 async function _fetch() {
+  const gen = _gen;
   try {
     const res = await NtApi.getUnits();
-    unitsOverlay.set({ disabled: res?.disabled || [], custom: res?.custom || [] });
+    if (gen === _gen) unitsOverlay.set({ disabled: res?.disabled || [], custom: res?.custom || [] });
   } catch {
-    unitsOverlay.set(EMPTY);
+    if (gen === _gen) unitsOverlay.set(EMPTY);
   }
 }
 
 /** Trigger a fetch. Returns a Promise so callers (e.g. Manage edits)
  *  can await consistency before the next render. */
 export function refreshUnitsOverlay() {
-  _inflight = _fetch().finally(() => { _loaded = true; _inflight = null; });
-  return _inflight;
+  const gen = _gen;
+  const p = _fetch().finally(() => { if (gen === _gen) { _loaded = true; _inflight = null; } });
+  _inflight = p;
+  return p;
 }
 
-// Auto-load on first store subscription. Idempotent.
-unitsOverlay.subscribe(() => {
-  if (!_loaded && !_inflight) refreshUnitsOverlay();
-});
+/** Another account (or none): forget this one's units; the next picker on
+ *  screen reads them again (lib/user-state.js). */
+export function resetUnitsOverlay() {
+  _gen++;
+  _loaded = false;
+  _inflight = null;
+  unitsOverlay.set(EMPTY);
+}

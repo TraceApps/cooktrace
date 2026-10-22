@@ -176,7 +176,9 @@ const _CtApiHttp = {
       applyTags: !!opts.applyTags,
       importCategories: opts.importCategories !== false,
     };
-    return this._imgFromApi(await this.post('/api/recipes/scrape', body));
+    const res = await this.post('/api/recipes/scrape', body);
+    // { skipped, existing_id } when the recipe is already in the catalog.
+    return res?.skipped ? res : this._imgFromApi(res);
   },
   async importRecipe({ text, file, addToPantry = true, applyTags = false, importCategories = true } = {}) {
     if (file) {
@@ -186,14 +188,15 @@ const _CtApiHttp = {
       form.append('applyTags', applyTags ? 'true' : 'false');
       form.append('importCategories', importCategories ? 'true' : 'false');
       const res = await this._fetch('POST', '/api/recipes/import', form, true);
-      // Paprika archive returns { recipes, count }; single returns a row.
-      if (res?.recipes) return { recipes: res.recipes.map(r => this._imgFromApi(r)), count: res.count };
-      return this._imgFromApi(res);
+      // Paprika archive returns { recipes, count, skipped }; single returns
+      // a row, or { skipped, existing_id } for a duplicate.
+      if (res?.recipes) return { recipes: res.recipes.map(r => this._imgFromApi(r)), count: res.count, skipped: res.skipped || [] };
+      return res?.skipped ? res : this._imgFromApi(res);
     }
     const body = { text, addToPantry, applyTags, importCategories };
     const res = await this.post('/api/recipes/import', body);
-    if (res?.recipes) return { recipes: res.recipes.map(r => this._imgFromApi(r)), count: res.count };
-    return this._imgFromApi(res);
+    if (res?.recipes) return { recipes: res.recipes.map(r => this._imgFromApi(r)), count: res.count, skipped: res.skipped || [] };
+    return res?.skipped ? res : this._imgFromApi(res);
   },
   // Bulk zip import (Mealie / Tandoor / Paprika backups). Two-step:
   // scan returns a manifest the UI renders as a picker; commit writes
@@ -255,6 +258,12 @@ const _CtApiHttp = {
   // Recipe sharing — public link tokens
   mintRecipeShareToken(id)              { return this.post(`/api/recipes/${id}/share`); },
   revokeRecipeShareToken(id)            { return this.del(`/api/recipes/${id}/share`); },
+
+  // Earlier versions: copies of a recipe a sync didn't keep, and the copy
+  // each restore replaced. Held by the server, so the Android app asks it.
+  getRecipeVersions(id)                 { return this.get(`/api/recipes/${id}/versions`); },
+  markRecipeVersionsSeen(id)            { return this.post(`/api/recipes/${id}/versions/seen`); },
+  async restoreRecipeVersion(id, versionId) { return this._imgFromApi(await this.post(`/api/recipes/${id}/versions/${versionId}/restore`)); },
 
   // Recipe sharing — per-user grants
   getSharePeers()                            { return this.get('/api/recipes/peers'); },
@@ -452,6 +461,8 @@ const SERVER_ONLY_METHODS = new Set([
   'getSharePeers', 'getRecipeShares', 'shareRecipeWithUsers',
   'unshareRecipeWithUser', 'mintRecipeShareToken',
   'revokeRecipeShareToken', 'getRecipesSharedWithMe',
+  // A recipe's earlier versions live on the server (sync keeps them there).
+  'getRecipeVersions', 'markRecipeVersionsSeen', 'restoreRecipeVersion',
   'getUsersList', 'getAppConfig',
   'scanRecipeZip', 'commitRecipeZip',
   // Low-level HTTP primitives — used by components that don't have a
@@ -480,6 +491,11 @@ async function _uploadImageConnected(file) {
 }
 
 // Dynamic proxy — picks the right impl per call based on platform mode.
+const _withoutSaveHints = fn => (...args) => fn(...args.map(a => (
+  a && typeof a === 'object' && !Array.isArray(a) && ('_base' in a || '_changed' in a)
+    ? (({ _base, _changed, ...rest }) => rest)(a) : a
+)));
+
 export const NtApi = new Proxy({}, {
   get(_, prop) {
     // Special-case uploadImage in native connected mode: server-first
@@ -494,7 +510,12 @@ export const NtApi = new Proxy({}, {
     else if (!getServerUrl())                                  impl = CtApiNative;
     else if (SERVER_ONLY_METHODS.has(prop))                    impl = _CtApiHttp;
     else                                                       impl = CtApiCached;
-    return typeof impl[prop] === 'function' ? impl[prop].bind(impl) : impl[prop];
+    const fn = typeof impl[prop] === 'function' ? impl[prop].bind(impl) : impl[prop];
+    // What a web save says about its copy (_base, _changed) means nothing
+    // to the phone's own database, which tracks its edits itself. A recipe
+    // save keeps it: one shared with the phone goes to the server.
+    if (isNative && impl !== _CtApiHttp && typeof fn === 'function' && prop !== 'updateRecipe') return _withoutSaveHints(fn);
+    return fn;
   },
 });
 

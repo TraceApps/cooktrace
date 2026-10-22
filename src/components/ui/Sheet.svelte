@@ -1,5 +1,13 @@
+<script context="module">
+  // Open sheets, the newest last: only the top one answers Escape and
+  // keeps keyboard focus (a sheet can open over another).
+  const _open = [];
+</script>
+
 <script>
   import { closeOnBack } from '../../lib/back-stack.js';
+  import { get } from 'svelte/store';
+  import { confirmRequest } from '../../stores/confirmDialog.js';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut }  from 'svelte/easing';
   import { createEventDispatcher } from 'svelte';
@@ -24,6 +32,45 @@
     dispatch('close');
   }
 
+  // A dialog for the keyboard: focus moves into the sheet when it opens,
+  // Tab stays inside it, Escape closes it (not while a confirmation is open
+  // over it, nor when something inside used it), and focus goes back where
+  // it was when it closes.
+  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  function dialog(node) {
+    const before = document.activeElement;
+    _open.push(node);
+    queueMicrotask(() => { if (!node.contains(document.activeElement)) node.focus({ preventScroll: true }); });
+    const onKey = (e) => {
+      if (_open[_open.length - 1] !== node) return;
+      if (e.key === 'Escape') {
+        // After everything else had the key: a picker or a dialog inside
+        // the sheet that used Escape to close itself marks it handled.
+        setTimeout(() => { if (!e.defaultPrevented && _open[_open.length - 1] === node && !get(confirmRequest)) close(); });
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = [...node.querySelectorAll(FOCUSABLE)].filter(el => el.offsetParent !== null || el === document.activeElement);
+      if (!items.length) { e.preventDefault(); node.focus(); return; }
+      const first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === node)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return {
+      destroy() {
+        window.removeEventListener('keydown', onKey);
+        const i = _open.indexOf(node);
+        if (i >= 0) _open.splice(i, 1);
+        // Back where it was, except into a text field on a touch screen,
+        // where that would open the keyboard again.
+        const typing = before && (before.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(before.tagName));
+        const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+        if (before && typeof before.focus === 'function' && document.contains(before) && !(typing && touch)) before.focus({ preventScroll: true });
+      },
+    };
+  }
+
   function onBackdropClick(e) {
     if (_locked) return;
     if (e.target === e.currentTarget) close();
@@ -36,6 +83,8 @@
   <div use:portal class="sheet-backdrop" on:click={onBackdropClick} use:closeOnBack={close}
     in:fade={{ duration: 200 }} out:fade={{ duration: 160 }}>
     <div
+      use:dialog
+      tabindex="-1"
       class="sheet-panel"
       class:sheet-full={height === 'full'}
       style={height !== 'auto' && height !== 'full' ? `height:${height}` : ''}
@@ -140,4 +189,6 @@
     padding: 0 20px 20px;
   }
   .sheet-body.no-title { padding-top: 16px; }
+  /* Focused to take the keyboard in, not to be pointed at. */
+  .sheet-panel:focus { outline: none; }
 </style>

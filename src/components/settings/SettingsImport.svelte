@@ -32,7 +32,7 @@
   let manifest = null;          // { count, recipes: [...] } from /scan
   let scanning = false;
   let committing = false;
-  let summary = null;           // { imported, failed: [{name, error}] }
+  let summary = null;           // { imported, total, skipped: [{name, existing_id}], failed: [{name, error}] }
 
   // Phase + progress for the XHR-driven upload. `phase`:
   //   'idle'      — nothing in flight
@@ -176,15 +176,19 @@
           if (p.uploaded) phase = 'importing';
         },
       });
+      const skipped = Array.isArray(res.skipped) ? res.skipped : [];
+      const failed = Array.isArray(res.failed) ? res.failed : [];
       summary = {
         imported: res.count || 0,
-        failed: Array.isArray(res.failed) ? res.failed : [],
+        total: (res.count || 0) + skipped.length + failed.length,
+        skipped,
+        failed,
       };
       if (summary.imported > 0) {
-        showSuccess(`Imported ${summary.imported} ${summary.imported === 1 ? 'recipe' : 'recipes'}`);
+        showSuccess($_('settings_import_ct.toast_imported', { values: { count: summary.imported } }));
       }
       if (summary.failed.length > 0) {
-        showError(`${summary.failed.length} ${summary.failed.length === 1 ? 'recipe' : 'recipes'} could not be imported`);
+        showError($_('settings_import_ct.summary_failed', { values: { count: summary.failed.length } }));
       }
     } catch (err) {
       showError(err.message || 'Import failed');
@@ -344,9 +348,9 @@
           </label>
         {/if}
         <div class="opt opt-row">
-          <span class="opt-label">If a recipe already exists:</span>
-          <select class="select sel-sm" bind:value={dedup}>
-            <option value="skip">Skip it (default)</option>
+          <span class="opt-label">{$_('settings_import_ct.dup_label')}</span>
+          <select class="select sel-sm" bind:value={dedup} aria-label={$_('settings_import_ct.dup_label')}>
+            <option value="skip">{$_('settings_import_ct.opt_skip')}</option>
             <option value="replace">{$_('settings_import_ct.opt_replace')}</option>
             <option value="force">{$_('settings_import_ct.opt_force')}</option>
           </select>
@@ -404,24 +408,51 @@
         <span class="material-symbols-rounded summary-icon">check_circle</span>
         <div>
           <div class="summary-title">
-            Imported {summary.imported} {summary.imported === 1 ? 'recipe' : 'recipes'}
+            {#if summary.imported === summary.total}
+              {$_('settings_import_ct.summary_all', { values: { count: summary.imported } })}
+            {:else}
+              {$_('settings_import_ct.summary_partial', { values: { imported: summary.imported, total: summary.total } })}
+            {/if}
           </div>
+          {#if summary.skipped.length > 0}
+            <div class="summary-sub">{$_('settings_import_ct.summary_dupes', { values: { count: summary.skipped.length } })}</div>
+          {/if}
           {#if summary.failed.length > 0}
-            <div class="summary-sub error">
-              {summary.failed.length} skipped because of errors
-            </div>
-          {:else}
-            <div class="summary-sub">All set. Find them on the Recipes tab.</div>
+            <div class="summary-sub error">{$_('settings_import_ct.summary_failed', { values: { count: summary.failed.length } })}</div>
+          {/if}
+          {#if summary.imported > 0 && summary.skipped.length === 0 && summary.failed.length === 0}
+            <div class="summary-sub">{$_('settings_import_ct.summary_find')}</div>
           {/if}
         </div>
       </div>
 
+      {#if summary.skipped.length > 0}
+        <div class="summary-group">
+          <div class="summary-group-title">{$_('settings_import_ct.dupes_heading')}</div>
+          <p class="summary-group-hint">{$_('settings_import_ct.dupes_hint')}</p>
+          <ul class="skipped-list">
+            {#each summary.skipped as d}
+              <li>
+                {#if d.existing_id}
+                  <a href={`#/recipes/${d.existing_id}`}>{d.name}</a>
+                {:else}
+                  {d.name}
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
+
       {#if summary.failed.length > 0}
-        <ul class="failed">
-          {#each summary.failed as f}
-            <li><strong>{f.name}</strong> — <span class="muted">{f.error}</span></li>
-          {/each}
-        </ul>
+        <div class="summary-group">
+          <div class="summary-group-title">{$_('settings_import_ct.failed_heading')}</div>
+          <ul class="failed">
+            {#each summary.failed as f}
+              <li><strong>{f.name}</strong>: <span class="muted">{f.error}</span></li>
+            {/each}
+          </ul>
+        </div>
       {/if}
 
       <div class="actions">
@@ -648,6 +679,38 @@
     overflow-y: auto;
   }
   .failed li { padding: 3px 0; line-height: 1.4; }
+
+  /* Duplicates skipped on purpose: listed plainly, not as errors. */
+  .summary-group { margin: 0 0 12px; }
+  .summary-group-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-2);
+    margin-bottom: 6px;
+  }
+  .summary-group-hint {
+    margin: 0 0 8px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-2);
+  }
+  .summary-group .failed { margin-bottom: 0; }
+  .skipped-list {
+    list-style: none;
+    margin: 0;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    font-size: 13px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .skipped-list li { padding: 3px 0; line-height: 1.4; }
+  .skipped-list a { color: var(--text-1); text-decoration: underline; text-decoration-color: var(--border-strong); }
+  .skipped-list a:hover { color: var(--accent); }
 
   /* Upload + scan progress strip. The track is a thin pill; the fill
      animates width during upload, runs an indeterminate sweep when

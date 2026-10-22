@@ -307,8 +307,8 @@
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
       // Wipe per-user prefixed localStorage so client-side stores reset
       // to defaults on reload. Mirrors NT's prefix logic verbatim.
-      const userId = localStorage.getItem('wl:userId');
-      const prefix = userId ? `wl_u${userId}_` : 'wl_';
+      const { settingPrefix } = await import('../../lib/setting-key.js');
+      const prefix = settingPrefix();
       const keys = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);

@@ -1,5 +1,8 @@
 import { writable, get, derived } from 'svelte/store';
 import { DB } from '../lib/db.js';
+import { settingPrefix } from '../lib/setting-key.js';
+// Whose settings: the account (and server) they're kept for.
+const _userKey = () => settingPrefix();
 
 const _dlog = import.meta.env.DEV
   ? console.log
@@ -126,7 +129,11 @@ export function scheduleSave(key, value) {
   if (!SERVER_SETTINGS.has(key)) return;
   if (_suppressSync) return;
   clearTimeout(_saveQueue[key]);
+  // The account the change was made for: if another one is signed in by
+  // the time it goes, it doesn't go (it would land in that account).
+  const forUser = _userKey();
   _saveQueue[key] = setTimeout(async () => {
+    if (_userKey() !== forUser) return;
     if (!_shouldSyncToServer()) return;
     try {
       const url = _settingsUrl();
@@ -151,6 +158,26 @@ export function scheduleSave(key, value) {
   }, 600);
 }
 
+/**
+ * A setting changed here, into the phone's copy (Android), where the sync
+ * sends it and an account switch counts it as a change waiting. Only into
+ * a copy that is this account's: the account signing in writes its own
+ * settings as the app starts, before the app has checked whose copy the
+ * phone holds (lib/local-account.js), and they'd count as the last
+ * account's changes. Nor while signed out. They still go straight to the
+ * server (scheduleSave).
+ */
+export async function mirrorSetting(key, value) {
+  if (!isNative) return;
+  // Signed out on a server: nobody's change (the app sets defaults as it
+  // starts on the sign-in screen).
+  if (getServerUrl() && !getAuthToken()) return;
+  const { localDataIsThisAccount } = await import('../lib/local-account.js');
+  if (!(await localDataIsThisAccount().catch(() => false))) return;
+  const { dbUpsertSetting } = await import('../lib/db-native.js');
+  await dbUpsertSetting(key, value);
+}
+
 export async function bulkSet(settingsObj) {
   if (!settingsObj || typeof settingsObj !== 'object') return;
   const entries = Object.entries(settingsObj);
@@ -164,8 +191,7 @@ export async function bulkSet(settingsObj) {
 
   if (isNative && userPrefEntries.length > 0) {
     try {
-      const { dbUpsertSetting } = await import('../lib/db-native.js');
-      for (const [key, value] of userPrefEntries) await dbUpsertSetting(key, value);
+      for (const [key, value] of userPrefEntries) await mirrorSetting(key, value);
     } catch (e) {
       console.warn('[settings] bulk native upsert failed:', e.message);
     }
@@ -212,7 +238,11 @@ export async function loadServerSettings() {
       if (DEVICE_PREFS.has(key)) continue;
       DB.setSetting(key, value, true);
     }
-    if (isNative) {
+    // Only into a copy that is this account's: signing in as someone else
+    // loads their settings before the app has checked whose copy the phone
+    // holds (lib/local-account.js), and they'd land in the last account's.
+    const ownCopy = isNative && await import('../lib/local-account.js').then(m => m.localDataIsThisAccount()).catch(() => false);
+    if (ownCopy) {
       try {
         const { dbUpsertSetting, dbMarkSettingsSynced } = await import('../lib/db-native.js');
         const keys = [];
@@ -250,15 +280,37 @@ if (typeof window !== 'undefined') {
     if (_suppressSync) return;
     const value = DB.getSetting(key, undefined);
     _recentlyChanged.set(key, Date.now());
-    if (isNative) {
-      import('../lib/db-native.js').then(({ dbUpsertSetting }) => dbUpsertSetting(key, value)).catch(() => {});
-    }
+    if (isNative) mirrorSetting(key, value).catch(() => {});
     scheduleSave(key, value);
   });
 }
 
+// Every setting store, so they can all be read again for another account
+// (reloadSettingStores). Settings are kept per account in this app's
+// storage (lib/db.js, lib/setting-key.js), but a store holds the value it
+// read when the app started; without this, the next account to sign in saw
+// the last one's values (units, AI keys, kitchen...) and could save them
+// as its own.
+const _settingStores = [];
+let _storesUser = _userKey();
+
+/** Read every setting store again if the signed-in account changed (or
+ *  `force`), and drop the last account's changes still waiting to go to
+ *  the server. Values are set straight into the stores: nothing is
+ *  written or sent. */
+export function reloadSettingStores({ force = false } = {}) {
+  const now = _userKey();
+  if (!force && now === _storesUser) return false;
+  _storesUser = now;
+  for (const k of Object.keys(_saveQueue)) { clearTimeout(_saveQueue[k]); delete _saveQueue[k]; }
+  _recentlyChanged.clear();
+  for (const { key, defaultValue, store } of _settingStores) store.set(DB.getSetting(key, defaultValue));
+  return true;
+}
+
 function createSettingStore(key, defaultValue) {
   const store = writable(DB.getSetting(key, defaultValue));
+  _settingStores.push({ key, defaultValue, store });
 
   window.addEventListener('wl:setting', (e) => {
     if (e.detail && e.detail.key === key) {
@@ -280,9 +332,7 @@ function createSettingStore(key, defaultValue) {
       store.set(value);
       if (_suppressSync) return;
       _recentlyChanged.set(key, Date.now());
-      if (isNative && SERVER_SETTINGS.has(key)) {
-        import('../lib/db-native.js').then(({ dbUpsertSetting }) => dbUpsertSetting(key, value)).catch(() => {});
-      }
+      if (isNative && SERVER_SETTINGS.has(key)) mirrorSetting(key, value).catch(() => {});
       scheduleSave(key, value);
     },
     update(fn) {

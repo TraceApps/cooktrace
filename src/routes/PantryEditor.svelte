@@ -32,6 +32,8 @@
 
   $: id = params.id ? parseInt(params.id, 10) : null;
   $: isEdit = Number.isFinite(id);
+  // The item as opened, sent with the save: only what the form changed goes in.
+  let loadedBase = null;
 
   let item = _blank();
   let loading = isEdit;
@@ -319,6 +321,7 @@
     loading = true;
     try {
       const row = await NtApi.getPantryItem(id);
+      loadedBase = row;
       item = {
         ..._blank(),
         ...row,
@@ -373,7 +376,7 @@
         nutrition: item.nutrition && Object.keys(item.nutrition).length ? item.nutrition : null,
       };
       if (isEdit) {
-        await NtApi.updatePantryItem(id, payload);
+        await NtApi.updatePantryItem(id, { ...payload, _base: loadedBase });
         showSuccess($_('pantry_editor_ct.toast.saved'));
       } else {
         await NtApi.createPantryItem(payload);

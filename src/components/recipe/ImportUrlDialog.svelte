@@ -22,7 +22,7 @@
   import { fade } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
   import { NtApi, mutatingAuthHeaders } from '../../lib/api.js';
-  import { showSuccess, showError } from '../../stores/toast.js';
+  import { showSuccess, showError, showInfo } from '../../stores/toast.js';
   import { portal } from '../../lib/portal.js';
 
   export let open = false;
@@ -105,9 +105,22 @@
         applyTags,
         importCategories,
       });
+      if (created?.skipped) {
+        // Already in the catalog: nothing was written, so open the
+        // recipe it matched instead of a new one.
+        open = false;
+        dispatch('close');
+        if (created.existing_id) {
+          showInfo($_('import_url_dialog.toast.already_exists'));
+          push(`/recipes/${created.existing_id}`);
+        } else {
+          showInfo($_('import_url_dialog.toast.already_exists_short'));
+        }
+        return;
+      }
       const stepCount = (created.steps || []).reduce((n, s) => n + (s?.text ? 1 : 0), 0);
       if (stepCount === 0) {
-        showError("Imported, but the source page didn't include cooking steps. Open the recipe to add them manually.");
+        showError($_('import_url_dialog.toast.imported_no_steps'));
       } else {
         showSuccess($_('import_url_dialog.toast.recipe_imported'));
       }

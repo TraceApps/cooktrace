@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Auto Backup up to Android 11: everything as before, except this install's
+     id (InstallMarkerPlugin), which must never reach another phone. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="ct_install_marker.xml" />
+</full-backup-content>

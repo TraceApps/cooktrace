@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { rememberAdminOrigin } from './lib/public-url.js';
 // Forward-proxy support (#177). Self-installs an undici
 // EnvHttpProxyAgent as the global fetch dispatcher when
 // HTTP_PROXY / HTTPS_PROXY / NO_PROXY (or lowercase equivalents)
@@ -30,7 +31,7 @@ import ntFederationRoutes from './routes/nt-federation.js';
 import notifyRoutes       from './routes/notify.js';
 import unitsRoutes        from './routes/units.js';
 import cookbooksRoutes    from './routes/cookbooks.js';
-import shareRoutes        from './routes/share.js';
+import shareRoutes, { getPublicRecipe } from './routes/share.js';
 import kitchensRoutes     from './routes/kitchens.js';
 import updatesRoutes      from './routes/updates.js';
 import apiTokensRoutes    from './routes/api-tokens.js';
@@ -48,6 +49,7 @@ import { seedOidcFromEnv } from './lib/oidc-env.js';
 // Initialise DB (runs schema)
 import db from './db.js';
 import { isPrivateUploadPath, UPLOAD_RESPONSE_HEADERS } from './lib/upload-paths.js';
+import { publicPageHtml } from './lib/public-recipe-meta.js';
 
 // Seed config from env vars if provided (env vars take priority over UI)
 seedSmtpFromEnv();
@@ -81,6 +83,9 @@ const router = express.Router();
 // global parser so they win — by the time the global parser runs, req.body
 // is already populated and it short-circuits.
 router.use('/api/data/import', express.json({ limit: '25mb' }));
+// The push's clock correction is measured from when the request arrived,
+// before its body uploads, so a slow upload doesn't read as a slow clock.
+router.use('/api/sync/push',   (req, res, next) => { req.receivedAt = Date.now(); next(); });
 router.use('/api/sync/push',   express.json({ limit: '25mb' }));
 // Global cap: 1 MB. Prevents a single authed user from filling memory with
 // repeated large requests. Anything above belongs on a per-route opt-in.
@@ -150,6 +155,12 @@ router.use('/uploads', express.static(uploadsPath, {
 router.use('/api/proxy', proxyRoutes);
 
 router.use(authenticate);   // attach req.user on every request
+// Remember the address an admin uses, so emailed links (password reset,
+// invite, sharing) go there instead of to whatever Host a request claims.
+router.use((req, res, next) => {
+  if (req.user?.role === 'admin') rememberAdminOrigin(req);
+  next();
+});
 router.use(csrfProtect);   // CSRF protection for cookie-based sessions
 
 // ── Request logging ────────────────────────────────────────────────────────
@@ -165,6 +176,15 @@ router.use((req, res, next) => {
 
 // Prevent browser/proxy caching of all API responses
 router.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+
+// Older docs gave the OIDC callback as /api/oidc/callback. An IdP set up from
+// them sends people here; forward to the real callback (which finds the
+// provider from the sign-in state) instead of letting the SPA fallback show
+// a blank page. Before the setup gate so OIDC-first installs work too.
+router.get('/api/oidc/callback', (req, res) => {
+  const q = req.originalUrl.indexOf('?');
+  res.redirect(307, `${BASE_URL}/api/auth/oidc/callback${q >= 0 ? req.originalUrl.slice(q) : ''}`);
+});
 
 // Setup enforcement — block data APIs until the first user account is created.
 // /api/auth/* is allowed so the client can register the admin. /api/r/*
@@ -252,6 +272,19 @@ try {
   logger.warn(`[server] could not pre-template dist/index.html: ${e.message}`);
 }
 
+// A public recipe link: the app page, which opens the recipe without signing
+// in. An unknown or removed token still gets the page (it says the link is
+// gone) but with a 404.
+router.get('/r/:token', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('Referrer-Policy', 'no-referrer');
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  if (!_indexHtmlTemplated) return res.sendFile(_indexHtmlPath);
+  const html = publicPageHtml(_indexHtmlTemplated, BASE_URL);
+  const recipe = getPublicRecipe(req.params.token);
+  res.status(recipe ? 200 : 404).set('Content-Type', 'text/html').send(html);
+});
+
 // SPA fallback — serves the templated index.html for any route under BASE_URL.
 // Express 5 / path-to-regexp 8 requires named splat syntax for catch-alls;
 // `/{*splat}` matches every path including the root, so the SPA HTML is
@@ -302,6 +335,13 @@ app.listen(PORT, async () => {
   } catch (e) {
     logger.warn(`[claim] orphan repair skipped: ${e.message}`);
   }
+
+  // Photos stored embedded in their rows (pushed by the Android app before
+  // the push turned them into files) become files. After listening, so it
+  // never holds up startup; it tries again on every start until all are done.
+  import('./lib/inline-photos.js').then(({ repairInlinePhotos }) => repairInlinePhotos()).catch(e => {
+    logger.warn(`[inline-photos] repair skipped: ${e.message}`);
+  });
 
   // Start the notification + sync scheduler
   import('./lib/scheduler.js').then(({ startScheduler }) => startScheduler()).catch(e => {

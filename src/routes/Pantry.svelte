@@ -1,5 +1,6 @@
 <script>
   import { closeOnBack } from '../lib/back-stack.js';
+  import { onSyncChanges } from '../lib/sync-refresh.js';
   import { onMount } from 'svelte';
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
@@ -690,24 +691,36 @@
     return c?.icon || categoryIcon(slug) || 'kitchen';
   }
 
-  async function load() {
-    loading = true;
-    loadError = null;
+  // Two reads at once (the page opening while a sync lands): the later
+  // one's answer stands, never an older one finishing last.
+  let _loadSeq = 0;
+  // quiet: read again after a sync, without the loading state.
+  async function load({ quiet = false } = {}) {
+    const seq = ++_loadSeq;
+    if (!quiet) { loading = true; loadError = null; }
     try {
       const [pantryRes, catsRes] = await Promise.all([
         NtApi.getPantry(),
         NtApi.getPantryCategories().catch(() => []),
       ]);
+      if (seq !== _loadSeq) return;
+      loadError = null;
       items = pantryRes;
       pantryCategories = catsRes || [];
     } catch (e) {
-      loadError = e.message || 'Could not load pantry';
-      showError(loadError);
+      // Only the newest read speaks; a quiet one after a sync that fails
+      // keeps what's shown, unsaid.
+      if (seq === _loadSeq && !quiet) {
+        loadError = e.message || 'Could not load pantry';
+        showError(loadError);
+      }
     } finally {
-      loading = false;
+      if (seq === _loadSeq) loading = false;
     }
   }
-  onMount(load);
+  onMount(() => { load(); });
+  // A sync that brought changes down shows them here at once.
+  onMount(() => onSyncChanges(() => load({ quiet: true })));
 
   // Variant feature announcement (Issue #4 commit 4). One-shot banner
   // at the top of the Pantry page introducing the new feature. Dismiss

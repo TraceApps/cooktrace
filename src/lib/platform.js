@@ -239,3 +239,25 @@ export function apiUrl(path) {
   }
   return _basePath + path;
 }
+
+/**
+ * The address of a recipe's public link, on the server this app talks to.
+ * A real path, not a #/ route: a server never sees what follows the #, so
+ * only a path lets chat apps show a preview of the recipe.
+ */
+export function publicRecipeUrl(token) {
+  const root = isNative ? String(getServerUrl() || '').replace(/\/+$/, '') : `${window.location.origin}${_basePath}`;
+  return `${root}/r/${token}`;
+}
+
+/**
+ * The token when this page is a public recipe link, else null: /r/<token>,
+ * or #/r/<token> from links copied before they had a real path.
+ */
+export function publicRecipeToken() {
+  if (isNative || typeof window === 'undefined') return null;
+  let path = window.location.pathname;
+  if (_basePath && path.startsWith(_basePath)) path = path.slice(_basePath.length);
+  const m = /^\/r\/([A-Za-z0-9_-]{8,64})\/?$/.exec(path) || /^#\/r\/([A-Za-z0-9_-]{8,64})\/?$/.exec(window.location.hash);
+  return m ? m[1] : null;
+}

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { logger } from '../logger.js';
+import { fetchChecked, readBody } from '../lib/ssrf-guard.js';
 import { makeRateLimiter } from '../middleware/rate-limit.js';
 
 const router = Router();
@@ -35,32 +36,46 @@ router.get('/', async (req, res) => {
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
-    const response = await fetch(url, {
+    // Only the allowed public hosts, and a redirect may not lead into the
+    // server's own network or to cloud metadata.
+    const response = await fetchChecked(url, {
       signal: controller.signal,
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; CookTrace/1.0)' },
-    });
-    clearTimeout(timer);
+    }, { maxRedirects: 3 });
 
     if (!response.ok) {
       logger.warn(`[proxy] upstream ${response.status} for ${url}`);
       return res.status(response.status).json({ error: `Upstream ${response.status}` });
     }
 
-    const contentType = response.headers.get('content-type') || '';
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
 
-    // Image response: pipe binary data with proper content-type
-    if (contentType.startsWith('image/') || isImgHost) {
-      const buffer = Buffer.from(await response.arrayBuffer());
+    // Image response: only an image, sent so it can't act as a page. This
+    // answers from the app's own origin, before sign-in, so an image host's
+    // HTML or SVG passed through as-is could have run script as the app.
+    // (An image host that names no type gets image/jpeg, as before.)
+    if (contentType.startsWith('image/') || (isImgHost && !contentType)) {
+      const buffer = await readBody(response, 10 * 1024 * 1024);
+      clearTimeout(timer);
       res.set('Content-Type', contentType || 'image/jpeg');
       res.set('Cache-Control', 'public, max-age=86400');
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox");
       return res.send(buffer);
+    }
+    if (isImgHost) {
+      clearTimeout(timer);
+      try { await response.body?.cancel(); } catch {}
+      return res.status(502).json({ error: 'That address is not an image' });
     }
 
     // JSON API response
-    res.json(await response.json());
+    const body = JSON.parse((await readBody(response, 5 * 1024 * 1024)).toString('utf8'));
+    clearTimeout(timer);
+    res.json(body);
   } catch(e) {
     logger.error('[proxy] fetch error:', e.message, 'url:', url);
-    res.status(503).json({ error: e.message });
+    res.status(503).json({ error: 'Could not reach that service' });
   }
 });
 

@@ -203,6 +203,7 @@ function dumpDatabase() {
     disabled_units:        _selectIfExists('disabled_units'),
     cookbooks:             _selectIfExists('cookbooks'),
     recipe_cookbook_links: _selectIfExists('recipe_cookbook_links'),
+    recipe_versions:       _selectIfExists('recipe_versions'),
     recipe_shares:         _selectIfExists('recipe_shares'),
     cookbook_shares:       _selectIfExists('cookbook_shares'),
     kitchens:              _selectIfExists('kitchens'),
@@ -334,6 +335,7 @@ function restoreFromZip(zip) {
     _restoreTable('recipe_shares',         data.recipe_shares);
     _restoreTable('cookbook_shares',       data.cookbook_shares);
     _restoreTable('recipe_comments',       data.recipe_comments);
+    _restoreTable('recipe_versions',       data.recipe_versions);
     // See TODO(review) in dumpDatabase — pending invitations only.
     _restoreTable('invite_tokens',         data.invite_tokens);
 

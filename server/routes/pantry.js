@@ -13,11 +13,16 @@
 import { Router } from 'express';
 import { localizeDataUrl } from '../lib/image-localizer.js';
 import db from '../db.js';
+import { stampFields } from '../lib/field-stamps.js';
+import { saveRow } from '../lib/rest-merge.js';
+import { repairVariantTree } from '../lib/pantry-tree.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { deriveSodiumSalt } from '../lib/nutrition-derive.js';
 import { dispatchWebhookEvent } from '../lib/webhooks.js';
 import { foldText } from '../lib/search-text.js';
+import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
+import { ownId } from '../lib/link-checks.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -59,8 +64,8 @@ function _hydrate(row, categoryMap = null) {
 //     pantry_categories for the user; unknown slug → null (cleanly drops)
 function _resolveCategoryId(u, body) {
   if (body.category_id != null && body.category_id !== '') {
-    const n = parseInt(body.category_id, 10);
-    return Number.isFinite(n) ? n : null;
+    // Only the account's own category (lib/link-checks.js).
+    return ownId('pantry_categories', body.category_id, u, { softDelete: false });
   }
   if (typeof body.category === 'string' && body.category.trim()) {
     const row = db.prepare(
@@ -101,7 +106,7 @@ router.get('/categories', wrap((req, res) => {
   // Include the count of non-deleted pantry items that point at each
   // category so the Manage hub can surface a usage pill.
   const rows = db.prepare(
-    `SELECT c.id, c.name, c.slug, c.icon, c.color, c.sort_order, c.default_aisle,
+    `SELECT c.id, c.name, c.slug, c.icon, c.color, c.sort_order, c.default_aisle, c.synced_at,
             (SELECT COUNT(*) FROM pantry_items p
               WHERE p.category_id = c.id AND p.deleted_at IS NULL
                 AND ${userClause(u).replace(/user_id/g, 'p.user_id')}) AS pantry_count
@@ -135,9 +140,29 @@ router.post('/categories', wrap((req, res) => {
      VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run(u, name, slug, icon, color, maxOrder + 1, defaultAisle);
   const row = db.prepare(
-    `SELECT id, name, slug, icon, color, sort_order, default_aisle FROM pantry_categories WHERE id = ?`
+    `SELECT id, name, slug, icon, color, sort_order, default_aisle, synced_at FROM pantry_categories WHERE id = ?`
   ).get(result.lastInsertRowid);
   res.status(201).json(row);
+}));
+
+// Before '/categories/:id', which would otherwise take 'order' for an id
+// (and answer 400): the new order never got saved.
+router.put('/categories/order', wrap((req, res) => {
+  const u = uid(req);
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : null;
+  if (!ids) return res.status(400).json({ error: 'ids array required' });
+  // A new order isn't an edit of the categories: updated_at stays, and
+  // only sort_order is stamped as changed now (lib/field-merge.js).
+  const upd = db.prepare(
+    `UPDATE pantry_categories
+        SET sort_order = ?
+      WHERE id = ? AND ${userClause(u)} AND sort_order IS NOT ?`
+  );
+  const tx = db.transaction(() => {
+    ids.forEach((id, idx) => { if (upd.run(idx, id, ...userArgs(u), idx).changes) stampFields('pantry_categories', id, ['sort_order']); });
+  });
+  tx();
+  res.json({ ok: true });
 }));
 
 router.put('/categories/:id', wrap((req, res) => {
@@ -160,34 +185,15 @@ router.put('/categories/:id', wrap((req, res) => {
         ? String(req.body.default_aisle).trim().slice(0, 40) : null)
     : existing.default_aisle;
 
-  db.prepare(
-    `UPDATE pantry_categories
-        SET name = ?, icon = ?, color = ?, sort_order = ?, default_aisle = ?, updated_at = datetime('now')
-      WHERE id = ?`
-  ).run(name, icon, color, sort, defaultAisle, id);
+  saveRow('pantry_categories', id, existing, { name, icon, color, sort_order: sort, default_aisle: defaultAisle }, req.body?._sync);
   const row = db.prepare(
-    `SELECT id, name, slug, icon, color, sort_order, default_aisle FROM pantry_categories WHERE id = ?`
+    `SELECT id, name, slug, icon, color, sort_order, default_aisle, synced_at FROM pantry_categories WHERE id = ?`
   ).get(id);
   res.json(row);
 }));
 
 // ── PUT /categories/order — bulk reorder ──────────────────────────────
 // Same shape as the recipe-categories order endpoint.
-router.put('/categories/order', wrap((req, res) => {
-  const u = uid(req);
-  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : null;
-  if (!ids) return res.status(400).json({ error: 'ids array required' });
-  const upd = db.prepare(
-    `UPDATE pantry_categories
-        SET sort_order = ?, updated_at = datetime('now')
-      WHERE id = ? AND ${userClause(u)}`
-  );
-  const tx = db.transaction(() => {
-    ids.forEach((id, idx) => upd.run(idx, id, ...userArgs(u)));
-  });
-  tx();
-  res.json({ ok: true });
-}));
 
 router.delete('/categories/:id', wrap((req, res) => {
   const u = uid(req);
@@ -312,6 +318,11 @@ router.get('/:id', wrap((req, res) => {
 // ── POST / — create ─────────────────────────────────────────────────────
 router.post('/', wrap((req, res) => {
   const u = uid(req);
+  // Sent before (Connect > Upload again, or an answer lost): the row made
+  // then, not a second one (lib/create-keys.js).
+  const createKey = cleanCreateKey(req.body?.client_key);
+  const made = findByCreateKey('pantry_items', u, createKey);
+  if (made) return res.json(_hydrate(made));
   const body = req.body || {};
   const name = (body.name || '').toString().trim();
   if (!name) return res.status(400).json({ error: 'Name is required' });
@@ -348,10 +359,13 @@ router.post('/', wrap((req, res) => {
   // both stay in range is done at update / promote time; create-time
   // values are trusted (caller is the editor flow which already picked
   // valid IDs).
-  const genericParentId = body.generic_parent_id != null && body.generic_parent_id !== ''
-    ? parseInt(body.generic_parent_id, 10) : null;
-  const nutritionSourceVariantId = body.nutrition_source_variant_id != null && body.nutrition_source_variant_id !== ''
-    ? parseInt(body.nutrition_source_variant_id, 10) : null;
+  // Only the account's own top-level item can be the parent. A new item
+  // has no variants yet, so it has no nutrition source either: one is
+  // set once its variants exist (PUT, which checks it is one of them).
+  const parentId = ownId('pantry_items', body.generic_parent_id, u);
+  const parentRow = parentId != null ? db.prepare(`SELECT generic_parent_id FROM pantry_items WHERE id = ?`).get(parentId) : null;
+  const genericParentId = parentRow && parentRow.generic_parent_id == null ? parentId : null;
+  const nutritionSourceVariantId = null;
   const result = db.prepare(
     `INSERT INTO pantry_items
        (user_id, name, brand, barcode, in_stock, quantity, unit, expires_on, nt_food_id,
@@ -380,6 +394,7 @@ router.post('/', wrap((req, res) => {
     Number.isFinite(genericParentId) ? genericParentId : null,
     Number.isFinite(nutritionSourceVariantId) ? nutritionSourceVariantId : null,
   );
+  setCreateKey('pantry_items', result.lastInsertRowid, createKey);
   const row = db.prepare(`SELECT * FROM pantry_items WHERE id = ?`).get(result.lastInsertRowid);
   res.status(201).json(_hydrate(row));
 }));
@@ -424,7 +439,7 @@ router.put('/:id', wrap((req, res) => {
       const candidate = parseInt(body.generic_parent_id, 10);
       if (!Number.isFinite(candidate))            return res.status(400).json({ error: 'generic_parent_id must be a number or null' });
       if (candidate === id)                       return res.status(400).json({ error: "An item can't be its own generic parent" });
-      const parent = db.prepare(
+      const parent = ownId('pantry_items', candidate, u) != null && db.prepare(
         `SELECT id, generic_parent_id FROM pantry_items WHERE id = ? AND deleted_at IS NULL`
       ).get(candidate);
       if (!parent)                                return res.status(400).json({ error: 'Generic parent not found' });
@@ -444,7 +459,7 @@ router.put('/:id', wrap((req, res) => {
     } else {
       const candidate = parseInt(body.nutrition_source_variant_id, 10);
       if (!Number.isFinite(candidate))            return res.status(400).json({ error: 'nutrition_source_variant_id must be a number or null' });
-      const source = db.prepare(
+      const source = ownId('pantry_items', candidate, u) != null && db.prepare(
         `SELECT id, generic_parent_id FROM pantry_items WHERE id = ? AND deleted_at IS NULL`
       ).get(candidate);
       if (!source)                                return res.status(400).json({ error: 'Nutrition source variant not found' });
@@ -457,41 +472,34 @@ router.put('/:id', wrap((req, res) => {
 
   const nextInStock = body.in_stock != null ? (body.in_stock ? 1 : 0) : existing.in_stock;
 
-  db.prepare(
-    `UPDATE pantry_items SET
-       name = ?, brand = ?, barcode = ?, in_stock = ?, quantity = ?, unit = ?, expires_on = ?,
-       nt_food_id = ?, img_url = ?, notes = ?,
-       category = ?, category_id = ?, serving_size = ?, serving_unit = ?, serving_label = ?,
-       nutrition = ?, g_per_cup = ?,
-       generic_parent_id = ?, nutrition_source_variant_id = ?,
-       updated_at = datetime('now')
-     WHERE id = ?`
-  ).run(
+  // With _sync, merged with changes made elsewhere (lib/rest-merge.js).
+  const { kept } = saveRow('pantry_items', id, existing, {
     name,
-    body.brand !== undefined ? (body.brand?.toString().trim() || null) : existing.brand,
-    body.barcode !== undefined ? (body.barcode?.toString().trim() || null) : existing.barcode,
-    nextInStock,
+    brand: body.brand !== undefined ? (body.brand?.toString().trim() || null) : existing.brand,
+    barcode: body.barcode !== undefined ? (body.barcode?.toString().trim() || null) : existing.barcode,
+    in_stock: nextInStock,
     // An explicit null or '' clears the quantity; only an absent key keeps
     // the stored one. Sending null used to fall through to "keep", so
     // marking an item back in stock left quantity 0, which still reads as
     // out of stock everywhere quantity is the source of truth.
-    body.quantity !== undefined ? (body.quantity === '' || body.quantity === null ? null : Number(body.quantity)) : existing.quantity,
-    body.unit !== undefined ? (body.unit || null) : existing.unit,
-    body.expires_on !== undefined ? (body.expires_on || null) : existing.expires_on,
-    body.nt_food_id !== undefined ? (body.nt_food_id || null) : existing.nt_food_id,
-    body.img_url !== undefined ? localizeDataUrl(body.img_url || body.imgUrl || null) : existing.img_url,
-    body.notes !== undefined ? (body.notes || null) : existing.notes,
-    nextCategorySlug,
-    nextCategoryId,
-    body.serving_size !== undefined ? (body.serving_size === '' || body.serving_size == null ? null : Number(body.serving_size)) : existing.serving_size,
-    body.serving_unit !== undefined ? (body.serving_unit || null) : existing.serving_unit,
-    body.serving_label !== undefined ? (body.serving_label || null) : existing.serving_label,
-    body.nutrition !== undefined ? _stringifyNutrition(body.nutrition) : existing.nutrition,
-    body.g_per_cup !== undefined ? (body.g_per_cup === '' || body.g_per_cup == null ? null : Number(body.g_per_cup)) : existing.g_per_cup,
-    nextGenericParentId,
-    nextNutritionSourceVariantId,
-    id,
-  );
+    quantity: body.quantity !== undefined ? (body.quantity === '' || body.quantity === null ? null : Number(body.quantity)) : existing.quantity,
+    unit: body.unit !== undefined ? (body.unit || null) : existing.unit,
+    expires_on: body.expires_on !== undefined ? (body.expires_on || null) : existing.expires_on,
+    nt_food_id: body.nt_food_id !== undefined ? (body.nt_food_id || null) : existing.nt_food_id,
+    img_url: body.img_url !== undefined ? localizeDataUrl(body.img_url || body.imgUrl || null) : existing.img_url,
+    notes: body.notes !== undefined ? (body.notes || null) : existing.notes,
+    category: nextCategorySlug,
+    category_id: nextCategoryId,
+    serving_size: body.serving_size !== undefined ? (body.serving_size === '' || body.serving_size == null ? null : Number(body.serving_size)) : existing.serving_size,
+    serving_unit: body.serving_unit !== undefined ? (body.serving_unit || null) : existing.serving_unit,
+    serving_label: body.serving_label !== undefined ? (body.serving_label || null) : existing.serving_label,
+    nutrition: body.nutrition !== undefined ? _stringifyNutrition(body.nutrition) : existing.nutrition,
+    g_per_cup: body.g_per_cup !== undefined ? (body.g_per_cup === '' || body.g_per_cup == null ? null : Number(body.g_per_cup)) : existing.g_per_cup,
+    generic_parent_id: nextGenericParentId,
+    nutrition_source_variant_id: nextNutritionSourceVariantId,
+  }, body._sync);
+  // A merge can't leave the variant tree in a shape the checks above refuse.
+  if (body._sync) repairVariantTree([id]);
 
   if (existing.in_stock === 1 && nextInStock === 0) {
     try {
@@ -500,7 +508,7 @@ router.put('/:id', wrap((req, res) => {
   }
 
   const row = db.prepare(`SELECT * FROM pantry_items WHERE id = ?`).get(id);
-  res.json(_hydrate(row));
+  res.json({ ..._hydrate(row), ...(kept ? { kept: 'server' } : {}) });
 }));
 
 // ── DELETE /:id — soft delete ───────────────────────────────────────────
@@ -560,8 +568,8 @@ router.patch('/:id/stock', wrap((req, res) => {
   if ((u == null && existing.user_id != null) || (u != null && existing.user_id !== u)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  const next = req.body?.in_stock ? 1 : 0;
-  db.prepare(`UPDATE pantry_items SET in_stock = ?, updated_at = datetime('now') WHERE id = ?`).run(next, id);
+  saveRow('pantry_items', id, existing, { in_stock: req.body?.in_stock ? 1 : 0 }, req.body?._sync);
+  const next = db.prepare(`SELECT in_stock FROM pantry_items WHERE id = ?`).get(id).in_stock;
 
   if (existing.in_stock === 1 && next === 0) {
     try {

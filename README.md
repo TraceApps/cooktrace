@@ -67,7 +67,7 @@ Third app in the Trace family alongside [NutriTrace](https://github.com/traceapp
 
 ### AI + Federation
 - **Trace AI.** Reads your recipes, pantry, diary, and cookbooks; can log a cook, plan a meal, add to shopping, or import a recipe from a URL, all conversationally. 19 tools total. Multi-provider (Claude / OpenAI / Gemini / any OpenAI-compatible endpoint). Smart Log voice, image attach, cook-mode voice control. → [full guide](https://traceapps.github.io/docs/cooktrace/trace/)
-- **NutriTrace federation.** Pull food data per-user with a Bearer token; log cooks back to the NT diary. → [full guide](https://traceapps.github.io/docs/cooktrace/nt-federation/)
+- **NutriTrace federation.** Pull food data from NutriTrace into your pantry, per user, with a Bearer token. → [full guide](https://traceapps.github.io/docs/cooktrace/nt-federation/)
 - **Model Context Protocol (MCP).** Expose your recipes, pantry, shopping list, and cook diary to external AI agents (Claude Desktop, Cursor, Codex) via the standard MCP Streamable HTTP transport. Off by default; opt in with `MCP_ENABLED=1`. Read, write, and destructive tool tiers, each independently gated by its own env flag and token scope. → [full guide](https://traceapps.github.io/docs/cooktrace/mcp/)
 
 ### Accounts + platforms
@@ -139,6 +139,7 @@ The most-asked knobs. Full list at [docs/self-hosting/env-vars](https://traceapp
 | `UPLOADS_PATH` | `/data/uploads` | Uploaded images and server-side backups. |
 | `PORT` | `3003` | Port the server listens on inside the container (3001 before 1.3.0). |
 | `BASE_URL` | - | Mount at a subpath, e.g. `/cooktrace`. |
+| `PUBLIC_URL` | - | The full address people open the app at, subpath included (e.g. `https://recipes.example.com`). Links in emails (password reset, invites, sharing) use it. Unset, they use an address an admin has opened the app at. |
 | `LOG_LEVEL` | `info` | `error` \| `warn` \| `info` \| `debug`. |
 | `INSECURE_COOKIES` | unset | Set to `1` on plain-HTTP LAN deployments so the auth cookie isn't dropped. See [LAN-HTTP notes](https://traceapps.github.io/docs/getting-started/lan-http/). |
 | `MAX_SESSION_HOURS` | `8760` | Session-length cap in hours. Lower for shared / kiosk machines. |

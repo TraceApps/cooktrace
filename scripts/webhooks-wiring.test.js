@@ -151,7 +151,7 @@ test('the Android sync upload fires the same webhook events as the REST routes',
   // sent after the response, so a rolled-back push never announces itself.
   assert.match(syncJs, /txn\(\);\s*webhookEvents\.push\(\.\.\.tableEvents\)/);
   const sendAt = syncJs.indexOf('for (const [event, data] of webhookEvents)');
-  const respondAt = syncJs.indexOf('res.json({ tables: results });');
+  const respondAt = syncJs.indexOf('res.json({ tables: results');
   assert.ok(respondAt > 0 && sendAt > respondAt, 'webhooks should be dispatched after the push response is built');
   assert.match(syncJs, /catch \(e\) \{ \/\* never let a webhook failure block the save \*\/ \}/);
 });

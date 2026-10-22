@@ -754,7 +754,8 @@
         dispatch('created', finalRow);
         open = false;
       } else {
-        await NtApi.updatePantryItem(itemId, payload);
+        // With the item as opened: only what the form changed goes in.
+        await NtApi.updatePantryItem(itemId, { ...payload, _base: item });
         showSuccess($_('pantry_sheet_extra.toast.saved'));
         item = { ...item, ...payload, id: itemId };
         dispatch('changed', { ...item });

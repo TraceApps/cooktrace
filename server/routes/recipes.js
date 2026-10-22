@@ -9,17 +9,23 @@
  * management) leaves user_id NULL.
  */
 import { Router } from 'express';
+import { linkBase } from '../lib/public-url.js';
 import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { dispatchWebhookEvent } from '../lib/webhooks.js';
 import { ensurePantryItems } from './pantry.js';
 import { scrapeRecipe, fetchRecipeHtml, extractFromHtml } from '../lib/recipe-scraper.js';
-import { aiExtractRecipe } from '../lib/recipe-ai-fallback.js';
+import { aiExtractRecipe, importAiConfig } from '../lib/recipe-ai-fallback.js';
+import { ownerOrOptIn } from '../lib/outbound-policy.js';
 import { scrapeWithRecipeScrapers, isRecipeScrapersAvailable } from '../lib/recipe-scrapers-bridge.js';
 import { importRecipeFromText, importPaprikaArchive, scanRecipeZip, scanLoadedZip, loadRecipeZip, readImageFromLoadedZip, readZipImageBytes, mealieEventImagePaths } from '../lib/recipe-importers.js';
 import { extractText, detectFileType } from '../lib/text-extractors.js';
 import { guardNestedRecipeFields } from '../lib/recipe-guards.js';
+import { saveRecipeVersion, versionColumns, mergeRecipe, sameContent, VERSION_FIELDS, META_FIELDS, RECIPE_MERGE_FIELDS } from '../lib/recipe-versions.js';
+import { clockOffset, editTime } from '../lib/sync-clock.js';
+import { stampFields } from '../lib/field-stamps.js';
+import { saveRow } from '../lib/rest-merge.js';
 import { parseRecipeText, HIGH_CONFIDENCE_THRESHOLD } from '../lib/heuristic-recipe-parser.js';
 import JSZip from 'jszip';
 import path from 'node:path';
@@ -50,6 +56,8 @@ function _userArgs(u) {
 // helper and silently dropped every mobile-created recipe out of
 // auto-share (root cause of the "member sees nothing" bug).
 import { autoShareNewRecipe as _autoShareNewRecipe } from '../lib/auto-share.js';
+import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
+import { ownId, ownIngredientLinks } from '../lib/link-checks.js';
 
 // Recipe row -> API-shape hydration lives in server/lib/recipe-hydrate.js
 // so cookbooks.js can hydrate cookbook recipe cards identically (they
@@ -204,7 +212,7 @@ router.get('/categories', wrap((req, res) => {
   // pill in the Manage hub so users can see at a glance which
   // taxonomies are stale.
   const rows = db.prepare(
-    `SELECT c.id, c.name, c.slug, c.color, c.sort_order,
+    `SELECT c.id, c.name, c.slug, c.color, c.sort_order, c.synced_at,
             (SELECT COUNT(*) FROM recipes r
               WHERE r.category_id = c.id AND r.deleted_at IS NULL
                 AND ${_whereUser(u).replace(/user_id/g, 'r.user_id')}) AS recipe_count
@@ -233,8 +241,29 @@ router.post('/categories', wrap((req, res) => {
   const result = db.prepare(
     `INSERT INTO recipe_categories (user_id, name, slug, color, sort_order) VALUES (?, ?, ?, ?, ?)`
   ).run(u, name, slug, color, maxOrder + 1);
-  const row = db.prepare(`SELECT id, name, slug, color, sort_order FROM recipe_categories WHERE id = ?`).get(result.lastInsertRowid);
+  const row = db.prepare(`SELECT id, name, slug, color, sort_order, synced_at FROM recipe_categories WHERE id = ?`).get(result.lastInsertRowid);
   res.status(201).json(row);
+}));
+
+// Before '/categories/:id', which would otherwise take 'order' for an id
+// (and answer 400): the new order never got saved.
+router.put('/categories/order', wrap((req, res) => {
+  const u = uid(req);
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : null;
+  if (!ids) return res.status(400).json({ error: 'ids array required' });
+  // A new order isn't an edit of the categories: updated_at stays, and
+  // only sort_order is stamped as changed now (two edits of a category
+  // meet field by field, see lib/field-merge.js).
+  const upd = db.prepare(
+    `UPDATE recipe_categories
+        SET sort_order = ?
+      WHERE id = ? AND ${_whereUser(u)} AND sort_order IS NOT ?`
+  );
+  const tx = db.transaction(() => {
+    ids.forEach((id, idx) => { if (upd.run(idx, id, ..._userArgs(u), idx).changes) stampFields('recipe_categories', id, ['sort_order']); });
+  });
+  tx();
+  res.json({ ok: true });
 }));
 
 router.put('/categories/:id', wrap((req, res) => {
@@ -254,12 +283,8 @@ router.put('/categories/:id', wrap((req, res) => {
     ? parseInt(req.body.sort_order, 10)
     : existing.sort_order;
 
-  db.prepare(
-    `UPDATE recipe_categories
-        SET name = ?, color = ?, sort_order = ?, updated_at = datetime('now')
-      WHERE id = ?`
-  ).run(name, color, sort, id);
-  const row = db.prepare(`SELECT id, name, slug, color, sort_order FROM recipe_categories WHERE id = ?`).get(id);
+  saveRow('recipe_categories', id, existing, { name, color, sort_order: sort }, req.body?._sync);
+  const row = db.prepare(`SELECT id, name, slug, color, sort_order, synced_at FROM recipe_categories WHERE id = ?`).get(id);
   res.json(row);
 }));
 
@@ -267,21 +292,6 @@ router.put('/categories/:id', wrap((req, res) => {
 // Body: { ids: [42, 17, 9, ...] } — applies sort_order = index to each
 // id in the given sequence. Used by the drag-and-drop reorder in the
 // Manage hub; mirrors the same pattern as cookbooks order.
-router.put('/categories/order', wrap((req, res) => {
-  const u = uid(req);
-  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(Number.isFinite) : null;
-  if (!ids) return res.status(400).json({ error: 'ids array required' });
-  const upd = db.prepare(
-    `UPDATE recipe_categories
-        SET sort_order = ?, updated_at = datetime('now')
-      WHERE id = ? AND ${_whereUser(u)}`
-  );
-  const tx = db.transaction(() => {
-    ids.forEach((id, idx) => upd.run(idx, id, ..._userArgs(u)));
-  });
-  tx();
-  res.json({ ok: true });
-}));
 
 router.delete('/categories/:id', wrap((req, res) => {
   const u = uid(req);
@@ -526,6 +536,11 @@ router.get('/:id', wrap((req, res) => {
 // ── POST / — create ─────────────────────────────────────────────────────
 router.post('/', wrap((req, res) => {
   const u = uid(req);
+  // Sent before (Connect > Upload again, or an answer lost): the row made
+  // then, not a second one (lib/create-keys.js).
+  const createKey = cleanCreateKey(req.body?.client_key);
+  const made = findByCreateKey('recipes', u, createKey);
+  if (made) return res.json(_withCreatorAvatar(_hydrate(made), made));
   // Resolve / auto-create pantry items BEFORE serializing to JSON,
   // but only when the user opts in via the autoCreatePantryFromRecipes
   // setting. Default off — typing "flour" in a recipe editor doesn't
@@ -536,6 +551,9 @@ router.post('/', wrap((req, res) => {
     body.ingredients = _linkIngredientsToPantry(u, body.ingredients);
   }
   const data = _toStorage(body);
+  // Only the account's own category and pantry items (lib/link-checks.js).
+  if (data.category_id != null) data.category_id = ownId('recipe_categories', data.category_id, u, { softDelete: false });
+  data.ingredients = ownIngredientLinks(data.ingredients, u);
   if (!data.name) return res.status(400).json({ error: 'Name is required' });
 
   // Capture creator's username on insert (denormalized for display speed).
@@ -554,6 +572,7 @@ router.post('/', wrap((req, res) => {
     data.ingredients, data.steps, data.tags, data.tools, data.nutrition,
     data.source_url, data.notes, data.visibility, creatorUsername, data.category_id, data.video_url,
   );
+  setCreateKey('recipes', result.lastInsertRowid, createKey);
   _autoShareNewRecipe(u, result.lastInsertRowid);
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(result.lastInsertRowid);
   res.status(201).json(_withCreatorAvatar(_hydrate(row), row));
@@ -596,6 +615,10 @@ router.put('/:id', wrap((req, res) => {
     data.rating      = existing.rating;
     data.favorite    = existing.favorite;
   }
+  // Only a category of the recipe's owner (lib/link-checks.js).
+  else if (data.category_id != null) data.category_id = ownId('recipe_categories', data.category_id, existing.user_id, { softDelete: false });
+  // Ingredients link only to the recipe owner's pantry items.
+  data.ingredients = ownIngredientLinks(data.ingredients, existing.user_id);
 
   // Option E guard (2026-08-11): if any of the nested JSON fields
   // (ingredients / steps / tags / tools / nutrition) is empty on the
@@ -610,6 +633,50 @@ router.put('/:id', wrap((req, res) => {
   // these fields, promote CT to full Option C (per-uuid merge).
   const guarded = guardNestedRecipeFields({ existing, incoming: data });
 
+  // A save that says which copy it was made on (_sync: the web app sends
+  // it, also when it replays saves made with no connection, and so does the
+  // Android app for a recipe shared with it) follows the same rule as a
+  // phone's sync: the newer edit stays, the copy that doesn't is kept as an
+  // earlier version, and what the save didn't change stays as it is here.
+  const sync = body._sync && typeof body._sync === 'object' ? body._sync : null;
+  let editedAt = null;
+  let keptServer = false;
+  let applied = null;
+  if (sync) {
+    // What this save changed: what it says (`changed`, from the copy the
+    // page had), else every field it sends. A Sous Chef doesn't change the
+    // owner's category, rating, favorite or visibility.
+    const sent = new Set(RECIPE_MERGE_FIELDS.filter(f => f !== 'deleted_at'
+      && (f === 'img_url' ? ('img_url' in body || 'imgUrl' in body) : f in body)));
+    const said = Array.isArray(sync.changed) ? sync.changed.filter(f => sent.has(f)) : [...sent];
+    const changed = new Set(said.filter(f => !(isKitchenEditor && ['category_id', 'rating', 'favorite', 'visibility'].includes(f))));
+    const incoming = {};
+    for (const f of RECIPE_MERGE_FIELDS) if (f !== 'deleted_at' && sent.has(f)) incoming[f] = guarded[f];
+    const m = mergeRecipe(existing, incoming, {
+      base: typeof sync.base_synced_at === 'string' ? sync.base_synced_at : null,
+      changed,
+      editedAt: editTime(typeof sync.edited_at === 'string' ? sync.edited_at : null, clockOffset(sync.client_now)),
+    });
+    for (const k of m.keep) {
+      saveRecipeVersion(id, existing.user_id, k.row, {
+        reason: k.reason,
+        editedBy: k.side === 'incoming' ? (u ?? existing.user_id) : (existing.last_edited_by ?? existing.user_id),
+      });
+    }
+    if (!m.write) {
+      return res.json({ ..._withCreatorAvatar(_hydrate(existing), existing), ...(m.devicePulls ? { kept: 'server' } : {}) });
+    }
+    for (const f of [...VERSION_FIELDS, ...META_FIELDS]) { data[f] = m.row[f]; guarded[f] = m.row[f]; }
+    editedAt = m.updatedAt;
+    keptServer = m.devicePulls;
+    applied = { fields: m.applied, at: m.fieldAt };
+  } else if (!sameContent(guarded, existing)) {
+    // A save that can't say which copy it was made on (an older page, an
+    // API client): it goes in as before, and the copy it replaces is kept,
+    // without pointing at it, in case it was someone else's newer edit.
+    saveRecipeVersion(id, existing.user_id, existing, { reason: 'replaced', editedBy: existing.last_edited_by ?? existing.user_id });
+  }
+
   db.prepare(
     `UPDATE recipes SET
        name = ?, description = ?, img_url = ?, servings = ?, yield_text = ?,
@@ -617,18 +684,104 @@ router.put('/:id', wrap((req, res) => {
        ingredients = ?, steps = ?, tags = ?, tools = ?, nutrition = ?,
        source_url = ?, notes = ?, visibility = ?, category_id = ?, video_url = ?,
        last_edited_by = ?,
-       updated_at = datetime('now')
+       updated_at = COALESCE(?, datetime('now'))
      WHERE id = ?`
   ).run(
     data.name, data.description, data.img_url, data.servings, data.yield_text,
     data.prep_minutes, data.cook_minutes, data.total_minutes, data.rest_minutes, data.rating, data.favorite,
     guarded.ingredients, guarded.steps, guarded.tags, guarded.tools, guarded.nutrition,
     data.source_url, data.notes, data.visibility, data.category_id, data.video_url,
-    // Only worth recording when someone other than the owner saved.
-    isOwner ? null : u,
+    // Only worth recording when someone other than the owner saved, and
+    // only for content of theirs that went in: otherwise it stays whose it was.
+    applied && !applied.fields.some(f => VERSION_FIELDS.includes(f)) ? existing.last_edited_by : (isOwner ? null : u),
+    editedAt,
     id,
   );
+  if (applied) stampFields('recipes', id, applied.fields, applied.at);
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(id);
+  res.json({ ..._withCreatorAvatar(_hydrate(row), row), ...(keptServer ? { kept: 'server' } : {}) });
+}));
+
+
+// ── Earlier versions ──────────────────────────────────────────────────
+// Copies of the recipe a sync didn't keep (an edit from another device
+// that was older, or the copy a newer one replaced), and the copy each
+// restore or older save replaced. The owner sees them all; someone else
+// who may edit it (an admin, a kitchen Sous Chef) sees their own edits.
+function _versionAccess(req, res) {
+  const u = uid(req);
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: 'Invalid id' }); return null; }
+  const recipe = db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(id);
+  if (!recipe) { res.status(404).json({ error: 'Not found' }); return null; }
+  const isOwner = (u == null && recipe.user_id == null) || recipe.user_id === u;
+  const isAdmin = req.user?.role === 'admin';
+  if (!isOwner && !isAdmin && !_canEditViaKitchen(id, u)) { res.status(403).json({ error: 'Forbidden' }); return null; }
+  return {
+    recipe, isOwner, u, isKitchenEditor: !isOwner && !isAdmin,
+    // Which versions: all of them, or this person's own edits.
+    mine: isOwner ? '' : ' AND v.edited_by = ?', mineArgs: isOwner ? [] : [u],
+  };
+}
+
+// GET /:id/versions: newest first, each with the content it holds and whose
+// edit it was.
+router.get('/:id/versions', wrap((req, res) => {
+  const a = _versionAccess(req, res);
+  if (!a) return;
+  const rows = db.prepare(
+    `SELECT v.id, v.reason, v.created_at, v.seen, v.data, v.edited_by,
+            COALESCE(us.full_name, us.username) AS edited_by_name
+       FROM recipe_versions v LEFT JOIN users us ON us.id = v.edited_by
+      WHERE v.recipe_id = ?${a.mine} ORDER BY v.id DESC`
+  ).all(a.recipe.id, ...a.mineArgs);
+  res.json(rows.map(r => {
+    const data = _safeJson(r.data, {});
+    data.ingredients = _normaliseIngredientGroups(data.ingredients);
+    return { ...r, seen: !!r.seen, data };
+  }));
+}));
+
+// POST /:id/versions/seen: they've looked, so the recipe page stops
+// pointing at them.
+router.post('/:id/versions/seen', wrap((req, res) => {
+  const a = _versionAccess(req, res);
+  if (!a) return;
+  db.prepare(`UPDATE recipe_versions AS v SET seen = 1 WHERE v.recipe_id = ? AND v.seen = 0${a.mine}`).run(a.recipe.id, ...a.mineArgs);
+  res.json({ ok: true });
+}));
+
+// POST /:id/versions/:vid/restore: the version becomes the recipe. The
+// copy it replaces is kept as a version first, so a restore can be undone.
+// A new edit time, so every device picks it up.
+router.post('/:id/versions/:vid/restore', wrap((req, res) => {
+  const a = _versionAccess(req, res);
+  if (!a) return;
+  const { recipe } = a;
+  const vid = parseInt(req.params.vid, 10);
+  const version = Number.isFinite(vid)
+    ? db.prepare(`SELECT v.* FROM recipe_versions v WHERE v.id = ? AND v.recipe_id = ?${a.mine}`).get(vid, recipe.id, ...a.mineArgs)
+    : null;
+  if (!version) return res.status(404).json({ error: 'Not found' });
+  const data = _safeJson(version.data, {});
+  // A version's name and category may no longer fit: a recipe needs a
+  // name, and a category deleted since stays the current one. A Sous Chef
+  // doesn't move the owner's recipe between categories.
+  if (!String(data.name ?? '').trim()) data.name = recipe.name;
+  if (a.isKitchenEditor) data.category_id = recipe.category_id;
+  else if (data.category_id != null) {
+    const cat = db.prepare(`SELECT user_id FROM recipe_categories WHERE id = ?`).get(data.category_id);
+    const ownCat = cat && ((recipe.user_id == null && cat.user_id == null) || cat.user_id === recipe.user_id);
+    if (!ownCat) data.category_id = recipe.category_id;
+  }
+  const { cols, vals } = versionColumns(data);
+  db.transaction(() => {
+    saveRecipeVersion(recipe.id, recipe.user_id, recipe, { reason: 'restore', editedBy: recipe.last_edited_by ?? recipe.user_id });
+    db.prepare(
+      `UPDATE recipes SET ${cols.map(c => `${c} = ?`).join(', ')}, last_edited_by = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(...vals, a.isOwner ? null : a.u, recipe.id);
+  })();
+  const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(recipe.id);
   res.json(_withCreatorAvatar(_hydrate(row), row));
 }));
 
@@ -809,11 +962,7 @@ router.put('/:id/cooks/:cookId', wrap((req, res) => {
   const photoUrl = nextPhotos[0] || null;
   const photosJson = nextPhotos.length ? JSON.stringify(nextPhotos) : null;
 
-  db.prepare(
-    `UPDATE cook_diary
-       SET date = ?, notes = ?, photo_url = ?, photos = ?, updated_at = datetime('now')
-     WHERE id = ?`
-  ).run(date, notes, photoUrl, photosJson, cookId);
+  saveRow('cook_diary', cookId, existing, { date, notes, photo_url: photoUrl, photos: photosJson }, req.body?._sync);
 
   _recomputeCookAggregates(id);
   res.json({ ok: true });
@@ -877,15 +1026,13 @@ router.post('/:id/shares', wrap((req, res) => {
   // configured or any individual send throws.
   if (newGrantees.length > 0 && isEmailConfigured()) {
     const sharerName = req.user?.full_name || req.user?.username || null;
-    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-    const host  = req.headers['x-forwarded-host']  || req.headers.host || '';
-    const baseUrl = `${proto}://${host}`;
+    const baseUrl = linkBase(req);
     const viewUrl = `${baseUrl}/#/recipes/${id}`;
     const granteeEmails = db.prepare(
       `SELECT id, email FROM users WHERE id IN (${newGrantees.map(() => '?').join(',')})`
     ).all(...newGrantees);
     for (const row of granteeEmails) {
-      if (!row.email) continue;
+      if (!row.email || !baseUrl) continue;
       sendRecipeShared(row.email, viewUrl, recipe.name, sharerName)
         .catch(e => logger.debug?.(`[share] email to ${row.email} failed: ${e.message}`));
     }
@@ -942,13 +1089,10 @@ router.delete('/:id/share', wrap((req, res) => {
 }));
 
 function _randomToken(byteLen) {
-  // Base64url encoding via Buffer (Node 18+).
-  const buf = Buffer.alloc(byteLen);
-  for (let i = 0; i < byteLen; i++) buf[i] = Math.floor(Math.random() * 256);
-  return buf.toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  // From the system's secure random source. Math.random() is predictable
+  // from its own output, so a token made with it could be worked out from
+  // links the person had already seen.
+  return crypto.randomBytes(byteLen).toString('base64url');
 }
 
 // ── DELETE /:id/cooks/:cookId — soft-delete a cook entry ───────────────
@@ -1005,7 +1149,7 @@ function _recomputeCookAggregates(recipeId) {
 async function _scrapeUrlOnly(url, opts = {}) {
   const errors = [];
   let html, finalUrl;
-  try { ({ html, finalUrl } = await fetchRecipeHtml(url)); }
+  try { ({ html, finalUrl } = await fetchRecipeHtml(url, { allowPrivate: !!opts.allowPrivate })); }
   catch (e) { return { parsed: null, usedTier: null, errors: [e.message] }; }
 
   const engine   = opts.engine   || 'standard';
@@ -1077,10 +1221,10 @@ router.post('/scrape', wrap(async (req, res) => {
   // tier is unavailable for this request (e.g. local-Android client).
   const engine   = _userSetting(u, 'urlImportEngine')   || 'standard';
   const fallback = _userSetting(u, 'urlImportFallback') || 'standard';
-  const aiCfg    = _aiConfigForUser(u);
+  const aiCfg    = _aiConfigForUser(u, req);
 
   let html, finalUrl;
-  try { ({ html, finalUrl } = await fetchRecipeHtml(url)); }
+  try { ({ html, finalUrl } = await fetchRecipeHtml(url, { allowPrivate: ownerOrOptIn(req, 'ALLOW_PRIVATE_RECIPE_URLS') })); }
   catch (e) { return res.status(400).json({ error: e.message }); }
 
   let parsed = null;
@@ -1146,7 +1290,8 @@ router.post('/scrape', wrap(async (req, res) => {
 
   const row = _saveImportedRecipe(u, parsed, { addToPantry, applyTags, importCategories, dedup, creatorUsername: req.user?.username || null });
   if (!row) {
-    return res.status(200).json({ skipped: true, reason: 'duplicate', _import_tier: usedTier });
+    const existing = _findImportDuplicate(u, parsed);
+    return res.status(200).json({ skipped: true, reason: 'duplicate', existing_id: existing?.id || null, name: parsed.name, _import_tier: usedTier });
   }
   res.status(201).json({ ...row, _import_tier: usedTier });
 }));
@@ -1182,8 +1327,8 @@ router.post('/batch-scrape', wrap(async (req, res) => {
 
   const engine   = _userSetting(u, 'urlImportEngine')   || 'standard';
   const fallback = _userSetting(u, 'urlImportFallback') || 'standard';
-  const aiCfg    = _aiConfigForUser(u);
-  const scrapeOpts = { engine, fallback, aiCfg };
+  const aiCfg    = _aiConfigForUser(u, req);
+  const scrapeOpts = { engine, fallback, aiCfg, allowPrivate: ownerOrOptIn(req, 'ALLOW_PRIVATE_RECIPE_URLS') };
 
   // Small concurrent pool. Workers pull from a shared index so we don't
   // need a queue library for a one-shot batch.
@@ -1284,22 +1429,36 @@ function _userSetting(u, key) {
 // Build an AI config object for a user from their stored settings, or
 // fall back to the server-side AI env config when they have nothing
 // of their own. Returns null when no usable config exists.
-function _aiConfigForUser(u) {
-  const provider = _userSetting(u, 'aiProvider');
-  const apiKey   = _userSetting(u, 'aiApiKey');
-  const model    = _userSetting(u, 'aiModel');
-  const baseUrl  = _userSetting(u, 'aiBaseUrl');
-  if (provider && apiKey) return { provider, apiKey, model: model || '', baseUrl: baseUrl || '' };
-  // Fall back to env-configured AI (same key as /api/ai/chat uses).
-  if (process.env.AI_API_KEY) {
-    return {
-      provider: process.env.AI_PROVIDER || 'claude',
-      apiKey:   process.env.AI_API_KEY,
-      model:    process.env.AI_MODEL || '',
-      baseUrl:  process.env.AI_BASE_URL || '',
-    };
+function _aiConfigForUser(u, req) {
+  const cfg = importAiConfig({
+    provider: _userSetting(u, 'aiProvider'),
+    apiKey:   _userSetting(u, 'aiApiKey'),
+    model:    _userSetting(u, 'aiModel'),
+    baseUrl:  _userSetting(u, 'aiBaseUrl'),
+  }, process.env);
+  // A user's own endpoint is reached through the address check; the
+  // server's (AI_* env vars) is the owner's and is trusted as is.
+  if (cfg?.source === 'user') cfg.allowPrivate = ownerOrOptIn(req, 'ALLOW_PRIVATE_AI_URLS');
+  return cfg;
+}
+
+// The recipe an import would duplicate: case-insensitive name first,
+// then source_url. Returns { id } or null. _saveImportedRecipe skips on
+// a match (dedup 'skip'), and the routes report the match's id so the
+// client can open it instead of a recipe that was never written.
+function _findImportDuplicate(u, parsed) {
+  const lower = String(parsed?.name || '').toLowerCase().trim();
+  let existing = lower ? db.prepare(
+    `SELECT id FROM recipes
+      WHERE ${_whereUser(u)} AND deleted_at IS NULL AND lower(name) = ? LIMIT 1`
+  ).get(...[..._userArgs(u), lower]) : null;
+  if (!existing && parsed?.source_url) {
+    existing = db.prepare(
+      `SELECT id FROM recipes
+        WHERE ${_whereUser(u)} AND deleted_at IS NULL AND source_url = ? LIMIT 1`
+    ).get(...[..._userArgs(u), parsed.source_url]);
   }
-  return null;
+  return existing || null;
 }
 
 // Shared writer used by /scrape, /import, and /import-file. Takes a
@@ -1321,17 +1480,7 @@ function _saveImportedRecipe(u, parsed, opts = {}) {
     dedup = 'skip',
   } = opts;
   if (dedup !== 'force' && parsed?.name) {
-    const lower = String(parsed.name).toLowerCase().trim();
-    let existing = db.prepare(
-      `SELECT id FROM recipes
-        WHERE ${_whereUser(u)} AND deleted_at IS NULL AND lower(name) = ? LIMIT 1`
-    ).get(...[..._userArgs(u), lower]);
-    if (!existing && parsed.source_url) {
-      existing = db.prepare(
-        `SELECT id FROM recipes
-          WHERE ${_whereUser(u)} AND deleted_at IS NULL AND source_url = ? LIMIT 1`
-      ).get(...[..._userArgs(u), parsed.source_url]);
-    }
+    const existing = _findImportDuplicate(u, parsed);
     if (existing) {
       if (dedup === 'skip') return null;
       // dedup === 'replace' falls through and gets re-inserted; the
@@ -1375,6 +1524,7 @@ function _saveImportedRecipe(u, parsed, opts = {}) {
     }
   }
   const data = _toStorage(body);
+  data.ingredients = ownIngredientLinks(data.ingredients, u);
   if (!data.name) throw Object.assign(new Error('No recipe name found'), { status: 400 });
 
   const result = db.prepare(
@@ -1564,7 +1714,7 @@ function _saveZipImage(bytes, ext) {
   try {
     fs.mkdirSync(_UPLOADS_DIR, { recursive: true });
     const safeExt = /^[a-z0-9]{2,5}$/.test(ext) ? ext : 'jpg';
-    const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${safeExt}`;
+    const filename = `${Date.now()}-${crypto.randomBytes(12).toString('hex')}.${safeExt}`;
     const filePath = path.join(_UPLOADS_DIR, filename);
     fs.writeFileSync(filePath, bytes);
     return `/uploads/${filename}`;
@@ -1711,18 +1861,9 @@ router.post('/import-zip/commit', _zipImportUpload.single('file'), wrap(async (r
       // so timeline events still land on the existing recipe.
       let targetRecipeId = row?.id || null;
       if (!row) {
-        skippedDup.push({ idx: i, name: recipe?.name || `(item ${i})` });
-        const lower = String(recipe?.name || '').toLowerCase().trim();
-        if (lower) {
-          const existing = db.prepare(
-            `SELECT id FROM recipes
-              WHERE ${_whereUser(u)} AND deleted_at IS NULL AND lower(name) = ? LIMIT 1`
-          ).get(...[..._userArgs(u), lower]) || (recipe.source_url ? db.prepare(
-            `SELECT id FROM recipes
-              WHERE ${_whereUser(u)} AND deleted_at IS NULL AND source_url = ? LIMIT 1`
-          ).get(...[..._userArgs(u), recipe.source_url]) : null);
-          targetRecipeId = existing?.id || null;
-        }
+        const existing = _findImportDuplicate(u, recipe);
+        targetRecipeId = existing?.id || null;
+        skippedDup.push({ idx: i, name: recipe?.name || `(item ${i})`, existing_id: targetRecipeId });
       } else {
         created.push(row);
       }
@@ -1845,16 +1986,19 @@ router.post('/import', _importUpload.single('file'), wrap(async (req, res) => {
     try { recipes = await importPaprikaArchive(f.buffer); }
     catch (e) { return res.status(400).json({ error: e.message }); }
     const created = [];
+    const skipped = [];
     for (const r of recipes) {
       try {
         const row = _saveImportedRecipe(u, r, { addToPantry, applyTags, importCategories, creatorUsername });
-        created.push(row);
+        // null = a duplicate that was skipped, not a recipe written.
+        if (row) created.push(row);
+        else skipped.push({ name: r?.name || '', existing_id: _findImportDuplicate(u, r)?.id || null });
       } catch (e) {
         // Continue on per-recipe failure — most archives have many.
       }
     }
-    if (created.length === 0) return res.status(400).json({ error: 'No recipes could be imported' });
-    return res.status(201).json({ recipes: created, count: created.length });
+    if (created.length === 0 && skipped.length === 0) return res.status(400).json({ error: 'No recipes could be imported' });
+    return res.status(created.length ? 201 : 200).json({ recipes: created, count: created.length, skipped });
   }
 
   // Single recipe — text body or single-file upload.
@@ -1874,6 +2018,10 @@ router.post('/import', _importUpload.single('file'), wrap(async (req, res) => {
 
   try {
     const row = _saveImportedRecipe(u, parsed, { addToPantry, applyTags, importCategories, creatorUsername });
+    if (!row) {
+      const existing = _findImportDuplicate(u, parsed);
+      return res.status(200).json({ skipped: true, reason: 'duplicate', existing_id: existing?.id || null, name: parsed?.name || '' });
+    }
     return res.status(201).json(row);
   } catch (e) {
     return res.status(e.status || 500).json({ error: e.message || 'Import failed' });
@@ -2211,8 +2359,15 @@ router.get('/:id/card.png', wrap(async (req, res) => {
   if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
   const recipe = db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(id);
   if (!recipe) return res.status(404).json({ error: 'Not found' });
-  // Allow public access to group-shared recipes; require auth for private.
-  if (recipe.visibility !== 'group' && (!req.user || (recipe.user_id != null && recipe.user_id !== req.user.id))) {
+  // Who may see the card is who may see the recipe (GET /:id): its owner,
+  // anyone it is shared with, and everyone when it is group-visible. This
+  // used to differ: a shared recipe's card was refused, and a recipe with
+  // no owner gave its card to anyone signed in.
+  const u = uid(req);
+  const isOwner = (u == null && recipe.user_id == null) || recipe.user_id === u;
+  const isShared = !isOwner && u != null
+    && !!db.prepare(`SELECT 1 FROM recipe_shares WHERE recipe_id = ? AND grantee_id = ?`).get(id, u);
+  if (!isOwner && !isShared && recipe.visibility !== 'group') {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -2227,10 +2382,15 @@ router.get('/:id/card.png', wrap(async (req, res) => {
 
   // SVG card — 600 × 800 portrait. Hero image embedded via <image> if we
   // can resolve to an absolute URL, else pure typography.
-  const safeName = String(recipe.name || 'Recipe').replace(/[<&]/g, '');
-  const safeSub = subtitle.replace(/[<&]/g, '');
-  const heroSection = recipe.img_url ? `
-    <image href="${_absoluteUrl(req, recipe.img_url)}" x="0" y="0" width="600" height="500" preserveAspectRatio="xMidYMid slice" />
+  // Escaped, not stripped: "Mac & Cheese" stays as typed, and nothing in a
+  // name or an image link can become markup. The card is an SVG served from
+  // this origin, so an unescaped quote in img_url used to add an event
+  // handler that ran as the app when the card was opened.
+  const name = String(recipe.name || 'Recipe');
+  const safeSub = _escapeXml(subtitle);
+  const heroUrl = _absoluteUrl(req, recipe.img_url);
+  const heroSection = heroUrl ? `
+    <image href="${_escapeXml(heroUrl)}" x="0" y="0" width="600" height="500" preserveAspectRatio="xMidYMid slice" />
     <rect x="0" y="380" width="600" height="120" fill="url(#grad)" />
   ` : `
     <rect x="0" y="0" width="600" height="500" fill="#0A0B0F" />
@@ -2247,22 +2407,38 @@ router.get('/:id/card.png', wrap(async (req, res) => {
   </defs>
   <rect width="600" height="800" fill="#0A0B0F" />
   ${heroSection}
-  <text x="40" y="560" font-family="system-ui, sans-serif" font-size="40" font-weight="800" fill="#FFFFFF">${_textWrap(safeName, 22)}</text>
+  <text x="40" y="560" font-family="system-ui, sans-serif" font-size="40" font-weight="800" fill="#FFFFFF">${_textWrap(name, 22)}</text>
   ${safeSub ? `<text x="40" y="660" font-family="system-ui, sans-serif" font-size="20" fill="#A1A8B8">${safeSub}</text>` : ''}
   <text x="40" y="760" font-family="system-ui, sans-serif" font-size="14" fill="#4FFFB0" font-weight="700" letter-spacing="2">COOKTRACE</text>
 </svg>`;
 
   res.setHeader('Content-Type', 'image/svg+xml');
-  res.setHeader('Cache-Control', 'public, max-age=300');
+  // The card can be someone's private recipe: no cache keeps it, as for the
+  // rest of /api. The policy stops any script in the SVG, as a backstop.
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' https: http: data:; style-src 'unsafe-inline'; sandbox");
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.send(svg);
 }));
 
+// An image link the card may show: a web address, or one of this app's own
+// paths, kept on this origin (the card is only served to someone signed in,
+// so it is always opened from here). It used to be made absolute with the
+// request's Host, which the sender controls. Anything else (javascript:,
+// data:, //host) leaves the card without its picture.
+const _BASE_PATH = (process.env.BASE_URL || '').replace(/\/$/, '');
 function _absoluteUrl(req, path) {
   if (!path) return '';
-  if (/^https?:\/\//.test(path)) return path;
-  const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-  const host = req.headers['x-forwarded-host'] || req.headers.host || '';
-  return `${proto}://${host}${path.startsWith('/') ? '' : '/'}${path}`;
+  const p = String(path).trim();
+  if (/^https?:\/\//i.test(p)) return p;
+  if (!p.startsWith('/') || p.startsWith('//')) return '';
+  return _BASE_PATH && !p.startsWith(_BASE_PATH + '/') ? `${_BASE_PATH}${p}` : p;
+}
+
+function _escapeXml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
 function _textWrap(text, perLine) {
@@ -2278,7 +2454,7 @@ function _textWrap(text, perLine) {
   }
   if (cur) lines.push(cur);
   if (lines.length > 3) lines.length = 3;
-  return lines.map((l, i) => i === 0 ? l : `<tspan x="40" dy="48">${l}</tspan>`).join('');
+  return lines.map((l, i) => i === 0 ? _escapeXml(l) : `<tspan x="40" dy="48">${_escapeXml(l)}</tspan>`).join('');
 }
 
 // ── Comments ────────────────────────────────────────────────────────────
@@ -2407,9 +2583,7 @@ router.put('/:id/comments/:commentId', wrap((req, res) => {
   if (!body) return res.status(400).json({ error: 'body required' });
   if (body.length > 4000) return res.status(400).json({ error: 'comment too long (4000 char max)' });
 
-  db.prepare(
-    `UPDATE recipe_comments SET body = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(body, cid);
+  saveRow('recipe_comments', cid, c, { body }, req.body?._sync);
   const row = _selectCommentJoined(cid);
   res.json(_commentRow(row));
 }));

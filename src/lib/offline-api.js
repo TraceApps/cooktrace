@@ -23,7 +23,7 @@ import { writable } from 'svelte/store';
 import {
   isOfflineError, isMirroredGet, mirrorKey, pathOf, writeOp, collapseOps, sentSeqs,
   answerWithOps, newTempId, createdId, remapIds, remapPath, describeOp, shouldRetryStatus,
-  MAKES_A_ROW, staleAnswerKeys, queuedReply,
+  MAKES_A_ROW, staleAnswerKeys, queuedReply, saveBase, saveTarget, withSaveBase, readTable, stampedRows,
 } from './offline-edits.js';
 // Loaded with everything else, never fetched on demand: a picture is kept
 // exactly when there is no connection to fetch a separate file with, and a
@@ -335,7 +335,7 @@ async function _flushOnce() {
     const body = op.body == null ? undefined : remapIds(op.body, map);
     let answer;
     try {
-      answer = await _http._fetch(op.method, path, body);
+      answer = await _http._fetch(op.method, path, withSaveBase(body, op.sync));
     } catch (err) {
       if (isOfflineError(err)) { stopped = { offline: true }; break; }
       // A server that is struggling, or a session that needs signing in
@@ -513,6 +513,23 @@ async function _straight(http, method, path, body, isUpload) {
   }
 }
 
+// The rows this page has shown, by table, id and the server's stamp of
+// that copy: a save of one says what it changed on the copy it was made on
+// (saveBase), not on a newer one another tab has read since.
+const _shown = new Map();
+const SHOWN_MAX = 3000;
+function _noteShown(url, answer) {
+  const table = readTable(url);
+  if (!table) return;
+  for (const r of stampedRows(answer)) {
+    const key = `${table}:${r.id}:${r.synced_at}`;
+    _shown.delete(key);
+    _shown.set(key, r);
+  }
+  while (_shown.size > SHOWN_MAX) _shown.delete(_shown.keys().next().value);
+}
+const _seen = (table, id, stamp) => _shown.get(`${table}:${id}:${stamp}`) || null;
+
 /** One call, with the copy and the queue behind it. */
 export async function offlineFetch(http, method, path, body) {
   _http = http;
@@ -522,6 +539,7 @@ export async function offlineFetch(http, method, path, body) {
     try {
       const answer = await http._fetch(m, path, body);
       if (isMirroredGet(path)) await _remember(mirrorKey(path), answer);
+      _noteShown(path, answer);
       _publish({ online: true });
       const ops = await _loadOps();
       return ops.length ? answerWithOps(path, answer, ops) : answer;
@@ -530,6 +548,7 @@ export async function offlineFetch(http, method, path, body) {
       _publish({ online: false });
       if (!isMirroredGet(path)) throw _offlineError();
       const mirrored = await _recall(path);
+      _noteShown(path, mirrored);
       // Even with no copy of this call, what is queued for it may be the
       // whole answer: a shopping list written from scratch in a shop.
       const answer = answerWithOps(path, mirrored, await _loadOps());
@@ -542,17 +561,23 @@ export async function offlineFetch(http, method, path, body) {
   }
 
   const target = remapPath(String(path), _swapped);
+  // A save of a row says which copy it was made on and what it changed, so
+  // an edit made since on another device isn't overwritten by an older one,
+  // and what this one didn't change stays as it is there (saveBase).
+  const sync = saveTarget(m, target) ? saveBase(m, target, body, _seen, new Date().toISOString()) : null;
+  if (saveTarget(m, target)) body = withSaveBase(body, null);
   const op = writeOp(m, target, body);
   if (!op) {
     // Sharing, kitchens, imports, AI, admin: still the server's job.
-    return _straight(http, m, target, body);
+    // (Categories, cookbooks and units go straight up too, saying their copy.)
+    return _straight(http, m, target, withSaveBase(body, sync));
   }
 
   _changedSomething = true;
   const queued = await _loadOps();
   if (_online() && !queued.length) {
     try {
-      const answer = await http._fetch(m, target, body);
+      const answer = await http._fetch(m, target, withSaveBase(body, sync));
       // Whatever this change makes stale goes, the same as after a replay.
       // Without this, something deleted while online was still in the copy
       // held here, and came back the moment the connection did not: the
@@ -573,6 +598,7 @@ export async function offlineFetch(http, method, path, body) {
     body,
     at: Date.now(),
     ...op,
+    ...(sync ? { sync } : {}),
     ...(tempId != null ? { tempId, id: tempId, key: `${op.kind.replace('-create', '')}:${tempId}` } : {}),
   });
   if (!stored) throw _offlineError();

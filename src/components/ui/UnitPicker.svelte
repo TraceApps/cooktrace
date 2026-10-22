@@ -93,7 +93,7 @@
       if (highlight >= 0 && flatList[highlight]) { pick(flatList[highlight]); e.preventDefault(); }
       else { open = false; }
     }
-    else if (e.key === 'Escape') { open = false; highlight = -1; }
+    else if (e.key === 'Escape') { if (open) e.preventDefault(); open = false; highlight = -1; }
     else if (e.key === 'Tab') { open = false; }
   }
 

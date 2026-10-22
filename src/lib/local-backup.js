@@ -233,6 +233,11 @@ export async function importLocalSnapshot(snapshot) {
       } catch {}
     }
   }
+  // The snapshot replaces what's here, so deletes noted since don't apply,
+  // and its cookbook links go up again (a sync only keeps links the
+  // server has, or ones waiting to go up).
+  await db.run(`DELETE FROM sync_deletes`, []);
+  await db.run(`UPDATE recipe_cookbook_links SET sync_status = 'pending'`, []);
 
   // Images — write each base64 blob back to Data/uploads.
   if (snapshot.images && typeof snapshot.images === 'object') {

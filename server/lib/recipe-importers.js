@@ -373,7 +373,9 @@ export async function importPaprikaArchive(buffer) {
 // image, which on a 500 MB Mealie backup with 100 recipes was 100x
 // the necessary work.
 export async function loadRecipeZip(buffer) {
-  return JSZip.loadAsync(buffer);
+  // Unpacked here too, not only in scanLoadedZip: callers that load once to
+  // read pictures and scan separately get the same <id>/image paths.
+  return _expandNestedZips(await JSZip.loadAsync(buffer));
 }
 export async function readImageFromLoadedZip(zip, entryName) {
   if (!entryName) return null;
@@ -391,7 +393,38 @@ export async function scanRecipeZip(buffer) {
   const zip = await JSZip.loadAsync(buffer);
   return scanLoadedZip(zip);
 }
+// ── Zips inside the zip ────────────────────────────────────────────────────
+// Tandoor's export is a zip of zips: export.zip holds one <id>.zip per
+// recipe, each with recipe.json and image.<ext> (cookbook/integration/
+// default.py). Unpack every inner zip in place, under a folder named after
+// it (<id>/recipe.json beside <id>/image.png), so the walker below finds
+// each recipe with its own picture, the way other exports lay them out.
+// One level deep, and capped, so a zip of zips can't balloon in memory.
+const NESTED_ZIP_MAX_BYTES = 1024 * 1024 * 1024;
+async function _expandNestedZips(zip) {
+  const inner = Object.values(zip.files).filter(e =>
+    !e.dir && /\.zip$/i.test(e.name) && !/^__MACOSX\//.test(e.name)
+  );
+  let total = 0;
+  for (const entry of inner) {
+    let sub;
+    try { sub = await JSZip.loadAsync(await entry.async('nodebuffer')); }
+    catch { continue; }                        // not a zip after all: leave it
+    const base = entry.name.replace(/\.zip$/i, '');
+    for (const f of Object.values(sub.files)) {
+      if (f.dir || /^__MACOSX\//.test(f.name)) continue;
+      const bytes = await f.async('nodebuffer');
+      total += bytes.length;
+      if (total > NESTED_ZIP_MAX_BYTES) throw new Error('The zips inside this archive unpack to more than 1 GB.');
+      zip.file(`${base}/${f.name}`, bytes);
+    }
+    zip.remove(entry.name);
+  }
+  return zip;
+}
+
 export async function scanLoadedZip(zip) {
+  await _expandNestedZips(zip);
   const out = [];
 
   // Paprika first — distinct extension makes this an unambiguous match.

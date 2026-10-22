@@ -8,10 +8,14 @@
  */
 import { Router } from 'express';
 import db from '../db.js';
+import { stampFields } from '../lib/field-stamps.js';
+import { saveRow } from '../lib/rest-merge.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { dispatchWebhookEvent } from '../lib/webhooks.js';
 import { titleCaseName as _titleCaseName, aisleForPantry as _aisleForPantry } from '../lib/shopping-items.js';
+import { ownId, linkableRecipeId } from '../lib/link-checks.js';
+import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -32,8 +36,9 @@ router.get('/', wrap((req, res) => {
     `SELECT s.*, p.name AS pantry_name, p.img_url AS pantry_img_url,
             r.name AS recipe_name
      FROM shopping_list s
-     LEFT JOIN pantry_items p ON p.id = s.pantry_id
+     LEFT JOIN pantry_items p ON p.id = s.pantry_id AND p.user_id IS s.user_id
      LEFT JOIN recipes      r ON r.id = s.recipe_id AND r.deleted_at IS NULL
+                           AND (r.user_id IS s.user_id OR EXISTS (SELECT 1 FROM recipe_shares rs WHERE rs.recipe_id = r.id AND rs.grantee_id = s.user_id))
      WHERE ${userClause(u).replace(/user_id/g, 's.user_id')} AND s.deleted_at IS NULL
      ORDER BY s.checked ASC,
               COALESCE(s.aisle, 'zzz') ASC,
@@ -47,6 +52,11 @@ router.get('/', wrap((req, res) => {
 // ── POST / — add an item ───────────────────────────────────────────────
 router.post('/', wrap((req, res) => {
   const u = uid(req);
+  // Sent before (Connect > Upload again, or an answer lost): the row made
+  // then, not a second one (lib/create-keys.js).
+  const createKey = cleanCreateKey(req.body?.client_key);
+  const made = findByCreateKey('shopping_list', u, createKey);
+  if (made) return res.json(_hydrate(made));
   const body = req.body || {};
   const name = (body.name || '').toString().trim();
   if (!name) return res.status(400).json({ error: 'Name is required' });
@@ -55,7 +65,11 @@ router.post('/', wrap((req, res) => {
   // a pantry item. Explicit body.aisle always wins so callers can force
   // a specific value; see _aisleForPantry for the fallback chain.
   let aisle = body.aisle && String(body.aisle).trim() ? String(body.aisle).trim() : null;
-  if (aisle == null && body.pantry_id) aisle = _aisleForPantry(body.pantry_id);
+  // Links only to the account's own pantry item, and its own or a shared
+  // recipe (lib/link-checks.js): anything else is no link.
+  const pantryId = ownId('pantry_items', body.pantry_id, u);
+  const recipeId = linkableRecipeId(body.recipe_id, u);
+  if (aisle == null && pantryId) aisle = _aisleForPantry(pantryId, u);
 
   const result = db.prepare(
     `INSERT INTO shopping_list (user_id, name, quantity, unit, aisle, checked, pantry_id, recipe_id)
@@ -66,9 +80,10 @@ router.post('/', wrap((req, res) => {
     body.unit || null,
     aisle,
     body.checked ? 1 : 0,
-    body.pantry_id || null,
-    body.recipe_id || null,
+    pantryId,
+    recipeId,
   );
+  setCreateKey('shopping_list', result.lastInsertRowid, createKey);
   const row = db.prepare(`SELECT * FROM shopping_list WHERE id = ?`).get(result.lastInsertRowid);
   res.status(201).json(_hydrate(row));
 }));
@@ -84,23 +99,18 @@ router.put('/:id', wrap((req, res) => {
     return res.status(403).json({ error: 'Forbidden' });
   }
   const body = req.body || {};
-  db.prepare(
-    `UPDATE shopping_list SET
-       name = ?, quantity = ?, unit = ?, aisle = ?, checked = ?, pantry_id = ?, sort_order = ?,
-       updated_at = datetime('now')
-     WHERE id = ?`
-  ).run(
-    body.name != null ? String(body.name).trim() || existing.name : existing.name,
-    body.quantity !== undefined ? (body.quantity === '' || body.quantity == null ? null : Number(body.quantity)) : existing.quantity,
-    body.unit !== undefined ? (body.unit || null) : existing.unit,
-    body.aisle !== undefined ? (body.aisle && String(body.aisle).trim() ? String(body.aisle).trim() : null) : existing.aisle,
-    body.checked !== undefined ? (body.checked ? 1 : 0) : existing.checked,
-    body.pantry_id !== undefined ? (body.pantry_id || null) : existing.pantry_id,
-    body.sort_order !== undefined ? (body.sort_order == null ? null : Number(body.sort_order)) : existing.sort_order,
-    id,
-  );
+  // With _sync, merged with changes made elsewhere (lib/rest-merge.js).
+  const { kept } = saveRow('shopping_list', id, existing, {
+    name: body.name != null ? String(body.name).trim() || existing.name : existing.name,
+    quantity: body.quantity !== undefined ? (body.quantity === '' || body.quantity == null ? null : Number(body.quantity)) : existing.quantity,
+    unit: body.unit !== undefined ? (body.unit || null) : existing.unit,
+    aisle: body.aisle !== undefined ? (body.aisle && String(body.aisle).trim() ? String(body.aisle).trim() : null) : existing.aisle,
+    checked: body.checked !== undefined ? (body.checked ? 1 : 0) : existing.checked,
+    pantry_id: body.pantry_id !== undefined ? ownId('pantry_items', body.pantry_id, u) : existing.pantry_id,
+    sort_order: body.sort_order !== undefined ? (body.sort_order == null ? null : Number(body.sort_order)) : existing.sort_order,
+  }, body._sync);
   const row = db.prepare(`SELECT * FROM shopping_list WHERE id = ?`).get(id);
-  res.json(_hydrate(row));
+  res.json({ ..._hydrate(row), ...(kept ? { kept: 'server' } : {}) });
 }));
 
 // ── DELETE /checked — clear all checked items at once ──────────────────
@@ -154,11 +164,18 @@ router.post('/reorder', wrap((req, res) => {
       const nextAisle = it.aisle !== undefined
         ? (it.aisle && String(it.aisle).trim() ? String(it.aisle).trim() : null)
         : existing.aisle;
+      // Moving an item is an edit only when its aisle changes: a new place
+      // in the list moves sort_order alone, stamped as changed now, and
+      // leaves updated_at (lib/field-merge.js merges field by field).
+      const aisleMoved = (existing.aisle ?? null) !== (nextAisle ?? null);
+      const sortMoved = (existing.sort_order ?? null) !== (nextSort ?? null);
+      if (!aisleMoved && !sortMoved) { n++; continue; }
       db.prepare(
         `UPDATE shopping_list
-            SET sort_order = ?, aisle = ?, updated_at = datetime('now')
+            SET sort_order = ?, aisle = ?${aisleMoved ? `, updated_at = datetime('now')` : ''}
           WHERE id = ?`
       ).run(nextSort, nextAisle, id);
+      if (sortMoved && !aisleMoved) stampFields('shopping_list', id, ['sort_order']);
       n++;
     }
     return n;
@@ -191,8 +208,8 @@ router.patch('/:id/check', wrap((req, res) => {
   if ((u == null && existing.user_id != null) || (u != null && existing.user_id !== u)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  const next = req.body?.checked ? 1 : 0;
-  db.prepare(`UPDATE shopping_list SET checked = ?, updated_at = datetime('now') WHERE id = ?`).run(next, id);
+  saveRow('shopping_list', id, existing, { checked: req.body?.checked ? 1 : 0 }, req.body?._sync);
+  const next = db.prepare(`SELECT checked FROM shopping_list WHERE id = ?`).get(id).checked;
 
   // Only a genuine 0-to-1 transition can newly complete the list; a
   // redundant re-check of an already-checked item (double-click, retry,
@@ -313,8 +330,10 @@ router.post('/from-plan', wrap((req, res) => {
   let added = 0;
   const tx = db.transaction(() => {
     for (const row of merged.values()) {
-      const aisle = _aisleForPantry(row.pantry_id);
-      insert.run(u, _titleCaseName(row.name), row.qty, row.unit, aisle, row.pantry_id, row.recipe_id);
+      // A shared recipe's ingredients point at its owner's pantry: no link.
+      const pantryId = ownId('pantry_items', row.pantry_id, u);
+      const aisle = _aisleForPantry(pantryId, u);
+      insert.run(u, _titleCaseName(row.name), row.qty, row.unit, aisle, pantryId, row.recipe_id);
       added++;
     }
   });
@@ -355,8 +374,10 @@ router.post('/from-recipe/:id', wrap((req, res) => {
     for (const it of flat) {
       if (!it.name) continue;
       if (onlyMissing && it.pantry_item_id && stockSet.has(it.pantry_item_id)) continue;
-      const aisle = _aisleForPantry(it.pantry_item_id);
-      insert.run(u, _titleCaseName(it.name), it.qty || null, it.unit || null, aisle, it.pantry_item_id || null, recipeId);
+      // A shared recipe's ingredients point at its owner's pantry: no link.
+      const pantryId = ownId('pantry_items', it.pantry_item_id, u);
+      const aisle = _aisleForPantry(pantryId, u);
+      insert.run(u, _titleCaseName(it.name), it.qty || null, it.unit || null, aisle, pantryId, recipeId);
       added++;
     }
   });

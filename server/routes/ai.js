@@ -15,9 +15,11 @@ const MAX_HISTORY = 200; // rows kept per user
 // ── GET /api/ai/history ───────────────────────────────────────────────────────
 router.get('/history', requireAuth, wrap((req, res) => {
   const u = uid(req);
+  // The newest 100, oldest first. id breaks ties: a question and its
+  // answer are often saved in the same second.
   const rows = u == null
-    ? db.prepare(`SELECT role, content, created_at FROM ai_chat_history WHERE user_id IS NULL ORDER BY created_at ASC LIMIT 100`).all()
-    : db.prepare(`SELECT role, content, created_at FROM ai_chat_history WHERE user_id = ? ORDER BY created_at ASC LIMIT 100`).all(u);
+    ? db.prepare(`SELECT role, content, created_at FROM (SELECT id, role, content, created_at FROM ai_chat_history WHERE user_id IS NULL ORDER BY created_at DESC, id DESC LIMIT 100) ORDER BY created_at ASC, id ASC`).all()
+    : db.prepare(`SELECT role, content, created_at FROM (SELECT id, role, content, created_at FROM ai_chat_history WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 100) ORDER BY created_at ASC, id ASC`).all(u);
   res.json(rows);
 }));
 
@@ -165,6 +167,7 @@ async function _callOpenAI(apiKey, model, messages, systemPrompt, baseUrl = 'htt
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({

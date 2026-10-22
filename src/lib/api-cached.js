@@ -14,6 +14,7 @@
 
 import { CtApiNative } from './api-native.js';
 import { fullSync, startSyncLoop } from './sync.js';
+import { recipeSaveBase, withSaveBase } from './offline-edits.js';
 
 // Cheap debounce so we don't fire 50 push attempts during a bulk
 // import. Last write wins; 600ms after the last write triggers a sync.
@@ -119,8 +120,12 @@ wrapped.updateRecipe = async function (id, data) {
     const token = getAuthToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
+  // Says which copy it was made on, as the web app does: the newer of two
+  // edits stays and the other is kept as an earlier version.
+  const now = new Date().toISOString();
+  const body = withSaveBase(data, recipeSaveBase(data, null, now), now);
   const res = await fetch(apiUrl(`/api/recipes/${id}`), {
-    method: 'PUT', headers, credentials: 'include', body: JSON.stringify(data),
+    method: 'PUT', headers, credentials: 'include', body: JSON.stringify(body),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

@@ -164,7 +164,7 @@
                 <input class="input edit-name" bind:value={editText}
                   on:keydown={(e) => {
                     if (e.key === 'Enter') saveEdit(it);
-                    if (e.key === 'Escape') cancelEdit();
+                    if (e.key === 'Escape') { cancelEdit(); e.preventDefault(); }
                   }}
                   autofocus />
                 <div class="row-actions">

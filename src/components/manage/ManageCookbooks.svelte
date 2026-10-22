@@ -84,7 +84,7 @@
         payload.smart_filter = filter;
       }
       const cb = await NtApi.createCookbook(payload);
-      cookbooks = [...cookbooks, { ...cb, recipe_count: 0 }];
+      cookbooks = [...cookbooks, { ...cb, recipe_count: cb.recipe_count ?? 0 }];
       newName = '';
       newDesc = '';
       newSmart = false;
@@ -114,6 +114,7 @@
         name,
         description: editDesc.trim() || null,
         cover_image_url: editCover || null,
+        _base: cb,
       });
       cookbooks = cookbooks.map(x => x.id === cb.id ? { ...x, ...updated } : x);
       cancelEdit();

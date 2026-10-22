@@ -8,6 +8,8 @@
 import { Router } from 'express';
 import { localizeDataUrl } from '../lib/image-localizer.js';
 import db from '../db.js';
+import { stampFields } from '../lib/field-stamps.js';
+import { saveRow } from '../lib/rest-merge.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 // Same recipe-card hydration the Recipes tab uses (category, tags,
@@ -22,6 +24,7 @@ import {
   buildStockSet,
   buildCategoryMap,
 } from '../lib/recipe-hydrate.js';
+import { cleanSmartFilter, matchesSmartFilter, parseSmartFilter } from '../lib/smart-cookbook.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -49,6 +52,8 @@ function _hydrate(row, recipeCount = null) {
     slug: row.slug,
     description: row.description,
     cover_image_url: row.cover_image_url,
+    // The server's stamp of this copy: a save made on it says so.
+    synced_at: row.synced_at,
     is_smart: !!row.is_smart,
     smart_filter,
     sort_order: row.sort_order,
@@ -59,49 +64,51 @@ function _hydrate(row, recipeCount = null) {
 }
 
 // Evaluate a smart-filter JSON against the user's recipes and return
-// the matching rows. Supported criteria:
-//   { category_id, tags: [], favorites_only, min_rating, max_total_minutes }
-// Tags use AND matching (every listed tag must be present).
-function _evalSmartFilter(userId, filter) {
+// the matching rows, newest first. The criteria themselves live in
+// lib/smart-cookbook.js, shared with the Android app's own database.
+// Just the columns the filter reads.
+const SMART_COUNT_COLS = 'r.id, r.deleted_at, r.category_id, r.favorite, r.rating, r.prep_minutes, r.cook_minutes, r.tags';
+
+function _evalSmartFilter(userId, filter, { full = true } = {}) {
   if (!filter || typeof filter !== 'object') return [];
-  const where = [`r.deleted_at IS NULL`];
-  const args = [];
-  if (userId == null) where.push(`r.user_id IS NULL`);
-  else { where.push(`r.user_id = ?`); args.push(userId); }
-  if (Number.isFinite(filter.category_id)) {
-    where.push(`r.category_id = ?`); args.push(filter.category_id);
+  const matches = db.prepare(
+    `SELECT ${SMART_COUNT_COLS}
+       FROM recipes r
+      WHERE ${userId == null ? 'r.user_id IS NULL' : 'r.user_id = ?'} AND r.deleted_at IS NULL
+      ORDER BY r.updated_at DESC, r.id DESC`
+  ).all(...(userId == null ? [] : [userId])).filter(r => matchesSmartFilter(r, filter));
+  if (!full) return matches;
+  // Then the full rows of just the matches (not a narrow column list):
+  // the caller runs every row through hydrateRecipe/matchSummary just
+  // like the non-smart branch, so a smart cookbook's cards get the same
+  // category/tags/rating/pantry_match as everywhere else recipe cards
+  // render.
+  const byId = new Map();
+  const get = db.prepare(`SELECT r.* FROM recipes r WHERE r.id IN (SELECT value FROM json_each(?))`);
+  for (let i = 0; i < matches.length; i += 500) {
+    for (const r of get.all(JSON.stringify(matches.slice(i, i + 500).map(m => m.id)))) byId.set(r.id, r);
   }
-  if (filter.favorites_only) where.push(`r.favorite = 1`);
-  if (Number.isFinite(filter.min_rating)) {
-    where.push(`r.rating >= ?`); args.push(filter.min_rating);
+  return matches.map(m => byId.get(m.id)).filter(Boolean);
+}
+
+// How many recipes opening the cookbook shows (GET /:id): what a smart
+// cookbook's filter matches, or the manual links to recipes that still
+// exist. A deleted recipe keeps its link (deletes are soft), so links
+// alone overcount. `cache` keeps one owner's recipes across a list.
+function _recipeCount(cb, cache = new Map()) {
+  if (cb.is_smart) {
+    const owner = cb.user_id ?? null;
+    if (!cache.has(owner)) cache.set(owner, _evalSmartFilter(owner, {}, { full: false }));
+    const filter = parseSmartFilter(cb.smart_filter_json) || {};
+    if (typeof filter !== 'object') return 0;
+    return cache.get(owner).filter(r => matchesSmartFilter(r, filter)).length;
   }
-  if (Number.isFinite(filter.max_total_minutes)) {
-    where.push(`COALESCE(r.prep_minutes, 0) + COALESCE(r.cook_minutes, 0) <= ?`);
-    args.push(filter.max_total_minutes);
-  }
-  // Full row (not a narrow column list) — the caller runs every row
-  // through hydrateRecipe/matchSummary just like the non-smart branch,
-  // so a smart cookbook's cards get the same category/tags/rating/
-  // pantry_match as everywhere else recipe cards render.
-  const sql = `
-    SELECT r.*
-      FROM recipes r
-     WHERE ${where.join(' AND ')}
-     ORDER BY r.updated_at DESC
-  `;
-  let rows = db.prepare(sql).all(...args);
-  // Tag AND-match runs in JS (recipes.tags is JSON-encoded). Cheap
-  // enough for any household-scale library.
-  const tagFilter = Array.isArray(filter.tags) ? filter.tags.map(s => String(s).toLowerCase()) : [];
-  if (tagFilter.length > 0) {
-    rows = rows.filter(r => {
-      let arr;
-      try { arr = JSON.parse(r.tags || '[]'); } catch { arr = []; }
-      const have = new Set((Array.isArray(arr) ? arr : []).map(t => String(t).toLowerCase()));
-      return tagFilter.every(t => have.has(t));
-    });
-  }
-  return rows;
+  return db.prepare(
+    `SELECT COUNT(*) AS n
+       FROM recipe_cookbook_links l
+       JOIN recipes r ON r.id = l.recipe_id
+      WHERE l.cookbook_id = ? AND r.deleted_at IS NULL`
+  ).get(cb.id).n;
 }
 
 // userClause variant for an aliased table (the JOIN paths below).
@@ -111,15 +118,13 @@ const userClauseAliased = (u, alias) => u == null ? `${alias}.user_id IS NULL` :
 router.get('/', wrap((req, res) => {
   const u = uid(req);
   const rows = db.prepare(
-    `SELECT c.*, (
-        SELECT COUNT(*) FROM recipe_cookbook_links l
-         WHERE l.cookbook_id = c.id
-       ) AS recipe_count
+    `SELECT c.*
        FROM cookbooks c
       WHERE ${userClauseAliased(u, 'c')} AND c.deleted_at IS NULL
       ORDER BY c.sort_order ASC, c.name ASC`
   ).all(...userArgs(u));
-  res.json(rows.map(r => _hydrate(r, r.recipe_count)));
+  const cache = new Map();
+  res.json(rows.map(r => _hydrate(r, _recipeCount(r, cache))));
 }));
 
 // ── PUT /order — rewrite the global cookbook display order ─────────────
@@ -132,11 +137,13 @@ router.put('/order', wrap((req, res) => {
     : [];
   if (ids.length === 0) return res.status(400).json({ error: 'cookbook_ids required' });
   const own = db.prepare(`SELECT id FROM cookbooks WHERE id = ? AND ${userClause(u)} AND deleted_at IS NULL`);
-  const upd = db.prepare(`UPDATE cookbooks SET sort_order = ?, updated_at = datetime('now') WHERE id = ?`);
+  // A new order isn't an edit of the cookbooks: only sort_order is stamped
+  // as changed now, and updated_at stays (lib/field-merge.js).
+  const upd = db.prepare(`UPDATE cookbooks SET sort_order = ? WHERE id = ? AND sort_order IS NOT ?`);
   const tx = db.transaction(() => {
     ids.forEach((cid, i) => {
       const r = own.get(cid, ...userArgs(u));
-      if (r) upd.run(i, cid);
+      if (r && upd.run(i, cid, i).changes) stampFields('cookbooks', cid, ['sort_order']);
     });
   });
   tx();
@@ -153,7 +160,6 @@ router.get('/shared-with-me', wrap((req, res) => {
   if (u == null) return res.json([]);
   const rows = db.prepare(
     `SELECT c.*,
-            (SELECT COUNT(*) FROM recipe_cookbook_links l WHERE l.cookbook_id = c.id) AS recipe_count,
             gu.username AS shared_by_username,
             s.via_kitchen_id,
             k.name AS via_kitchen_name
@@ -164,8 +170,11 @@ router.get('/shared-with-me', wrap((req, res) => {
       WHERE s.grantee_id = ? AND c.deleted_at IS NULL
       ORDER BY s.granted_at DESC`
   ).all(u);
+  // Counted the way the owner sees it, which is also what opening it
+  // shows (recipes this account can't open come up locked).
+  const cache = new Map();
   res.json(rows.map(r => ({
-    ..._hydrate(r, r.recipe_count),
+    ..._hydrate(r, _recipeCount(r, cache)),
     shared_with_me: true,
     shared_by: r.shared_by_username || null,
     via_kitchen_id: r.via_kitchen_id ?? null,
@@ -229,9 +238,7 @@ router.get('/:id', wrap((req, res) => {
     // always target the OWNER's recipes — the reader sees exactly
     // what the owner sees. Recipes the reader can't independently
     // access get locked below.
-    let filter = null;
-    try { filter = cb.smart_filter_json ? JSON.parse(cb.smart_filter_json) : null; } catch {}
-    recipes = _evalSmartFilter(cb.user_id, filter || {});
+    recipes = _evalSmartFilter(cb.user_id, parseSmartFilter(cb.smart_filter_json) || {});
   } else {
     // Full row (not the old narrow column list) so hydrateRecipe below
     // can resolve category / tags / ingredients the same as every
@@ -323,14 +330,7 @@ router.post('/', wrap((req, res) => {
   // we store stays clean across schema iterations.
   let smart_filter_json = null;
   if (is_smart && req.body?.smart_filter && typeof req.body.smart_filter === 'object') {
-    const f = req.body.smart_filter;
-    const clean = {};
-    if (Number.isFinite(parseInt(f.category_id, 10))) clean.category_id = parseInt(f.category_id, 10);
-    if (Array.isArray(f.tags)) clean.tags = f.tags.map(s => String(s).trim()).filter(Boolean);
-    if (f.favorites_only === true) clean.favorites_only = true;
-    if (Number.isFinite(parseInt(f.min_rating, 10))) clean.min_rating = parseInt(f.min_rating, 10);
-    if (Number.isFinite(parseInt(f.max_total_minutes, 10))) clean.max_total_minutes = parseInt(f.max_total_minutes, 10);
-    smart_filter_json = JSON.stringify(clean);
+    smart_filter_json = JSON.stringify(cleanSmartFilter(req.body.smart_filter));
   }
   let slug = _slugify(name);
   let n = 2;
@@ -347,7 +347,7 @@ router.post('/', wrap((req, res) => {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(u, name, slug, description, cover_image_url, is_smart, smart_filter_json, maxOrder + 1);
   const row = db.prepare(`SELECT * FROM cookbooks WHERE id = ?`).get(result.lastInsertRowid);
-  res.status(201).json(_hydrate(row, 0));
+  res.status(201).json(_hydrate(row, _recipeCount(row)));
 }));
 
 // ── PUT /:id — update ───────────────────────────────────────────────────
@@ -380,27 +380,13 @@ router.put('/:id', wrap((req, res) => {
   let nextFilterJson = existing.smart_filter_json;
   if (req.body?.is_smart !== undefined) nextIsSmart = req.body.is_smart ? 1 : 0;
   if (nextIsSmart && req.body?.smart_filter && typeof req.body.smart_filter === 'object') {
-    const f = req.body.smart_filter;
-    const clean = {};
-    if (Number.isFinite(parseInt(f.category_id, 10))) clean.category_id = parseInt(f.category_id, 10);
-    if (Array.isArray(f.tags)) clean.tags = f.tags.map(s => String(s).trim()).filter(Boolean);
-    if (f.favorites_only === true) clean.favorites_only = true;
-    if (Number.isFinite(parseInt(f.min_rating, 10))) clean.min_rating = parseInt(f.min_rating, 10);
-    if (Number.isFinite(parseInt(f.max_total_minutes, 10))) clean.max_total_minutes = parseInt(f.max_total_minutes, 10);
-    nextFilterJson = JSON.stringify(clean);
+    nextFilterJson = JSON.stringify(cleanSmartFilter(req.body.smart_filter));
   }
   if (!nextIsSmart) nextFilterJson = null;
 
-  db.prepare(
-    `UPDATE cookbooks
-        SET name = ?, description = ?, cover_image_url = ?, sort_order = ?,
-            is_smart = ?, smart_filter_json = ?,
-            updated_at = datetime('now')
-      WHERE id = ?`
-  ).run(name, description, cover_image_url, sort_order, nextIsSmart, nextFilterJson, id);
+  saveRow('cookbooks', id, existing, { name, description, cover_image_url, sort_order, is_smart: nextIsSmart, smart_filter_json: nextFilterJson }, req.body?._sync);
   const row = db.prepare(`SELECT * FROM cookbooks WHERE id = ?`).get(id);
-  const cnt = db.prepare(`SELECT COUNT(*) AS n FROM recipe_cookbook_links WHERE cookbook_id = ?`).get(id).n;
-  res.json(_hydrate(row, cnt));
+  res.json(_hydrate(row, _recipeCount(row)));
 }));
 
 // ── DELETE /:id — soft delete ───────────────────────────────────────────

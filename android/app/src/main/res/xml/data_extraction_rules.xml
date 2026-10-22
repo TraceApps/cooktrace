@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 and later: cloud backup and moving to a new phone keep
+     everything as before, except this install's id (InstallMarkerPlugin),
+     which must never reach another phone. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="ct_install_marker.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="ct_install_marker.xml" />
+    </device-transfer>
+</data-extraction-rules>

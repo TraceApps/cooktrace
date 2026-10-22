@@ -58,6 +58,7 @@
         name,
         icon: editIcon || null,
         default_aisle: editDefaultAisle.trim() || null,
+        _base: c,
       });
       categories = categories.map(x => x.id === c.id ? updated : x);
       cancelEdit();

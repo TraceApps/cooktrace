@@ -16,6 +16,7 @@
 
 import { getDb, LOCAL_USER_ID } from './db-native.js';
 import { resolveAssetUrl } from './platform.js';
+import { cleanSmartFilter, matchesSmartFilter } from './smart-cookbook.js';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
 // ── Small utilities ──────────────────────────────────────────────────
@@ -177,6 +178,54 @@ function _cookbookFromRow(row) {
   return out;
 }
 
+// Note a row deleted outright here so the next sync deletes it on the
+// server too. Only rows the server has (a server_id); one made here and
+// never synced just goes.
+async function _noteDelete(table, id) {
+  const r = (await _query(`SELECT server_id FROM ${table} WHERE id = ?`, [id]))[0];
+  if (r?.server_id) {
+    await _run(`INSERT INTO sync_deletes (table_name, server_id) VALUES (?, ?)`, [table, r.server_id]);
+  }
+}
+
+// A smart cookbook's recipes, newest first, by the same rules as the
+// server (smart-cookbook.js), so it holds the same recipes offline.
+async function _smartCookbookRecipes(filter, cols = '*') {
+  if (!filter || typeof filter !== 'object') return [];
+  const rows = await _query(
+    `SELECT ${cols} FROM recipes
+      WHERE user_id = ? AND deleted_at IS NULL
+      ORDER BY updated_at DESC, id DESC`,
+    [LOCAL_USER_ID]
+  );
+  return rows.filter(r => matchesSmartFilter(r, filter));
+}
+
+// How many recipes opening the cookbook shows: what a smart cookbook's
+// filter matches, or the links to recipes that still exist (a deleted
+// recipe keeps its link). `cache` keeps the recipes and the link counts
+// across a list, so the whole list costs two queries.
+async function _cookbookCount(cb, cache = {}) {
+  if (cb.is_smart) {
+    const filter = cb.smart_filter || {};
+    if (typeof filter !== 'object') return 0;
+    if (!cache.rows) cache.rows = await _smartCookbookRecipes({},
+      'id, deleted_at, category_id, favorite, rating, prep_minutes, cook_minutes, tags');
+    return cache.rows.filter(r => matchesSmartFilter(r, filter)).length;
+  }
+  if (!cache.links) {
+    const rows = await _query(
+      `SELECT l.cookbook_id, COUNT(*) AS n
+         FROM recipe_cookbook_links l
+         JOIN recipes r ON r.id = l.recipe_id AND r.deleted_at IS NULL
+        GROUP BY l.cookbook_id`,
+      []
+    );
+    cache.links = new Map(rows.map(r => [r.cookbook_id, r.n]));
+  }
+  return cache.links.get(cb.id) ?? 0;
+}
+
 // ── NtApi native implementation ──────────────────────────────────────
 
 export const CtApiNative = {
@@ -245,7 +294,8 @@ export const CtApiNative = {
     const existing = (await _query(`SELECT * FROM recipes WHERE id = ?`, [id]))[0];
     if (!existing) throw new Error('Recipe not found');
     const d = { ...existing, ...data };
-    const img = d.img_url ?? d.imgUrl ?? existing.img_url ?? null;
+    // No picture is null, as the server keeps it: '' would read as a change.
+    const img = (d.img_url ?? d.imgUrl ?? existing.img_url) || null;
     await _run(
       `UPDATE recipes SET
          name = ?, description = ?, img_url = ?, servings = ?,
@@ -259,7 +309,9 @@ export const CtApiNative = {
         d.name,
         d.description ?? null,
         img,
-        d.servings ?? 2,
+        // Not given (a rating, a favorite): left as it was, so no servings
+        // stays none rather than becoming 2.
+        d.servings ?? null,
         d.prep_minutes  ?? null,
         d.cook_minutes  ?? null,
         d.total_minutes ?? null,
@@ -419,11 +471,13 @@ export const CtApiNative = {
         try {
           const recipes = await importPaprikaArchive(blob);
           const created = [];
+          const skipped = [];
           for (const r of recipes) {
             const saved = await _saveImportedRecipeLocal(this, r, { addToPantry, applyTags });
             if (saved) created.push(saved);
+            else if (r?.name) skipped.push({ name: r.name, existing_id: (await _findImportDuplicateLocal(r))?.id || null });
           }
-          return { recipes: created, count: created.length };
+          return { recipes: created, count: created.length, skipped };
         } catch (e) {
           if (!/no \.paprikarecipe/i.test(e.message || '')) throw e;
           // Not a Paprika archive — fall through to generic ZIP scan.
@@ -435,7 +489,13 @@ export const CtApiNative = {
     } else {
       throw new Error('importRecipe requires `text` or `file`');
     }
-    return _saveImportedRecipeLocal(this, recipe, { addToPantry, applyTags });
+    const saved = await _saveImportedRecipeLocal(this, recipe, { addToPantry, applyTags });
+    if (!saved && recipe?.name) {
+      // Same shape as the server's duplicate answer.
+      const existing = await _findImportDuplicateLocal(recipe);
+      return { skipped: true, reason: 'duplicate', existing_id: existing?.id || null, name: recipe.name };
+    }
+    return saved;
   },
 
   async scanRecipeZip(file) {
@@ -503,23 +563,11 @@ export const CtApiNative = {
         const saved = await _saveImportedRecipeLocal(this, entry.recipe, { addToPantry, applyTags, dedup });
         let targetRecipeId = saved?.id;
         if (!saved) {
-          skipped.push({ name: entry.recipe?.name || '?' });
           // Re-resolve the existing recipe so timeline events still
-          // land on it. Match the same way _saveImportedRecipeLocal
-          // does (case-insensitive name, then source_url).
-          if (entry.recipe?.name) {
-            const lower = entry.recipe.name.toLowerCase().trim();
-            const existing = (await _query(
-              `SELECT id FROM recipes
-                WHERE user_id = ? AND deleted_at IS NULL AND LOWER(name) = ? LIMIT 1`,
-              [LOCAL_USER_ID, lower]
-            ))[0] || (entry.recipe.source_url ? (await _query(
-              `SELECT id FROM recipes
-                WHERE user_id = ? AND deleted_at IS NULL AND source_url = ? LIMIT 1`,
-              [LOCAL_USER_ID, entry.recipe.source_url]
-            ))[0] : null);
-            targetRecipeId = existing?.id || null;
-          }
+          // land on it, and so the summary can link to it.
+          const existing = await _findImportDuplicateLocal(entry.recipe);
+          targetRecipeId = existing?.id || null;
+          skipped.push({ name: entry.recipe?.name || '?', existing_id: targetRecipeId });
         } else {
           imported.push(saved);
         }
@@ -1166,6 +1214,7 @@ export const CtApiNative = {
     return (await _query(`SELECT * FROM recipe_categories WHERE id = ?`, [id]))[0];
   },
   async deleteRecipeCategory(id) {
+    await _noteDelete('recipe_categories', id);
     await _run(`UPDATE recipes SET category_id = NULL WHERE category_id = ?`, [id]);
     await _run(`DELETE FROM recipe_categories WHERE id = ?`, [id]);
     return { ok: true };
@@ -1226,6 +1275,7 @@ export const CtApiNative = {
     return (await _query(`SELECT * FROM pantry_categories WHERE id = ?`, [id]))[0];
   },
   async deletePantryCategory(id) {
+    await _noteDelete('pantry_categories', id);
     await _run(`UPDATE pantry_items SET category_id = NULL WHERE category_id = ?`, [id]);
     await _run(`DELETE FROM pantry_categories WHERE id = ?`, [id]);
     return { ok: true };
@@ -1288,6 +1338,7 @@ export const CtApiNative = {
     return (await _query(`SELECT * FROM custom_units WHERE id = ?`, [id]))[0];
   },
   async deleteCustomUnit(id) {
+    await _noteDelete('custom_units', id);
     await _run(`DELETE FROM custom_units WHERE id = ?`, [id]);
     return { ok: true };
   },
@@ -1296,28 +1347,39 @@ export const CtApiNative = {
 
   async getCookbooks() {
     const rows = await _query(
-      `SELECT c.*,
-              (SELECT COUNT(*) FROM recipe_cookbook_links l WHERE l.cookbook_id = c.id) AS recipe_count
+      `SELECT c.*
          FROM cookbooks c
         WHERE c.user_id = ? AND c.deleted_at IS NULL
         ORDER BY c.sort_order ASC, c.name COLLATE NOCASE ASC`,
       [LOCAL_USER_ID]
     );
-    return rows.map(_cookbookFromRow);
+    const cache = {};
+    const out = [];
+    for (const row of rows) {
+      const cb = _cookbookFromRow(row);
+      cb.recipe_count = await _cookbookCount(cb, cache);
+      out.push(cb);
+    }
+    return out;
   },
   async getCookbook(id) {
     const cb = (await _query(`SELECT * FROM cookbooks WHERE id = ? AND deleted_at IS NULL`, [id]))[0];
     if (!cb) return null;
     const out = _cookbookFromRow(cb);
-    const recipes = await _query(
-      `SELECT r.*, l.sort_order AS link_sort
-         FROM recipe_cookbook_links l
-         JOIN recipes r ON r.id = l.recipe_id AND r.deleted_at IS NULL
-        WHERE l.cookbook_id = ?
-        ORDER BY l.sort_order ASC, r.name COLLATE NOCASE ASC`,
-      [id]
-    );
+    // A smart cookbook holds whatever its filter matches, worked out on
+    // every read like the server does; its links are not used.
+    const recipes = out.is_smart
+      ? await _smartCookbookRecipes(out.smart_filter || {})
+      : await _query(
+        `SELECT r.*, l.sort_order AS link_sort
+           FROM recipe_cookbook_links l
+           JOIN recipes r ON r.id = l.recipe_id AND r.deleted_at IS NULL
+          WHERE l.cookbook_id = ?
+          ORDER BY l.sort_order ASC, r.name COLLATE NOCASE ASC`,
+        [id]
+      );
     out.recipes = recipes.map(_recipeFromRow);
+    out.recipe_count = out.recipes.length;
     return out;
   },
   async createCookbook(d) {
@@ -1329,16 +1391,34 @@ export const CtApiNative = {
     const id = await _runInsert(
       `INSERT INTO cookbooks (user_id, name, slug, description, cover_image_url, is_smart, smart_filter_json, sort_order, sync_status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-      [LOCAL_USER_ID, d.name, slug, d.description || null, d.cover_image_url || null, _bool(d.is_smart), _stringify(d.smart_filter), max + 1]
+      // The filter is kept as the server keeps it (smart-cookbook.js).
+      [LOCAL_USER_ID, d.name, slug, d.description || null, d.cover_image_url || null, _bool(d.is_smart),
+       d.is_smart && d.smart_filter && typeof d.smart_filter === 'object' ? JSON.stringify(cleanSmartFilter(d.smart_filter)) : null, max + 1]
     );
-    return _cookbookFromRow((await _query(`SELECT * FROM cookbooks WHERE id = ?`, [id]))[0]);
+    const cb = _cookbookFromRow((await _query(`SELECT * FROM cookbooks WHERE id = ?`, [id]))[0]);
+    cb.recipe_count = await _cookbookCount(cb);
+    return cb;
   },
   async updateCookbook(id, d) {
+    // Only what the caller sends changes, as on the server (PUT
+    // /api/cookbooks/:id): a rename or a new cover must not turn a smart
+    // cookbook into an empty plain one, or blank its name.
+    const existing = (await _query(`SELECT * FROM cookbooks WHERE id = ? AND deleted_at IS NULL`, [id]))[0];
+    if (!existing) return null;
+    const name = d.name != null ? (String(d.name).trim() || existing.name) : existing.name;
+    const description = d.description !== undefined ? (d.description ? String(d.description).trim() : null) : existing.description;
+    const cover = d.cover_image_url !== undefined ? (d.cover_image_url || null) : existing.cover_image_url;
+    const isSmart = d.is_smart !== undefined ? _bool(d.is_smart) : existing.is_smart;
+    let filterJson = existing.smart_filter_json;
+    if (isSmart && d.smart_filter && typeof d.smart_filter === 'object') filterJson = JSON.stringify(cleanSmartFilter(d.smart_filter));
+    if (!isSmart) filterJson = null;
     await _run(
       `UPDATE cookbooks SET name = ?, description = ?, cover_image_url = ?, is_smart = ?, smart_filter_json = ?, updated_at = datetime('now'), sync_status = 'pending' WHERE id = ?`,
-      [d.name, d.description || null, d.cover_image_url || null, _bool(d.is_smart), _stringify(d.smart_filter), id]
+      [name, description, cover, isSmart, filterJson, id]
     );
-    return _cookbookFromRow((await _query(`SELECT * FROM cookbooks WHERE id = ?`, [id]))[0]);
+    const cb = _cookbookFromRow((await _query(`SELECT * FROM cookbooks WHERE id = ?`, [id]))[0]);
+    if (cb) cb.recipe_count = await _cookbookCount(cb);
+    return cb;
   },
   async deleteCookbook(id) {
     await _run(`UPDATE cookbooks SET deleted_at = datetime('now'), sync_status = 'pending' WHERE id = ?`, [id]);
@@ -1355,10 +1435,27 @@ export const CtApiNative = {
         [id, recipeIds[i], max + 1 + i]
       );
       if ((r?.changes?.changes ?? r?.changes ?? 0) > 0) added++;
+      // Put back before the removal went up: the removal is off.
+      await _run(
+        `DELETE FROM sync_deletes WHERE table_name = 'recipe_cookbook_links'
+            AND server_id = (SELECT server_id FROM cookbooks WHERE id = ?)
+            AND recipe_server_id = (SELECT server_id FROM recipes WHERE id = ?)`,
+        [id, recipeIds[i]]
+      );
     }
     return { ok: true, added };
   },
   async removeRecipeFromCookbook(id, recipeId) {
+    // The server only hears of a removal through sync_deletes; a link
+    // push only adds.
+    const cb = (await _query(`SELECT server_id FROM cookbooks WHERE id = ?`, [id]))[0];
+    const r = (await _query(`SELECT server_id FROM recipes WHERE id = ?`, [recipeId]))[0];
+    if (cb?.server_id && r?.server_id) {
+      await _run(
+        `INSERT INTO sync_deletes (table_name, server_id, recipe_server_id) VALUES ('recipe_cookbook_links', ?, ?)`,
+        [cb.server_id, r.server_id]
+      );
+    }
     await _run(`DELETE FROM recipe_cookbook_links WHERE cookbook_id = ? AND recipe_id = ?`, [id, recipeId]);
     return { ok: true };
   },
@@ -1374,7 +1471,7 @@ export const CtApiNative = {
   async reorderCookbookRecipes(id, recipeIds) {
     for (let i = 0; i < recipeIds.length; i++) {
       await _run(
-        `UPDATE recipe_cookbook_links SET sort_order = ? WHERE cookbook_id = ? AND recipe_id = ?`,
+        `UPDATE recipe_cookbook_links SET sort_order = ?, sync_status = 'pending' WHERE cookbook_id = ? AND recipe_id = ?`,
         [i, id, recipeIds[i]]
       );
     }
@@ -1454,6 +1551,11 @@ export const CtApiNative = {
     return { ok: true };
   },
   async clearAiChat() {
+    await _run(
+      `INSERT INTO sync_deletes (table_name, server_id)
+       SELECT 'ai_chat_history', server_id FROM ai_chat_history WHERE user_id = ? AND server_id IS NOT NULL`,
+      [LOCAL_USER_ID]
+    );
     await _run(`DELETE FROM ai_chat_history WHERE user_id = ?`, [LOCAL_USER_ID]);
     return { ok: true };
   },
@@ -1472,6 +1574,11 @@ export const CtApiNative = {
   async mintRecipeShareToken()     { throw new Error('Public share links require a server connection.'); },
   async revokeRecipeShareToken()   { return { ok: true }; },
   async getRecipesSharedWithMe()   { return []; },
+  // Earlier versions come from syncing with a server; a phone on its own
+  // has none.
+  async getRecipeVersions()        { return []; },
+  async markRecipeVersionsSeen()   { return { ok: true }; },
+  async restoreRecipeVersion()     { throw new Error('Earlier versions require a server connection.'); },
 
   // Kitchens (household / group sharing) — single-user local mode has
   // no concept of kitchens. Returns empty / no-op shapes that match
@@ -1553,6 +1660,25 @@ export const NtApiNative = CtApiNative;
  *   dedup        'skip' (default) | 'force' | 'replace'
  * @returns {object|null}   the saved recipe row, or null when skipped
  */
+async function _findImportDuplicateLocal(r) {
+  // The recipe an import would duplicate: case-insensitive name first,
+  // then source_url. Mirrors the server's _findImportDuplicate.
+  const lower = String(r?.name || '').toLowerCase().trim();
+  let existing = lower ? (await _query(
+    `SELECT id, name, source_url FROM recipes
+      WHERE user_id = ? AND deleted_at IS NULL AND LOWER(name) = ? LIMIT 1`,
+    [LOCAL_USER_ID, lower]
+  ))[0] : null;
+  if (!existing && r?.source_url) {
+    existing = (await _query(
+      `SELECT id, name, source_url FROM recipes
+        WHERE user_id = ? AND deleted_at IS NULL AND source_url = ? LIMIT 1`,
+      [LOCAL_USER_ID, r.source_url]
+    ))[0];
+  }
+  return existing || null;
+}
+
 async function _saveImportedRecipeLocal(api, r, opts = {}) {
   const { addToPantry = true, dedup = 'skip' } = opts;
   if (!r?.name) return null;
@@ -1562,20 +1688,7 @@ async function _saveImportedRecipeLocal(api, r, opts = {}) {
   // existing recipe alone. 'replace' updates the existing row.
   // 'force' creates a duplicate (the pre-dedup behaviour).
   if (dedup !== 'force') {
-    const lower = r.name.toLowerCase().trim();
-    const existingByName = (await _query(
-      `SELECT id, name, source_url FROM recipes
-        WHERE user_id = ? AND deleted_at IS NULL AND LOWER(name) = ? LIMIT 1`,
-      [LOCAL_USER_ID, lower]
-    ))[0];
-    let existing = existingByName;
-    if (!existing && r.source_url) {
-      existing = (await _query(
-        `SELECT id, name, source_url FROM recipes
-          WHERE user_id = ? AND deleted_at IS NULL AND source_url = ? LIMIT 1`,
-        [LOCAL_USER_ID, r.source_url]
-      ))[0];
-    }
+    const existing = await _findImportDuplicateLocal(r);
     if (existing) {
       if (dedup === 'skip') return null;
       if (dedup === 'replace') {

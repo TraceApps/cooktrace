@@ -1,5 +1,6 @@
 <script>
   import { closeOnBack } from '../lib/back-stack.js';
+  import { onSyncChanges } from '../lib/sync-refresh.js';
   import { onMount, tick } from 'svelte';
   import { fold } from '../lib/fold.js';
   import { columnsAcrossFold, gridTemplateAcrossFold, columnForIndex } from '../lib/fold-core.js';
@@ -8,7 +9,8 @@
   import { _ } from 'svelte-i18n';
   import { formatDuration } from '../lib/duration.js';
   import { NtApi } from '../lib/api.js';
-  import { showError, showSuccess } from '../stores/toast.js';
+  import { recipeBaseOf } from '../lib/offline-edits.js';
+  import { showError, showSuccess, showInfo } from '../stores/toast.js';
   import { pageBanners, bannerStyle, aiEnabled, aiKeyVerified, recipesSort, mixSharedIntoRecipes } from '../stores/settings.js';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
   import ImportFromFileDialog from '../components/recipe/ImportFromFileDialog.svelte';
@@ -19,7 +21,7 @@
   import { confirmDialog } from '../stores/confirmDialog.js';
   import { buildRecipeCardPages, buildRecipeShareText } from '../lib/recipe-card.js';
   import { svgToPngBlob, shareBlobs } from '../lib/shopping-card.js';
-  import { isNative, getServerUrl } from '../lib/platform.js';
+  import { isNative, getServerUrl, publicRecipeUrl } from '../lib/platform.js';
 
   import { foldText } from '../lib/search-text.js';
 
@@ -111,13 +113,30 @@
       pasteText = '';
       clearPasteFile();
       if (result?.recipes && Array.isArray(result.recipes)) {
-        showSuccess(`Imported ${result.count} recipes`);
+        const count = result.count || 0;
+        const skipped = Array.isArray(result.skipped) ? result.skipped.length : 0;
+        if (count === 0) {
+          showInfo($_('recipes_page.toast.archive_all_duplicates', { values: { skipped } }));
+        } else if (skipped > 0) {
+          showSuccess($_('recipes_page.toast.archive_imported_skipped', { values: { count, skipped } }));
+        } else {
+          showSuccess($_('recipes_page.toast.archive_imported', { values: { count } }));
+        }
         await load();
+      } else if (result?.skipped) {
+        // Already in the catalog: nothing was written, so open the
+        // recipe it matched instead of a new one.
+        if (result.existing_id) {
+          showInfo($_('recipes_page.toast.already_exists'));
+          push(`/recipes/${result.existing_id}`);
+        } else {
+          showInfo($_('recipes_page.toast.already_exists_short'));
+        }
       } else {
         const created = result;
         const stepCount = (created.steps || []).reduce((n, s) => n + (s?.text ? 1 : 0), 0);
         if (stepCount === 0) {
-          showError("Imported — but the source had no cooking steps. Open it to add them manually.");
+          showError($_('recipes_page.toast.imported_no_steps'));
         } else {
           showSuccess($_('recipes_page.toast.recipe_imported'));
         }
@@ -360,7 +379,7 @@
   }
   function shareLinkUrl(token) {
     if (typeof window === 'undefined' || !token) return '';
-    return `${window.location.origin}/#/r/${token}`;
+    return publicRecipeUrl(token);
   }
   async function openShareDialog(recipe) {
     shareDialogRecipe = recipe;
@@ -501,7 +520,9 @@
     }
     else if (v === 'favorite') {
       try {
-        const updated = await NtApi.updateRecipe(r.id, { ...r, favorite: !r.favorite });
+        // Says it changes the favorite only: the list's copy may be older
+        // than an edit made elsewhere since, which the save mustn't undo.
+        const updated = await NtApi.updateRecipe(r.id, { ...r, favorite: !r.favorite, _base: recipeBaseOf(r), _changed: ['favorite'] });
         recipes = recipes.map(x => x.id === r.id ? updated : x);
       } catch (err) { showError(err.message || 'Update failed'); }
     }
@@ -606,8 +627,24 @@
   $: if (viewMode || sharedRecipes.length || cookbooks.length || recipes.length) {
     if (typeof window !== 'undefined') tick().then(_measureVtPill);
   }
-  if (typeof window !== 'undefined') {
-    window.addEventListener('resize', () => tick().then(_measureVtPill));
+  // The buttons change width after that first measure: the icon font
+  // loads (until then an icon is its name, "auto_stories", in text) and
+  // the counts arrive. Measure again whenever a button resizes, so the
+  // pill sits on the active button rather than where it was.
+  let vtResize = null;
+  onMount(() => {
+    const remeasure = () => tick().then(_measureVtPill);
+    window.addEventListener('resize', remeasure);
+    if (typeof ResizeObserver !== 'undefined') vtResize = new ResizeObserver(() => _measureVtPill());
+    document.fonts?.ready?.then(remeasure);
+    return () => {
+      window.removeEventListener('resize', remeasure);
+      vtResize?.disconnect();
+      vtResize = null;
+    };
+  });
+  $: if (vtResize) {
+    for (const el of [vtContainer, vtBtnRecipes, vtBtnShared, vtBtnCookbooks]) if (el) vtResize.observe(el);
   }
 
   // Category filter — driven by a clickable chip row OR a `?category=<slug>`
@@ -760,9 +797,13 @@
     return arr;
   }
 
-  async function load() {
-    loading = true;
-    loadError = null;
+  // Two reads at once (the page opening while a sync lands): the later
+  // one's answer stands, never an older one finishing last.
+  let _loadSeq = 0;
+  // quiet: read again after a sync, without the loading state.
+  async function load({ quiet = false } = {}) {
+    const seq = ++_loadSeq;
+    if (!quiet) { loading = true; loadError = null; }
     try {
       const [recipesRes, catsRes, cookbooksRes, sharedRes, sharedCbRes] = await Promise.all([
         NtApi.getRecipes(),
@@ -777,6 +818,8 @@
           return [];
         }),
       ]);
+      if (seq !== _loadSeq) return;
+      loadError = null;
       recipes = recipesRes;
       categories = catsRes || [];
       cookbooks = cookbooksRes || [];
@@ -792,13 +835,20 @@
       // active button on cold start.
       tick().then(() => requestAnimationFrame(_measureVtPill));
     } catch (e) {
-      loadError = e.message || 'Could not load recipes';
-      showError(loadError);
+      // Only the newest read speaks; a quiet one after a sync that fails
+      // keeps what's shown, unsaid.
+      if (seq === _loadSeq && !quiet) {
+        loadError = e.message || 'Could not load recipes';
+        showError(loadError);
+      }
     } finally {
-      loading = false;
+      if (seq === _loadSeq) loading = false;
     }
   }
-  onMount(load);
+  onMount(() => { load(); });
+  // A sync that brought changes down (the first one after signing in
+  // included) shows them here at once.
+  onMount(() => onSyncChanges(() => load({ quiet: true })));
 
   function totalMinutes(r) {
     if (r?.total_minutes != null) return r.total_minutes;

@@ -439,7 +439,7 @@ async function _callOpenAIWithTools(apiKey, model, messages, systemPrompt, tools
       }),
     };
     if (openaiTools.length) body.tools = openaiTools;
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
     if (apiKey && apiKey !== 'no-key') headers['Authorization'] = `Bearer ${apiKey}`;
     const res = await fetch(`${baseUrl}/v1/chat/completions`, {
       method: 'POST',

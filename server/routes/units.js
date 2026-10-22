@@ -10,6 +10,7 @@
  */
 import { Router } from 'express';
 import db from '../db.js';
+import { saveRow } from '../lib/rest-merge.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 
@@ -28,7 +29,7 @@ router.get('/', wrap((req, res) => {
     `SELECT abbr FROM disabled_units WHERE ${userClause(u)}`
   ).all(...userArgs(u)).map(r => r.abbr);
   const custom = db.prepare(
-    `SELECT id, abbr, full_name, category, sort_order
+    `SELECT id, abbr, full_name, category, sort_order, synced_at
        FROM custom_units
       WHERE ${userClause(u)}
       ORDER BY sort_order ASC, abbr ASC`
@@ -108,7 +109,7 @@ router.post('/', wrap((req, res) => {
      VALUES (?, ?, ?, ?, ?)`
   ).run(u, abbr, full_name, category, maxOrder + 1);
   const row = db.prepare(
-    `SELECT id, abbr, full_name, category, sort_order FROM custom_units WHERE id = ?`
+    `SELECT id, abbr, full_name, category, sort_order, synced_at FROM custom_units WHERE id = ?`
   ).get(result.lastInsertRowid);
   res.status(201).json(row);
 }));
@@ -129,13 +130,9 @@ router.put('/:id', wrap((req, res) => {
     ? (req.body.category ? String(req.body.category).trim() : null)
     : existing.category;
 
-  db.prepare(
-    `UPDATE custom_units
-        SET abbr = ?, full_name = ?, category = ?, updated_at = datetime('now')
-      WHERE id = ?`
-  ).run(abbr, full_name, category, id);
+  saveRow('custom_units', id, existing, { abbr, full_name, category }, req.body?._sync);
   const row = db.prepare(
-    `SELECT id, abbr, full_name, category, sort_order FROM custom_units WHERE id = ?`
+    `SELECT id, abbr, full_name, category, sort_order, synced_at FROM custom_units WHERE id = ?`
   ).get(id);
   res.json(row);
 }));
