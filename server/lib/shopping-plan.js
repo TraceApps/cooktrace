@@ -8,9 +8,9 @@
  * Each list row keeps where its amount came from in `sources`, a JSON list:
  *   { recipe_id, diary_id, date, servings, ref, name, qty, unit }
  * one per ingredient line of a recipe (scaled to the planned servings).
- * A planned cook's share is replaced when the same week is built again,
- * and dropped once the cook is gone; anything typed into the row by hand
- * stays. recipe_id and diary_id are ids of this side (server or phone):
+ * A planned cook's share is replaced when the same week is built again or
+ * the cook is changed, and dropped once the cook is gone; anything typed
+ * into the row by hand stays. recipe_id and diary_id are ids of this side (server or phone):
  * mapSourceIds() turns them into the other side's ids during a sync.
  */
 import {
@@ -105,6 +105,20 @@ function _manualPart(row, sources) {
   return rest > Math.max(1e-6, Math.abs(q) * 0.02) ? rest : 0;
 }
 
+// Whether an update changes the row at all: one that doesn't isn't written,
+// so a plan edit that leaves the list as it was neither stamps nor syncs it.
+// One that changes the amount is marked so, for saying so (a moved cook
+// changes only the date its share carries).
+function _changes(row, upd) {
+  const num = v => (v == null || v === '' ? null : Number(v));
+  if (num(row.quantity) !== num(upd.quantity) || (row.unit || null) !== (upd.unit || null)) {
+    upd.amount = true;
+    return true;
+  }
+  if (upd.pantry_id != null && row.pantry_id == null) return true;
+  return JSON.stringify(parseSources(row.sources)) !== upd.sources;
+}
+
 function _total(manual, unit, sources) {
   const parts = sources.map(s => ({ qty: s.qty, unit: s.unit }));
   if (manual != null && manual > 0) parts.push({ qty: manual, unit });
@@ -124,16 +138,24 @@ function _strip(c) {
  *   contributions: from recipeContributions()
  *   opts.window: { from, to } for a plan build; the planned cooks in it
  *         replace what they added before, and a cook no longer planned
- *         takes its share out. Without it every contribution adds.
+ *         takes its share out.
+ *   opts.cooks: ids of planned cooks whose shares these contributions
+ *         replace wherever they're dated (a cook moved to another week),
+ *         the share coming out for one with none.
+ *   Without either, every contribution adds.
  * Returns { inserts, updates, deletes }:
  *   inserts: { name, quantity, unit, pantry_id, recipe_id, sources (JSON) }
- *   updates: { id, quantity, unit, sources (JSON), pantry_id? }
+ *   updates: { id, quantity, unit, sources (JSON), pantry_id?, amount? }
+ *     (amount: the row's amount changes, not only where it came from)
  *   deletes: ids of rows that only held a cancelled cook's share
  * A line already on a checked-off row (bought) isn't added again.
  */
 export function mergeIntoList(rows, contributions, opts = {}) {
   const win = opts.window || null;
-  const inWindow = s => win && s.diary_id != null && s.date && s.date >= win.from && s.date <= win.to;
+  const cooks = opts.cooks ? new Set(opts.cooks) : null;
+  const replacing = !!(win || cooks);
+  const inWindow = s => s.diary_id != null && (
+    (win && s.date && s.date >= win.from && s.date <= win.to) || (cooks && cooks.has(s.diary_id)));
 
   // Lines already bought: on a checked row.
   const bought = new Set();
@@ -160,7 +182,7 @@ export function mergeIntoList(rows, contributions, opts = {}) {
 
   // Rows with a planned share in the window that nothing replaces: the
   // share comes out (the cook was moved, cancelled or no longer uses it).
-  if (win) {
+  if (replacing) {
     for (const r of open) {
       const k = _rowKey(r.name, r.unit);
       if (groups.has(k) && byKey.get(k) === r) continue;
@@ -170,7 +192,8 @@ export function mergeIntoList(rows, contributions, opts = {}) {
       const kept = sources.filter(s => !inWindow(s));
       if (!kept.length && !manual) { deletes.push(r.id); continue; }
       const t = _total(manual, r.unit, kept);
-      updates.push({ id: r.id, quantity: t.quantity, unit: t.unit, sources: JSON.stringify(kept) });
+      const upd = { id: r.id, quantity: t.quantity, unit: t.unit, sources: JSON.stringify(kept) };
+      if (_changes(r, upd)) updates.push(upd);
     }
   }
 
@@ -193,12 +216,12 @@ export function mergeIntoList(rows, contributions, opts = {}) {
     const manual = _manualPart(row, sources);
     // A plan build replaces the window's shares; the same line added again
     // outside a plan adds again (cooking it twice).
-    const kept = win ? sources.filter(s => !inWindow(s)) : sources;
+    const kept = replacing ? sources.filter(s => !inWindow(s)) : sources;
     const next = [...kept, ...list.map(_strip)];
     const t = _total(manual, row.unit || list[0].unit, next);
     const upd = { id: row.id, quantity: t.quantity, unit: t.unit, sources: JSON.stringify(next) };
     if (row.pantry_id == null && pantryId != null) upd.pantry_id = pantryId;
-    updates.push(upd);
+    if (_changes(row, upd)) updates.push(upd);
   }
 
   return { inserts, updates, deletes };
@@ -229,6 +252,34 @@ export function mapSourceIds(json, recipe, diary) {
     return next;
   });
   return { json: JSON.stringify(out), unknown };
+}
+
+/** The planned cooks a list holds a share of, by id: on rows not yet bought. */
+export function cooksOnList(rows) {
+  const ids = new Set();
+  for (const r of rows || []) {
+    if (r.checked) continue;
+    for (const s of parseSources(r.sources)) if (s.diary_id != null) ids.add(s.diary_id);
+  }
+  return ids;
+}
+
+/**
+ * Of these cooks' lines, only the ones still on the list (#81). Keeping the
+ * list in step with a changed plan rescales what's there and takes out what
+ * isn't needed; it doesn't put back a line that was bought and cleared, or
+ * deleted by hand, which only building that week's list again does.
+ *   rows: the list rows that aren't deleted
+ *   cooks: the planned cooks whose lines are held to the list
+ */
+export function onlyListed(contributions, rows, cooks) {
+  const held = new Set(cooks);
+  const listed = new Set();
+  for (const r of rows || []) {
+    if (r.checked) continue;
+    for (const s of parseSources(r.sources)) listed.add(_sourceKey(s));
+  }
+  return contributions.filter(c => !held.has(c.diary_id) || listed.has(_sourceKey(c)));
 }
 
 /** Ids-only check: keep the ids an account may point at, take out the rest. */

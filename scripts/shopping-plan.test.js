@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   recipeContributions, mergeIntoList, parseSources, mapSourceIds, cleanSourceIds, scaleFor,
+  cooksOnList, onlyListed,
 } from '../src/lib/shopping-plan.js';
 
 const WEEK = { from: '2030-01-07', to: '2030-01-13' };
@@ -64,8 +65,12 @@ test('building the same week again replaces its share; a hand-typed amount stays
   byName(rows, 'tomato').quantity = 10; // 2 more typed in
   const again = mergeIntoList(rows, [...plan(shak, 10, '2030-01-07', 4), ...plan(tacos, 11, '2030-01-09', 4)], { window: WEEK });
   assert.equal(again.inserts.length, 0, 'nothing doubled');
-  const tom = again.updates.find(u => u.id === byName(rows, 'tomato').id);
-  assert.equal(tom.quantity, 10, 'the 2 typed in stay');
+  assert.ok(!again.updates.some(u => u.id === byName(rows, 'tomato').id), 'the same plan again leaves the row as it is');
+  assert.equal(byName(rows, 'tomato').quantity, 10, 'the 2 typed in stay');
+  // The shakshuka for 6: its share grows, and the 2 typed in still stay.
+  const more = mergeIntoList(rows, [...plan(shak, 10, '2030-01-07', 6), ...plan(tacos, 11, '2030-01-09', 4)], { window: WEEK });
+  const tom = more.updates.find(u => u.id === byName(rows, 'tomato').id);
+  assert.equal(tom.quantity, 13, '9 + 2 + 2 typed');
   assert.equal(parseSources(tom.sources).length, 2);
 });
 
@@ -125,4 +130,54 @@ test('ids in sources map to the other side, and unknown ones wait', () => {
   assert.deepEqual(cleaned.map(s => [s.recipe_id, s.diary_id]), [[1, null], [null, null]], "another account's ids are taken out");
   assert.deepEqual(parseSources('nonsense'), []);
   assert.deepEqual(parseSources(null), []);
+});
+
+// ── #81: the list follows the plan, and adds only what's short ──────────
+
+test('a cook moved to next week and that week built is counted once', () => {
+  const rows = asRows(mergeIntoList([], plan(tacos, 11, '2030-01-09', 4), { window: WEEK }));
+  // Moved to the 16th; next week is built with the cooks the list holds.
+  const NEXT = { from: '2030-01-14', to: '2030-01-20' };
+  const r = mergeIntoList(rows, plan(tacos, 11, '2030-01-16', 4), { window: NEXT, cooks: new Set([11]) });
+  assert.equal(r.inserts.length, 0, 'nothing doubled');
+  const tort = r.updates.find(u => u.id === byName(rows, 'tortilla').id);
+  assert.equal(tort.quantity, 10, '8-10 buys 10');
+  assert.deepEqual(parseSources(tort.sources).map(s => s.date), ['2030-01-16'], 'the share is dated where the cook is now');
+});
+
+test("a changed cook's share follows it; a deleted one's comes out", () => {
+  const rows = asRows(mergeIntoList([], [...plan(shak, 10, '2030-01-07', 4), ...plan(tacos, 11, '2030-01-09', 4)], { window: WEEK }));
+  // The tacos for 8 instead of 4.
+  const more = mergeIntoList(rows, [...plan(shak, 10, '2030-01-07', 4), ...plan(tacos, 11, '2030-01-09', 8)], { cooks: new Set([10, 11]) });
+  assert.equal(more.updates.find(u => u.id === byName(rows, 'tortilla').id).quantity, 20);
+  assert.equal(more.updates.find(u => u.id === byName(rows, 'tomato').id).quantity, 10);
+  // The tacos deleted.
+  const gone = mergeIntoList(rows, plan(shak, 10, '2030-01-07', 4), { cooks: new Set([10, 11]) });
+  assert.deepEqual(gone.deletes, [byName(rows, 'tortilla').id]);
+  assert.equal(gone.updates.find(u => u.id === byName(rows, 'tomato').id).quantity, 6);
+});
+
+test('the cooks a list holds are the ones on rows not yet bought', () => {
+  const rows = asRows(mergeIntoList([], [...plan(shak, 10, '2030-01-07', 4), ...plan(tacos, 11, '2030-01-09', 4)], { window: WEEK }));
+  assert.deepEqual([...cooksOnList(rows)].sort(), [10, 11]);
+  for (const r of rows) if (parseSources(r.sources).some(s => s.diary_id === 11)) r.checked = 1;
+  // Tomatoes and oil are shared with cook 10, so only its rows are left open.
+  assert.deepEqual([...cooksOnList(rows)], [10]);
+});
+
+test("keeping up with a changed plan doesn't bring back what was bought and cleared", () => {
+  const rows = asRows(mergeIntoList([], [...plan(shak, 10, '2030-01-07', 4), ...plan(tacos, 11, '2030-01-09', 4)], { window: WEEK }));
+  // Tortillas bought and cleared: the row is gone.
+  const left = rows.filter(r => !r.name.startsWith('tortilla'));
+  const more = onlyListed([...plan(shak, 10, '2030-01-07', 4), ...plan(tacos, 11, '2030-01-09', 8)], left, [10, 11]);
+  const r = mergeIntoList(left, more, { cooks: [10, 11] });
+  assert.equal(r.inserts.length, 0, 'the tortillas stay off');
+  assert.equal(r.updates.find(u => u.id === byName(left, 'tomato').id).quantity, 10, 'what is still there follows');
+});
+
+test('a plan change that leaves the list as it was writes nothing', () => {
+  const lines = [...plan(shak, 10, '2030-01-07', 4), ...plan(tacos, 11, '2030-01-09', 4)];
+  const rows = asRows(mergeIntoList([], lines, { window: WEEK }));
+  const r = mergeIntoList(rows, lines, { cooks: [10, 11] });
+  assert.deepEqual([r.inserts.length, r.updates.length, r.deletes.length], [0, 0, 0]);
 });

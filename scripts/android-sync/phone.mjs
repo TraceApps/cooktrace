@@ -825,6 +825,39 @@ const scenarios = {
     out.phone = { notes: (await here('shopping_list', milk.id)).notes, anyDay: (await here('cook_diary', cook.id)).any_day, date: (await here('cook_diary', cook.id)).date };
     out.ids = { cook: sCook, milk: sMilk };
   },
+  // The shopping list follows the plan on the phone too (#81), as it does
+  // on the server, and what it adds is only what's short of the pantry.
+  async planFollows() {
+    const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    const rice = await api.createPantryItem({ name: 'Rice', in_stock: false });
+    const salt = await api.createPantryItem({ name: 'Salt', in_stock: true });
+    const fried = await api.createRecipe({ name: 'Fried Rice', servings: 2, steps: [{ text: 'Fry' }], ingredients: [{ items: [{ name: 'Rice', qty: '300', unit: 'g', pantry_item_id: rice.id }, { name: 'Eggs', qty: '2' }, { name: 'Salt', qty: '1', unit: 'tsp', pantry_item_id: salt.id }] }] });
+    const curry = await api.createRecipe({ name: 'Curry', servings: 2, steps: [{ text: 'Simmer' }], ingredients: [{ items: [{ name: 'Rice', qty: '150', unit: 'g', pantry_item_id: rice.id }, { name: 'Onion', qty: '1' }] }] });
+    const plan = (r, n) => api.createDiaryEntry({ recipe_id: r.id, date: day(n), kind: 'planned', servings: 2 });
+    const a = await plan(fried, 1);
+    const b = await plan(curry, 2);
+    await plan(curry, 9);
+    const rows = async () => (await api.getShoppingList()).filter(r => !r.deleted_at);
+    const list = async () => Object.fromEntries((await rows()).map(r => [r.name, r.quantity]));
+    await api.shopFromPlan({ from: day(0), to: day(6) });
+    out.built = await list();
+    out.mealOnly = !!(await api.updateDiaryEntry(b.id, { meal_type: 'lunch' }))?.list;
+    out.edited = !!(await api.updateDiaryEntry(b.id, { servings: 4 }))?.list;
+    out.afterEdit = await list();
+    await api.deleteShoppingItem((await rows()).find(r => r.name === 'Eggs').id);
+    await api.updateDiaryEntry(a.id, { servings: 4 });
+    out.afterCleared = await list();
+    await api.updateDiaryEntry(a.id, { date: day(8) });
+    out.afterMove = await list();
+    await api.shopFromPlan({ from: day(7), to: day(13) });
+    out.nextWeek = await list();
+    out.removed = !!(await api.deleteDiaryEntry(b.id))?.list;
+    out.afterDelete = await list();
+    await api.updateDiaryEntry(a.id, { kind: 'cooked' });
+    out.afterCooked = await list();
+    await sync();
+    out.server = Object.fromEntries((await web('GET', '/api/shopping')).filter(r => !r.deleted_at).map(r => [r.name, r.quantity]));
+  },
   // Allergens: a pantry item's from its label and a recipe's correction,
   // made on the phone, read and changed on the web, both ways.
   async allergens() {

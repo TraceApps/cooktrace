@@ -17,7 +17,7 @@
 import { getDb, LOCAL_USER_ID, dbMarkDisabledUnitsChanged } from './db-native.js';
 import { resolveAssetUrl } from './platform.js';
 import { cleanSmartFilter, matchesSmartFilter } from './smart-cookbook.js';
-import { recipeContributions, mergeIntoList, parseSources } from './shopping-plan.js';
+import { recipeContributions, mergeIntoList, parseSources, cooksOnList, onlyListed } from './shopping-plan.js';
 import { ingredientKey } from './quantity.js';
 import { allergenSummary, cleanCodes, cleanOverrides, knownCodes } from './allergens.js';
 import { revisionOf, revOf, parseRevision, restoreValues } from './recipe-content.js';
@@ -232,6 +232,48 @@ async function _inStockIds() {
   );
 }
 
+// The planned cooks with these ids that are still planned, scaled to their
+// servings; `onlyMissing` leaves out what's in stock (as the server does).
+async function _planContributions(ids, onlyMissing) {
+  const list = [...ids].filter(Number.isFinite);
+  if (!list.length) return [];
+  const planned = await _query(
+    `SELECT cd.id AS diary_id, cd.date, cd.servings AS planned_servings,
+            r.id, r.servings, r.ingredients
+       FROM cook_diary cd JOIN recipes r ON r.id = cd.recipe_id AND r.deleted_at IS NULL
+      WHERE cd.user_id = ? AND cd.deleted_at IS NULL AND cd.kind = 'planned'
+        AND cd.id IN (${list.map(() => '?').join(',')})`,
+    [LOCAL_USER_ID, ...list]
+  );
+  const stock = await _inStockIds();
+  const skip = it => onlyMissing && it.pantry_item_id && stock.has(it.pantry_item_id);
+  return planned.flatMap(p => recipeContributions(p, {
+    diaryId: p.diary_id, date: p.date, servings: p.planned_servings, skip,
+  }));
+}
+
+async function _listSources() {
+  return _query(`SELECT checked, sources FROM shopping_list WHERE user_id = ? AND deleted_at IS NULL`, [LOCAL_USER_ID]);
+}
+
+// A planned cook was changed, moved or deleted: when the list holds its
+// share, the lines still on the list are worked out again (as the server
+// does, #81). Returns what changed, or null.
+async function _followPlan(diaryId) {
+  try {
+    const rows = await _listSources();
+    const onList = cooksOnList(rows);
+    if (!onList.has(diaryId)) return null;
+    const contributions = onlyListed(await _planContributions(onList, true), rows, onList);
+    const result = await _applyToList(contributions, { cooks: onList });
+    return result.added + result.changed + result.removed > 0 ? result : null;
+  } catch (e) {
+    // The cook is saved either way; the list catches up on the next build.
+    console.warn('[shopping] the list did not follow the plan:', e?.message);
+    return null;
+  }
+}
+
 // What a plan or a recipe adds, folded into the list as the server does
 // (shopping-plan.js). Every row written goes up with the next sync.
 async function _applyToList(contributions, opts) {
@@ -258,7 +300,11 @@ async function _applyToList(contributions, opts) {
   for (const id of plan.deletes) {
     await _run(`UPDATE shopping_list SET deleted_at = datetime('now'), sync_status = 'pending' WHERE id = ?`, [id]);
   }
-  return { added: plan.inserts.length, updated: plan.updates.length, removed: plan.deletes.length };
+  return {
+    added: plan.inserts.length, updated: plan.updates.length, removed: plan.deletes.length,
+    // Of the updates, the ones whose amount changed.
+    changed: plan.updates.filter(r => r.amount).length,
+  };
 }
 
 async function _aisleForPantry(pantryId) {
@@ -537,6 +583,7 @@ export const CtApiNative = {
     // Which version it was made from (as the server does): said, else the
     // recipe's current one when it's being marked cooked; none while planned.
     const before = (await _query(`SELECT kind, recipe_id, recipe_rev FROM cook_diary WHERE id = ?`, [cookId]))[0];
+    const wasPlanned = before?.kind === 'planned';
     const kindAfter = d.kind ?? before?.kind;
     if (kindAfter !== 'cooked') {
       if (before?.recipe_rev != null) fields.push('recipe_rev = NULL');
@@ -560,17 +607,20 @@ export const CtApiNative = {
     await _run(`UPDATE cook_diary SET ${fields.join(', ')} WHERE id = ?`, params);
     const recipeRow = (await _query(`SELECT recipe_id FROM cook_diary WHERE id = ?`, [cookId]))[0];
     if (recipeRow?.recipe_id) await _recomputeCookAggregates(recipeRow.recipe_id);
-    return { ok: true };
+    // A planned cook's share of the shopping list follows it (#81).
+    const list = wasPlanned ? await _followPlan(cookId) : null;
+    return list ? { ok: true, list } : { ok: true };
   },
 
   async deleteCook(_recipeId, cookId) {
-    const row = (await _query(`SELECT recipe_id FROM cook_diary WHERE id = ?`, [cookId]))[0];
+    const row = (await _query(`SELECT recipe_id, kind, deleted_at FROM cook_diary WHERE id = ?`, [cookId]))[0];
     await _run(
       `UPDATE cook_diary SET deleted_at = datetime('now'), sync_status = 'pending' WHERE id = ?`,
       [cookId]
     );
     if (row?.recipe_id) await _recomputeCookAggregates(row.recipe_id);
-    return { ok: true };
+    const list = row?.kind === 'planned' && !row.deleted_at ? await _followPlan(cookId) : null;
+    return list ? { ok: true, list } : { ok: true };
   },
 
   async scrapeRecipe(url) {
@@ -1261,21 +1311,19 @@ export const CtApiNative = {
     if (!to) to = _shiftDay(today, 7);
     const onlyMissing = opts.only_missing !== false;
 
-    const planned = await _query(
-      `SELECT cd.id AS diary_id, cd.date, cd.servings AS planned_servings,
-              r.id, r.servings, r.ingredients
-         FROM cook_diary cd JOIN recipes r ON r.id = cd.recipe_id AND r.deleted_at IS NULL
-        WHERE cd.user_id = ? AND cd.deleted_at IS NULL AND cd.kind = 'planned'
-          AND cd.date >= ? AND cd.date <= ?`,
+    const inRange = (await _query(
+      `SELECT id FROM cook_diary
+        WHERE user_id = ? AND deleted_at IS NULL AND kind = 'planned' AND date >= ? AND date <= ?`,
       [LOCAL_USER_ID, from, to]
-    );
-    const stock = await _inStockIds();
-    const skip = it => onlyMissing && it.pantry_item_id && stock.has(it.pantry_item_id);
-    const contributions = planned.flatMap(p => recipeContributions(p, {
-      diaryId: p.diary_id, date: p.date, servings: p.planned_servings, skip,
-    }));
-    const result = await _applyToList(contributions, { window: { from, to } });
-    return { ...result, planned_cooks: planned.length, from, to };
+    )).map(r => r.id);
+    // With the cooks the list holds from other weeks, so a cook moved to
+    // another week isn't counted twice; their lines kept to the list's.
+    const rows = await _listSources();
+    const others = [...cooksOnList(rows)].filter(id => !inRange.includes(id));
+    const cooks = new Set([...inRange, ...others]);
+    const contributions = onlyListed(await _planContributions(cooks, onlyMissing), rows, others);
+    const result = await _applyToList(contributions, { window: { from, to }, cooks });
+    return { ...result, planned_cooks: inRange.length, from, to };
   },
 
   // ── Recipe categories ──────────────────────────────────────────────

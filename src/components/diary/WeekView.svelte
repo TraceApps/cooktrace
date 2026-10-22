@@ -17,7 +17,8 @@
     members: the household; a planned cook names who it's a problem for
       among those home that day (lib/allergens.js)
   Events: open (entry), actions (entry), cooked (entry), servings ({ entry, value }),
-    plan ({ date }), planAnyDay, build, buildWeek, planRecipe (recipe)
+    plan ({ date }), planAnyDay, build, buildWeek, planRecipe (recipe),
+    move ({ entry, date }): a plan dragged to another day
 -->
 <script>
   import { createEventDispatcher } from 'svelte';
@@ -50,6 +51,35 @@
     return p ? resolveAssetUrl(p) : '';
   }
   const servingsOf = e => (Number(e.servings) > 0 ? Math.round(Number(e.servings)) : 2);
+
+  // A plan dragged to another day, today or later, with a mouse or a
+  // trackpad (#81). On a touch screen a long press opens its menu, where
+  // Move does the same.
+  const canDrag = typeof matchMedia === 'function' && matchMedia('(pointer: fine)').matches;
+  let dragged = null;
+  let over = null;
+  function dragStart(ev, e) {
+    dragged = e;
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', String(e.id));
+  }
+  function dragEnd() { dragged = null; over = null; }
+  function dragOver(ev, d) {
+    if (!dragged || d.isPast) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    over = d.iso;
+  }
+  function dragLeave(ev, d) {
+    if (over === d.iso && !ev.currentTarget.contains(ev.relatedTarget)) over = null;
+  }
+  function drop(ev, d) {
+    if (!dragged || d.isPast) return;
+    ev.preventDefault();
+    const e = dragged;
+    dragEnd();
+    if (e.date !== d.iso || e.any_day) dispatch('move', { entry: e, date: d.iso });
+  }
   const MEAL_ICONS = { breakfast: 'free_breakfast', lunch: 'lunch_dining', dinner: 'restaurant', snack: 'cookie' };
 </script>
 
@@ -105,6 +135,7 @@
     <div class="tray-cards">
       {#each anyDay as e (e.id)}
         <button class="tray-card" on:click={() => dispatch('actions', e)}
+          draggable={canDrag} on:dragstart={(ev) => dragStart(ev, e)} on:dragend={dragEnd}
           aria-label={$_('cookdiary_page.week.any_day_card', { values: { name: e.recipe_name || 'Recipe' } })}>
           {#if photo(e)}<img src={photo(e)} alt="" loading="lazy" />{:else}<span class="ph material-symbols-rounded" aria-hidden="true">restaurant</span>{/if}
           <span class="tray-text">
@@ -120,7 +151,9 @@
 
 <ol class="days">
   {#each days as d (d.iso)}
-    <li class="day" class:today={d.isToday}>
+    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+    <li class="day" class:today={d.isToday} class:drop-over={over === d.iso}
+      on:dragover={(ev) => dragOver(ev, d)} on:dragleave={(ev) => dragLeave(ev, d)} on:drop={(ev) => drop(ev, d)}>
       <div class="day-date" aria-hidden="true">
         <span class="wd">{d.isToday ? $_('cookdiary_page.week.today') : d.weekday}</span>
         <span class="num">{d.num}</span>
@@ -149,7 +182,8 @@
             </article>
           {:else}
             <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
-            <article class="card planned" class:now={d.isToday || d.isPast}
+            <article class="card planned" class:now={d.isToday || d.isPast} class:dragging={dragged === e}
+              draggable={canDrag} on:dragstart={(ev) => dragStart(ev, e)} on:dragend={dragEnd}
               use:longpress on:longpress={() => dispatch('actions', e)}
               on:contextmenu|preventDefault={() => dispatch('actions', e)}>
               <div class="card-row">
@@ -224,6 +258,16 @@
 {/if}
 
 <style>
+  /* A plan being dragged, and the day it would land on. */
+  .card.planned[draggable='true'], .tray-card[draggable='true'] { cursor: grab; }
+  .card.planned.dragging { opacity: 0.5; }
+  .day.drop-over {
+    outline: 2px dashed var(--accent);
+    outline-offset: 2px;
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    border-radius: var(--radius-md);
+  }
+
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
   /* Summary: four tiles in a row and the list button. */

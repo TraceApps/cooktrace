@@ -23,6 +23,7 @@ import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-key
 import { linkableRecipeId } from '../lib/link-checks.js';
 import { cookedVersion } from '../lib/recipe-history.js';
 import { localToday, shiftDay } from '../lib/calendar-day.js';
+import { followPlan } from './shopping.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -259,6 +260,8 @@ router.put('/:id', wrap((req, res) => {
 
   // Recompute aggregates if cooked-state or recipe changed.
   if (existing.kind !== kind || existing.recipe_id) recomputeRecipeAggregates(existing.recipe_id);
+  // A planned cook's share of the shopping list follows it (#81).
+  const list = existing.kind === 'planned' ? followPlan(u, id) : null;
 
   // Flipping a planned entry to cooked is the Diary's main "I cooked
   // this" path, so it fires meal.cooked the same as a fresh cooked row.
@@ -273,7 +276,7 @@ router.put('/:id', wrap((req, res) => {
       });
     } catch (e) { /* never let a webhook failure block the save */ }
   }
-  res.json({ ok: true });
+  res.json(list ? { ok: true, list } : { ok: true });
 }));
 
 // ── DELETE /:id — soft delete ──────────────────────────────────────────
@@ -288,7 +291,9 @@ router.delete('/:id', wrap((req, res) => {
   }
   db.prepare(`UPDATE cook_diary SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).run(id);
   if (existing.recipe_id) recomputeRecipeAggregates(existing.recipe_id);
-  res.json({ ok: true });
+  // A planned cook taken off takes its share of the list with it (#81).
+  const list = existing.kind === 'planned' ? followPlan(u, id) : null;
+  res.json(list ? { ok: true, list } : { ok: true });
 }));
 
 // Whitelist meal-type strings; everything else stores as NULL.

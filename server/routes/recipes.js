@@ -78,6 +78,7 @@ import {
 } from '../lib/recipe-hydrate.js';
 import { localToday } from '../lib/calendar-day.js';
 import { frameAncestorsDirective } from '../lib/frame-ancestors.js';
+import { followPlan } from './shopping.js';
 
 // Tack the creator's current avatar onto a hydrated recipe so the
 // byline can render their photo. Live lookup (cheap PK fetch) keeps
@@ -1163,6 +1164,8 @@ router.put('/:id/cooks/:cookId', wrap((req, res) => {
   }, req.body?._sync);
 
   _recomputeCookAggregates(id);
+  // Cooked, a planned cook's share of the shopping list follows it (#81).
+  if (existing.kind === 'planned') followPlan(u, cookId);
   if (made) {
     try {
       dispatchWebhookEvent(u, 'meal.cooked', {
@@ -1312,12 +1315,15 @@ router.delete('/:id/cooks/:cookId', wrap((req, res) => {
   const isOwner = (u == null && recipe.user_id == null) || recipe.user_id === u;
   if (!isOwner) return res.status(403).json({ error: 'Forbidden' });
 
+  const was = db.prepare(`SELECT kind FROM cook_diary WHERE id = ? AND recipe_id = ? AND deleted_at IS NULL`).get(cookId, id);
   db.prepare(
     `UPDATE cook_diary SET deleted_at = datetime('now'), updated_at = datetime('now')
      WHERE id = ? AND recipe_id = ?`
   ).run(cookId, id);
 
   _recomputeCookAggregates(id);
+  // A planned cook taken off takes its share of the list with it (#81).
+  if (was?.kind === 'planned') followPlan(u, cookId);
   res.json({ ok: true });
 }));
 

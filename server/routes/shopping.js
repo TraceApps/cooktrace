@@ -10,13 +10,13 @@ import { Router } from 'express';
 import db from '../db.js';
 import { stampFields } from '../lib/field-stamps.js';
 import { saveRow } from '../lib/rest-merge.js';
-import { wrap } from '../logger.js';
+import { wrap, logger } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { dispatchWebhookEvent } from '../lib/webhooks.js';
 import { titleCaseName as _titleCaseName, aisleForPantry as _aisleForPantry } from '../lib/shopping-items.js';
 import { ownId, linkableRecipeId } from '../lib/link-checks.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
-import { recipeContributions, mergeIntoList, parseSources } from '../lib/shopping-plan.js';
+import { recipeContributions, mergeIntoList, parseSources, cooksOnList, onlyListed } from '../lib/shopping-plan.js';
 import { localToday, shiftDay } from '../lib/calendar-day.js';
 
 const router = Router();
@@ -276,7 +276,11 @@ function _applyToList(u, contributions, opts) {
     }
     for (const id of plan.deletes) remove.run(id);
   })();
-  return { added: plan.inserts.length, updated: plan.updates.length, removed: plan.deletes.length };
+  return {
+    added: plan.inserts.length, updated: plan.updates.length, removed: plan.deletes.length,
+    // Of the updates, the ones whose amount changed.
+    changed: plan.updates.filter(r => r.amount).length,
+  };
 }
 
 function _inStockSet(u) {
@@ -287,12 +291,62 @@ function _inStockSet(u) {
   );
 }
 
+// The planned cooks with these ids that are still planned, each recipe
+// scaled to the cook's servings; `onlyMissing` leaves out what's in stock.
+function _planContributions(u, ids, onlyMissing) {
+  const list = [...ids].filter(Number.isFinite);
+  if (!list.length) return [];
+  const planned = db.prepare(
+    `SELECT cd.id AS diary_id, cd.date, cd.servings AS planned_servings,
+            r.id, r.servings, r.ingredients
+       FROM cook_diary cd
+       JOIN recipes r ON r.id = cd.recipe_id AND r.deleted_at IS NULL
+      WHERE ${userClause(u).replace(/user_id/g, 'cd.user_id')} AND cd.deleted_at IS NULL
+        AND cd.kind = 'planned' AND cd.id IN (${list.map(() => '?').join(',')})`
+  ).all(...userArgs(u), ...list);
+  const stock = _inStockSet(u);
+  const skip = it => onlyMissing && it.pantry_item_id && stock.has(it.pantry_item_id);
+  return planned.flatMap(p => recipeContributions(p, {
+    diaryId: p.diary_id, date: p.date, servings: p.planned_servings, skip,
+  }));
+}
+
+function _listSources(u) {
+  return db.prepare(
+    `SELECT checked, sources FROM shopping_list WHERE ${userClause(u)} AND deleted_at IS NULL`
+  ).all(...userArgs(u));
+}
+
+/**
+ * A planned cook was changed, moved or deleted (routes/cook-diary.js): when
+ * the list holds its share, the shares are worked out again, so the list
+ * follows the plan without building the week again (#81). A cook the list
+ * doesn't hold changes nothing.
+ */
+export function followPlan(u, diaryId) {
+  try {
+    const rows = _listSources(u);
+    const onList = cooksOnList(rows);
+    if (!onList.has(diaryId)) return null;
+    const contributions = onlyListed(_planContributions(u, onList, true), rows, onList);
+    const result = _applyToList(u, contributions, { cooks: onList });
+    return result.added + result.changed + result.removed > 0 ? result : null;
+  } catch (e) {
+    // The cook is saved either way; the list catches up on the next build.
+    logger.warn(`[shopping] the list did not follow the plan: ${e.message}`);
+    return null;
+  }
+}
+
 // ── POST /from-plan: the planned cooks of a date range onto the list ────
 // Every cook_diary row with kind='planned' in the range (defaults: today
 // to +7 days), each recipe scaled to the cook's servings. Building the
 // same range again replaces its cooks' share instead of adding it twice;
 // a cook no longer planned takes its share out. `only_missing` (default
-// on) leaves out ingredients whose pantry item is in stock.
+// on) leaves out ingredients whose pantry item is in stock. The planned
+// cooks the list already holds from other weeks are worked out with the
+// range's, so a cook moved to another week isn't counted twice; their lines
+// are kept to the ones still on the list.
 router.post('/from-plan', wrap((req, res) => {
   const u = uid(req);
   // Calendar days from the server's local today (the UTC date was a day off
@@ -303,24 +357,18 @@ router.post('/from-plan', wrap((req, res) => {
   if (!to) to = shiftDay(todayIso, 7);
   const onlyMissing = req.query.only_missing !== '0';
 
-  const planned = db.prepare(
-    `SELECT cd.id AS diary_id, cd.date, cd.servings AS planned_servings,
-            r.id, r.servings, r.ingredients
-       FROM cook_diary cd
-       JOIN recipes r ON r.id = cd.recipe_id AND r.deleted_at IS NULL
-      WHERE ${userClause(u).replace(/user_id/g, 'cd.user_id')} AND cd.deleted_at IS NULL
-        AND cd.kind = 'planned'
-        AND cd.date >= ? AND cd.date <= ?`
-  ).all(...userArgs(u), from, to);
-
-  const stock = _inStockSet(u);
-  const skip = it => onlyMissing && it.pantry_item_id && stock.has(it.pantry_item_id);
-  const contributions = planned.flatMap(p => recipeContributions(p, {
-    diaryId: p.diary_id, date: p.date, servings: p.planned_servings, skip,
-  }));
+  const inRange = db.prepare(
+    `SELECT id FROM cook_diary
+      WHERE ${userClause(u)} AND deleted_at IS NULL AND kind = 'planned'
+        AND date >= ? AND date <= ?`
+  ).all(...userArgs(u), from, to).map(r => r.id);
+  const rows = _listSources(u);
+  const others = [...cooksOnList(rows)].filter(id => !inRange.includes(id));
+  const cooks = new Set([...inRange, ...others]);
+  const contributions = onlyListed(_planContributions(u, cooks, onlyMissing), rows, others);
   // Run even with nothing planned: cooks taken off the plan leave the list.
-  const result = _applyToList(u, contributions, { window: { from, to } });
-  res.json({ ...result, planned_cooks: planned.length, from, to });
+  const result = _applyToList(u, contributions, { window: { from, to }, cooks });
+  res.json({ ...result, planned_cooks: inRange.length, from, to });
 }));
 
 // ── POST /from-recipe/:id: a recipe's ingredients onto the list ─────────

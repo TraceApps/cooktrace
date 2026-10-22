@@ -870,12 +870,15 @@ async function _fullSync({ silent, forceCheck, showFailureBanner, token, signal,
     syncState.update(s => ({ ...s, phase: 'push' }));
     const push = await pushChanges({ token, signal, gen });
     if (push.stopped) throw stopped();
-    // Recipes held back for a pantry item that went up in this push: now.
-    if (push.deferred && push.pushed) {
-      const more = await pushChanges({ token, signal, gen });
-      if (more.stopped) throw stopped();
-      push.pushed += more.pushed || 0;
-      push.serverKept = (push.serverKept || 0) + (more.serverKept || 0);
+    // Rows held back for a row that went up in this push: now. A chain
+    // takes a push a link (a pantry item, the recipe linked to it, then the
+    // list rows that recipe's planned cooks put there), so it goes on while
+    // each push still sends something, a few times at most.
+    for (let round = 0, last = push; round < 3 && last.deferred && last.pushed; round++) {
+      last = await pushChanges({ token, signal, gen });
+      if (last.stopped) throw stopped();
+      push.pushed += last.pushed || 0;
+      push.serverKept = (push.serverKept || 0) + (last.serverKept || 0);
     }
     // The server kept something other than what went up: bring it down
     // now rather than on the next round.

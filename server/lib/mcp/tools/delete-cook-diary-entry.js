@@ -10,6 +10,7 @@ import { z } from 'zod';
 import db from '../../../db.js';
 import { toolResult, toolError } from '../_util.js';
 import { recomputeRecipeAggregates } from '../../../routes/cook-diary.js';
+import { followPlan } from '../../../routes/shopping.js';
 
 export function registerDeleteCookDiaryEntry(server, { userId }) {
   server.registerTool(
@@ -43,6 +44,8 @@ export function registerDeleteCookDiaryEntry(server, { userId }) {
       ).run(entry_id);
 
       if (existing.recipe_id) recomputeRecipeAggregates(existing.recipe_id);
+      // A planned cook's share of the shopping list goes with it (#81).
+      if (existing.kind === 'planned') followPlan(userId, entry_id);
 
       return toolResult({
         ok: true,

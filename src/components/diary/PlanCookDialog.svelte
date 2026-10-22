@@ -8,11 +8,17 @@
    * Given a `recipe`, it plans that one and shows it at the top. Without
    * one, it lists your recipes to pick from (`pickId` picked first).
    * Dispatches `planned` with the new diary entry.
+   *
+   * Given a planned `entry`, it edits that plan instead (#81): its day (any
+   * day, today or later), meal and servings, the recipe staying as it is.
+   * Dispatches `saved` with what the server said (its `list`, when the
+   * shopping list followed).
    */
   import { createEventDispatcher, tick } from 'svelte';
   import { fade } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
   import { portal } from '../../lib/portal.js';
+  import { resolveAssetUrl } from '../../lib/platform.js';
   import { closeOnBack } from '../../lib/back-stack.js';
   import { failed } from '../../lib/messages.js';
   import { NtApi } from '../../lib/api.js';
@@ -32,6 +38,10 @@
   export let pickId = null;
   /** The day it opens on (YYYY-MM-DD); today when not given. */
   export let date = null;
+  /** A planned cook to edit: { id, recipe_id, recipe_name, date, any_day, meal_type, servings }. */
+  export let entry = null;
+  /** The edited plan's recipe in full, when the page has it (allergens). */
+  export let entryRecipe = null;
 
   const dispatch = createEventDispatcher();
   const firstDay = firstDayOfWeek();
@@ -47,6 +57,7 @@
   let search = '';
   let busy = false;
   let wasOpen = false;
+  let servingsFrom = null; // editing: the servings it opened on
 
   $: MEALS = [
     { id: 'breakfast', label: $_('cookdiary_page.week.meal_breakfast'), icon: 'free_breakfast' },
@@ -64,6 +75,22 @@
   }
   let panel;
   async function reset() {
+    if (entry) {
+      // An any-day plan is dated its week's first day, which may be gone:
+      // turned into a dated plan, it starts on today at the earliest.
+      planDate = entry.any_day && entry.date < today() ? today() : (entry.date || today());
+      anyDay = !!entry.any_day;
+      mealType = entry.meal_type || null;
+      // A plan without servings shops for the recipe as written; it keeps
+      // none unless they're changed here.
+      const n = Math.round(Number(entry.servings ?? entryRecipe?.servings));
+      servings = Number.isFinite(n) && n > 0 ? n : 2;
+      servingsFrom = servings;
+      servingsSet = true;
+      search = '';
+      recipeId = entry.recipe_id;
+      return;
+    }
     planDate = date || today();
     anyDay = false;
     mealType = null;
@@ -102,9 +129,34 @@
 
   function close() { open = false; }
 
+  // The recipe at the top: the one given, or the edited plan's.
+  $: shownRecipe = recipe || (entry ? {
+    ...(entryRecipe || {}),
+    id: entry.recipe_id,
+    name: entry.recipe_name || entryRecipe?.name || '',
+    imgUrl: entry.recipe_img_url ? resolveAssetUrl(entry.recipe_img_url) : null,
+  } : null);
+
   async function save() {
     if (!recipeId) { showError($_('cookdiary_page.toast.pick_recipe')); return; }
     busy = true;
+    if (entry) {
+      try {
+        const result = await NtApi.updateDiaryEntry(entry.id, {
+          date: anyDay ? isoDay(weekStartOf(fromIso(planDate), firstDay)) : planDate,
+          any_day: anyDay,
+          meal_type: mealType || null,
+          ...(entry.servings != null || servings !== servingsFrom ? { servings } : {}),
+        });
+        open = false;
+        dispatch('saved', result || {});
+      } catch (e) {
+        showError(failed('fail.update_entry', e));
+      } finally {
+        busy = false;
+      }
+      return;
+    }
     try {
       // Any day of the week: dated the week's first day.
       const entry = await NtApi.createDiaryEntry({
@@ -134,26 +186,26 @@
   <div use:portal class="modal-backdrop" on:click|self={close} use:closeOnBack={close} transition:fade={{ duration: 160 }}>
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="plan-cook-title" tabindex="-1" bind:this={panel} on:click|stopPropagation>
       <header class="modal-header">
-        <h2 id="plan-cook-title">{$_('cookdiary_page.plan_a_cook')}</h2>
+        <h2 id="plan-cook-title">{entry ? $_('cookdiary_page.edit_plan') : $_('cookdiary_page.plan_a_cook')}</h2>
         <button class="btn-icon" on:click={close} aria-label={$_('common.close')}><span class="material-symbols-rounded">close</span></button>
       </header>
       <div class="modal-body">
-        {#if recipe}
+        {#if shownRecipe}
           <div class="recipe-row fixed">
-            {#if recipe.imgUrl}
-              <img src={recipe.imgUrl} alt="" />
+            {#if shownRecipe.imgUrl}
+              <img src={shownRecipe.imgUrl} alt="" />
             {:else}
               <span class="material-symbols-rounded">restaurant</span>
             {/if}
             <span class="recipe-text">
-              <span class="recipe-name" dir="auto">{recipe.name}</span>
-              {#if members.length}<AllergenChips summary={cardAllergens(recipe)} {recipe} {members} date={anyDay ? '' : planDate} />{/if}
+              <span class="recipe-name" dir="auto">{shownRecipe.name}</span>
+              {#if members.length}<AllergenChips summary={cardAllergens(shownRecipe)} recipe={shownRecipe} {members} date={anyDay ? '' : planDate} />{/if}
             </span>
           </div>
         {/if}
         <label class="field">
           <span class="field-label">{$_('cookdiary_page.date')}</span>
-          <DateInput bind:value={planDate} />
+          <DateInput bind:value={planDate} min={entry ? today() : ''} />
         </label>
         <button type="button" class="meal-chip any-day-toggle" class:active={anyDay}
           aria-pressed={anyDay} on:click={() => anyDay = !anyDay}>
@@ -178,7 +230,7 @@
           <ServingsStepper bind:value={servings} label={$_('cookdiary_page.servings')}
             on:change={() => servingsSet = true} />
         </div>
-        {#if !recipe}
+        {#if !shownRecipe}
           <label class="field">
             <span class="field-label">{$_('cookdiary_page.recipe')}</span>
             <input class="input" type="search" placeholder={$_('cook_diary_ui.search')} bind:value={search} />
@@ -206,7 +258,7 @@
       <footer class="modal-footer">
         <button class="btn btn-secondary" on:click={close}>{$_('cookdiary_page.cancel')}</button>
         <button class="btn btn-primary" on:click={save} disabled={busy}>
-          {busy ? $_('cookdiary_page.saving') : $_('cookdiary_page.plan_it')}
+          {busy ? $_('cookdiary_page.saving') : entry ? $_('cookdiary_page.save_plan') : $_('cookdiary_page.plan_it')}
         </button>
       </footer>
     </div>

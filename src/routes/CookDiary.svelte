@@ -14,6 +14,8 @@
   import { localDateStr } from '../lib/db.js';
   import { relativeTime, shortDate } from '../lib/relative-time.js';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
+  import Sheet from '../components/ui/Sheet.svelte';
+  import DatePicker from '../components/ui/DatePicker.svelte';
   import PlanCookDialog from '../components/diary/PlanCookDialog.svelte';
   import WeekView from '../components/diary/WeekView.svelte';
   import BuildWeekSheet from '../components/diary/BuildWeekSheet.svelte';
@@ -485,8 +487,8 @@
         const recipe = await NtApi.getRecipe(entry.recipe_id).catch(() => null);
         if (recipe?.ingredients) Object.assign(patch, cookVersion(recipe));
       }
-      await NtApi.updateDiaryEntry(entry.id, patch);
-      showSuccess($_('cookdiary_page.toast.marked_cooked'));
+      const r = await NtApi.updateDiaryEntry(entry.id, patch);
+      showSuccess($_(_listFollowed(r) ? 'cookdiary_page.toast.marked_cooked_list' : 'cookdiary_page.toast.marked_cooked'));
       await load();
       loadStats();
       loadHeatmap();
@@ -520,6 +522,14 @@
     ...(actionSheetEntry.kind === 'planned' && actionSheetEntry.any_day
       ? [{ label: $_('cookdiary_page.week.pick_day'), icon: 'event', value: 'move' }]
       : []),
+    // Any plan: another day, or its day, meal and servings (#81). A cook
+    // already made stays where it was.
+    ...(actionSheetEntry.kind === 'planned'
+      ? [
+          { label: $_('cookdiary_page.move_plan'), icon: 'calendar_month', value: 'move_to' },
+          { label: $_('cookdiary_page.edit_plan'), icon: 'edit', value: 'edit' },
+        ]
+      : []),
     { label: $_('common.delete'), icon: 'delete', value: 'delete', danger: true },
   ] : [];
   async function onEntryAction(ev) {
@@ -531,7 +541,48 @@
     if (v === 'as_made') openEntry(e);
     else if (v === 'cooked') await markPlannedAsCooked(e);
     else if (v === 'move') { moveEntry = e; moveSheetOpen = true; }
+    else if (v === 'move_to') { moveToEntry = e; moveToOpen = true; }
+    else if (v === 'edit') { editEntry = e; editOpen = true; }
     else if (v === 'delete') await removeEntry(e);
+  }
+
+  // The shopping list follows a planned cook that's on it (#81): the
+  // server says so, and the toast says it too.
+  const _listFollowed = (r) => !!(r?.list && ((r.list.added || 0) + (r.list.changed || 0) + (r.list.removed || 0)) > 0);
+  async function _afterPlanChange() {
+    await load({ quiet: true });
+    if (view === 'week') await loadWeekExtras();
+  }
+
+  // Move a plan to any day from today, from its menu or by dragging it in
+  // the Week view.
+  let moveToOpen = false;
+  let moveToEntry = null;
+  async function movePlan(e, iso) {
+    if (!e || !iso || (iso === e.date && !e.any_day)) return;
+    try {
+      const r = await NtApi.updateDiaryEntry(e.id, { date: iso, any_day: false });
+      const day = fromIso(iso).toLocaleDateString($locale || undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+      showSuccess($_(_listFollowed(r) ? 'cookdiary_page.toast.moved_list' : 'cookdiary_page.toast.moved', { values: { day } }));
+      await _afterPlanChange();
+    } catch (err) {
+      showError(failed('fail.update_entry', err));
+    }
+  }
+  function onMoveToPick(ev) {
+    const e = moveToEntry;
+    moveToOpen = false;
+    moveToEntry = null;
+    movePlan(e, ev.detail);
+  }
+
+  // Edit a plan: its day, meal and servings (PlanCookDialog).
+  let editOpen = false;
+  let editEntry = null;
+  async function onPlanSaved(ev) {
+    showSuccess($_(_listFollowed(ev.detail) ? 'cookdiary_page.toast.plan_saved_list' : 'cookdiary_page.toast.plan_saved'));
+    editEntry = null;
+    await _afterPlanChange();
   }
 
   async function removeEntry(entry) {
@@ -543,8 +594,8 @@
     });
     if (!ok) return;
     try {
-      await NtApi.deleteDiaryEntry(entry.id);
-      showSuccess($_('cookdiary_page.toast.removed'));
+      const r = await NtApi.deleteDiaryEntry(entry.id);
+      showSuccess($_(_listFollowed(r) ? 'cookdiary_page.toast.removed_list' : 'cookdiary_page.toast.removed'));
       await load();
       loadStats();
       loadHeatmap();
@@ -712,6 +763,7 @@
         members={householdMembers}
         on:open={(ev) => openEntry(ev.detail)}
         on:actions={(ev) => onEntryLongPress(ev.detail)}
+        on:move={(ev) => movePlan(ev.detail.entry, ev.detail.date)}
         on:cooked={(ev) => markPlannedAsCooked(ev.detail)}
         on:servings={onWeekServings}
         on:plan={(ev) => openPlan(null, ev.detail.date)}
@@ -909,6 +961,18 @@
 <!-- Plan-a-cook dialog -->
 <PlanCookDialog bind:open={planOpen} pickId={planPickId} date={planDate} on:planned={onPlanned} />
 
+<!-- Editing a plan: its day, meal and servings. -->
+<PlanCookDialog bind:open={editOpen} entry={editEntry}
+  entryRecipe={editEntry ? weekRecipes.get(editEntry.recipe_id) || null : null} on:saved={onPlanSaved} />
+
+<!-- Moving a plan to another day, today or later. -->
+<Sheet bind:open={moveToOpen} title={$_('cookdiary_page.move_plan')}>
+  {#if moveToEntry}
+    <p class="move-to-name" dir="auto">{moveToEntry.recipe_name || $_('cookdiary_page.recipe')}</p>
+    <DatePicker value={moveToEntry.date} min={todayIso} on:select={onMoveToPick} />
+  {/if}
+</Sheet>
+
 <!-- Filter picker — pick a single recipe to scope all 3 views. -->
 {#if filterPickerOpen}
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
@@ -1013,6 +1077,7 @@
 {/if}
 
 <style>
+  .move-to-name { margin: 0 0 8px; font-weight: 600; color: var(--text-1); text-align: center; }
   .header-action {
     position: fixed;
     top: calc(var(--safe-top) + 10px);

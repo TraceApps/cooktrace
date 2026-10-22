@@ -646,6 +646,21 @@ test('a pull with a table or column this app does not know yet still goes in', {
   assert.deepEqual(r.applied, { done: true, row: { local: true, date: '2030-02-01' } });
 });
 
+test('the shopping list follows the plan on the phone, as on the server (#81)', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('planFollows');
+  assert.deepEqual(r.built, { Rice: 450, Eggs: 2, Onion: 1 }, 'the salt is in stock');
+  assert.equal(r.mealOnly, false, 'only the meal: the list is left as it is');
+  assert.equal(r.edited, true);
+  assert.deepEqual(r.afterEdit, { Rice: 600, Eggs: 2, Onion: 2 }, 'the curry for 4');
+  assert.deepEqual(r.afterCleared, { Rice: 900, Onion: 2 }, 'the eggs bought and cleared stay off');
+  assert.deepEqual(r.afterMove, { Rice: 900, Onion: 2 }, 'moved, still on the list once');
+  assert.deepEqual(r.nextWeek, { Rice: 1050, Onion: 3, Eggs: 4 }, 'next week built: the moved cook counted once');
+  assert.equal(r.removed, true);
+  assert.deepEqual(r.afterDelete, { Rice: 750, Onion: 1, Eggs: 4 });
+  assert.deepEqual(r.afterCooked, { Rice: 150, Onion: 1 }, 'cooked: the rest of its share is not needed');
+  assert.deepEqual(r.server, { Rice: 150, Onion: 1 }, 'and the server has the same list after a sync');
+});
+
 test('allergens: a label on the phone and a recipe\'s correction sync both ways, and an app from before leaves them be', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const srv = await startServer();
   const call = async (tok, method, path, body) => {
