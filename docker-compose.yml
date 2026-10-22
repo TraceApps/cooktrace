@@ -41,8 +41,11 @@ services:
       # Optional — mount at a subpath instead of root (for reverse-proxy setups)
       # - BASE_URL=/cooktrace
       # Optional: the full address people open the app at, subpath included.
-      # Links in reset, invite, sharing and weekly summary emails use it.
+      # Links in reset, invite, sharing and weekly summary emails use it, and
+      # it's the address changes are accepted from behind a reverse proxy.
       # - PUBLIC_URL=${PUBLIC_URL:-}
+      # Optional: dashboards allowed to show CookTrace in a frame (Homarr, Organizr)
+      # - FRAME_ANCESTORS=${FRAME_ANCESTORS:-}
       # Optional — log level: error | warn | info (default) | debug
       - LOG_LEVEL=${LOG_LEVEL:-info}
       # Optional — cap the upload size for bulk recipe-zip imports (Mealie,
