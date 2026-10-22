@@ -9,6 +9,60 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.1] - 2026-10-22
+
+Patch release. Android sync that keeps your edits, earlier versions of a recipe when two devices disagree, imports from Tandoor and Paprika that work, single sign-on fixes, share links that open for everyone, and a round of security fixes (two rated critical).
+
+> **Upgrade note.** Importing a recipe from an address on your own network (a LAN Mealie, say) is now for admins only; set `ALLOW_PRIVATE_RECIPE_URLS=1` to open it to every account. An AI address an account sets for smart import can't point inside your network unless `ALLOW_PRIVATE_AI_URLS=1`. Password reset, invite and sharing emails build their links from `PUBLIC_URL`, so set it to the address people open. Update the Android app too: the sync fixes are in the app as well as the server.
+
+### Added
+
+- **Earlier versions of a recipe.** When edits from two devices change the same part of a recipe, the newer one stays, and the recipe page says so and lists the other, with what differs and a preview. Restore puts it back, and a restore can be undone. A kitchen member sees the versions that were their own edits.
+- **Imports say what they skipped** ([#72](https://github.com/TraceApps/cooktrace/issues/72), thanks @joeShuff). A bulk import reads "Imported 119 of 121 Recipes" and lists each recipe skipped as a duplicate, linked to the one you have.
+
+### Changed
+
+- **A sync keeps the newer edit, field by field.** An edit made offline in the Android app or the browser no longer overwrites a newer change from another device, even when a phone's clock is off. Changes to different fields are both kept, an amount and its unit stay together, and an item deleted on one device stays deleted. Older versions of the app sync as before.
+- **Shared recipe links are a plain address** (`/r/...`) instead of a `#/` one, so they open for people without an account. Links copied before this still open.
+- **Sheets work from the keyboard**: focus moves into a sheet and stays there, Escape closes it, and focus goes back where it was.
+- **Trace's attach button offers Camera or Gallery on phones and in the Android app.** On a computer it opens the file picker.
+
+### Fixed
+
+- **A Tandoor export imports** ([#72](https://github.com/TraceApps/cooktrace/issues/72), thanks @joeShuff), each recipe with its picture. Every Tandoor export failed with "No JSON files found".
+- **Importing a recipe you already have opens it**, from a link, pasted text, a file or a Paprika archive, instead of an empty page or counting it as imported.
+- **Smart cookbooks show their recipes** ([#76](https://github.com/TraceApps/cooktrace/issues/76), thanks @herver1971): the right count instead of "0 recipes", their recipes in the Android app, and the right ones when filtered by category, on the phone and the server. Renaming one in the Android app no longer empties it, and a plain cookbook no longer counts deleted recipes.
+- **The Android app syncs everything it creates, edits and deletes**: categories, custom units, Trace chat, recipes added to or taken out of a cookbook, and the right category and pantry links for recipes and pantry items. An edit made offline reaches your other devices, a recipe made on the phone is made once, and photos go up as files instead of inside the rows.
+- **The Android app after signing in or connecting**: no blank screen after signing in on the setup screen, the recipe list, pantry, shopping list and diary fill in after the first sync, Upload matches the categories an account already has, and Disconnect keeps your settings.
+- **Cookbook covers change in the Android app** and are kept for offline use.
+- **Single sign-on**: an email that already has an account no longer gets a second, empty one when the provider doesn't mark it verified (Authentik's default since 2025.10); Authelia 4.39 and later work out of the box; the callback works at `/api/oidc/callback` and without a provider number; and `OIDC_ENABLE_EMAIL_PASSWORD_LOGIN` works for providers added in Settings.
+- **Signing in on a plain-HTTP address says what's wrong** instead of looping back to the sign-in page, and links to the fix (`INSECURE_COOKIES=1`).
+- **The app no longer loads behind the sign-in screen**, and your custom and hidden units load after signing in without a reload.
+- **Share links from the Android app point at your server**, subpath included.
+- **The installed app works when CookTrace is served from a subpath** (`BASE_URL`). Thanks @kgenerozov for the fix in LiftTrace and NutriTrace.
+- **Trace with OpenAI-compatible servers**: endpoints that stream unless told not to work ([nutritrace#258](https://github.com/TraceApps/nutritrace/issues/258), thanks @jsapede), smart import works with one set on the server or without an API key (Ollama), and Trace set up through environment variables shows as set up in the Android app.
+- **Trace shows your newest messages when you open it**, not the oldest 100.
+- **Reordering recipe or pantry categories on the web keeps the new order**, and the Recipes, Shared and Cookbooks switch highlights the tab you're on.
+
+### Security
+
+- **Another account signing in on the same phone never sees or sends the last one's data.** Signing back in keeps everything, another account starts from its own data, and you're asked before unsent changes are discarded. The server also takes the session the app sends over an older sign-in cookie.
+- **A link can only point at your own pantry items, recipes, categories and cookbooks**, from the web or the Android app.
+- **The Android app's SSO sign-in no longer passes the session token through the `cooktrace://` link**, which another app could intercept; it carries a single-use code only the app that started the sign-in can redeem.
+- **A password reset link can no longer be pointed at someone else's site**, and names in emails can't carry markup.
+- **Recipe import and smart import can't be used to read services on your own network** (see the upgrade note), and push notifications and the NutriTrace link never reach cloud-metadata addresses.
+- **The recipe share card can't run script or leak a private recipe**, the image proxy passes images only, and shared recipe pages are kept out of search engines.
+- **Share links and uploaded file names come from a secure random source**, and a removed share link stays removed.
+- **@capacitor/android** and **@capacitor/core** bumped to 8.5.3, closes [GHSA-rvm3-566m-v7fv](https://github.com/advisories/GHSA-rvm3-566m-v7fv) (critical: a crafted link to the app's own address could load any page as the app). CookTrace was exposed through recipe source and video links; no longer possible.
+- **proxy-addr** bumped 2.0.7 to 2.0.8, closes [GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h) (critical). CookTrace never sets a trusted proxy, so it wasn't exposed.
+- **@modelcontextprotocol/sdk** bumped 1.30.0 to 1.32.1, closes [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h) (high), [GHSA-22jm-h49p-29qw](https://github.com/advisories/GHSA-22jm-h49p-29qw) (high) and [GHSA-6prh-2h8m-c8cw](https://github.com/advisories/GHSA-6prh-2h8m-c8cw) (moderate). CookTrace doesn't use the affected parts.
+- **source-map-js** bumped 1.2.1 to 1.2.2, closes [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) (high). Build tooling only.
+- **vite** bumped 7.3.6 to 7.3.7, closes [GHSA-587h-7wmj-h5pm](https://github.com/advisories/GHSA-587h-7wmj-h5pm) (high), [GHSA-698v-4r3x-3vcv](https://github.com/advisories/GHSA-698v-4r3x-3vcv) and [GHSA-r825-w8mm-5pxw](https://github.com/advisories/GHSA-r825-w8mm-5pxw). Only the development server (`npm run dev`) was affected; the app and server people install never include it.
+- **hono** bumped 4.13.7 to 4.13.13 on the server (through the MCP library), closes [GHSA-5r4p-p66f-jhc7](https://github.com/advisories/GHSA-5r4p-p66f-jhc7) (moderate). CookTrace never uses the affected `serveStatic`, so it wasn't exposed.
+- `npm audit` reports 0 vulnerabilities for the app and the server.
+
+---
+
 ## [1.4.1-dev03] - 2026-10-09 (pre-release)
 
 Security fixes (two rated critical), Android sync that no longer loses edits, and smart cookbooks that show their recipes.
