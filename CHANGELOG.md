@@ -7,148 +7,235 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.5.0-dev01] - 2026-10-22 (pre-release)
+
+First dev pre-release of the 1.5.0 minor. Recipe history, a Week view with a shopping list that follows the plan, your household and allergens on every recipe, cook timers that ring on a locked phone, and CookTrace in Spanish and French. Everything in [v1.4.1](https://github.com/TraceApps/cooktrace/releases/tag/v1.4.1) is included.
+
 ### Added
 
-- **Move and edit planned cooks, and the shopping list follows** ([#81](https://github.com/TraceApps/cooktrace/issues/81), thanks @walshy828). Long-press a planned cook for **Move to Another Day** (a calendar from today on) and **Edit Plan** (its day, meal and servings); with a mouse or trackpad, drag it onto another day in the Week view. When the list holds a planned cook's ingredients, editing, deleting or cooking it changes the list straight away, and the message says so; what you've bought and cleared, or deleted from the list, stays off.
-- **Cook timers that ring when you've walked away, for any length, in your recipe's language** ([#77](https://github.com/TraceApps/cooktrace/issues/77), thanks @belqit). In the Android app the phone rings a timer itself, through the lock screen, with the app closed and after a restart, and keeps sounding until you stop it; while it counts it sits in the notification shade with +1 Min and Stop, and the app follows what you press there. Cook Mode has a Timer button, and each step a Timer of its own, for any length: quick picks for the usual ones and a keypad for the rest, starting on the step's own time. The times in a step become timers in English, Spanish, French, Italian, German, Swedish and Russian, whatever language the app is in: "1 hora y 30 minutos", "1h30", "20 bis 25 Minuten", "полчаса", "an hour". In a browser, a timer rings on time even in a background tab, and "Timer Done" opens the app when tapped.
-- **Plan a cook from the recipe** ([#61](https://github.com/TraceApps/cooktrace/issues/61), thanks @Orevin). A Plan button next to I Cooked This picks the day (or any day that week), the meal and how many it's for, without leaving the recipe. The next plan shows under the buttons and opens that week in the Diary. I Cooked This on a day it was planned marks that plan cooked instead of leaving it behind. A recipe card's Plan a Cook works in place too, and a recipe's Cook History lists only what you've cooked, not what's planned.
-- **Right-to-left writing: Arabic, Hebrew and mixed lines** (from [NoteTrace #21](https://github.com/TraceApps/notetrace/issues/21), requested by @mmBesar). A recipe's name, description, ingredients, steps and notes read the way their first letter does, so an Arabic ingredient sits on the right with its box and its amount on the left, an Arabic step has its number on the right, and Arabic and English in one line come out in the right order. The recipe list, cookbooks, the editor, the shopping list, the pantry, the diary, the public recipe page, share cards and Trace's chat do the same. How recipes are saved doesn't change.
-- **The watch app updates itself to the phone's release.** Installed from GitHub, it used to stay on whatever version it was put on with adb. Now, when the phone updates, the watch fetches the same release's watch app and installs it. The first time, the watch asks you to allow CookTrace to install apps; after that it updates without a tap, while the watch is on its charger.
-- **AI agents can edit a recipe over MCP, set its nutrition and photo, and import from a URL** ([#74](https://github.com/TraceApps/cooktrace/issues/74), thanks @Stasky745 for the request and [#79](https://github.com/TraceApps/cooktrace/pull/79)). `update_recipe` changes only what it's sent and saves the way the app does, so every edit can be undone from the recipe's History or earlier versions; `create_recipe` and `update_recipe` take per-serving `nutrition` and rest and total times, `update_recipe` says which fields changed, and `get_recipe` includes the photo; `set_recipe_image` takes a public image address or the image itself; `import_recipe_from_url` runs the app's URL import with its three tiers. [MCP](https://traceapps.github.io/docs/cooktrace/mcp/).
-- **Recipe history** ([#54](https://github.com/TraceApps/cooktrace/issues/54), thanks @DefectiveConsole for the request, and for testing it on dev and finding seven ways it could lose track of a version). Every change to a recipe's ingredients, steps, servings or times keeps a version, and each cook records the one you made, so an old diary entry opens the recipe as it was that day. History on the recipe page lists every version with what changed; compare any two, give one a name, and restore an older one without losing the newer ones. Each version shows when you cooked it and how you rated it, and Trace can read the history too.
-- **Your household, and allergens on every recipe.** Settings > Household lists who you cook for, with their allergies, diets, dislikes and the days they're home. Allergens come from pantry labels (Open Food Facts) and ingredient names, with a correction per recipe. Warnings name who they're for, on recipe cards, the recipe page, the week and the shopping list; Safe for Everyone filters the recipe list, and Build My Week leaves out what someone home that day can't eat. Other Allergies covers foods beyond the 14 major allergens (corn, kiwi), as strictly, found by ingredient name.
-- **All of CookTrace in Spanish**, every screen and message, and messages that read the same way everywhere: "Couldn't save the recipe: the server can't be reached."
-- **French** ([#78](https://github.com/TraceApps/cooktrace/pull/78), thanks @lionep), in Settings > Regional & Units. About 40% of the app so far; the rest shows in English until it's translated on [Weblate](https://hosted.weblate.org/projects/cooktrace/app/fr/).
-- **Uses Up, in the Week view**: what's in stock and about to expire, how many days each has left and which planned cook uses it, and the recipes you haven't planned that would use the most of it, each with a Plan button that puts it on the week's next free day.
-- **Build My Week**: choose how many dinners and servings, and whether to favor what's expiring, skip what you cooked lately, or keep to 30 minutes. The picks come ranked by what's in your pantry, what they use up, the ingredients they share, and when you last cooked them, each saying why, with a Swap for the next best and the totals updating as you go. Add to Week plans them on the free days (any extra for any day).
+- **Recipe history** ([#54](https://github.com/TraceApps/cooktrace/issues/54), thanks @DefectiveConsole for the request and for finding seven ways it could lose a version). Every change to a recipe keeps a version, and each cook records the one you made, so an old diary entry opens the recipe as it was. Compare, name and restore versions, each with when you cooked it and how you rated it.
+- **A Week view in the Cook Diary**: what you cooked and what's planned, a servings stepper on each plan, Plan a Cook on free days, and a summary that builds or updates the week's shopping list in one tap.
+- **Plan a cook for any day of a week**: those plans wait in a tray until you pick a day, and the week's list includes them.
+- **Move and edit planned cooks, and the shopping list follows** ([#81](https://github.com/TraceApps/cooktrace/issues/81), thanks @walshy828). Move to Another Day and Edit Plan in a plan's menu, or drag it to another day with a mouse. A list that holds a plan's items follows when you edit, delete or cook it, without bringing back what you bought or deleted.
+- **Plan a cook from the recipe** ([#61](https://github.com/TraceApps/cooktrace/issues/61), thanks @Orevin): a Plan button next to I Cooked This, the next plan shown under it, and I Cooked This on a planned day marks that plan cooked.
+- **Build My Week**: pick how many dinners and what to favor, and get recipes ranked by your pantry, what they use up and when you last made them, with a Swap for each.
+- **Uses Up, in the Week view**: what's about to expire, which plan uses it, and the recipes that would use the rest.
+- **Your household, and allergens on every recipe.** Settings > Household lists who you cook for, with allergies, diets, dislikes and the days they're home. Warnings name who they're for, Safe for Everyone filters the recipe list, and Build My Week leaves out what someone home that day can't eat.
+- **Cook timers that ring when you've walked away** ([#77](https://github.com/TraceApps/cooktrace/issues/77), thanks @belqit). In the Android app the phone rings a timer itself, locked or closed, with +1 Min and Stop in the notification shade. Cook Mode and each step have a Timer for any length, and a step's times become timers in seven languages.
+- **All of CookTrace in Spanish**, every screen and message.
+- **French** ([#78](https://github.com/TraceApps/cooktrace/pull/78), thanks @lionep), about 40% so far; the rest is open on [Weblate](https://hosted.weblate.org/projects/cooktrace/app/fr/).
+- **Right-to-left writing** (from [notetrace#21](https://github.com/TraceApps/notetrace/issues/21), thanks @mmBesar): Arabic, Hebrew and mixed lines read the right way in recipes, lists, the diary, share cards and Trace.
+- **Tap a shopping list item to see it in full**: how much, what the pantry has, which planned cooks need it, and a note that shows on the list.
+- **See which recipes use a pantry item**, and **change its stock right in its sheet** ([#60](https://github.com/TraceApps/cooktrace/issues/60), thanks @herver1971).
 - **Trace can plan with servings, or for any day of a week.**
-- **Tap a shopping list item to see it in full**: how much is on the list, what the pantry has and when it's due to be used, which planned cooks need it on which day and how much, the kinds you buy, about how much one weighs, and a note that shows on the list. Check it off or open it in the pantry from there; Edit and Change Aisle stay in the long-press menu. On a tablet or an unfolded phone it lays out in two columns.
-- **A Week view in the Cook Diary**, next to List, Month and Photos. Days behind you show what you cooked; today and the days ahead show your planned cooks, each with a servings stepper, and a plan for today can be marked cooked. A free day has a Plan a Cook button for that date. A summary for the week counts the meals planned, what to buy, what's already in the pantry and how many items about to expire it uses up, and builds or updates the shopping list for the week in one tap. Weeks start on Sunday or Monday, as your locale has them.
-- **Plan a cook for any day of a week.** Plan a Cook has an Any Day That Week option; those plans wait in a tray at the top of the Week view until you pick a day for them, and the week's shopping list includes them.
-- **Earlier versions of a recipe.** When edits from two devices change the same part of a recipe, the newer one stays, and the recipe page says so and lists the other, with what differs and a preview. Restore puts it back, and a restore can be undone the same way. A kitchen member sees the versions that were their own edits.
-- **See which recipes use a pantry item** ([#60](https://github.com/TraceApps/cooktrace/issues/60), thanks @herver1971). The item's sheet lists them, each one tappable, and the "used in" number on a pantry card opens the sheet straight on that list. A variant also lists the recipes that ask for its generic, and a generic the ones that ask for one of its variants. Back from a recipe returns to the sheet.
-- **Change stock right in a pantry item's sheet** ([#60](https://github.com/TraceApps/cooktrace/issues/60), thanks @herver1971): an In Stock switch and On Hand - and +, without going into Edit. They work like the card's check button: 0 is out of stock, and a blank amount stays blank.
-- **Shared recipe links show a preview in chat apps**: the recipe's name, a line about it, and its photo. Links are now a plain address (`/r/...`) instead of a `#/` one, which a server never sees. Links copied before this still open.
+- **AI agents can edit a recipe over MCP**, set its nutrition and photo, and import from a link ([#74](https://github.com/TraceApps/cooktrace/issues/74), thanks @Stasky745, and [#79](https://github.com/TraceApps/cooktrace/pull/79)). Every edit can be undone from the recipe's History. [MCP](https://traceapps.github.io/docs/cooktrace/mcp/)
+- **The watch app updates itself to the phone's release**, quietly, while it's on its charger.
+- **Shared recipe links show a preview in chat apps**: name, a line about it, and its photo.
 
 ### Changed
 
-- **Trace's model lists are current.** Claude Haiku 5.5 and Gemini 3.8 Flash are the new defaults, Claude Sonnet 5.5 and Opus 5.5, GPT-6 Luna, GPT-5.6 Sol, and Gemini 3.1 Flash Lite are added, Gemini 3.1 Pro is listed as the preview it is, and Gemini 2.5 leaves the list (open to existing Google users only). A model you already chose keeps working, in Trace and in recipe imports; shut-down Gemini models switch to the default. The same lists as NutriTrace, LiftTrace and NoteTrace.
-- **The Diary's Month calendar starts the week on your locale's first day** (Monday in most of Europe) instead of always Sunday.
-- **Amounts in a recipe's steps follow the servings.** Scale a recipe and the cups, spoons, grams and other measures written in its steps change with it, tinted so you can see which, as do the ingredients listed under each step. Times, temperatures, pan sizes, and amounts for each piece ("2 tbsp per pancake") stay as written.
-- **Plan a Cook asks for servings**, starting at the recipe's own. The Diary shows them on each planned cook, and the shopping list scales to them.
-- **Amounts on the shopping list read the way a cook writes them** (3/8 cup, not 0.375 cup), things you count round up to whole ones (8 tomatoes, not 7.5), and the quantity fields take fractions like 1/2.
-- **The week's plan on the shopping list is scaled and added up.** Each recipe is scaled to the servings planned, the same ingredient from several recipes becomes one item (1 cup and 120 ml of milk add up), and every item remembers which recipes and cooks it's for. Building the list for the same week again updates it instead of adding everything twice, a cook taken off the plan takes its ingredients out, and items already checked off aren't added back.
+- **Amounts in a recipe's steps follow the servings**, tinted so you can see which. Times, temperatures, pan sizes and per-piece amounts stay as written.
+- **Plan a Cook asks for servings**, and the shopping list scales to them.
+- **The week's plan on the shopping list is scaled and added up**: the same ingredient from several recipes is one item, building again updates instead of doubling, and checked-off items aren't added back.
 - **Adding a recipe to the shopping list adds to an item that's already there** instead of making a second one.
-- **A sync keeps the newer edit, field by field.** An edit made offline in the Android app or in the browser no longer overwrites a newer change made on another device to a recipe, a pantry item, the shopping list, a category, a custom unit, a cookbook or the diary, even when a phone's clock is off. Changes to different fields are both kept: an item checked off on the phone and renamed on the web keeps both. Fields that belong together, such as an amount and its unit, stay together. An item deleted on one device stays deleted when another only edited it earlier or reordered the list. Cook counts follow the cook diary. Older versions of the app sync as before, and a recipe copy they replace is kept as an earlier version.
-- **A pantry item opens in its sheet everywhere.** The old full-page view is gone; a link or bookmark to it, and Open in Pantry on a shopping list item, open the Pantry with the item's sheet up.
-- **Sheets work from the keyboard.** Focus moves into a sheet when it opens and stays there, Escape closes it (or only the picker open inside it), and focus goes back where it was, except into a text field on a touch screen.
-- **Trace's attach button offers Camera or Gallery on phones and in the Android app**, the same as the other Trace apps. Each choice goes straight to the camera or the photo picker; on a computer the button opens the file picker.
+- **Amounts on the shopping list read the way a cook writes them** (3/8 cup, 8 tomatoes, not 7.5), and the quantity fields take fractions.
+- **A pantry item opens in its sheet everywhere**; the old full-page view is gone.
+- **The Month calendar starts the week on your locale's first day.**
+- **Trace's model lists are current**: Claude Haiku 5.5 and Gemini 3.8 Flash are the defaults, newer Claude, GPT and Gemini models are added, and Gemini 2.5 leaves the list. A model you chose keeps working; shut-down Gemini models switch to the default. [Models](https://traceapps.github.io/docs/trace/models/)
+- **Scheduled backups run at the time you picked, in your time zone, and are named in it.**
 
 ### Fixed
 
-- **A planned cook moved to another week is counted once on the shopping list.** Building the new week's list added its ingredients again while the old week's share stayed.
-- **A shopping list built on the phone reaches the server in one sync** when its recipes link to pantry items made at the same time. It took a second sync.
-- **Scheduled backups run at the time you picked, in your time zone, and are named in it** (from [NoteTrace #44](https://github.com/TraceApps/notetrace/issues/44), thanks @marinierb). The time in Settings > Backup was read in the server's zone, UTC on a container without `TZ`, so a 2:00 AM backup in New York ran at 10:00 PM the evening before, and files were named in UTC. The schedule now keeps the zone of the browser that set it and shows it next to the time; a schedule set before this runs as it did, with **Use My Time Zone** to switch. Backup files, on the server and the phone, are named in local time. `TZ` on the container sets the server's own zone.
-- **Trace works with Gemini when a tool answers with a list** (found with [lifttrace#147](https://github.com/TraceApps/lifttrace/issues/147), thanks @wretchedxx). With a Google Gemini key, questions that looked at your pantry, shopping list, cookbooks, cook diary or categories, or at what you can make from your pantry, failed with "Invalid JSON payload received. Unknown name "response" ... Proto field is not repeating, cannot start list." Gemini takes a tool's answer only as an object, so a list now goes to it inside one.
-- **A printed recipe keeps the times in its steps.** "Simmer for 20 minutes" printed as "Simmer for ."
-- **A server that can't be reached no longer opens CookTrace with no one signed in.** When the browser couldn't ask your server who is signed in (the server down, a 502 page from your proxy, a sign-in proxy's page) and had no account of its own to fall back on, it took the server for a single-user one and opened the app with no account and no sign-in page. Now it shows the sign-in page, which says the server can't be reached (or that something else answered), with **Retry**, and asks again when you're back online. Signed in, it still opens offline from what this browser kept, and a single-user server still opens straight to the app, offline too.
-- **The Android app signs in with Single Sign-On from Settings too, and says when something in front of your server is in the way** (found with [notetrace#36](https://github.com/TraceApps/notetrace/issues/36), thanks @harikiran-lab). With a sign-in proxy in front of the server (an Authentik or Authelia outpost, Cloudflare Access), first-run setup showed only a username and password, and a password then failed with "Unexpected token '<'". Now setup, Settings > Server Connection and the sign-in page say that something other than CookTrace answered (a sign-in proxy, or the wrong address), and to let the app reach /api. If the sign-in options can't be loaded, they say so with Retry instead of quietly leaving SSO out. Settings > Server Connection shows the server's Single Sign-On buttons as soon as its address is in, and moves the data on your phone over the same way a password sign-in does; it needs a server with this release, and says so on an older one.
-- **Trace can go through your whole recipe library** (found with [notetrace#34](https://github.com/TraceApps/notetrace/issues/34), thanks @harikiran-lab). Asked to go through everything ("which of my recipes use cilantro?"), Trace could stop with "Too many tool call rounds": it had 5 rounds of looking things up, the recipe list stopped at 100 without saying so, and each recipe took a round of its own. The recipe list now pages through every match and finds ingredients too, Trace reads recipes in batches, one answer can take 12 rounds, and when that isn't enough Trace answers from what it found and says what's left. For MCP agents, `search_recipes`, `list_pantry` and `list_cook_diary` page with `offset` and say the `total`, and `search_recipes` lists every recipe when no query is given.
-- **Trace's replies are no longer cut off at 4,096 tokens, and a reply that stops short says so** (found with [notetrace#23](https://github.com/TraceApps/notetrace/issues/23), thanks @harikiran-lab). A reasoning model's thinking counts toward a reply's length, and 4,096 tokens could go to thinking alone, so Trace said it returned nothing. Trace now asks for up to 16,384 tokens, with every provider, and asks again with 4,096 when a server or an older model won't take that many (vLLM before 0.32 serving a small context, Claude 3 Haiku). A reply cut off at its limit, or one with reasoning but no answer, is said and never used, so a rewrite never replaces your text with half of it and a cut-off tool call never runs. When Trace is set by environment variables, the server asked for only 1,024 tokens from Claude and OpenAI; it now asks for what the app does.
-- **Turning on user accounts keeps the admin's email** (found with [nutritrace#269](https://github.com/TraceApps/nutritrace/issues/269)). Settings > Users registered the new admin with the email you entered, then saved the rest of your profile in a way that cleared it. A profile save now leaves alone any field it doesn't include. Thanks @jsapede.
-- **Saving your Profile in the browser no longer depends on the browser's storage** (found with [nutritrace#269](https://github.com/TraceApps/nutritrace/issues/269)). When the browser refused this site storage, every save failed before reaching the server; when something else was waiting to go up, a profile save waited behind it, and failed if storage then stopped working. With a connection it now goes straight up, an earlier profile save still waiting is replaced rather than sent after it, and with neither a connection nor storage the message says so. A save kept for later no longer makes the app forget who is signed in. Thanks @jsapede.
-- **A cook Trace logs with no date goes on today.** It took the date in UTC, so on a New York evening it went on tomorrow, and on a Sydney morning on yesterday. Trace now sends your device's date.
-- **Cook streaks count every day east of UTC.** On a server set to a time zone east of UTC (Europe, Asia, Australia), and in the Android app there, a streak skipped every other day, so three days in a row read as 2 or 1 and the longest streak stayed at 1.
-- **Signing in with SSO finishes on phones with an older Android System WebView.** On older WebView versions (seen on 124), the app didn't recognize the sign-in return from the browser, so the sign-in page closed and the app stayed signed out.
-- **A timer or cook changed on the watch is no longer undone by the phone.** The phone's word always counted as the newest, even when it was older than the watch's.
-- **A cook logged today says Today**, not "21 Hours Ago", and dates like "3 Days Ago" follow the app's language.
-- **A recipe's Last Cooked shows the day it was cooked**, not the day before, anywhere west of UTC.
-- **A fresh install's welcome screen no longer shows a "Setup required" error.** The recipes page loaded behind it before setup opened, and the server refused it until the first account existed. Setup now opens first, and nothing else asks the server for data until it's done.
-- **Turning update checks on or off in the browser reaches the server.** The setup wizard, Settings and the Updates banner were all refused, so the server kept its old setting.
-- **The Android app says when a server isn't set up yet.** Connecting to a fresh install said the server couldn't be reached (or that only HTTPS works). Now it says to open the server in a browser and create the first account first; Android apps from before this get the same answer when they sign in. `/api/health` answers before setup too, with `setup_required: true`, so a container healthcheck passes from the first start.
-- **A unit turned off in the Android app stays off.** With a server, the sync the change started put it straight back on, and it never reached the server; turning every unit back on didn't reach it either.
-- **The Android app syncs half as often, and does less when nothing changed.** It ran two 30-second syncs at once. Now one runs while the app is on screen, and a sync with nothing new no longer downloads the whole library to look for pictures, sends a push for anyone with a unit turned off, or rewrites cookbook links and settings it already has: 2 requests and about 20 database reads instead of up to 7 and 55.
-- **Ingredient lines import cleanly** ([#57](https://github.com/TraceApps/cooktrace/discussions/57), thanks @tmzhuang). A range like "4 - 5 roma tomatoes" is one amount, and sizes, package sizes and prep ("large", "15-ounce can", "garlic, minced") go to the note, so the pantry gets "Tomatoes" and "Garlic" rather than "- 5 roma tomatoes" or "garlic, minced". A comma inside a name stays ("boneless, skinless chicken").
-- **An ingredient links to the pantry item it names, plural or not.** "tomato" finds "Tomatoes", and an import naming both makes one item.
-- **Importing a recipe in the Android app links its ingredients to the pantry** and adds new items out of stock. It marked them all in stock and left the recipe unlinked, so nothing ever showed as missing.
-- **Recipes exported from Mealime import with their photo, notes and original link.** The export names each photo by its path inside the zip, which the import didn't follow, and the notes (`comment`) and link (`isBasedOn`) weren't read. Any schema.org recipe file gains from this: its times, tools and picture come through too.
-- **The Android app shows how many of a recipe's ingredients you have** on recipe cards and in cookbooks. It was always empty there.
-- **Plan a Cook on a recipe card opens the planner with that recipe picked.** It went to the Diary and did nothing more.
-- **Trace answers with models that can't use tools** ([nutritrace#259](https://github.com/TraceApps/nutritrace/issues/259)). With an OpenAI-compatible model that has no tool support, every chat failed with `tool use is not supported`. Trace now asks again without tools and says once that the model can't look up or change your recipes and pantry, and a recipe import says the model can't import recipes. Thanks @jsapede for the report.
-- **Messages show on phones while Trace is open.** They were hidden behind it. Long messages wrap instead of running off the screen.
-- **Photos synced from the Android app are stored as files on the server.** A photo that reached the sync embedded in its recipe, pantry item, cookbook or cook diary entry was kept inline, so every list carried it and share cards and link previews couldn't show it. Photos already stored that way are turned into files when the server starts.
-- **The Android app no longer opens on a blank screen after signing in on the setup screen.** Now and then it stayed blank until it was closed and opened again.
-- **A recipe's ingredients made or edited in the Android app link the right pantry items on the server.** They sent the phone's own numbers for the items, so a link could point at another item, or at nothing, once synced, and a recipe from the web linked the wrong items on the phone. A link to another account's pantry item is no longer kept.
-- **A recipe made on the phone is made once.** Two syncs could start at once (opening the app, the connection coming back, the timer) and send the same new recipe twice, making two on the server and three on the phone, and keeping the same earlier version twice. Syncs now run one at a time, a new row carries a key so the server makes it once even when it's sent again, and the same earlier version is kept once. An edit made while a sync is running goes up right after it.
+- **A server that can't be reached shows the sign-in page** with Retry, instead of opening CookTrace with no one signed in.
+- **The Android app signs in with Single Sign-On from Settings too**, and says when a sign-in proxy is in the way ([notetrace#36](https://github.com/TraceApps/notetrace/issues/36), thanks @harikiran-lab).
+- **Signing in with SSO finishes on phones with an older Android System WebView.**
+- **The Android app says when a server isn't set up yet**, and `/api/health` answers before setup with `setup_required: true`.
+- **A fresh install's welcome screen no longer shows a "Setup required" error.**
+- **Trace goes through your whole recipe library** ([notetrace#34](https://github.com/TraceApps/notetrace/issues/34), thanks @harikiran-lab) instead of stopping with "Too many tool call rounds". MCP's list tools page with `offset` and say the `total`.
+- **Trace's replies are no longer cut off at 4,096 tokens**, and a reply that stops short says so ([notetrace#23](https://github.com/TraceApps/notetrace/issues/23), thanks @harikiran-lab).
+- **Trace answers with models that can't use tools** ([nutritrace#259](https://github.com/TraceApps/nutritrace/issues/259), thanks @jsapede), and says what they can't do.
+- **Trace works with Gemini when a tool answers with a list** ([lifttrace#147](https://github.com/TraceApps/lifttrace/issues/147), thanks @wretchedxx).
+- **Trace connects the first time its settings are filled in**, with Test Connection on its own row ([notetrace#18](https://github.com/TraceApps/notetrace/issues/18)).
+- **OpenAI Compatible accepts a Base URL with or without `/v1`**, and works without an API key (Ollama, LM Studio).
+- **Trace and smart recipe import work when the server turns Trace on** (`AI_ENABLED`).
+- **When Trace gets no answer from your provider, it says what to check** instead of "Failed to fetch". [When Trace gets no answer](https://traceapps.github.io/docs/trace/local-llm/#when-trace-gets-no-answer)
+- **Messages show on phones while Trace is open**, and long ones wrap.
+- **Today is your local day everywhere**: a cook with no date, the heatmap, Shop From Plan's default range, cook streaks east of UTC, a recipe's Last Cooked west of UTC, and "Today" instead of "21 Hours Ago".
+- **Editing a cook from the recipe saves its rating and meal.**
+- **A planned cook moved to another week is counted once on the shopping list.**
+- **Fractional amounts reach the shopping list**: "1/2", "1 1/2" and "½" were dropped, and "4-5" counts as 5.
+- **Ingredient lines import cleanly** ([#57](https://github.com/TraceApps/cooktrace/discussions/57), thanks @tmzhuang): "4 - 5 roma tomatoes" is one amount, and sizes and prep go to the note.
+- **An ingredient links to the pantry item it names, plural or not**, and importing a recipe in the Android app links its ingredients and adds new items out of stock.
+- **Recipes exported from Mealime import with their photo, notes and original link.**
+- **Plan a Cook on a recipe card opens the planner with that recipe picked.**
+- **A printed recipe keeps the times in its steps.**
+- **The Android app shows how many of a recipe's ingredients you have** on cards and in cookbooks.
+- **Uploaded pantry photos and cookbook covers show in the Android app**, and on the web under a subpath (found with [lifttrace#141](https://github.com/TraceApps/lifttrace/issues/141), thanks @rgpag1).
+- **The Android app syncs half as often and does less when nothing changed** (one 30-second sync while it's on screen), a picture that failed to download is retried, and a shopping list built on the phone reaches the server in one sync.
+- **A unit turned off in the Android app stays off.**
+- **A timer or cook changed on the watch is no longer undone by the phone.**
+- **Turning update checks on or off in the browser reaches the server.**
+- **Turning on user accounts keeps the admin's email, and your Profile saves without the browser's storage** (found with [nutritrace#269](https://github.com/TraceApps/nutritrace/issues/269), thanks @jsapede).
+- **The recipe sort menu, date pickers and scrollbars follow the theme on Safari.**
+- **`INSECURE_COOKIES` is explained the same way everywhere**, and the sign-in screen's "How to fix it" opens the right part of the reverse proxy guide.
+
+### Security
+
+- **Other sites can no longer show CookTrace inside a frame.** If you show it in a dashboard (Homarr, Organizr, Home Assistant), set `FRAME_ANCESTORS` to the dashboard's address, for example `FRAME_ANCESTORS=https://home.example.com`.
+- **Pages on lookalike addresses can no longer read or change your account.** Only the Android app's own addresses and `PUBLIC_URL` are allowed, compared exactly.
+- **Web pages on other sites can no longer make changes through your browser on a server without accounts** (single-user mode). If your reverse proxy doesn't pass the address you open, set `PUBLIC_URL`.
+
+---
+
+## [1.4.1] - 2026-10-22
+
+Patch release. Android sync that keeps your edits, earlier versions of a recipe when two devices disagree, imports from Tandoor and Paprika that work, single sign-on fixes, share links that open for everyone, and a round of security fixes (two rated critical).
+
+> **Upgrade note.** Importing a recipe from an address on your own network (a LAN Mealie, say) is now for admins only; set `ALLOW_PRIVATE_RECIPE_URLS=1` to open it to every account. An AI address an account sets for smart import can't point inside your network unless `ALLOW_PRIVATE_AI_URLS=1`. Password reset, invite and sharing emails build their links from `PUBLIC_URL`, so set it to the address people open. Update the Android app too: the sync fixes are in the app as well as the server.
+
+### Added
+
+- **Earlier versions of a recipe.** When edits from two devices change the same part of a recipe, the newer one stays, and the recipe page says so and lists the other, with what differs and a preview. Restore puts it back, and a restore can be undone. A kitchen member sees the versions that were their own edits.
+- **Imports say what they skipped** ([#72](https://github.com/TraceApps/cooktrace/issues/72), thanks @joeShuff). A bulk import reads "Imported 119 of 121 Recipes" and lists each recipe skipped as a duplicate, linked to the one you have.
+
+### Changed
+
+- **A sync keeps the newer edit, field by field.** An edit made offline in the Android app or the browser no longer overwrites a newer change from another device, even when a phone's clock is off. Changes to different fields are both kept, an amount and its unit stay together, and an item deleted on one device stays deleted. Older versions of the app sync as before.
+- **Shared recipe links are a plain address** (`/r/...`) instead of a `#/` one, so they open for people without an account. Links copied before this still open.
+- **Sheets work from the keyboard**: focus moves into a sheet and stays there, Escape closes it, and focus goes back where it was.
+- **Trace's attach button offers Camera or Gallery on phones and in the Android app.** On a computer it opens the file picker.
+
+### Fixed
+
+- **A Tandoor export imports** ([#72](https://github.com/TraceApps/cooktrace/issues/72), thanks @joeShuff), each recipe with its picture. Every Tandoor export failed with "No JSON files found".
+- **Importing a recipe you already have opens it**, from a link, pasted text, a file or a Paprika archive, instead of an empty page or counting it as imported.
+- **Smart cookbooks show their recipes** ([#76](https://github.com/TraceApps/cooktrace/issues/76), thanks @herver1971): the right count instead of "0 recipes", their recipes in the Android app, and the right ones when filtered by category, on the phone and the server. Renaming one in the Android app no longer empties it, and a plain cookbook no longer counts deleted recipes.
+- **The Android app syncs everything it creates, edits and deletes**: categories, custom units, Trace chat, recipes added to or taken out of a cookbook, and the right category and pantry links for recipes and pantry items. An edit made offline reaches your other devices, a recipe made on the phone is made once, and photos go up as files instead of inside the rows.
+- **The Android app after signing in or connecting**: no blank screen after signing in on the setup screen, the recipe list, pantry, shopping list and diary fill in after the first sync, Upload matches the categories an account already has, and Disconnect keeps your settings.
+- **Cookbook covers change in the Android app** and are kept for offline use.
+- **Single sign-on**: an email that already has an account no longer gets a second, empty one when the provider doesn't mark it verified (Authentik's default since 2025.10); Authelia 4.39 and later work out of the box; the callback works at `/api/oidc/callback` and without a provider number; and `OIDC_ENABLE_EMAIL_PASSWORD_LOGIN` works for providers added in Settings.
+- **Signing in on a plain-HTTP address says what's wrong** instead of looping back to the sign-in page, and links to the fix (`INSECURE_COOKIES=1`).
+- **The app no longer loads behind the sign-in screen**, and your custom and hidden units load after signing in without a reload.
+- **Share links from the Android app point at your server**, subpath included.
+- **The installed app works when CookTrace is served from a subpath** (`BASE_URL`). Thanks @kgenerozov for the fix in LiftTrace and NutriTrace.
+- **Trace with OpenAI-compatible servers**: endpoints that stream unless told not to work ([nutritrace#258](https://github.com/TraceApps/nutritrace/issues/258), thanks @jsapede), smart import works with one set on the server or without an API key (Ollama), and Trace set up through environment variables shows as set up in the Android app.
+- **Trace shows your newest messages when you open it**, not the oldest 100.
+- **Reordering recipe or pantry categories on the web keeps the new order**, and the Recipes, Shared and Cookbooks switch highlights the tab you're on.
+
+### Security
+
+- **Another account signing in on the same phone never sees or sends the last one's data.** Signing back in keeps everything, another account starts from its own data, and you're asked before unsent changes are discarded. The server also takes the session the app sends over an older sign-in cookie.
+- **A link can only point at your own pantry items, recipes, categories and cookbooks**, from the web or the Android app.
+- **The Android app's SSO sign-in no longer passes the session token through the `cooktrace://` link**, which another app could intercept; it carries a single-use code only the app that started the sign-in can redeem.
+- **A password reset link can no longer be pointed at someone else's site**, and names in emails can't carry markup.
+- **Recipe import and smart import can't be used to read services on your own network** (see the upgrade note), and push notifications and the NutriTrace link never reach cloud-metadata addresses.
+- **The recipe share card can't run script or leak a private recipe**, the image proxy passes images only, and shared recipe pages are kept out of search engines.
+- **Share links and uploaded file names come from a secure random source**, and a removed share link stays removed.
+- **@capacitor/android** and **@capacitor/core** bumped to 8.5.3, closes [GHSA-rvm3-566m-v7fv](https://github.com/advisories/GHSA-rvm3-566m-v7fv) (critical: a crafted link to the app's own address could load any page as the app). CookTrace was exposed through recipe source and video links; no longer possible.
+- **proxy-addr** bumped 2.0.7 to 2.0.8, closes [GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h) (critical). CookTrace never sets a trusted proxy, so it wasn't exposed.
+- **@modelcontextprotocol/sdk** bumped 1.30.0 to 1.32.1, closes [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h) (high), [GHSA-22jm-h49p-29qw](https://github.com/advisories/GHSA-22jm-h49p-29qw) (high) and [GHSA-6prh-2h8m-c8cw](https://github.com/advisories/GHSA-6prh-2h8m-c8cw) (moderate). CookTrace doesn't use the affected parts.
+- **source-map-js** bumped 1.2.1 to 1.2.2, closes [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) (high). Build tooling only.
+- **vite** bumped 7.3.6 to 7.3.7, closes [GHSA-587h-7wmj-h5pm](https://github.com/advisories/GHSA-587h-7wmj-h5pm) (high), [GHSA-698v-4r3x-3vcv](https://github.com/advisories/GHSA-698v-4r3x-3vcv) and [GHSA-r825-w8mm-5pxw](https://github.com/advisories/GHSA-r825-w8mm-5pxw). Only the development server (`npm run dev`) was affected; the app and server people install never include it.
+- **hono** bumped 4.13.7 to 4.13.13 on the server (through the MCP library), closes [GHSA-5r4p-p66f-jhc7](https://github.com/advisories/GHSA-5r4p-p66f-jhc7) (moderate). CookTrace never uses the affected `serveStatic`, so it wasn't exposed.
+- `npm audit` reports 0 vulnerabilities for the app and the server.
+
+---
+
+## [1.4.1-dev03] - 2026-10-09 (pre-release)
+
+Security fixes (two rated critical), Android sync that no longer loses edits, and smart cookbooks that show their recipes.
+
+### Added
+
+- **Earlier versions of a recipe.** When edits from two devices change the same part of a recipe, the newer one stays, and the recipe page says so and lists the other, with what differs and a preview. Restore puts it back, and a restore can be undone. A kitchen member sees the versions that were their own edits.
+
+### Changed
+
+- **A sync keeps the newer edit, field by field.** An edit made offline in the Android app or in the browser no longer overwrites a newer change made on another device, even when a phone's clock is off. Changes to different fields are both kept (an item checked off on the phone and renamed on the web keeps both), an amount and its unit stay together, and an item deleted on one device stays deleted. Older versions of the app sync as before.
+- **Sheets work from the keyboard.** Focus moves into a sheet when it opens and stays there, Escape closes it, and focus goes back where it was.
+- **Trace's attach button offers Camera or Gallery on phones and in the Android app**, the same as the other Trace apps. On a computer it opens the file picker.
+
+### Fixed
+
+- **Smart cookbooks show how many recipes they hold** ([#76](https://github.com/TraceApps/cooktrace/issues/76), thanks @herver1971). Every smart cookbook said "0 recipes", and a plain cookbook still counted recipes you had deleted.
+- **Smart cookbooks open with their recipes in the Android app** ([#76](https://github.com/TraceApps/cooktrace/issues/76)). They opened empty, and renaming one there turned it into an empty plain cookbook.
+- **Smart cookbooks filtered by category show the right recipes on the phone and the server**, whichever one they were made on.
+- **The Android app syncs what it creates, edits and deletes.** A recipe or pantry item could land in the wrong category on the server, and categories, custom units and Trace chat made on the phone never reached it.
+- **Deletes sync both ways in the Android app**: categories, custom units, Trace chat, and recipes taken out of a cookbook. A recipe added to a cookbook on the phone no longer drops off at the next sync.
+- **An edit made offline reaches your other devices.** One that synced after another device's last sync was skipped there; after this update every device catches up once.
+- **A recipe made on the phone is made once.** Two syncs starting at once could make it twice on the server and three times on the phone.
+- **A recipe's ingredients made or edited in the Android app link the right pantry items on the server**, and a recipe from the web links the right ones on the phone.
+- **Photos synced from the Android app are stored as files on the server.** They were kept inside the recipe, pantry item, cookbook or diary entry, so every list carried them and share cards couldn't show them. Photos already stored that way become files when the server starts.
 - **The recipe list fills in after the first sync** instead of saying "No Recipes Yet" until you leave the page. The pantry, shopping list and cook diary refresh the same way.
-- **Upload from the phone to a server matches categories the account already has** instead of making a second copy of each, and a second upload makes nothing twice.
+- **Upload from the phone to a server matches categories the account already has** instead of making a second copy of each.
+- **The Android app no longer opens on a blank screen after signing in on the setup screen.**
 - **Disconnect keeps your settings on the phone** and no longer shows the welcome screen.
-- **Reordering recipe or pantry categories on the web keeps the new order.** The request reached the wrong route and was refused.
-- **A Tandoor export imports** ([#72](https://github.com/TraceApps/cooktrace/issues/72), thanks @joeShuff). Tandoor packs each recipe in its own zip inside the export, which the importer never opened, so every Tandoor export failed with "No JSON files found". Each recipe now comes in with its own picture.
+- **Changing a cookbook's cover in the Android app works**, and covers are kept for offline use.
+- **Reordering recipe or pantry categories on the web keeps the new order.**
+- **The Recipes, Shared and Cookbooks switch highlights the tab you're on.**
+- **The installed app works when CookTrace is served from a subpath** (`BASE_URL`). Every visit after the first sent the app's requests to the site root. Thanks @kgenerozov for the fix in LiftTrace and NutriTrace.
+- **Trace works with OpenAI-compatible endpoints that stream unless told not to** ([nutritrace#258](https://github.com/TraceApps/nutritrace/issues/258), reported by @jsapede). Chat and smart recipe import failed with "Unexpected non-whitespace character after JSON".
+- **Smart recipe import works with an OpenAI-compatible endpoint set on the server, or one without an API key** (such as Ollama). It failed with "Unknown AI provider" or counted as not set up.
+- **Trace shows your newest messages when you open it.** It loaded the oldest 100, so a longer chat never showed its latest messages.
+
+### Security
+
+- **Another account signing in on the same phone never sees or sends the last one's data.** Signing back in to the same account keeps everything, another account starts from its own data, and you're asked before unsent changes from the last account are discarded.
+- **The server takes the session the app sends over an older sign-in cookie.** On Android, a cookie from an earlier account could be answered as that account.
+- **A link can only point at your own pantry items, recipes, categories and cookbooks**, from the web or the Android app. One could point at another account's row, showing its name and aisle or adding your recipes to their cookbook.
+- **The recipe share card can't run script or leak a private recipe.** It escapes what it shows, isn't cached, blocks script, and follows the recipe's own sharing.
+- **A password reset link can no longer be pointed at someone else's site.** It took its address from the request, so a forged host could receive another person's reset token. Reset, invite and sharing emails now use `PUBLIC_URL`, or an address an admin uses, and keep the `BASE_URL` subpath.
+- **Names in emails can no longer carry markup.** Everything an email shows is escaped.
+- **Accounts can't use recipe import to read services on your own network.** Only an admin can import from your network; `ALLOW_PRIVATE_RECIPE_URLS=1` opens it to every account.
+- **An AI address an account sets is checked before smart import uses it.** Other accounts can't point it inside your network unless `ALLOW_PRIVATE_AI_URLS=1`.
+- **Push notifications and the NutriTrace link never reach cloud-metadata addresses** and follow a redirect only on the same server; the open `/api/proxy` checks every redirect.
+- **The image proxy passes images only**, and images can't act as a page.
+- **@capacitor/android** and **@capacitor/core** bumped to 8.5.3, closes [GHSA-rvm3-566m-v7fv](https://github.com/advisories/GHSA-rvm3-566m-v7fv) (critical: a crafted link to the app's own address could load any page as the app, with its sign-in and access to the phone). CookTrace was exposed through recipe source and video links; no longer possible.
+- **proxy-addr** bumped 2.0.7 to 2.0.8, closes [GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h) (critical). CookTrace never sets a trusted proxy, so it wasn't exposed.
+- **@modelcontextprotocol/sdk** bumped 1.30.0 to 1.32.1, closes [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h) (high). CookTrace doesn't use the affected OAuth client.
+- **source-map-js** bumped 1.2.1 to 1.2.2, closes [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) (high). Build tooling only.
+
+---
+
+## [1.4.1-dev02] - 2026-10-04 (pre-release)
+
+Imports now say what they skipped, and importing a recipe you already have opens it.
+
+### Fixed
+
 - **Imports say what they skipped** ([#72](https://github.com/TraceApps/cooktrace/issues/72), thanks @joeShuff). After a bulk import, the summary reads "Imported 119 of 121 Recipes" and lists each recipe skipped as a duplicate, linked to the one you already have, apart from any that failed.
 - **Importing a recipe you already have opens it.** Importing it again from a link, pasted text or a file showed a "no cooking steps" warning and opened an empty page. It now says the recipe already exists and opens yours.
 - **A Paprika archive no longer counts recipes you already have as imported.**
+
+---
+
+## [1.4.1-dev01] - 2026-10-03 (pre-release)
+
+A hotfix: Tandoor exports import again, single sign-on fixes, and share links that open for everyone.
+
+### Fixed
+
+- **A Tandoor export imports** ([#72](https://github.com/TraceApps/cooktrace/issues/72), thanks @joeShuff). Tandoor packs each recipe in its own zip inside the export, which the importer never opened, so every Tandoor export failed with "No JSON files found". Each recipe now comes in with its own picture.
 - **Signing in through SSO with an email that already has an account no longer creates a second account.** When the identity provider doesn't mark the email verified (Authentik's default since 2025.10), the sign-in is refused with a pointer to link the provider from your profile, instead of landing you in a new, empty account.
 - **SSO works with Authelia 4.39 and later out of the box.** Email, username and groups are read from the provider's userinfo when the ID token leaves them out.
 - **The SSO callback also works without the provider number, and at `/api/oidc/callback`**, the address older docs gave. Both used to end on a blank page.
 - **`OIDC_ENABLE_EMAIL_PASSWORD_LOGIN` works for providers added in Settings.** It was ignored unless a provider was also defined through env vars.
 - **Signing in on a plain-HTTP address says what's wrong instead of looping.** The sign-in cookie only works over HTTPS unless `INSECURE_COOKIES=1` is set, so signing in from an `http://` address dropped you back on the login page with no error. The sign-in and setup screens now explain it and link to the fix, the app no longer flashes before sending you back, and the server log says so too.
-- **`INSECURE_COOKIES` is explained the same way in the README, DEPLOY.md, `.env.example` and `docker-compose.yml` as in the other Trace apps**: what it does, why signing in at a plain `http://` address loops without it, and to leave it off behind HTTPS. When the browser drops the sign-in cookie on an HTTPS address, "How to fix it" on the sign-in screen opens the part of the reverse proxy guide about it.
-- **Shared recipe links open for people without an account.** On a server with accounts, the link showed the sign-in screen instead of the recipe. Behind a reverse proxy with its own login, the link opens for you too; for people without that login, leave `/r/`, `/api/r/` and the app's files open in the proxy ([Public links behind a login](https://traceapps.github.io/docs/getting-started/reverse-proxy/#public-links-behind-a-login)).
+- **Shared recipe links open for people without an account.** On a server with accounts, the link showed the sign-in screen instead of the recipe. Links are now a plain address (`/r/...`) instead of a `#/` one; links copied before this still open.
 - **Share links from the Android app point at your server.** They used the app's own internal address, which opened nothing for anyone else, and ignored a server set up under a subpath.
 - **The app no longer loads behind the sign-in screen.** Opened signed out, it asked the server for your data and was refused before the sign-in screen replaced it. It now waits to learn who is signed in.
 - **Trace set up through the server's environment variables shows as set up in the Android app.** The app asked without its sign-in, so the server refused and Trace looked unconfigured.
 - **Your custom and hidden units load after signing in on the web** without a reload. Opened signed out, the app tried to load them before you signed in and then gave up.
-- **The installed app works when CookTrace is served from a subpath.** With `BASE_URL` set (say `/cooktrace`), every visit after the first sent the app's requests to the site root instead, online and offline. Thanks @kgenerozov for the fix in LiftTrace and NutriTrace.
-- **Trace works with OpenAI-compatible endpoints that stream unless told not to** ([nutritrace#258](https://github.com/TraceApps/nutritrace/issues/258), reported by @jsapede). Chat answers and smart recipe import failed with "Unexpected non-whitespace character after JSON"; every request now asks for a single answer.
-- **Smart recipe import works with an OpenAI-compatible endpoint set on the server, or one without an API key.** With `AI_PROVIDER=oai-compat` it failed with "Unknown AI provider", and a keyless endpoint such as Ollama counted as not set up.
-- **Smart cookbooks show how many recipes they hold** ([#76](https://github.com/TraceApps/cooktrace/issues/76), thanks @herver1971). The cookbooks list, shared cookbooks and the Android app said "0 recipes" for every smart cookbook, and a plain cookbook still counted recipes you had deleted.
-- **Smart cookbooks open with their recipes in the Android app** ([#76](https://github.com/TraceApps/cooktrace/issues/76)). They opened empty, and renaming one there turned it into an empty plain cookbook.
-- **Changing a cookbook's cover in the Android app works.** It failed with an error.
-- **The Android app syncs what it creates, edits and deletes.** A recipe or pantry item could land in the wrong category on the server, and recipe categories, pantry categories, custom units and Trace chat made on the phone never reached it.
-- **An edit made offline reaches your other devices.** One that synced after another device's last sync was skipped there; after this update every device catches up once.
-- **Deletes sync both ways in the Android app**: categories, custom units and Trace chat, and recipes taken out of a cookbook. A recipe added to an existing cookbook on the phone no longer drops off at the next sync.
-- **Smart cookbooks filtered by category show the right recipes on the phone and the server**, whichever one they were made on.
-- **Cookbook covers are kept for offline use in the Android app.**
-- **The Recipes, Shared and Cookbooks switch highlights the tab you're on.** It could sit off to one side until the page was resized.
-- **Trace shows your newest messages when you open it.** It loaded the oldest 100, so once a chat passed 100 messages the latest ones never appeared.
-- **Fractional amounts reach the shopping list.** Adding a recipe or a week's plan to the list dropped amounts like "1/2", "1 1/2" or "½" (the item came in with no amount), and a range like "4-5" now counts as the larger number.
-- **Uploaded pantry photos and cookbook covers show in the Android app.** They were blank in the pantry list, its expiring and variant rows, the cookbook grid, and the photo shown while editing. They also show on the web when CookTrace is served from a subpath (`BASE_URL`). Found while fixing the same bug in LiftTrace ([lifttrace#141](https://github.com/TraceApps/lifttrace/issues/141), reported by @rgpag1).
-- **Trace connects the first time its settings are filled in** (found with [notetrace#18](https://github.com/TraceApps/notetrace/issues/18)). Whichever setting was filled in last (usually the API key) was tested before it counted, so nothing happened, and the chat button stayed hidden until a setting was changed again. **Test Connection** now has its own row, so a test can be run at any time, and the status line says why one failed.
-- **OpenAI Compatible accepts a Base URL with or without `/v1`**, or the whole `/v1/chat/completions` address, in Settings and in `AI_BASE_URL`, for chat and for recipe imports. Given with `/v1`, every request went to `/v1/v1/chat/completions`.
-- **OpenAI Compatible works without an API key**, for servers that need none (Ollama, LM Studio). The connection test asked for one, so the chat button never appeared.
-- **Trace chats when the server turns it on for everyone** (`AI_ENABLED`). The chat button showed, but sending said Trace was turned off, and its switch in Settings was locked by the server.
-- **Smart recipe import can be chosen when the server sets Trace up** (`AI_ENABLED`). It stayed greyed out as "Trace AI required", though the import runs on the server and uses its AI.
-- **When Trace gets no answer from your provider, it says what to check** instead of "Failed to fetch" (or, in Settings, that you're offline): the Base URL, or a server that has to allow this site on every answer, errors included, or an https:// address for a page on HTTPS. A reverse proxy that adds CORS headers only to successful answers hid the provider's real error, such as a model that can't use tools.
 
 ### Security
 
-- **Other sites can no longer show CookTrace inside a frame.** A page could put CookTrace in an invisible frame and trick a click into it; only CookTrace itself may frame it now. If you show CookTrace inside a dashboard (Homarr, Organizr, Home Assistant), it shows blank after this update until you set `FRAME_ANCESTORS` to the dashboard's address, for example `FRAME_ANCESTORS=https://home.example.com`. Origins only; a path is ignored. A proxy that already sets its own frame-ancestors for the dashboard needs `FRAME_ANCESTORS` too.
-
-- **Pages on lookalike addresses can no longer read or change your account.** The server let any web page whose address contained its own name call it with your sign-in and read the answer: `recipes.example.com.attacker.example`, `xrecipes.example.com`, any subdomain of it, the same name on another port, or on a home network `:30031` for a server on `:3003`. Such a page under your own domain or on your server's machine could read and change your account while you were signed in; a page anywhere else got nothing, unless the server runs without accounts (single-user mode), where it could read what your browser can reach. Someone would need a page on such an address and you to open it. Only the Android app's own addresses and `PUBLIC_URL` are allowed now, compared exactly; the Android app, older versions included, works as before.
-- **Web pages on other sites can no longer make changes through your browser on a server without accounts.** A page can make your browser send a form or a file upload to the server without being able to read the answer. In single-user mode, which has no sign-in, a page on any site could do that, for example restore its own backup over yours, which gave its author an admin account on your server. Someone would need your server's address and you to open their page. The server now refuses any change your browser says came from another address, with accounts too, where a sign-in already needed a token such a page can't get. The web app, the Android and watch apps, MCP, the API and scripts work as before; if your reverse proxy doesn't pass on the address you open (the `Host` or `X-Forwarded-Host` header), set `PUBLIC_URL` to it. Over https that matters only for older browsers, such as Safari before 16.4.
-- **Another account signing in on the same phone never sees or sends the last one's data.** The Android app keeps a copy of your account on the phone, and signing in as someone else showed that copy, and sent changes still waiting under the new account's sign-in. The app now checks whose copy it holds before showing anything: signing back in to the same account keeps everything, another account starts from its own data, and if the last account left changes that never reached the server, you're asked before they're discarded. The same server at another address (its LAN address and its domain) is still the same account; where the app can't tell, it asks. Settings and units on show follow the account too.
-- **The server takes the session the app sends over an older sign-in cookie.** On Android a sign-in cookie from an earlier account could ride along with the next account's requests and be answered as the earlier account. CookTrace's own session now wins, and an expired one never falls back to the cookie. A token from a proxy or sign-in gate in front of the server is left alone: the web app signs in with its cookie as before, and still needs its CSRF token. The app removes only CookTrace's cookie when the phone changes hands, so a sign-in gate's cookie stays.
-- **A link can only point at your own pantry items, recipes and categories.** A shopping item, pantry variant, cook or recipe could be saved pointing at another account's row, which also showed that account's pantry item name and aisle. Such links are dropped now, and the list never shows another account's item through one.
-- **The Android app can no longer link your data to another account's.** A synced recipe, pantry item, shopping item or cookbook link could point at a category, item, recipe or cookbook belonging to someone else on the server, including adding your recipes to their cookbooks. The server now accepts a link only to something the account owns or was shared.
-- **The image proxy passes images only.** For its image hosts it passed through whatever came back from the app's own address, a web page included, before sign-in. Anything that isn't an image is refused now, and images can't act as a page.
-- **The recipe share card can't run script or leak a private recipe.** A quote in a recipe's image link ran script as the app when the card was opened, a private recipe's card could be kept by a shared cache, a recipe with no owner gave its card to anyone signed in, and its picture took its address from the request. The card now escapes what it shows, isn't cached, blocks script, and follows the recipe's own sharing: a recipe shared with you shows its card too.
-- **A password reset link can no longer be pointed at someone else's site.** The link took its address from the request, so anyone could ask for another person's reset with a forged host and have the real email, token included, send them to it. Reset, invite and recipe sharing emails now link to `PUBLIC_URL` when it's set, or to an address an admin uses. Links also keep the `BASE_URL` subpath now.
-- **Names in emails can no longer carry markup.** A name, or a title someone shared, went into the email as-is, so HTML or a link typed into it became real markup in the recipient's inbox. Affected the SMTP test and invite emails, the recipe shared with you email, and recipe names in the weekly summary. Everything an email shows is escaped now.
-- **Accounts can't use recipe import to read services on your own network.** An address inside it (directly, through a name, or through a redirect) could be imported and the page sent to an AI address the account chose. Only an admin can now import from your network; `ALLOW_PRIVATE_RECIPE_URLS=1` opens it to every account, and to a single-user install, which has no sign-in.
-- **An AI address an account sets is checked before smart import uses it.** Other accounts can't point it inside your network unless `ALLOW_PRIVATE_AI_URLS=1`, and a failed request shows its status and the provider's own message, not the raw reply.
-- **Push notifications and the NutriTrace link never reach cloud-metadata addresses** and follow a redirect only on the same server. NutriTrace food search passes back only food fields, a failed push test no longer shows the raw reply, and the open `/api/proxy` checks every redirect.
 - **The Android app's SSO sign-in no longer passes the session token through the `cooktrace://` link**, which another app could intercept. The link carries a single-use code that only the app that started the sign-in can redeem.
 - **Share link tokens come from a secure random source.** They were made with `Math.random()`, which can be predicted from its own output.
 - **A removed share link stays removed.** A phone still holding the old link could bring it back with its next edit to the recipe, and a device could set a link of its own choosing. The link is now only set by creating or removing it.
 - **Shared recipe pages are kept out of search engines** and don't pass their address on to sites the recipe links to.
 - **Uploaded files get unguessable names.** The random part of the name was made with `Math.random()`, which can be predicted from its own output.
-- **@capacitor/android** bumped 8.3.0 to 8.5.3, and @capacitor/core 8.4.0 to 8.5.3, closes [GHSA-rvm3-566m-v7fv](https://github.com/advisories/GHSA-rvm3-566m-v7fv) (critical: tapping a crafted link to the app's own address could load any web page as the app, with its stored sign-in and its access to the phone). CookTrace was exposed: the Android app shows a recipe's source and video links, and a recipe shared with you by someone else could carry a crafted one. No longer possible.
-- **source-map-js** bumped 1.2.1 to 1.2.2, closes [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) (high: a crafted source map could stall the process). Build tooling only; neither the app nor the server uses it.
-- **@modelcontextprotocol/sdk** bumped 1.30.0 to 1.32.1 on the server, closes [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h) (high: its OAuth client could send credentials to a server another MCP server named). CookTrace only uses the SDK to run its own MCP server, never its OAuth client.
-- **proxy-addr** bumped 2.0.7 to 2.0.8 on the server, closes [GHSA-jqcg-44mw-7w3h](https://github.com/advisories/GHSA-jqcg-44mw-7w3h) (critical: a trusted-proxy range written in IPv4-mapped IPv6 form trusted every client's forwarded address). CookTrace never sets a trusted proxy, so it wasn't exposed.
-- **vite** bumped 7.3.6 to 7.3.7, closes [GHSA-587h-7wmj-h5pm](https://github.com/advisories/GHSA-587h-7wmj-h5pm) (high), [GHSA-698v-4r3x-3vcv](https://github.com/advisories/GHSA-698v-4r3x-3vcv) and [GHSA-r825-w8mm-5pxw](https://github.com/advisories/GHSA-r825-w8mm-5pxw) (moderate), all three through the development server's open-in-editor link, where a crafted file path could run a command on the developer's computer on Windows (WSL included). Only the development server (`npm run dev`) has that link; the app and server people install never include it.
-- **hono** bumped 4.13.7 to 4.13.13 on the server (through the MCP library), closes [GHSA-5r4p-p66f-jhc7](https://github.com/advisories/GHSA-5r4p-p66f-jhc7) (moderate: `serveStatic` could serve a file without running the middleware on its path). CookTrace wasn't exposed: it never uses `serveStatic`, the MCP library uses hono only to read requests, and Express serves its files.
 - `npm audit` reports 0 vulnerabilities for the app and the server.
 
 ---
