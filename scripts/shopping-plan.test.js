@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   recipeContributions, mergeIntoList, parseSources, mapSourceIds, cleanSourceIds, scaleFor,
-  cooksOnList, onlyListed,
+  cooksOnList, onlyListed, withoutRecipe,
 } from '../src/lib/shopping-plan.js';
 
 const WEEK = { from: '2030-01-07', to: '2030-01-13' };
@@ -180,4 +180,27 @@ test('a plan change that leaves the list as it was writes nothing', () => {
   const rows = asRows(mergeIntoList([], lines, { window: WEEK }));
   const r = mergeIntoList(rows, lines, { cooks: [10, 11] });
   assert.deepEqual([r.inserts.length, r.updates.length, r.deletes.length], [0, 0, 0]);
+});
+
+test("a recipe's trash icon in By Recipe takes out only that recipe's share", () => {
+  const pancakes = { id: 5, servings: 2, ingredients: [{ items: [{ id: 'f', name: 'Flour', qty: '1', unit: 'cup' }, { id: 'e', name: 'Eggs', qty: '2' }] }] };
+  const bread = { id: 6, servings: 1, ingredients: [{ items: [{ id: 'f', name: 'flour', qty: '2', unit: 'cup' }] }] };
+  let rows = asRows(mergeIntoList([], recipeContributions(pancakes, {})));
+  rows = rows.map(r => ({ ...r, recipe_id: 5 }));
+  const more = mergeIntoList(rows, recipeContributions(bread, {}));
+  for (const u of more.updates) Object.assign(rows.find(r => r.id === u.id), u);
+  const flour = byName(rows, 'flour');
+  assert.equal(flour.quantity, 3, 'one Flour 3 cup item');
+  // Pancakes off: its eggs go, the flour stays with bread's 2 cups, under bread.
+  const r = withoutRecipe(rows, 5);
+  assert.deepEqual(r.deletes, [byName(rows, 'egg').id]);
+  assert.equal(r.updates.length, 1);
+  assert.equal(r.updates[0].quantity, 2);
+  assert.equal(r.updates[0].recipe_id, 6);
+  // An amount typed in by hand stays even when its only recipe goes.
+  flour.quantity = 4;
+  const typed = withoutRecipe([flour], 5);
+  assert.equal(typed.updates[0].quantity, 3, '2 for bread + 1 typed');
+  // An item added before sources were kept goes with its recipe, as before.
+  assert.deepEqual(withoutRecipe([{ id: 9, name: 'Salt', recipe_id: 5, sources: null }], 5).deletes, [9]);
 });

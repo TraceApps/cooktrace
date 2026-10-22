@@ -343,6 +343,8 @@
     try {
       if (g.recipeId != null) {
         await NtApi.clearShoppingByRecipe(g.recipeId);
+        // An item another recipe also wants stays, under that recipe.
+        await load({ quiet: true });
       } else {
         for (const id of removedIds) await NtApi.deleteShoppingItem(id);
       }

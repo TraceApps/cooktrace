@@ -16,7 +16,7 @@ import { dispatchWebhookEvent } from '../lib/webhooks.js';
 import { titleCaseName as _titleCaseName, aisleForPantry as _aisleForPantry } from '../lib/shopping-items.js';
 import { ownId, linkableRecipeId } from '../lib/link-checks.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
-import { recipeContributions, mergeIntoList, parseSources, cooksOnList, onlyListed } from '../lib/shopping-plan.js';
+import { recipeContributions, mergeIntoList, parseSources, cooksOnList, onlyListed, withoutRecipe } from '../lib/shopping-plan.js';
 import { localToday, shiftDay } from '../lib/calendar-day.js';
 
 const router = Router();
@@ -143,12 +143,23 @@ router.delete('/by-recipe/:id', wrap((req, res) => {
   const u = uid(req);
   const recipeId = parseInt(req.params.id, 10);
   if (!Number.isFinite(recipeId)) return res.status(400).json({ error: 'Invalid id' });
-  const result = db.prepare(
-    `UPDATE shopping_list
-        SET deleted_at = datetime('now'), updated_at = datetime('now')
-      WHERE ${userClause(u)} AND deleted_at IS NULL AND recipe_id = ?`
-  ).run(...userArgs(u), recipeId);
-  res.json({ removed: result.changes });
+  // Only that recipe's share: an item another recipe also wants stays.
+  const rows = db.prepare(
+    `SELECT id, name, quantity, unit, checked, recipe_id, sources
+       FROM shopping_list WHERE ${userClause(u)} AND deleted_at IS NULL`
+  ).all(...userArgs(u));
+  const plan = withoutRecipe(rows, recipeId);
+  const update = db.prepare(
+    `UPDATE shopping_list SET quantity = ?, unit = ?, sources = ?, recipe_id = ?, updated_at = datetime('now') WHERE id = ?`
+  );
+  const remove = db.prepare(
+    `UPDATE shopping_list SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
+  );
+  db.transaction(() => {
+    for (const r of plan.updates) update.run(r.quantity, r.unit, r.sources, r.recipe_id, r.id);
+    for (const id of plan.deletes) remove.run(id);
+  })();
+  res.json({ removed: plan.deletes.length + plan.updates.length });
 }));
 
 // ── POST /reorder — bulk drag-drop apply ──────────────────────────────

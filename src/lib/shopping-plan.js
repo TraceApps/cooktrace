@@ -254,6 +254,36 @@ export function mapSourceIds(json, recipe, diary) {
   return { json: JSON.stringify(out), unknown };
 }
 
+/**
+ * One recipe taken off the list (By Recipe's trash icon): its share of each
+ * item comes out. An item only it put there goes; one it shares with
+ * another recipe, or with an amount typed in by hand, stays with the rest
+ * and moves to the next recipe that wants it.
+ *   rows: the account's list rows that aren't deleted
+ * Returns { updates: [{ id, quantity, unit, sources (JSON), recipe_id }], deletes: [id] }.
+ */
+export function withoutRecipe(rows, recipeId) {
+  const id = Number(recipeId);
+  const updates = [];
+  const deletes = [];
+  for (const r of rows || []) {
+    const sources = parseSources(r.sources);
+    const mine = sources.filter(s => Number(s.recipe_id) === id);
+    if (!mine.length) {
+      // Added before items kept where their amounts came from.
+      if (Number(r.recipe_id) === id) deletes.push(r.id);
+      continue;
+    }
+    const kept = sources.filter(s => Number(s.recipe_id) !== id);
+    const manual = _manualPart(r, sources);
+    if (!kept.length && !manual) { deletes.push(r.id); continue; }
+    const t = _total(manual, r.unit, kept);
+    const next = Number(r.recipe_id) === id ? (kept.find(s => s.recipe_id != null)?.recipe_id ?? null) : r.recipe_id;
+    updates.push({ id: r.id, quantity: t.quantity, unit: t.unit, sources: JSON.stringify(kept), recipe_id: next ?? null });
+  }
+  return { updates, deletes };
+}
+
 /** The planned cooks a list holds a share of, by id: on rows not yet bought. */
 export function cooksOnList(rows) {
   const ids = new Set();

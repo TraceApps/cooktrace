@@ -17,7 +17,7 @@
 import { getDb, LOCAL_USER_ID, dbMarkDisabledUnitsChanged } from './db-native.js';
 import { resolveAssetUrl } from './platform.js';
 import { cleanSmartFilter, matchesSmartFilter } from './smart-cookbook.js';
-import { recipeContributions, mergeIntoList, parseSources, cooksOnList, onlyListed } from './shopping-plan.js';
+import { recipeContributions, mergeIntoList, parseSources, cooksOnList, onlyListed, withoutRecipe } from './shopping-plan.js';
 import { ingredientKey } from './quantity.js';
 import { allergenSummary, cleanCodes, cleanOverrides, knownCodes } from './allergens.js';
 import { revisionOf, revOf, parseRevision, restoreValues } from './recipe-content.js';
@@ -1272,18 +1272,26 @@ export const CtApiNative = {
     return { ok: true };
   },
 
+  // Only that recipe's share, as the server does: an item another recipe
+  // also wants stays (shopping-plan.js withoutRecipe).
   async clearShoppingByRecipe(recipeId) {
-    const before = (await _query(
-      `SELECT COUNT(*) AS n FROM shopping_list
-        WHERE user_id = ? AND recipe_id = ? AND deleted_at IS NULL`,
-      [LOCAL_USER_ID, recipeId]
-    ))[0]?.n || 0;
-    await _run(
-      `UPDATE shopping_list SET deleted_at = datetime('now'), sync_status = 'pending'
-        WHERE user_id = ? AND recipe_id = ? AND deleted_at IS NULL`,
-      [LOCAL_USER_ID, recipeId]
+    const rows = await _query(
+      `SELECT id, name, quantity, unit, checked, recipe_id, sources
+         FROM shopping_list WHERE user_id = ? AND deleted_at IS NULL`,
+      [LOCAL_USER_ID]
     );
-    return { removed: before };
+    const plan = withoutRecipe(rows, recipeId);
+    for (const r of plan.updates) {
+      await _run(
+        `UPDATE shopping_list SET quantity = ?, unit = ?, sources = ?, recipe_id = ?,
+                updated_at = datetime('now'), sync_status = 'pending' WHERE id = ?`,
+        [r.quantity, r.unit, r.sources, r.recipe_id, r.id]
+      );
+    }
+    for (const id of plan.deletes) {
+      await _run(`UPDATE shopping_list SET deleted_at = datetime('now'), sync_status = 'pending' WHERE id = ?`, [id]);
+    }
+    return { removed: plan.deletes.length + plan.updates.length };
   },
 
   async shopFromRecipe(recipeId, opts = {}) {
