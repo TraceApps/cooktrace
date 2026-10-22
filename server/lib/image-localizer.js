@@ -11,6 +11,7 @@ import crypto from 'crypto';
 import dns from 'dns/promises';
 import net from 'net';
 import { logger } from '../logger.js';
+import { redactUrl } from './redact-url.js';
 import { isLinkLocalOrCloudMeta, isPrivateOrLoopback } from './ssrf-guard.js';
 
 const UPLOADS_DIR = process.env.UPLOADS_PATH || './uploads';
@@ -67,12 +68,12 @@ export async function localizeImage(img_url) {
   }
   // Reject non-http(s) protocols outright
   if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-    logger.warn(`[image-localizer] Refusing non-http(s) URL: ${img_url.substring(0, 80)}`);
+    logger.warn(`[image-localizer] Refusing non-http(s) URL: ${redactUrl(img_url).substring(0, 80)}`);
     return img_url;
   }
   // SSRF guard — refuse private/loopback/link-local hosts (incl. cloud metadata 169.254.169.254)
   if (await _hostnameResolvesPrivate(parsedUrl.hostname)) {
-    logger.warn(`[image-localizer] Refusing private/loopback URL: ${img_url.substring(0, 80)}`);
+    logger.warn(`[image-localizer] Refusing private/loopback URL: ${redactUrl(img_url).substring(0, 80)}`);
     return img_url;
   }
 
@@ -93,13 +94,13 @@ export async function localizeImage(img_url) {
     clearTimeout(timer);
 
     if (!response.ok) {
-      logger.debug(`[image-localizer] Failed to download (${response.status}): ${img_url.substring(0, 80)}`);
+      logger.debug(`[image-localizer] Failed to download (${response.status}): ${redactUrl(img_url).substring(0, 80)}`);
       return img_url; // Keep original URL — might work sometimes
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
     if (buffer.length < 100) {
-      logger.debug(`[image-localizer] Image too small (${buffer.length}b), skipping: ${img_url.substring(0, 80)}`);
+      logger.debug(`[image-localizer] Image too small (${buffer.length}b), skipping: ${redactUrl(img_url).substring(0, 80)}`);
       return img_url;
     }
 
@@ -107,10 +108,10 @@ export async function localizeImage(img_url) {
     fs.writeFileSync(filePath, buffer);
 
     const localPath = `/uploads/${filename}`;
-    logger.debug(`[image-localizer] Downloaded: ${img_url.substring(0, 60)} → ${localPath}`);
+    logger.debug(`[image-localizer] Downloaded: ${redactUrl(img_url).substring(0, 60)} → ${localPath}`);
     return localPath;
   } catch (e) {
-    logger.debug(`[image-localizer] Error: ${e.message} — ${img_url.substring(0, 80)}`);
+    logger.debug(`[image-localizer] Error: ${e.message} — ${redactUrl(img_url).substring(0, 80)}`);
     return img_url; // Keep original on failure
   }
 }

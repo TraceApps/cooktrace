@@ -12,6 +12,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Share to OFF works with your own Open Food Facts account** (the same bug as [nutritrace#284](https://github.com/TraceApps/nutritrace/issues/284)). With no account set in Settings, the pantry's Share to OFF used a shared login that Open Food Facts refuses, and failed with "Unexpected token '<', "<!-- start"... is not valid JSON". Sharing now needs your own free Open Food Facts account: with none set, Share to OFF asks for it right there, keeping what you typed, and shares once it's saved (it's the same account as in Settings > Food Sources). The item and its photo go through your server (the Android app with no server sends them to Open Food Facts itself), and a wrong username or password, an item Open Food Facts refuses, or Open Food Facts being unreachable each get a plain message. The item's photo is now sent too.
 - **Pantry items added from USDA keep USDA's values** (the same bug as [nutritrace#290](https://github.com/TraceApps/nutritrace/issues/290)). Items added from USDA with a serving size other than 100 g were saved with wrong values: USDA gives every value per 100 g, and the app read them as per serving, so popcorn at 385 kcal per 100 g with a 13 g serving was saved at 2,962. Edit one and tap **Refresh from USDA**, or add it again; a recipe's saved nutrition picks up the new values when it's calculated again. Drinks USDA lists in milliliters are now kept per 100 ml. Refresh from OFF, and now Refresh from USDA, show the new numbers in the form right away; they used to show only once saved.
 
+### Security
+
+- **The server log no longer shows your USDA API key when USDA answers with an error.** The server logged the full address of a failed pantry lookup, key included. Keys, tokens, passwords and a `user:password@` part in an address are now shown as `***` in every log line that prints one, photo downloads included.
+
 ---
 
 ## [1.5.0-dev01] - 2026-10-22 (pre-release)
