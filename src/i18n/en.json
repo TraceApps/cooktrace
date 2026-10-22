@@ -2225,9 +2225,9 @@
     "detail_total": "Total time"
   },
   "off_share": {
-    "need_account": "Add your Open Food Facts account in Settings to share.",
-    "open_settings": "Open Settings",
-    "login": "Open Food Facts did not accept your username or password. Check them in Settings.",
+    "need_account": "Add your Open Food Facts account to share. It is kept in Settings > Food Sources.",
+    "save_and_share": "Save and Share",
+    "login": "Open Food Facts did not accept your username or password.",
     "refused": "Open Food Facts did not accept the product: {detail}",
     "refused_plain": "Open Food Facts did not accept the product.",
     "unreachable": "Open Food Facts could not be reached. Try again later.",

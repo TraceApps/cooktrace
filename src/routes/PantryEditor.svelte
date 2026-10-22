@@ -25,6 +25,7 @@
   import { NUTRIMENTS, isDerived, deriveSodiumSalt } from '../lib/nutriments.js';
   import { lookupCommonDensity } from '../lib/recipe-nutrition.js';
   import { lookupBarcode, contributeToOFF, offShareMessage } from '../lib/off.js';
+  import OffAccountInline from '../components/pantry/OffAccountInline.svelte';
   import { offEnabled, offUsername, offPassword, offUploadCountry } from '../stores/settings.js';
   import { DB } from '../lib/db.js';
   import { isNative } from '../lib/platform.js';
@@ -135,7 +136,7 @@
   let downloadSuccess   = false;
   let contributing      = false;
   let offSuccess        = false;
-  // No Open Food Facts login in Settings: say so and link there (TraceApps/nutritrace#284).
+  // No Open Food Facts login: ask for it here, without leaving (TraceApps/nutritrace#284).
   let offNeedsAccount   = false;
   let offPhotoFailed    = false;
   let offVerified       = null;  // null = unchecked, true = confirmed, false = not found yet
@@ -264,8 +265,9 @@
         } catch { offVerified = false; }
       }, 3000);
     } catch (e) {
-      if (e?.kind === 'no_account') offNeedsAccount = true;
-      else showError(offShareMessage(e, $_) || failed('fail.off_share', e));
+      // A wrong login is fixed in place too, so nothing typed is lost.
+      if (e?.kind === 'no_account' || e?.kind === 'login') offNeedsAccount = true;
+      if (e?.kind !== 'no_account') showError(offShareMessage(e, $_) || failed('fail.off_share', e));
     } finally {
       contributing = false;
     }
@@ -560,13 +562,7 @@
               </button>
             </div>
             {#if offNeedsAccount}
-              <div class="off-verify-row" role="status">
-                <span class="off-verify-pending">
-                  <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">info</span>
-                  {$_('off_share.need_account')}
-                  <a class="link" href="#/settings/foodsources">{$_('off_share.open_settings')}</a>
-                </span>
-              </div>
+              <OffAccountInline on:saved={() => { offNeedsAccount = false; shareOrViewOnOFF(); }} />
             {/if}
             {#if offPhotoFailed}
               <div class="off-verify-row" role="status">
