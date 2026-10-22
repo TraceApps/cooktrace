@@ -19,6 +19,7 @@ No accounts, no telemetry, no cloud sync unless you opt in.</p>
   <a href="https://traceapps.github.io/docs/cooktrace/"><img alt="Documentation" src="https://img.shields.io/badge/docs-traceapps.github.io-8A2BE2?logo=readthedocs&logoColor=white"></a>
   <a href="https://github.com/traceapps/cooktrace/pkgs/container/cooktrace"><img alt="GHCR" src="https://img.shields.io/badge/ghcr.io-traceapps%2Fcooktrace-181717?logo=github&logoColor=white"></a>
   <a href="https://hub.docker.com/r/traceapps/cooktrace"><img alt="Docker Hub pulls" src="https://img.shields.io/docker/pulls/traceapps/cooktrace?logo=docker&logoColor=white&label=docker%20pulls&color=2496ED"></a>
+  <a href="https://hosted.weblate.org/engage/cooktrace/"><img alt="Translation status" src="https://hosted.weblate.org/widget/cooktrace/svg-badge.svg"></a>
 </p>
 
 <p align="center">
@@ -89,6 +90,8 @@ Third app in the Trace family alongside [NutriTrace](https://github.com/traceapp
 ## Install
 
 Published to two registries with identical tag sets: `ghcr.io/traceapps/cooktrace` (primary) and `traceapps/cooktrace` on [Docker Hub](https://hub.docker.com/r/traceapps/cooktrace) (mirror). The snippet below uses GHCR; swap in `traceapps/cooktrace:latest` if that suits your setup.
+
+**Unraid:** CookTrace is in Community Applications. Search for CookTrace in the Apps tab; the template sets the port, the appdata folders and the settings. Fill in JWT Secret before the first start.
 
 Minimal `docker-compose.yml`:
 
