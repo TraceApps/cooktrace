@@ -77,6 +77,7 @@ import {
   buildAllergenPantry as _buildAllergenPantry,
 } from '../lib/recipe-hydrate.js';
 import { localToday } from '../lib/calendar-day.js';
+import { frameAncestorsDirective } from '../lib/frame-ancestors.js';
 
 // Tack the creator's current avatar onto a hydrated recipe so the
 // byline can render their photo. Live lookup (cheap PK fetch) keeps
@@ -2643,7 +2644,7 @@ router.get('/:id/card.png', wrap(async (req, res) => {
   // The card can be someone's private recipe: no cache keeps it, as for the
   // rest of /api. The policy stops any script in the SVG, as a backstop.
   res.setHeader('Cache-Control', 'private, no-store');
-  res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' https: http: data:; style-src 'unsafe-inline'; sandbox");
+  res.setHeader('Content-Security-Policy', `default-src 'none'; img-src 'self' https: http: data:; style-src 'unsafe-inline'; sandbox; ${frameAncestorsDirective(process.env.FRAME_ANCESTORS)}`);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.send(svg);
 }));

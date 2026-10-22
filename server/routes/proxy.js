@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { logger } from '../logger.js';
 import { fetchChecked, readBody } from '../lib/ssrf-guard.js';
+import { frameAncestorsDirective } from '../lib/frame-ancestors.js';
 import { makeRateLimiter } from '../middleware/rate-limit.js';
 
 const router = Router();
@@ -60,7 +61,7 @@ router.get('/', async (req, res) => {
       res.set('Content-Type', contentType || 'image/jpeg');
       res.set('Cache-Control', 'public, max-age=86400');
       res.set('X-Content-Type-Options', 'nosniff');
-      res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+      res.set('Content-Security-Policy', `default-src 'none'; style-src 'unsafe-inline'; sandbox; ${frameAncestorsDirective(process.env.FRAME_ANCESTORS)}`);
       return res.send(buffer);
     }
     if (isImgHost) {

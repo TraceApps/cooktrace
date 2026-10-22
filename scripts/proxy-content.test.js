@@ -23,5 +23,6 @@ test('the type is read in lower case, so IMAGE/JPEG is still an image', () => {
 
 test('an image is sent with nosniff and a sandbox policy', () => {
   assert.match(src, /res\.set\('X-Content-Type-Options', 'nosniff'\);/);
-  assert.match(src, /res\.set\('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox"\);/);
+  // The sandbox, plus the framing rule this policy would otherwise replace.
+  assert.match(src, /res\.set\('Content-Security-Policy', `default-src 'none'; style-src 'unsafe-inline'; sandbox; \$\{frameAncestorsDirective\(process\.env\.FRAME_ANCESTORS\)\}`\);/);
 });

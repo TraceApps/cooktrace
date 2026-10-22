@@ -93,6 +93,7 @@ Recommended:
 Only for plain HTTP:
 
 - `INSECURE_COOKIES`: Set `1` to send the sign-in cookie over plain HTTP too. The cookie is HTTPS-only by default, so at a plain `http://` address other than `localhost` (a LAN IP, an Unraid WebUI link) the browser drops it and signing in loops back to the sign-in page; the sign-in and setup screens say so. Use `1` only on a trusted LAN, and leave it `0` behind HTTPS. See [Plain-HTTP LAN](https://traceapps.github.io/docs/getting-started/lan-http/).
+- `FRAME_ANCESTORS`: addresses allowed to show CookTrace inside a frame, several separated by spaces or commas (`https://*.example.com` covers a whole domain). By default only CookTrace itself may, so no other site can frame it to trick a click. If you show CookTrace inside a dashboard (Homarr, Organizr, Home Assistant), it shows blank after this update until you set `FRAME_ANCESTORS` to the dashboard's address, for example `FRAME_ANCESTORS=https://home.example.com`. Origins only; a path is ignored. A proxy that already sets its own frame-ancestors for the dashboard needs `FRAME_ANCESTORS` too.
 
 Optional integrations:
 

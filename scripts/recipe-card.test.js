@@ -43,6 +43,6 @@ test('who may see the card is who may see the recipe', () => {
 
 test('the card is private to caches and cannot run script', () => {
   assert.match(route, /res\.setHeader\('Cache-Control', 'private, no-store'\);/);
-  assert.match(route, /Content-Security-Policy', "default-src 'none'; img-src 'self' https: http: data:; style-src 'unsafe-inline'; sandbox"/);
+  assert.match(route, /Content-Security-Policy', `default-src 'none'; img-src 'self' https: http: data:; style-src 'unsafe-inline'; sandbox; \$\{frameAncestorsDirective\(process\.env\.FRAME_ANCESTORS\)\}`/);
   assert.doesNotMatch(route, /'public, max-age/);
 });
