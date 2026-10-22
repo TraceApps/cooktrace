@@ -2224,6 +2224,15 @@
     "detail_rest": "Rest time",
     "detail_total": "Total time"
   },
+  "off_share": {
+    "need_account": "Add your Open Food Facts account in Settings to share.",
+    "open_settings": "Open Settings",
+    "login": "Open Food Facts did not accept your username or password. Check them in Settings.",
+    "refused": "Open Food Facts did not accept the product: {detail}",
+    "refused_plain": "Open Food Facts did not accept the product.",
+    "unreachable": "Open Food Facts could not be reached. Try again later.",
+    "photo_failed": "The product was shared, but Open Food Facts did not take the photo."
+  },
   "fail": {
     "because": "{what}: {why}.",
     "plain": "{what}.",
@@ -3635,7 +3644,7 @@
     "country_switzerland": "Switzerland",
     "country_united_kingdom": "United Kingdom",
     "country_united_states": "United States",
-    "username_hint": "Optional, only needed to upload edits.",
+    "username_hint": "Needed to share products with Open Food Facts. An account is free.",
     "show": "Show",
     "toggle_password": "Toggle password visibility",
     "flashlight_desc": "Turn on the rear-camera flashlight automatically when the scanner opens (web only; the native app uses the OS camera UI's own controls)."

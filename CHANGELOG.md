@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Share to OFF works with your own Open Food Facts account** (the same bug as [nutritrace#284](https://github.com/TraceApps/nutritrace/issues/284)). With no account set in Settings, the pantry's Share to OFF used a shared login that Open Food Facts refuses, and failed with "Unexpected token '<', "<!-- start"... is not valid JSON". Sharing now needs your own free Open Food Facts account: with none set, Share to OFF says so and links to Settings > Food Sources. The item and its photo go through your server (the Android app with no server sends them to Open Food Facts itself), and a wrong username or password, an item Open Food Facts refuses, or Open Food Facts being unreachable each get a plain message. The item's photo is now sent too.
+
 ---
 
 ## [1.5.0-dev01] - 2026-10-22 (pre-release)

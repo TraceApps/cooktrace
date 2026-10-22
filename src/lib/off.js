@@ -15,7 +15,8 @@
  *     CapacitorHttp which bypasses the WebView's CORS and reaches
  *     openfoodfacts.org directly.
  */
-import { apiUrl, isNative, getServerUrl } from './platform.js';
+import { apiUrl, isNative, getServerUrl, getAuthToken, resolveAssetUrl } from './platform.js';
+import { shareWithOff, OffShareError } from './off-contribute.js';
 import { deriveSodiumSalt } from './nutriments.js';
 import { settingPrefix } from './setting-key.js';
 import { cleanCodes } from './allergens.js';
@@ -169,37 +170,36 @@ export async function searchByName(query, page = 1) {
 }
 
 /**
- * Submit a pantry item to Open Food Facts. Requires the user's OFF
- * account (offUsername / offPassword) configured in Settings — the
- * "nutritrace-app" / "nutritrace" guest account NT uses works as a
- * generic fallback but isn't ideal for attribution.
+ * Submit a pantry item to Open Food Facts with the person's own OFF account
+ * (offUsername / offPassword in Settings). There is no shared fallback
+ * login: Open Food Facts refuses it (TraceApps/nutritrace#284).
+ * Returns { ok: true, photo: null | 'sent' | 'failed' }; throws
+ * OffShareError (kind: no_account | login | refused | unreachable).
  */
 export async function contributeToOFF(item, settings) {
   const { name, brand, barcode } = item;
   if (!name || !barcode) throw new Error('Name and barcode required');
 
-  const username = (settings && settings.offUsername) || 'cooktrace-app';
-  const password = (settings && settings.offPassword) || 'cooktrace';
+  const username = String((settings && settings.offUsername) || '').trim();
+  const password = (settings && settings.offPassword) || '';
+  if (!username || !password) throw new OffShareError('no_account');
   const uploadCountry = (settings && settings.offUploadCountry) || 'Auto';
-  const lang = (typeof navigator !== 'undefined' && navigator.language || 'en').substring(0, 2);
+  const lang = (typeof navigator !== 'undefined' && navigator.language || 'en').substring(0, 2).toLowerCase();
 
-  let params = 'code=' + encodeURIComponent(barcode);
-  params += '&user_id=' + encodeURIComponent(username);
-  params += '&password=' + encodeURIComponent(password);
-  params += '&lang=' + lang;
-  params += '&product_name_' + lang + '=' + encodeURIComponent(name);
-  if (brand) params += '&brands=' + encodeURIComponent(brand);
-  params += '&nutrition_data_per=100g';
+  const fields = {
+    code: barcode, lang, app_name: 'CookTrace',
+    ['product_name_' + lang]: name,
+    nutrition_data_per: '100g',
+  };
+  if (brand) fields.brands = brand;
   // Pantry serving size + unit feed OFF's serving_size field. Skip the
   // 100g default since OFF infers that from nutrition_data_per.
   const portion = item.serving_size;
   const portionUnit = item.serving_unit || 'g';
   if (portion && (parseFloat(portion) !== 100 || portionUnit !== 'g')) {
-    params += '&serving_size=' + encodeURIComponent(portion + ' ' + portionUnit);
+    fields.serving_size = portion + ' ' + portionUnit;
   }
-  if (uploadCountry && uploadCountry !== 'Auto') {
-    params += '&countries=' + encodeURIComponent(uploadCountry);
-  }
+  if (uploadCountry && uploadCountry !== 'Auto') fields.countries = uploadCountry;
   // Map the nutrition keys OFF expects.
   const nutMap = {
     calories: 'energy-kcal', kilojoules: 'energy', fat: 'fat',
@@ -210,17 +210,69 @@ export async function contributeToOFF(item, settings) {
   const nut = item.nutrition || {};
   for (const [key, field] of Object.entries(nutMap)) {
     if (nut[key] !== undefined && nut[key] !== '' && !isNaN(parseFloat(nut[key]))) {
-      params += '&nutriment_' + field + '=' + nut[key];
+      fields['nutriment_' + field] = nut[key];
     }
   }
-  // OFF's contribute endpoint isn't proxy-allowlisted on the server-
-  // side (only world.openfoodfacts.org GETs are), but it accepts the
-  // form values via GET querystring so we can fire it directly.
-  // Browsers + Capacitor WebView can both reach the public OFF host.
-  const res = await fetch(`${OFF_BASE}/cgi/product_jqm2.pl?` + params);
-  const json = await res.json();
-  if (json.status !== 1) throw new Error(json.status_verbose || 'Upload failed');
-  return true;
+  // The item's photo goes up after the product, as a multipart POST.
+  let image = item.img_url ? await _imageBlob(item.img_url) : null;
+  // Over the server's 10 MB cap: the product goes without it.
+  const photoTooBig = !!image && image.size > 10 * 1024 * 1024;
+  if (photoTooBig) image = null;
+
+  // The Android app with no server sends to Open Food Facts itself (it
+  // allows any origin). Everything else goes through CookTrace's server,
+  // which POSTs with the login in the body and names the app.
+  if (isNative && !getServerUrl()) {
+    const sent = await shareWithOff({ fetchImpl: fetch, userId: username, password, fields, image });
+    return photoTooBig ? { ...sent, photo: 'failed' } : sent;
+  }
+  const fd = new FormData();
+  fd.append('user_id', username);
+  fd.append('password', password);
+  fd.append('fields', JSON.stringify(fields));
+  if (image) fd.append('image', image, 'front.jpg');
+  const headers = {};
+  if (isNative) {
+    const token = getAuthToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    const csrf = typeof localStorage !== 'undefined' ? localStorage.getItem('ct:csrf') : null;
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+  }
+  let res;
+  try {
+    res = await fetch(apiUrl('/api/off/contribute'), { method: 'POST', headers, body: fd, credentials: 'include', cache: 'no-store' });
+  } catch {
+    throw new Error('Could not reach the CookTrace server.');
+  }
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (out.kind) throw new OffShareError(out.kind, out.detail || '');
+    throw new Error(out.error || `API error ${res.status}`);
+  }
+  if (out.ok !== true) throw new OffShareError('unreachable');
+  return photoTooBig ? { ...out, photo: 'failed' } : out;
+}
+
+/** Open Food Facts' answer in plain words (never a parse error), or null for
+ *  an error that isn't Open Food Facts' (the caller words it). */
+export function offShareMessage(e, t) {
+  if (e?.kind === 'login') return t('off_share.login');
+  if (e?.kind === 'refused') return e.detail ? t('off_share.refused', { values: { detail: e.detail } }) : t('off_share.refused_plain');
+  if (e?.kind === 'unreachable') return t('off_share.unreachable');
+  return null;
+}
+
+// The photo as a Blob for the upload, or null (it is optional).
+async function _imageBlob(imgUrl) {
+  try {
+    const res = await fetch(resolveAssetUrl(imgUrl), { credentials: 'include' });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return blob && blob.size && /^image\//.test(blob.type || 'image/') ? blob : null;
+  } catch {
+    return null;
+  }
 }
 
 // ── Mapping ────────────────────────────────────────────────────────────

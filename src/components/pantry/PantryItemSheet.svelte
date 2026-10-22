@@ -47,7 +47,7 @@
   import NutritionFactsBox from '../recipe/NutritionFactsBox.svelte';
   import { categoryLabel, categoryIcon } from '../../lib/pantry-categories.js';
   import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS, isDerived, deriveSodiumSalt } from '../../lib/nutriments.js';
-  import { lookupBarcode, contributeToOFF } from '../../lib/off.js';
+  import { lookupBarcode, contributeToOFF, offShareMessage } from '../../lib/off.js';
   import { displayVariantName as _sharedDisplayVariantName, isItemInStock, stockAfterToggle, stockAfterStep } from '../../lib/pantry-variants.js';
   import { isOfflineError } from '../../lib/offline-edits.js';
   import { foldText } from '../../lib/search-text.js';
@@ -167,6 +167,9 @@
   let downloadSuccess = false;
   let contributing = false;
   let offSuccess = false;
+  // No Open Food Facts login in Settings: say so and link there (TraceApps/nutritrace#284).
+  let offNeedsAccount = false;
+  let offPhotoFailed = false;
   let offVerified = null;
   let offProductExists = null;
   let _lastCheckedBarcode = null;
@@ -752,6 +755,8 @@
     if (!draft.barcode) { showError($_('pantry_sheet_extra.toast.add_barcode')); return; }
     if (offProductExists) { await _openOffPage(); return; }
     if (!draft.name) { showError($_('pantry_sheet_extra.toast.add_name')); return; }
+    offNeedsAccount = false; offPhotoFailed = false;
+    if (!String($offUsername || '').trim() || !$offPassword) { offNeedsAccount = true; return; }
     contributing = true; offSuccess = false; offVerified = null;
     try {
       const existing = await lookupBarcode(draft.barcode);
@@ -761,10 +766,11 @@
         await _openOffPage();
         return;
       }
-      await contributeToOFF(draft, {
+      const sent = await contributeToOFF(draft, {
         offUsername: $offUsername, offPassword: $offPassword,
         offUploadCountry: $offUploadCountry,
       });
+      offPhotoFailed = sent?.photo === 'failed';
       offSuccess = true;
       offProductExists = true;
       setTimeout(() => offSuccess = false, 3000);
@@ -774,7 +780,10 @@
           offVerified = !!found;
         } catch { offVerified = false; }
       }, 3000);
-    } catch (e) { showError(failed('fail.off_share', e)); }
+    } catch (e) {
+      if (e?.kind === 'no_account') offNeedsAccount = true;
+      else showError(offShareMessage(e, $_) || failed('fail.off_share', e));
+    }
     finally { contributing = false; }
   }
 
@@ -1083,6 +1092,20 @@
                     {downloading ? $_('common.loading') : downloadSuccess ? $_('pantry_item_sheet_ui.off_updated') : $_('pantry_editor.actions.refresh_off')}
                   </button>
                 </div>
+                {#if offNeedsAccount}
+                  <div class="off-verify-row" role="status">
+                    <span class="off-verify-pending">
+                      <span class="material-symbols-rounded" style="font-size:14px;vertical-align:middle">info</span>
+                      {$_('off_share.need_account')}
+                      <a class="link" href="#/settings/foodsources">{$_('off_share.open_settings')}</a>
+                    </span>
+                  </div>
+                {/if}
+                {#if offPhotoFailed}
+                  <div class="off-verify-row" role="status">
+                    <span class="off-verify-pending">{$_('off_share.photo_failed')}</span>
+                  </div>
+                {/if}
                 {#if offSuccess}
                   <div class="off-verify-row">
                     {#if offVerified === null}
