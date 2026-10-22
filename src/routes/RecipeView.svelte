@@ -25,6 +25,8 @@
   import { sanitizeRichText } from '../components/ui/RichTextEditor.svelte';
   import NutritionFactsBox from '../components/recipe/NutritionFactsBox.svelte';
   import CookLogDialog from '../components/recipe/CookLogDialog.svelte';
+  import PlanCookDialog from '../components/diary/PlanCookDialog.svelte';
+  import { isoDay, fromIso } from '../lib/week.js';
   import { relativeTime, shortDate } from '../lib/relative-time.js';
   import { formatDate, formatUpdated, domainFromUrl } from '../lib/format.js';
   import { dateFormat, timeFormat } from '../stores/settings.js';
@@ -83,6 +85,8 @@
     recipe.user_id === $currentUser?.id ||
     $currentUser?.role === 'admin'
   );
+  // The recipe's owner (the one who can edit its cooks from here).
+  $: ownsRecipe = !!recipe && (recipe.user_id == null || recipe.user_id === $currentUser?.id);
   $: isSharedView = !!recipe && recipe.user_id != null
     && $currentUser?.id != null
     && recipe.user_id !== $currentUser.id;
@@ -246,7 +250,48 @@
     else if (e.key === 'ArrowRight') lightboxNext();
   }
   $: if (Number.isFinite(id)) loadCooks();
+  // What you've made (Cook History), and what's planned next (#61): a plan
+  // isn't a cook until it's marked cooked.
+  $: madeCooks = cooks.filter(c => c.kind !== 'planned')
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  // Today, as of the last look at the cooks (a page left open overnight
+  // catches up when they load again).
+  let todayIso = isoDay(new Date());
+  // Your own plans: on a shared recipe the cooks include other people's,
+  // and their plans aren't in your Diary.
+  $: _mine = (c) => c.cooked_by_user_id == null || $currentUser?.id == null || c.cooked_by_user_id === $currentUser.id;
+  // A plan for any day of a week is dated the week's first day: it's still
+  // ahead until that week is over.
+  const _planEnds = c => {
+    if (!c.any_day) return c.date;
+    const d = fromIso(c.date);
+    return isoDay(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 6));
+  };
+  $: upcomingPlans = cooks
+    .filter(c => c.kind === 'planned' && _mine(c) && _planEnds(c) >= todayIso)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  // When a plan is: today, tomorrow, a day this week, a date further on,
+  // or the week of a plan for any day of it.
+  $: planWhen = (c) => {
+    const d = fromIso(c.date);
+    if (c.any_day) return $_('recipe_view_ui.planned_week', { values: { date: d.toLocaleDateString($locale || undefined, { month: 'short', day: 'numeric' }) } });
+    const days = Math.round((d - fromIso(todayIso)) / 86400000);
+    if (days === 0) return $_('recipe_view_ui.planned_today');
+    if (days === 1) return $_('recipe_view_ui.planned_tomorrow');
+    if (days > 1 && days < 7) return d.toLocaleDateString($locale || undefined, { weekday: 'long' });
+    return d.toLocaleDateString($locale || undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+  let planOpen = false;
+
+  // Your plan for this recipe on `day`, if there is one: dated that day,
+  // or for any day of the week it falls in.
+  function _planOn(day) {
+    return cooks.find(c => c.kind === 'planned' && _mine(c)
+      && (c.date === day || (c.any_day && c.date <= day && day <= _planEnds(c))));
+  }
+
   async function loadCooks() {
+    todayIso = isoDay(new Date());
     cooksLoading = true;
     try { cooks = await NtApi.getCooks(id); }
     catch { cooks = []; }
@@ -894,8 +939,19 @@
         showSuccess($_('recipe_view_ct.toast.diary_updated'));
       } else {
         // Made from the recipe as this page shows it, unless another was picked.
-        recipe = await NtApi.markCooked(recipe.id, { ...e.detail, ...madeFrom(e.detail.recipe_rev) });
-        showSuccess($_('recipe_view_ct.toast.logged_cooked'));
+        const made = { ...e.detail, ...madeFrom(e.detail.recipe_rev) };
+        // Planned for that day: the plan is what was cooked (as the Diary's
+        // Mark as Cooked), so it doesn't stay behind as still to cook. Only
+        // a recipe's owner edits its cooks here; others log a new one.
+        const plan = ownsRecipe ? _planOn(made.date || todayIso) : null;
+        if (plan) {
+          await NtApi.updateCook(recipe.id, plan.id, { ...made, kind: 'cooked', _base: plan });
+          recipe = await NtApi.getRecipe(recipe.id);
+          showSuccess($_('recipe_view_ct.toast.plan_cooked'));
+        } else {
+          recipe = await NtApi.markCooked(recipe.id, made);
+          showSuccess($_('recipe_view_ct.toast.logged_cooked'));
+        }
         // "I made this" is the natural end of a cook session — clear
         // checks + drop out of cook mode so the next visit is fresh.
         if (cookMode) endCookMode();
@@ -1273,7 +1329,23 @@
               <span class="material-symbols-rounded">restaurant</span>
               {cookBusy ? $_('recipe_view_ui.logging') : $_('recipe_view_ui.i_cooked_this')}
             </button>
+            <button class="btn btn-secondary cook-btn" on:click={() => planOpen = true}>
+              <span class="material-symbols-rounded">event_available</span>
+              {$_('recipe_view_ui.plan')}
+            </button>
           </div>
+          {#if upcomingPlans.length}
+            {@const next = upcomingPlans[0]}
+            <!-- The next plan for this recipe; the Diary's week has the rest. -->
+            <button class="planned-line" on:click={() => push(`/diary?week=${next.date}`)} title={$_('recipe_view_ui.planned_open')}>
+              <span class="material-symbols-rounded" aria-hidden="true">event</span>
+              <span class="planned-text">
+                {$_('recipe_view_ui.planned_for', { values: { when: planWhen(next) } })}{#if next.meal_type}{' · '}{$_(`cookdiary_page.week.meal_${next.meal_type}`)}{/if}
+                {#if upcomingPlans.length > 1}<span class="planned-more">{$_('recipe_view_ui.planned_more', { values: { count: upcomingPlans.length - 1 } })}</span>{/if}
+              </span>
+              <span class="material-symbols-rounded chev" aria-hidden="true">chevron_right</span>
+            </button>
+          {/if}
         </div>
 
         <!-- Time + servings + yield -->
@@ -1701,14 +1773,14 @@
              width below the layout grid: photos look better wide and
              this is "your log", visually separated from the recipe
              content above. -->
-        {#if cooks.length > 0}
+        {#if madeCooks.length > 0}
           <section class="section cook-history-section">
             <h2 class="section-title">
               <span class="material-symbols-rounded section-icon">history</span>
               <span class="section-title-text">{$_('recipe.cook_history')}</span>
             </h2>
             <ul class="cook-list">
-              {#each cooks as c (c.id)}
+              {#each madeCooks as c (c.id)}
                 {@const photoList = (Array.isArray(c.photos) && c.photos.length > 0) ? c.photos : (c.photo_url ? [c.photo_url] : [])}
                 <li class="cook-entry">
                   {#if photoList.length > 0}
@@ -1773,6 +1845,8 @@
 </div>
 
 <HistorySheet bind:open={historyOpen} recipeId={recipe?.id} {history} conflicts={versions.length} on:conflicts={openConflicts} />
+
+<PlanCookDialog bind:open={planOpen} {recipe} on:planned={loadCooks} />
 
 <CookLogDialog
   bind:open={cookDialogOpen}
@@ -2345,6 +2419,45 @@
     gap: 6px;
   }
   .cook-btn .material-symbols-rounded { font-size: 18px; }
+  /* Narrow (a phone, or a narrow pane beside the sidebar): the three
+     actions as equal tiles, icon over label, rather than two on a row and
+     one alone under them. Keyed to this row's room, not the window's. */
+  .rating-row { container-type: inline-size; }
+  @container (max-width: 520px) {
+    .cook-actions-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      width: 100%;
+    }
+    .cook-actions-row .cook-btn {
+      flex-direction: column;
+      justify-content: center;
+      gap: 3px;
+      height: auto;
+      min-height: 58px;
+      padding: 8px 4px;
+      font-size: 12.5px;
+      line-height: 1.2;
+      text-align: center;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    .cook-actions-row .cook-btn .material-symbols-rounded { font-size: 20px; }
+  }
+  /* The next plan, under the buttons: tap for the Diary's week. */
+  .planned-line {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; margin-top: 10px; padding: 8px 10px; min-height: 40px;
+    background: var(--accent-dim); color: var(--text-1);
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    border-radius: var(--radius-sm);
+    font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+  }
+  .planned-line:hover { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+  .planned-line > .material-symbols-rounded { font-size: 18px; color: var(--accent); flex-shrink: 0; }
+  .planned-text { flex: 1; min-width: 0; }
+  .planned-more { color: var(--text-3); margin-left: 6px; white-space: nowrap; }
+  .planned-line .chev { color: var(--text-3); }
 
   /* ── Cook mode ────────────────────────────────────────────────────────── */
   /* The editor-header itself becomes the cook-mode banner: same height
@@ -3204,7 +3317,8 @@
     .step-check,
     .star-btn,
     .time-chip,
-    .cooked-actions,
+    .cook-actions-row,
+    .planned-line,
     .cook-list,
     .comments-section,
     .last-updated,

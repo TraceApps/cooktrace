@@ -98,6 +98,7 @@ test('every modal overlay in the app is registered', () => {
   const innerPanels = [
     ['components/ui/Sheet.svelte', 'sheet-panel'], ['components/ui/Dialog.svelte', 'dialog-box'],
     ['components/recipe/CookLogDialog.svelte', 'cl-box'], ['routes/Shopping.svelte', 'modal-clear'],
+    ['components/diary/PlanCookDialog.svelte', 'class="modal"'],
   ];
   const files = walk(new URL('../src/', import.meta.url).pathname).filter((f) => f.endsWith('.svelte'));
   const missing = [];

@@ -1076,6 +1076,7 @@ router.get('/:id/cooks', wrap((req, res) => {
 
   const rows = db.prepare(
     `SELECT cd.id, cd.date, cd.kind, cd.notes, cd.photo_url, cd.photos, cd.created_at, cd.rating, cd.meal_type, cd.recipe_rev,
+            cd.any_day, cd.servings,
             cd.user_id AS cooked_by_user_id,
             u.username AS cooked_by_username, u.full_name AS cooked_by_full_name
      FROM cook_diary cd
@@ -1140,18 +1141,34 @@ router.put('/:id/cooks/:cookId', wrap((req, res) => {
   const rating = req.body?.rating !== undefined
     ? (() => { const n = parseInt(req.body.rating, 10); return Number.isFinite(n) ? (Math.max(0, Math.min(5, n)) || null) : null; })()
     : existing.rating;
+  // A plan made into this cook: I Cooked This on a day it was planned
+  // (#61), as the Diary's Mark as Cooked does. Nothing else changes a kind.
+  const kind = existing.kind === 'planned' && req.body?.kind === 'cooked' ? 'cooked' : existing.kind;
   // Which version it was made from (#54): one of this recipe's.
   let recipeRev = existing.recipe_rev;
-  if (req.body?.recipe_rev !== undefined && existing.kind === 'cooked') {
+  if (req.body?.recipe_rev !== undefined && kind === 'cooked') {
     const want = _REV_RX.test(String(req.body.recipe_rev || ''))
       ? cookedVersion(id, req.body.recipe_rev, { version: req.body.recipe_version, u }) : null;
     if (want && !getRevision(id, want)) return res.status(400).json({ error: "That version isn't one of this recipe's." });
     if (want) recipeRev = want;
   }
 
-  saveRow('cook_diary', cookId, existing, { date, notes, photo_url: photoUrl, photos: photosJson, meal_type: mealType, rating, recipe_rev: recipeRev }, req.body?._sync);
+  // Cooked, it's no longer a plan for "any day" of its week; a plan made
+  // cooked without a version takes the recipe's current one (db.js).
+  const made = kind !== existing.kind;
+  saveRow('cook_diary', cookId, existing, {
+    date, notes, photo_url: photoUrl, photos: photosJson, meal_type: mealType, rating, recipe_rev: recipeRev,
+    ...(made ? { kind, any_day: 0 } : {}),
+  }, req.body?._sync);
 
   _recomputeCookAggregates(id);
+  if (made) {
+    try {
+      dispatchWebhookEvent(u, 'meal.cooked', {
+        date, recipe_id: id, recipe_name: recipe.name, kind: 'cooked', servings: existing.servings ?? null, rating, meal_type: mealType,
+      });
+    } catch (e) { /* never let a webhook failure block the save */ }
+  }
   res.json({ ok: true });
 }));
 // ── GET /:id/shares — list user grants on this recipe ────────────────

@@ -1502,7 +1502,8 @@
       "link_copied": "Enlace copiado",
       "share_unsupported": "Este navegador no puede compartir.",
       "diary_updated": "Entrada del diario actualizada",
-      "logged_cooked": "Registrada"
+      "logged_cooked": "Registrada",
+      "plan_cooked": "Registrada, y el plan está hecho"
     },
     "shared_chip": "Compartidos",
     "retry": "Reintentar",
@@ -3123,6 +3124,13 @@
     "start_cooking": "Empezar a cocinar",
     "logging": "Registrando…",
     "i_cooked_this": "La cociné",
+    "plan": "Planificar",
+    "planned_for": "Planificada: {when}",
+    "planned_today": "hoy",
+    "planned_tomorrow": "mañana",
+    "planned_week": "la semana del {date}",
+    "planned_more": "+{count} más",
+    "planned_open": "Abrir en el diario",
     "servings_count": "{count, plural, one {# porción} other {# porciones}}",
     "scale": "Escala",
     "mark_not_gathered": "Marcar como pendiente",

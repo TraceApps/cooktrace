@@ -14,6 +14,7 @@
   import { showError, showSuccess, showInfo } from '../stores/toast.js';
   import { pageBanners, bannerStyle, aiEnabled, aiKeyVerified, recipesSort, mixSharedIntoRecipes } from '../stores/settings.js';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
+  import PlanCookDialog from '../components/diary/PlanCookDialog.svelte';
   import ImportFromFileDialog from '../components/recipe/ImportFromFileDialog.svelte';
   import CookbookImportDialog from '../components/recipe/CookbookImportDialog.svelte';
   import ImportUrlDialog from '../components/recipe/ImportUrlDialog.svelte';
@@ -158,6 +159,8 @@
   // Share Link / public-link entries need a server to mint and host
   // the /r/<token> URL: hidden entirely in local-only Android mode.
   let cardSheetOpen = false;
+  let planOpen = false;
+  let planTarget = null;
   let cardSheetTarget = null;
   $: _canShareLink = !isNative || !!getServerUrl();
   $: cardActions = cardSheetTarget ? [
@@ -530,7 +533,8 @@
         recipes = recipes.map(x => x.id === r.id ? updated : x);
       } catch (err) { showError(failed('fail.favorite', err)); }
     }
-    else if (v === 'plan')     push(`/diary?plan=${r.id}`);
+    // Planned here, without leaving the list (#61).
+    else if (v === 'plan')     { planTarget = r; planOpen = true; }
     else if (v === 'shop') {
       try {
         const result = await NtApi.shopFromRecipe(r.id, { only_missing: true });
@@ -915,6 +919,7 @@
     {/if}
   </header>
 
+  <PlanCookDialog bind:open={planOpen} recipe={planTarget} />
   <ActionSheet
     bind:open={createSheetOpen}
     title={$_('recipes_ui.add_a_recipe')}

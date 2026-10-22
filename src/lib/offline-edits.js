@@ -423,6 +423,18 @@ export function answerWithOps(url, mirrored, ops) {
   if (path === '/api/recipes') {
     return _withQueued(mirrored, ops, { create: 'recipe-create', update: 'recipe-update', remove: 'recipe-delete', patches: ['recipe-allergens'] });
   }
+  // A recipe's cooks and plans, with the ones logged or planned for it
+  // while offline (its Cook History and "Planned for" line, #61).
+  const recipeCooks = path.match(/^\/api\/recipes\/(-?\d+)\/cooks$/);
+  if (recipeCooks) {
+    const id = Number(recipeCooks[1]);
+    const cookedHere = `/api/recipes/${id}/cooked`;
+    const forThis = (ops || [])
+      .filter(op => op.kind !== 'diary-create' || Number(op.body?.recipe_id) === id || pathOf(op.path) === cookedHere)
+      // "I Cooked This" sends no kind: it's a cook.
+      .map(op => (op.kind === 'diary-create' && pathOf(op.path) === cookedHere ? { ...op, body: { kind: 'cooked', recipe_id: id, ...op.body } } : op));
+    return _withQueued(mirrored, forThis, { create: 'diary-create', update: 'diary-update', remove: 'diary-delete' });
+  }
   const oneRecipe = path.match(/^\/api\/recipes\/(-?\d+)$/);
   if (oneRecipe && mirrored) {
     const id = Number(oneRecipe[1]);

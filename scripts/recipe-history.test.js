@@ -387,3 +387,22 @@ test("only someone who may change a recipe's history brings back a deleted versi
     assert.deepEqual((await s.ok('GET', `/api/recipes/${r.id}/revisions`)).revisions.map(v => v.number), [1, 2], "the owner's does");
   } finally { await s.stop(); }
 });
+
+test("a recipe's cooks say a plan's week and servings, and I Cooked This on a planned day makes the plan the cook (#61)", { skip, timeout: 60_000 }, async () => {
+  const s = await start();
+  try {
+    const r = await s.ok('POST', '/api/recipes', scones());
+    const plan = await s.ok('POST', '/api/cook-diary', { recipe_id: r.id, date: '2030-08-05', kind: 'planned', servings: 6, any_day: true });
+    let cooks = await s.ok('GET', `/api/recipes/${r.id}/cooks`);
+    assert.deepEqual(cooks.map(c => [c.kind, c.any_day, c.servings]), [['planned', 1, 6]]);
+    // The plan made into the cook: one row, cooked, with its servings and a version.
+    await s.ok('PUT', `/api/recipes/${r.id}/cooks/${plan.id}`, { kind: 'cooked', date: '2030-08-07', rating: 5, meal_type: 'dinner' });
+    cooks = await s.ok('GET', `/api/recipes/${r.id}/cooks`);
+    assert.deepEqual(cooks.map(c => [c.id, c.kind, c.date, c.any_day, c.servings, c.rating]), [[plan.id, 'cooked', '2030-08-07', 0, 6, 5]]);
+    assert.match(cooks[0].recipe_rev, /^v[0-9a-f]{14}$/, 'made from the current version');
+    assert.equal((await s.ok('GET', `/api/recipes/${r.id}`)).cook_count, 1);
+    // An edit never turns a cook back into a plan.
+    await s.ok('PUT', `/api/recipes/${r.id}/cooks/${plan.id}`, { kind: 'planned', notes: 'good' });
+    assert.equal((await s.ok('GET', `/api/recipes/${r.id}/cooks`))[0].kind, 'cooked');
+  } finally { await s.stop(); }
+});

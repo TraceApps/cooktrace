@@ -273,3 +273,18 @@ test("offline, a recipe's history shows the version its waiting saves make, as t
   const one = answerWithOps(`${path}/${v1.rev}`, kept.revisions[0], [op(1, 'PUT', `${path}/${v1.rev}`, { label: 'Base' })]);
   assert.equal(one.label, 'Base');
 });
+
+test("offline, a recipe's cooks show the cooks and plans queued for it (#61)", () => {
+  const plan = newTempId(), cooked = newTempId(), other = newTempId();
+  const kept = [{ id: 7, recipe_id: 4, kind: 'cooked', date: '2026-10-01' }, { id: 8, recipe_id: 4, kind: 'planned', date: '2026-10-30' }];
+  const ops = [
+    { ...made(1, 'diary-create', { recipe_id: 4, date: '2026-10-22', kind: 'planned', meal_type: 'lunch' }, plan), path: '/api/cook-diary', method: 'POST' },
+    { ...made(2, 'diary-create', { date: '2026-10-21', rating: 4 }, cooked), path: '/api/recipes/4/cooked', method: 'POST' },
+    { ...made(3, 'diary-create', { recipe_id: 9, date: '2026-10-22', kind: 'planned' }, other), path: '/api/cook-diary', method: 'POST' },
+    { ...op(4, 'DELETE', '/api/cook-diary/8'), key: 'diary:8' },
+  ];
+  const shown = answerWithOps('/api/recipes/4/cooks', kept, ops);
+  assert.deepEqual(shown.map(c => [c.id, c.kind, c.date]), [[7, 'cooked', '2026-10-01'], [plan, 'planned', '2026-10-22'], [cooked, 'cooked', '2026-10-21']]);
+  assert.ok(shown.slice(1).every(c => c._pending));
+  assert.equal(answerWithOps('/api/recipes/4/cooks', kept, []), kept, 'nothing waiting: as kept');
+});

@@ -7,16 +7,14 @@
   import { fade, slide } from 'svelte/transition';
   import { _, locale } from 'svelte-i18n';
   import { pageBanners, bannerStyle, household } from '../stores/settings.js';
-  import { cleanHousehold, homeOn, cardAllergens } from '../lib/allergens.js';
-  import AllergenChips from '../components/allergens/AllergenChips.svelte';
+  import { cleanHousehold } from '../lib/allergens.js';
   import { NtApi } from '../lib/api.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { confirmDialog } from '../stores/confirmDialog.js';
   import { localDateStr } from '../lib/db.js';
   import { relativeTime, shortDate } from '../lib/relative-time.js';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
-  import DateInput from '../components/ui/DateInput.svelte';
-  import ServingsStepper from '../components/ui/ServingsStepper.svelte';
+  import PlanCookDialog from '../components/diary/PlanCookDialog.svelte';
   import WeekView from '../components/diary/WeekView.svelte';
   import BuildWeekSheet from '../components/diary/BuildWeekSheet.svelte';
   import { usesUp, freeDays } from '../lib/plan-ideas.js';
@@ -37,7 +35,8 @@
   let weekAnchor = weekStartOf(new Date(), firstDay);
 
   // Recipe filter — when set, narrows list / month / photos views to a
-  // single recipe. Picker reuses the planRecipes list (loaded lazily).
+  // single recipe. Picker lists your recipes (loaded lazily).
+  let planRecipes = [];
   let filterRecipeId = null;
   let filterPickerOpen = false;
   let filterSearch = '';
@@ -423,17 +422,12 @@
     }
   }
 
-  // Add planned dialog state
+  // Plan a Cook (components/diary/PlanCookDialog.svelte): opens on a day,
+  // with a recipe already picked when one is given (a link here as
+  // /diary?plan=<id>).
   let planOpen = false;
-  let planDate = todayIso;
-  let planRecipeId = null;
-  let planMealType = null;  // 'breakfast' | 'lunch' | 'dinner' | 'snack' | null
-  let planServings = 2;     // how many to cook for: the list scales to it
-  let planServingsSet = false; // changed by hand: picking a recipe keeps it
-  let planAnyDay = false;   // for any day of the date's week
-  let planRecipes = [];     // user's recipes for the picker
-  let planSearch = '';
-  let planBusy = false;
+  let planDate = null;
+  let planPickId = null;
   $: PLAN_MEAL_TYPES = [
     { id: 'breakfast', label: $_('cookdiary_page.week.meal_breakfast'), icon: 'free_breakfast' },
     { id: 'lunch',     label: $_('cookdiary_page.week.meal_lunch'),     icon: 'lunch_dining'   },
@@ -450,77 +444,29 @@
     return m ? m.icon : 'restaurant';
   }
 
-  // Opens the dialog, with a recipe already picked when one is given (a
-  // recipe card's Plan a Cook links here as /diary?plan=<id>).
-  async function openPlan(recipeId = null, date = null) {
-    planOpen = true;
+  function openPlan(recipeId = null, date = null) {
+    planPickId = recipeId != null ? Number(recipeId) : null;
     planDate = date || todayIso;
-    planAnyDay = false;
-    planRecipeId = null;
-    planMealType = null;
-    planSearch = '';
-    planServingsSet = false;
-    planServings = 2;
-    if (planRecipes.length === 0) {
-      try {
-        const list = await NtApi.getRecipes();
-        planRecipes = list.slice().sort((a, b) =>
-          (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' })
-        );
-      }
-      catch { planRecipes = []; }
-    }
-    if (recipeId != null) pickPlanRecipe(Number(recipeId));
+    planOpen = true;
   }
-  // Who you cook for (Settings > Household): planned servings start at
-  // who's home that day (everyone, for any day of the week).
+  // Who you cook for (Settings > Household).
   $: householdMembers = cleanHousehold($household);
-  $: if (planOpen && !planServingsSet && householdMembers.length) {
-    planServings = Math.max(1, homeOn(householdMembers, planAnyDay ? null : planDate).length);
-  }
-  // Without a household, servings start at the recipe's own. Either way
-  // a change by hand stays.
-  function pickPlanRecipe(id) {
-    planRecipeId = id;
-    if (planServingsSet || householdMembers.length) return;
-    const r = planRecipes.find(x => x.id === id);
-    const n = Math.round(Number(r?.servings));
-    planServings = Number.isFinite(n) && n > 0 ? n : 2;
-  }
   onMount(() => {
-    const want = new URLSearchParams($querystring || '').get('plan');
-    if (want && /^\d+$/.test(want)) {
-      openPlan(want);
-      replace('/diary'); // so Back and a reload don't open it again
+    const q = new URLSearchParams($querystring || '');
+    const want = q.get('plan');
+    // A week to open on (a recipe's "Planned for" line links here).
+    const week = q.get('week');
+    if (week && /^\d{4}-\d{2}-\d{2}$/.test(week)) {
+      view = 'week';
+      weekAnchor = weekStartOf(fromIso(week), firstDay);
     }
+    if (want && /^\d+$/.test(want)) openPlan(want);
+    if (want || week) replace('/diary'); // so Back and a reload don't open it again
   });
-  $: filteredPlanRecipes = planSearch.trim()
-    ? planRecipes.filter(r => foldText(r.name).includes(foldText(planSearch).trim()))
-    : planRecipes;
-
-  async function savePlan() {
-    if (!planRecipeId) { showError($_('cookdiary_page.toast.pick_recipe')); return; }
-    planBusy = true;
-    try {
-      // Any day of the week: dated the week's first day.
-      await NtApi.createDiaryEntry({
-        recipe_id: planRecipeId,
-        date: planAnyDay ? isoDay(weekStartOf(fromIso(planDate), firstDay)) : planDate,
-        kind: 'planned',
-        meal_type: planMealType || null,
-        servings: planServings,
-        any_day: planAnyDay,
-      });
-      showSuccess($_('cookdiary_page.toast.planned'));
-      planOpen = false;
-      await load();
-      loadStats();
-      loadHeatmap();
-    } catch (e) {
-      showError(failed('fail.plan_cook', e));
-    } finally {
-      planBusy = false;
-    }
+  async function onPlanned() {
+    await load();
+    loadStats();
+    loadHeatmap();
   }
 
   async function markPlannedAsCooked(entry) {
@@ -961,75 +907,7 @@
 />
 
 <!-- Plan-a-cook dialog -->
-{#if planOpen}
-  <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-  <div class="modal-backdrop" on:click|self={() => planOpen = false} use:closeOnBack={() => planOpen = false} transition:fade={{ duration: 160 }}>
-    <div class="modal" on:click|stopPropagation>
-      <header class="modal-header">
-        <h2>{$_('cookdiary_page.plan_a_cook')}</h2>
-        <button class="btn-icon" on:click={() => planOpen = false} aria-label={$_('common.close')}><span class="material-symbols-rounded">close</span></button>
-      </header>
-      <div class="modal-body">
-        <label class="field">
-          <span class="field-label">{$_('cookdiary_page.date')}</span>
-          <DateInput bind:value={planDate} />
-        </label>
-        <button type="button" class="plan-meal-chip any-day-toggle" class:active={planAnyDay}
-          aria-pressed={planAnyDay} on:click={() => planAnyDay = !planAnyDay}>
-          <span class="material-symbols-rounded">{planAnyDay ? 'check' : 'inbox'}</span>
-          {$_('cookdiary_page.week.any_day_toggle')}
-        </button>
-        <div class="field">
-          <span class="field-label">{$_('cookdiary_page.meal')} <span class="field-hint">{$_('cookdiary_page.optional')}</span></span>
-          <div class="plan-meal-chips" role="radiogroup" aria-label={$_('cook_diary_ui.meal_type')}>
-            {#each PLAN_MEAL_TYPES as m}
-              <button type="button"
-                class="plan-meal-chip" class:active={planMealType === m.id}
-                aria-pressed={planMealType === m.id}
-                on:click={() => planMealType = (planMealType === m.id ? null : m.id)}>
-                <span class="material-symbols-rounded">{m.icon}</span>
-                {m.label}
-              </button>
-            {/each}
-          </div>
-        </div>
-        <div class="field plan-servings">
-          <span class="field-label">{$_('cookdiary_page.servings')}</span>
-          <ServingsStepper bind:value={planServings} label={$_('cookdiary_page.servings')}
-            on:change={() => planServingsSet = true} />
-        </div>
-        <label class="field">
-          <span class="field-label">{$_('cookdiary_page.recipe')}</span>
-          <input class="input" type="search" placeholder={$_('cook_diary_ui.search')} bind:value={planSearch} />
-        </label>
-        <div class="recipe-picker">
-          {#each filteredPlanRecipes as r (r.id)}
-            <button class="recipe-row" class:active={planRecipeId === r.id} on:click={() => pickPlanRecipe(r.id)}>
-              {#if r.imgUrl}
-                <img src={r.imgUrl} alt="" loading="lazy" />
-              {:else}
-                <span class="material-symbols-rounded">restaurant</span>
-              {/if}
-              <span class="recipe-text">
-                <span class="recipe-name" dir="auto">{r.name}</span>
-                {#if householdMembers.length}<AllergenChips summary={cardAllergens(r)} recipe={r} members={householdMembers} date={planAnyDay ? '' : planDate} />{/if}
-              </span>
-              {#if planRecipeId === r.id}<span class="material-symbols-rounded check">check</span>{/if}
-            </button>
-          {:else}
-            <p class="empty-line">{$_('cook_diary_ui.no_recipes_match')}</p>
-          {/each}
-        </div>
-      </div>
-      <footer class="modal-footer">
-        <button class="btn btn-secondary" on:click={() => planOpen = false}>{$_('cookdiary_page.cancel')}</button>
-        <button class="btn btn-primary" on:click={savePlan} disabled={planBusy}>
-          {planBusy ? $_('cookdiary_page.saving') : $_('cookdiary_page.plan_it')}
-        </button>
-      </footer>
-    </div>
-  </div>
-{/if}
+<PlanCookDialog bind:open={planOpen} pickId={planPickId} date={planDate} on:planned={onPlanned} />
 
 <!-- Filter picker — pick a single recipe to scope all 3 views. -->
 {#if filterPickerOpen}
@@ -1329,7 +1207,6 @@
     font: inherit; color: inherit;
   }
   .week-rel { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
-  .any-day-toggle { align-self: flex-start; }
   .month-label { font-size: 14px; font-weight: 600; color: var(--text-1); min-width: 130px; text-align: center; }
   .btn-icon {
     background: transparent; border: none; cursor: pointer;
@@ -1546,39 +1423,6 @@
     border: 1px dashed color-mix(in srgb, var(--accent) 50%, transparent);
   }
   .cell-pill:hover { filter: brightness(1.1); }
-
-  /* Plan dialog meal-type chip row — same look as the CookLogDialog
-     so the planner + log experience match. */
-  .plan-meal-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  /* Servings: the label on the left, the stepper on the right. */
-  .field.plan-servings {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-  }
-  .plan-meal-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 10px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-full, 99px);
-    color: var(--text-2);
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background var(--dur-fast), color var(--dur-fast), border-color var(--dur-fast);
-  }
-  .plan-meal-chip:hover { color: var(--text-1); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
-  .plan-meal-chip.active {
-    background: var(--accent-dim);
-    color: var(--accent);
-    border-color: var(--accent);
-  }
-  .plan-meal-chip .material-symbols-rounded { font-size: 14px; }
-  .field-hint { font-weight: 400; color: var(--text-3); font-size: 12px; }
 
   /* Plan modal */
   .modal-backdrop {

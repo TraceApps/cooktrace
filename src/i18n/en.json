@@ -1450,7 +1450,8 @@
       "link_copied":             "Link copied",
       "share_unsupported":       "This browser can't share.",
       "diary_updated":           "Diary entry updated",
-      "logged_cooked":           "Cook logged"
+      "logged_cooked":           "Cook logged",
+      "plan_cooked": "Cook logged, and the plan is done"
     },
     "shared_chip":               "Shared",
     "retry":                     "Retry",
@@ -3082,6 +3083,13 @@
     "start_cooking": "Start Cooking",
     "logging": "Logging…",
     "i_cooked_this": "I Cooked This",
+    "plan": "Plan",
+    "planned_for": "Planned for {when}",
+    "planned_today": "today",
+    "planned_tomorrow": "tomorrow",
+    "planned_week": "the week of {date}",
+    "planned_more": "+{count} more",
+    "planned_open": "Open in the Diary",
     "servings_count": "{count, plural, one {# Serving} other {# Servings}}",
     "scale": "Scale",
     "mark_not_gathered": "Mark as not gathered",
