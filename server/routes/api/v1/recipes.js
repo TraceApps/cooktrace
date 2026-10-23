@@ -41,6 +41,7 @@ import db from '../../../db.js';
 import { wrap } from '../../../logger.js';
 import { requireScope } from '../../../middleware/bearer-auth.js';
 import { foldText } from '../../../lib/search-text.js';
+import { parseQty, servingRatio } from '../../../lib/quantity.js';
 
 const router = Router();
 
@@ -66,27 +67,6 @@ function _absImg(req, u) {
   const origin = _selfOrigin(req);
   if (!origin) return s;
   return origin + (s.startsWith('/') ? '' : '/') + s;
-}
-
-// Parse CT ingredient qty strings: '2', '1/2', '1 1/2', '0.75', 'to taste'.
-// Returns a positive Number or null. Whole-plus-fraction and pure fraction
-// forms both handled since CT stores freeform text.
-function _parseQty(s) {
-  if (s == null) return null;
-  const t = String(s).trim();
-  if (!t) return null;
-  const mMixed = t.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/);
-  if (mMixed) {
-    const n = Number(mMixed[1]) + Number(mMixed[2]) / Number(mMixed[3]);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  }
-  const mFrac = t.match(/^(\d+)\s*\/\s*(\d+)$/);
-  if (mFrac) {
-    const n = Number(mFrac[1]) / Number(mFrac[2]);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  }
-  const n = Number(t.replace(',', '.'));
-  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 function _uidFor(req) {
@@ -186,7 +166,7 @@ router.get('/:id', wrap((req, res) => {
   if (pantryIds.size) {
     const placeholders = Array.from(pantryIds).map(() => '?').join(',');
     const rows = db.prepare(
-      `SELECT id, name, brand, serving_size, serving_unit, nutrition, barcode, img_url,
+      `SELECT id, name, brand, serving_size, serving_unit, g_per_cup, nutrition, barcode, img_url,
               generic_parent_id, nutrition_source_variant_id
          FROM pantry_items
         WHERE id IN (${placeholders}) AND ${_whereUser(u)} AND deleted_at IS NULL`
@@ -205,7 +185,7 @@ router.get('/:id', wrap((req, res) => {
     if (variantIds.length) {
       const p2 = variantIds.map(() => '?').join(',');
       const more = db.prepare(
-        `SELECT id, name, brand, serving_size, serving_unit, nutrition, barcode, img_url,
+        `SELECT id, name, brand, serving_size, serving_unit, g_per_cup, nutrition, barcode, img_url,
                 generic_parent_id, nutrition_source_variant_id
            FROM pantry_items
           WHERE id IN (${p2}) AND ${_whereUser(u)} AND deleted_at IS NULL`
@@ -303,7 +283,7 @@ router.get('/:id', wrap((req, res) => {
   const pantryByName = new Map();
   try {
     const nameRows = db.prepare(
-      `SELECT id, name, brand, serving_size, serving_unit, nutrition, barcode, img_url,
+      `SELECT id, name, brand, serving_size, serving_unit, g_per_cup, nutrition, barcode, img_url,
               generic_parent_id, nutrition_source_variant_id
          FROM pantry_items
         WHERE ${_whereUser(u)} AND deleted_at IS NULL`
@@ -344,7 +324,9 @@ router.get('/:id', wrap((req, res) => {
       // variant follow-up. Nutrition falls through if the linked row
       // already has its own nutrition (sourceId will be null).
       const nutritionRow = pantry ? _resolveNutritionSource(pantry.id) : null;
-      const parsedQty = _parseQty(rawQty);
+      // The same reading as the recipe totals: "½", "1 1/2", "0,5" (#296).
+      const q = parseQty(rawQty);
+      const parsedQty = q > 0 ? q : null;
       const unit = rawUnit || pantry?.serving_unit || '';
 
       const item = {
@@ -376,7 +358,31 @@ router.get('/:id', wrap((req, res) => {
           // partial nutrition (e.g. Honey with just carbs + sugars) do
           // not ship as 0 kcal to NT even when the caloric value is
           // trivially derivable.
-          item.nutrition = _deriveCalories(raw);
+          // Pantry nutrition is per the item's own serving (usually
+          // 100 g). Scale it to the recipe amount with the same ratio
+          // CT's recipe totals use, and say which serving it was. An
+          // amount that can't be converted ("a pinch" against 100 g)
+          // ships unscaled with scaled: false rather than a guess.
+          // TraceApps/nutritrace#296.
+          const n = _deriveCalories(raw);
+          const size = Number(nutritionSrc.serving_size);
+          if (Number.isFinite(size) && size > 0 && nutritionSrc.serving_unit) {
+            item.basis = { amount: size, unit: String(nutritionSrc.serving_unit).slice(0, 16) };
+          }
+          const ratio = item.basis && parsedQty
+            ? servingRatio(parsedQty, rawUnit, nutritionSrc) : null;
+          if (Number.isFinite(ratio) && ratio > 0) {
+            item.nutrition = Object.fromEntries(Object.entries(n).map(([k, v]) => {
+              const num = typeof v === 'string' && v.trim() ? Number(v) : v;
+              return [k, typeof num === 'number' && Number.isFinite(num) ? Math.round(num * ratio * 100) / 100 : v];
+            }));
+            item.scaled = true;
+          } else {
+            item.nutrition = n;
+            item.scaled = false;
+            // The amount as written, for NutriTrace to say what wasn't converted.
+            item.amount_text = `${rawQty} ${rawUnit}`.trim().slice(0, 60);
+          }
         }
       }
       items.push(item);

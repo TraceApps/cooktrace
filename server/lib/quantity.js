@@ -264,6 +264,17 @@ export function convertQty(qty, fromUnit, toUnit, gPerCup) {
 }
 
 /**
+ * How many servings of a pantry item an amount is: 200 g against a 100 g
+ * serving is 2. Null when the amount can't be converted to the serving's
+ * unit (a pinch against 100 g); NaN or 0 when the serving size is bad.
+ */
+export function servingRatio(qty, unit, serving) {
+  const converted = convertQty(qty, unit, serving?.serving_unit, serving?.g_per_cup);
+  if (converted == null) return null;
+  return converted / Number(serving.serving_size);
+}
+
+/**
  * Where amounts of one ingredient can be added up: volume with volume,
  * weight with weight, a count unit only with itself, and no unit with no
  * unit. Amounts with different keys stay apart.

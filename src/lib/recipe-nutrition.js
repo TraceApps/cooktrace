@@ -13,7 +13,7 @@
  *   - "Count" units (pc, clove, slice, etc.) only line up when both
  *     recipe and pantry use the same count unit.
  */
-import { parseQty, unitFamily, convertWithinFamily, convertQty } from './quantity.js';
+import { parseQty, unitFamily, convertWithinFamily, convertQty, servingRatio } from './quantity.js';
 
 // Units and conversions live in quantity.js (shared with the server).
 export { unitFamily, convertWithinFamily, convertQty };
@@ -540,15 +540,14 @@ export function computeRecipeNutrition(ingredients, pantryById) {
       // the pantry row has a g_per_cup. Falling back is silent — the
       // caller doesn't need to know which path was used, only whether
       // the ingredient ended up contributing.
-      const converted = convertQty(qtyNum, it.unit, pantry.serving_unit, pantry.g_per_cup);
-      if (converted == null) {
+      const ratio = servingRatio(qtyNum, it.unit, pantry);
+      if (ratio == null) {
         const reason = (it.unit && pantry.serving_unit && unitFamily(it.unit) !== unitFamily(pantry.serving_unit) && !pantry.g_per_cup)
           ? `unit mismatch — set density on "${it.name}" to enable cross-family conversion`
           : `unit mismatch (${it.unit || '—'} vs ${pantry.serving_unit})`;
         skipped.push({ name: it.name, reason });
         continue;
       }
-      const ratio = converted / Number(pantry.serving_size);
       if (!Number.isFinite(ratio) || ratio <= 0) {
         skipped.push({ name: it.name, reason: 'serving size invalid' });
         continue;
