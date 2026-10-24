@@ -19,8 +19,8 @@
   import Combobox from '../components/ui/Combobox.svelte';
   import IngredientNameField from '../components/recipe/IngredientNameField.svelte';
   import ActionSheet from '../components/ui/ActionSheet.svelte';
-  import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS } from '../lib/nutriments.js';
-  import { visibleNutriments } from '../stores/settings.js';
+  import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS, asCustomNutriments } from '../lib/nutriments.js';
+  import { visibleNutriments, customNutriments } from '../stores/settings.js';
   import { computeRecipeNutrition } from '../lib/recipe-nutrition.js';
   import { confirmDialog } from '../stores/confirmDialog.js';
   import { parseQty, formatQty } from '../lib/qty.js';
@@ -295,7 +295,7 @@
   );
   // Show full catalog when the panel is "expanded all" — defer for now,
   // visibleNutriments is the single knob.
-  $: editableNutriments = NUTRIMENTS.filter(n => visibleNutSet.has(n.id));
+  $: editableNutriments = [...NUTRIMENTS.filter(n => visibleNutSet.has(n.id)), ...asCustomNutriments($customNutriments)];
   // Nutrient labels by id, reactive to the locale.
   $: nutLabel = (nut) => $_(`nutriments.${nut.id}`, { default: nut.label });
 

@@ -9,6 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Custom nutrients, the same as in NutriTrace.** Settings > Nutrition has Add custom nutrient (a name and a unit) for anything not on a label, such as Omega-3. It gets a field in the pantry item editor, the item's All Nutrients list and the recipe editor, a row on the Nutrition Facts box, and recipe totals from linked pantry items add it up. The list follows your account to your other devices.
 - **More label nutrients** (from [NutriTrace #281](https://github.com/TraceApps/nutritrace/issues/281)). Starch, Selenium, Copper, Manganese, Choline, Iodine and Pantothenic Acid (B5) are built in, in Nutrition Facts order, and the vitamins and minerals now follow that order. Open Food Facts and USDA fill them in, along with the other vitamins and minerals Open Food Facts carries, and the label scanner and AI agents can set them too.
 
 ### Fixed

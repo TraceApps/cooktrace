@@ -22,11 +22,11 @@
   import Combobox from '../components/ui/Combobox.svelte';
   import DateInput from '../components/ui/DateInput.svelte';
   import { PANTRY_CATEGORIES, categoryLabel } from '../lib/pantry-categories.js';
-  import { NUTRIMENTS, isDerived, deriveSodiumSalt } from '../lib/nutriments.js';
+  import { NUTRIMENTS, isDerived, deriveSodiumSalt, asCustomNutriments } from '../lib/nutriments.js';
   import { lookupCommonDensity } from '../lib/recipe-nutrition.js';
   import { lookupBarcode, contributeToOFF, offShareMessage } from '../lib/off.js';
   import OffAccountInline from '../components/pantry/OffAccountInline.svelte';
-  import { offEnabled, offUsername, offPassword, offUploadCountry } from '../stores/settings.js';
+  import { offEnabled, customNutriments, offUsername, offPassword, offUploadCountry } from '../stores/settings.js';
   import { DB } from '../lib/db.js';
   import { isNative } from '../lib/platform.js';
 
@@ -53,9 +53,11 @@
   let categoryNewIcon = 'kitchen';
 
   // Curated subset shown by default — matches NT's "core 12" pattern.
-  $: visibleNutriments = showAllNutrients
-    ? NUTRIMENTS
-    : NUTRIMENTS.filter(n => n.default).slice(0, 12);
+  // Custom nutrients are always listed: the user added them to fill them in.
+  $: visibleNutriments = [
+    ...(showAllNutrients ? NUTRIMENTS : NUTRIMENTS.filter(n => n.default).slice(0, 12)),
+    ...asCustomNutriments($customNutriments),
+  ];
 
   function _blank() {
     return {

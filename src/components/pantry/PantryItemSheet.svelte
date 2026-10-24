@@ -46,7 +46,7 @@
   import { confirmDialog } from '../../stores/confirmDialog.js';
   import NutritionFactsBox from '../recipe/NutritionFactsBox.svelte';
   import { categoryLabel, categoryIcon } from '../../lib/pantry-categories.js';
-  import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS, isDerived, deriveSodiumSalt } from '../../lib/nutriments.js';
+  import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS, isDerived, deriveSodiumSalt, asCustomNutriments } from '../../lib/nutriments.js';
   import { lookupBarcode, contributeToOFF, offShareMessage } from '../../lib/off.js';
   import OffAccountInline from './OffAccountInline.svelte';
   import { displayVariantName as _sharedDisplayVariantName, isItemInStock, stockAfterToggle, stockAfterStep } from '../../lib/pantry-variants.js';
@@ -54,7 +54,7 @@
   import { foldText } from '../../lib/search-text.js';
   import { lookupForRefresh as usdaLookupForRefresh, usdaFdcId } from '../../lib/usda.js';
   import { offlineState } from '../../lib/offline-api.js';
-  import { visibleNutriments, offEnabled, usdaEnabled, usdaApiKey, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks } from '../../stores/settings.js';
+  import { visibleNutriments, customNutriments, offEnabled, usdaEnabled, usdaApiKey, offUsername, offPassword, offUploadCountry, aiEffectivelyEnabled, envLocks } from '../../stores/settings.js';
   import { scanNutritionLabel } from '../../lib/scan-nutrition.js';
   import PantryAllergens from './PantryAllergens.svelte';
   import { household } from '../../stores/settings.js';
@@ -352,9 +352,10 @@
   $: visibleIds = $visibleNutriments && $visibleNutriments.length
     ? $visibleNutriments
     : DEFAULT_VISIBLE_NUTRIMENT_IDS;
-  $: visibleInlineNutriments = visibleIds
-    .map(id => NUTRIMENTS.find(n => n.id === id))
-    .filter(Boolean);
+  $: visibleInlineNutriments = [
+    ...visibleIds.map(id => NUTRIMENTS.find(n => n.id === id)).filter(Boolean),
+    ...asCustomNutriments($customNutriments),
+  ];
 
   // ── Categories ─────────────────────────────────────────────────────
   async function _loadPantryCategories() {
@@ -1695,7 +1696,7 @@
       {$_('pantry_item_sheet_ui.all_nutrients_hint')}
     </p>
     <div class="all-nutrients-grid">
-      {#each NUTRIMENTS as n}
+      {#each [...NUTRIMENTS, ...asCustomNutriments($customNutriments)] as n}
         <label class="nutrient-row">
           <span class="nutrient-name">
             {n.label}

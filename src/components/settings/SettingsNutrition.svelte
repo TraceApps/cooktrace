@@ -1,7 +1,8 @@
 <script>
   import { _ } from 'svelte-i18n';
-  import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS } from '../../lib/nutriments.js';
-  import { visibleNutriments } from '../../stores/settings.js';
+  import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS, CUSTOM_NUTRIENT_UNITS, customNutrientId } from '../../lib/nutriments.js';
+  import { visibleNutriments, customNutriments } from '../../stores/settings.js';
+  import Sheet from '../ui/Sheet.svelte';
 
   // Effective set: user choice if any, else NT-style defaults.
   $: effectiveSet = new Set(
@@ -21,6 +22,25 @@
   }
   function showAll() {
     visibleNutriments.set(NUTRIMENTS.map(n => n.id));
+  }
+
+  // ── Custom nutrients (same flow as NutriTrace: a name and a unit) ──────
+  let sheetOpen = false;
+  let newLabel = '';
+  let newUnit = 'g';
+
+  function addCustom() {
+    const label = newLabel.trim();
+    if (!label) return;
+    const id = customNutrientId(label);
+    const list = $customNutriments || [];
+    if (!list.some(n => n.id === id)) customNutriments.set([...list, { id, label, unit: newUnit }]);
+    newLabel = '';
+    newUnit = 'g';
+    sheetOpen = false;
+  }
+  function removeCustom(id) {
+    customNutriments.set(($customNutriments || []).filter(n => n.id !== id));
   }
 
   // Group for the UI.
@@ -67,7 +87,47 @@
       </div>
     </div>
   {/each}
+
+  <div class="nut-group">
+    <p class="nut-group-label">{$_('settings_nutrition_ui.custom_heading')}</p>
+    <p class="setting-desc custom-desc">{$_('settings_nutrition_ui.custom_desc')}</p>
+    {#each ($customNutriments || []) as cn (cn.id)}
+      <div class="custom-row">
+        <span class="nut-name">{cn.label}</span>
+        <span class="nut-unit">{cn.unit}</span>
+        <button type="button" class="custom-remove" title={$_('settings_nutrition_ui.custom_remove')}
+          aria-label={$_('settings_nutrition_ui.custom_remove')} on:click={() => removeCustom(cn.id)}>
+          <span class="material-symbols-rounded">delete</span>
+        </button>
+      </div>
+    {:else}
+      <p class="setting-desc">{$_('settings_nutrition_ui.custom_empty')}</p>
+    {/each}
+    <button type="button" class="seg custom-add" on:click={() => sheetOpen = true}>
+      <span class="material-symbols-rounded">add</span>
+      {$_('settings_nutrition_ui.custom_add')}
+    </button>
+  </div>
 </div>
+
+<Sheet bind:open={sheetOpen} title={$_('settings_nutrition_ui.custom_sheet_title')}>
+  <div class="custom-form">
+    <label class="custom-field">
+      <span class="setting-label">{$_('settings_nutrition_ui.custom_name')}</span>
+      <input class="input" placeholder={$_('settings_nutrition_ui.custom_name_placeholder')} bind:value={newLabel}
+        on:keydown={(e) => e.key === 'Enter' && addCustom()} />
+    </label>
+    <label class="custom-field">
+      <span class="setting-label">{$_('settings_nutrition_ui.custom_unit')}</span>
+      <select class="input" bind:value={newUnit}>
+        {#each CUSTOM_NUTRIENT_UNITS as u}<option value={u}>{u}</option>{/each}
+      </select>
+    </label>
+    <button type="button" class="btn btn-primary" disabled={!newLabel.trim()} on:click={addCustom}>
+      {$_('settings_nutrition_ui.custom_confirm')}
+    </button>
+  </div>
+</Sheet>
 
 <style>
   .setting-card {
@@ -127,6 +187,22 @@
   .nut-check input { width: 16px; height: 16px; accent-color: var(--accent); }
   .nut-name { flex: 1; color: var(--text-1); }
   .nut-check.checked .nut-name { color: var(--accent); font-weight: 600; }
+  .custom-desc { margin: 0 0 8px; }
+  .custom-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: var(--radius-sm); font-size: 13px;
+  }
+  .custom-row:hover { background: var(--surface-2); }
+  .custom-remove {
+    background: none; border: 0; cursor: pointer; color: var(--danger);
+    width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-sm);
+  }
+  .custom-remove .material-symbols-rounded { font-size: 18px; }
+  .custom-add { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; }
+  .custom-add .material-symbols-rounded { font-size: 18px; }
+  .custom-form { display: flex; flex-direction: column; gap: 16px; padding-top: 8px; }
+  .custom-field { display: flex; flex-direction: column; gap: 6px; }
   .nut-unit {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 11px;

@@ -151,6 +151,36 @@ export function deriveSodiumSalt(nutrition) {
   return nutrition;
 }
 
+// ── Custom nutrients ────────────────────────────────────────────────────
+// Nutrients the user adds in Settings > Nutrition for anything the built-in
+// list lacks (Omega-3, say). Same shape and ids as NutriTrace's
+// `customNutriments`: { id: 'custom_<name>', label, unit }. A custom nutrient
+// is stored on a pantry item or recipe like any other key, so totals, sync
+// and backups carry it with no extra work.
+export const CUSTOM_NUTRIENT_UNITS = ['g', 'mg', 'mcg', 'IU', 'kcal', 'kJ', '%'];
+
+/** The id a custom nutrient gets from its name ("Omega 3" is custom_omega_3). */
+export function customNutrientId(label) {
+  return 'custom_' + String(label || '').trim().toLowerCase().replace(/\s+/g, '_');
+}
+
+/** The saved list as catalog rows: always shown, never part of the FDA label's
+ *  macro block, no %DV. Rows without an id, a name or a unit are dropped. */
+export function asCustomNutriments(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter(c => c && typeof c.id === 'string' && c.id && typeof c.label === 'string' && c.label.trim())
+    .map(c => ({
+      id: c.id, label: c.label, unit: c.unit || '', category: 'custom',
+      default: false, bold: false, dv: null, fdaBlock: 'micros', custom: true,
+    }));
+}
+
+/** The built-in catalog followed by the user's custom nutrients. */
+export function allNutriments(custom) {
+  return [...NUTRIMENTS, ...asCustomNutriments(custom)];
+}
+
 /** True if the given nutriment id was auto-derived on the saved object. */
 export function isDerived(nutrition, id) {
   return !!(nutrition && nutrition._derived && nutrition._derived[id]);

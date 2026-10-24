@@ -34,11 +34,11 @@
    */
   import { _ } from 'svelte-i18n';
   import {
-    NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS,
+    NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS, allNutriments,
     dvPercent, isDerived,
     displayEnergy, energyUnitSuffix,
   } from '../../lib/nutriments.js';
-  import { visibleNutriments, energyUnit } from '../../stores/settings.js';
+  import { visibleNutriments, customNutriments, energyUnit } from '../../stores/settings.js';
 
   export let nutrition = {};
   export let servings = null;
@@ -66,8 +66,9 @@
 
   // Filter to nutriments that have a value present AND (are user-visible
   // OR forceShowAll is on).
-  $: rows = NUTRIMENTS.filter(n => {
-    if (!forceShowAll && !visibleSet.has(n.id)) return false;
+  // Custom nutrients are always eligible: the user added them to see them.
+  $: rows = allNutriments($customNutriments).filter(n => {
+    if (!forceShowAll && !n.custom && !visibleSet.has(n.id)) return false;
     const v = nutrition?.[n.id];
     return v != null && v !== '' && Number(v) >= 0 &&
       // Only include zero-valued rows for the canonical FDA-required

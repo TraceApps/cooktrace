@@ -30,6 +30,7 @@ export const USER_PREFS = new Set([
   // servings follow it.
   'household',
   'visibleNutriments',         // string[] of nutriment ids shown in the FDA box
+  'customNutriments',          // { id, label, unit }[] the user added (same as NutriTrace)
   'customUnits',               // string[] of user-defined unit abbreviations
   // NutriTrace federation (Phase 2)
   'ntInstanceUrl','ntInstanceToken','ntFederationEnabled','ntConnectionVerified',
@@ -445,6 +446,7 @@ export const household         = createSettingStore('household',         []);
 // new defaults later without users who never customized losing them.
 export const visibleNutriments = createSettingStore('visibleNutriments', null);
 export const customUnits       = createSettingStore('customUnits',       []);
+export const customNutriments  = createSettingStore('customNutriments',  []);
 
 // NutriTrace federation (used in Phase 2)
 export const ntInstanceUrl       = createSettingStore('ntInstanceUrl',       '');

@@ -3693,7 +3693,17 @@
     "cat_mineral": "Minerals",
     "cat_vitamin": "Vitamins",
     "cat_other": "Other",
-    "visibility_desc": "Pick which nutrients show up in the Nutrition Facts box on every recipe. Hidden nutrients can still be entered in the editor but won't display."
+    "visibility_desc": "Pick which nutrients show up in the Nutrition Facts box on every recipe. Hidden nutrients can still be entered in the editor but won't display.",
+    "custom_heading": "Custom Nutrients",
+    "custom_desc": "Track nutrients not covered by the built-in list (e.g. Omega-3). They show up wherever you enter nutrition and on the Nutrition Facts box.",
+    "custom_empty": "No custom nutrients",
+    "custom_add": "Add custom nutrient",
+    "custom_sheet_title": "Add Custom Nutrient",
+    "custom_name": "Nutrient Name",
+    "custom_name_placeholder": "e.g. Omega-3",
+    "custom_unit": "Unit",
+    "custom_confirm": "Add Nutrient",
+    "custom_remove": "Remove nutrient"
   },
   "settings_trace_ui": {
     "model_custom": "Custom",
