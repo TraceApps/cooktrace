@@ -2506,6 +2506,13 @@
     "magnesium": "Magnesium",
     "zinc": "Zinc",
     "phosphorus": "Phosphorus",
+    "starch": "Starch",
+    "b5": "Pantothenic Acid (B5)",
+    "iodine": "Iodine",
+    "selenium": "Selenium",
+    "copper": "Copper",
+    "manganese": "Manganese",
+    "choline": "Choline",
     "caffeine": "Caffeine",
     "alcohol": "Alcohol"
   },

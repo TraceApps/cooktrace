@@ -52,32 +52,40 @@ export const NUTRIMENTS = [
   { id: 'fiber',               label: 'Dietary Fiber',       unit: 'g',    category: 'macro',   default: true,  bold: false, dv: 28,   subOf: 'carbohydrates', fdaBlock: 'macros' },
   { id: 'sugars',              label: 'Total Sugars',        unit: 'g',    category: 'macro',   default: true,  bold: false, dv: null, subOf: 'carbohydrates', fdaBlock: 'macros' },
   { id: 'added-sugars',        label: 'Added Sugars',        unit: 'g',    category: 'macro',   default: true,  bold: false, dv: 50,   subOf: 'sugars',        fdaBlock: 'macros' },
+  { id: 'starch',              label: 'Starch',              unit: 'g',    category: 'macro',   default: false, bold: false, dv: null, subOf: 'carbohydrates', fdaBlock: 'macros' },
 
   // Protein
   { id: 'proteins',            label: 'Protein',             unit: 'g',    category: 'macro',   default: true,  bold: true,  dv: 50,   fdaBlock: 'macros' },
 
-  // Vitamins & minerals (Nutrition-Facts label order: D, Ca, Fe, K)
-  { id: 'vitamin-d',           label: 'Vitamin D',           unit: 'mcg',   category: 'vitamin', default: false, bold: false, dv: 20,   fdaBlock: 'micros' },
-  { id: 'calcium',             label: 'Calcium',             unit: 'mg',   category: 'mineral', default: false, bold: false, dv: 1300, fdaBlock: 'micros' },
-  { id: 'iron',                label: 'Iron',                unit: 'mg',   category: 'mineral', default: false, bold: false, dv: 18,   fdaBlock: 'micros' },
-  { id: 'potassium',           label: 'Potassium',           unit: 'mg',   category: 'mineral', default: false, bold: false, dv: 4700, fdaBlock: 'micros' },
+  // Vitamins & minerals, in the order 21 CFR 101.9 prints them: the four
+  // required rows first (D, calcium, iron, potassium), then the voluntary
+  // ones in the order of the regulation's list. A nutrient the US label
+  // lacks follows the EU label instead (starch, a voluntary row under carbs).
+  { id: 'vitamin-d',           label: 'Vitamin D',           unit: 'mcg', category: 'vitamin', default: false, bold: false, dv: 20,   fdaBlock: 'micros' },
+  { id: 'calcium',             label: 'Calcium',             unit: 'mg',  category: 'mineral', default: false, bold: false, dv: 1300, fdaBlock: 'micros' },
+  { id: 'iron',                label: 'Iron',                unit: 'mg',  category: 'mineral', default: false, bold: false, dv: 18,   fdaBlock: 'micros' },
+  { id: 'potassium',           label: 'Potassium',           unit: 'mg',  category: 'mineral', default: false, bold: false, dv: 4700, fdaBlock: 'micros' },
 
-  // Additional vitamins
-  { id: 'vitamin-a',           label: 'Vitamin A',           unit: 'mcg',   category: 'vitamin', default: false, bold: false, dv: 900,  fdaBlock: 'micros' },
-  { id: 'vitamin-c',           label: 'Vitamin C',           unit: 'mg',   category: 'vitamin', default: false, bold: false, dv: 90,   fdaBlock: 'micros' },
-  { id: 'vitamin-e',           label: 'Vitamin E',           unit: 'mg',   category: 'vitamin', default: false, bold: false, dv: 15,   fdaBlock: 'micros' },
-  { id: 'vitamin-k',           label: 'Vitamin K',           unit: 'mcg',   category: 'vitamin', default: false, bold: false, dv: 120,  fdaBlock: 'micros' },
-  { id: 'b1',                  label: 'Vitamin B1 (Thiamin)',unit: 'mg',   category: 'vitamin', default: false, bold: false, dv: 1.2,  fdaBlock: 'micros' },
-  { id: 'b2',                  label: 'Vitamin B2 (Riboflavin)', unit: 'mg', category: 'vitamin', default: false, bold: false, dv: 1.3, fdaBlock: 'micros' },
-  { id: 'b3',                  label: 'Vitamin B3 (Niacin)', unit: 'mg',   category: 'vitamin', default: false, bold: false, dv: 16,   fdaBlock: 'micros' },
-  { id: 'b6',                  label: 'Vitamin B6',          unit: 'mg',   category: 'vitamin', default: false, bold: false, dv: 1.7,  fdaBlock: 'micros' },
-  { id: 'b9',                  label: 'Folate (B9)',         unit: 'mcg',   category: 'vitamin', default: false, bold: false, dv: 400,  fdaBlock: 'micros' },
-  { id: 'b12',                 label: 'Vitamin B12',         unit: 'mcg',   category: 'vitamin', default: false, bold: false, dv: 2.4,  fdaBlock: 'micros' },
-
-  // Minerals
-  { id: 'magnesium',           label: 'Magnesium',           unit: 'mg',   category: 'mineral', default: false, bold: false, dv: 420,  fdaBlock: 'micros' },
-  { id: 'zinc',                label: 'Zinc',                unit: 'mg',   category: 'mineral', default: false, bold: false, dv: 11,   fdaBlock: 'micros' },
-  { id: 'phosphorus',          label: 'Phosphorus',          unit: 'mg',   category: 'mineral', default: false, bold: false, dv: 1250, fdaBlock: 'micros' },
+  // Voluntary vitamins and minerals
+  { id: 'vitamin-a',           label: 'Vitamin A',           unit: 'mcg', category: 'vitamin', default: false, bold: false, dv: 900,  fdaBlock: 'micros' },
+  { id: 'vitamin-c',           label: 'Vitamin C',           unit: 'mg',  category: 'vitamin', default: false, bold: false, dv: 90,   fdaBlock: 'micros' },
+  { id: 'vitamin-e',           label: 'Vitamin E',           unit: 'mg',  category: 'vitamin', default: false, bold: false, dv: 15,   fdaBlock: 'micros' },
+  { id: 'vitamin-k',           label: 'Vitamin K',           unit: 'mcg', category: 'vitamin', default: false, bold: false, dv: 120,  fdaBlock: 'micros' },
+  { id: 'b1',                  label: 'Vitamin B1 (Thiamin)', unit: 'mg',  category: 'vitamin', default: false, bold: false, dv: 1.2,  fdaBlock: 'micros' },
+  { id: 'b2',                  label: 'Vitamin B2 (Riboflavin)', unit: 'mg',  category: 'vitamin', default: false, bold: false, dv: 1.3,  fdaBlock: 'micros' },
+  { id: 'b3',                  label: 'Vitamin B3 (Niacin)', unit: 'mg',  category: 'vitamin', default: false, bold: false, dv: 16,   fdaBlock: 'micros' },
+  { id: 'b6',                  label: 'Vitamin B6',          unit: 'mg',  category: 'vitamin', default: false, bold: false, dv: 1.7,  fdaBlock: 'micros' },
+  { id: 'b9',                  label: 'Folate (B9)',         unit: 'mcg', category: 'vitamin', default: false, bold: false, dv: 400,  fdaBlock: 'micros' },
+  { id: 'b12',                 label: 'Vitamin B12',         unit: 'mcg', category: 'vitamin', default: false, bold: false, dv: 2.4,  fdaBlock: 'micros' },
+  { id: 'b5',                  label: 'Pantothenic Acid (B5)', unit: 'mg',  category: 'vitamin', default: false, bold: false, dv: 5,    fdaBlock: 'micros' },
+  { id: 'phosphorus',          label: 'Phosphorus',          unit: 'mg',  category: 'mineral', default: false, bold: false, dv: 1250, fdaBlock: 'micros' },
+  { id: 'iodine',              label: 'Iodine',              unit: 'mcg', category: 'mineral', default: false, bold: false, dv: 150,  fdaBlock: 'micros' },
+  { id: 'magnesium',           label: 'Magnesium',           unit: 'mg',  category: 'mineral', default: false, bold: false, dv: 420,  fdaBlock: 'micros' },
+  { id: 'zinc',                label: 'Zinc',                unit: 'mg',  category: 'mineral', default: false, bold: false, dv: 11,   fdaBlock: 'micros' },
+  { id: 'selenium',            label: 'Selenium',            unit: 'mcg', category: 'mineral', default: false, bold: false, dv: 55,   fdaBlock: 'micros' },
+  { id: 'copper',              label: 'Copper',              unit: 'mg',  category: 'mineral', default: false, bold: false, dv: 0.9,  fdaBlock: 'micros' },
+  { id: 'manganese',           label: 'Manganese',           unit: 'mg',  category: 'mineral', default: false, bold: false, dv: 2.3,  fdaBlock: 'micros' },
+  { id: 'choline',             label: 'Choline',             unit: 'mg',  category: 'vitamin', default: false, bold: false, dv: 550,  fdaBlock: 'micros' },
 
   // Other (no FDA-standard position, render in the micros block when present)
   { id: 'caffeine',            label: 'Caffeine',            unit: 'mg',   category: 'other',   default: false, bold: false, dv: null, fdaBlock: 'micros' },

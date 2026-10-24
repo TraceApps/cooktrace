@@ -296,6 +296,38 @@ function _numNut(n, baseField, mult = 1) {
   return _num(n[baseField], mult);
 }
 
+// OFF keeps every amount in grams. These are the nutrients beyond the
+// macros: [our id, OFF field, factor to the unit we track]. mg is x1000,
+// mcg x1000000. Same table as NutriTrace. Only what OFF actually has is
+// kept, so a missing value is not saved as a real 0.
+const _OFF_MICROS = [
+  ['starch', 'starch_100g', 1],
+  ['caffeine', 'caffeine_100g', 1000],
+  ['alcohol', 'alcohol_100g', 1],
+  ['vitamin-d', 'vitamin-d_100g', 1000000],
+  ['calcium', 'calcium_100g', 1000],
+  ['iron', 'iron_100g', 1000],
+  ['vitamin-a', 'vitamin-a_100g', 1000000],
+  ['vitamin-c', 'vitamin-c_100g', 1000],
+  ['vitamin-e', 'vitamin-e_100g', 1000],
+  ['vitamin-k', 'vitamin-k_100g', 1000000],
+  ['b1', 'vitamin-b1_100g', 1000],
+  ['b2', 'vitamin-b2_100g', 1000],
+  ['b3', 'vitamin-b3_100g', 1000],
+  ['b6', 'vitamin-b6_100g', 1000],
+  ['b9', 'vitamin-b9_100g', 1000000],
+  ['b12', 'vitamin-b12_100g', 1000000],
+  ['b5', 'pantothenic-acid_100g', 1000],
+  ['phosphorus', 'phosphorus_100g', 1000],
+  ['iodine', 'iodine_100g', 1000000],
+  ['magnesium', 'magnesium_100g', 1000],
+  ['zinc', 'zinc_100g', 1000],
+  ['selenium', 'selenium_100g', 1000000],
+  ['copper', 'copper_100g', 1000],
+  ['manganese', 'manganese_100g', 1000],
+  ['choline', 'choline_100g', 1000],
+];
+
 function _mapOFFProduct(p) {
   if (!p || !p.product_name) return null;
   const n = p.nutriments || {};
@@ -323,6 +355,11 @@ function _mapOFFProduct(p) {
     potassium:       _numNut(n, 'potassium_100g', 1000),
     cholesterol:     _numNut(n, 'cholesterol_100g', 1000),
   });
+  for (const [id, field, mult] of _OFF_MICROS) {
+    const raw = n[field];
+    if (raw == null || raw === '' || n[field.replace(/_100g$/, '') + '_modifier'] === '~') continue;
+    nutrition[id] = _num(raw, mult);
+  }
 
   // Quality signals lifted from OFF for the pantry search UI. Used by
   // _rankOFFResults to sort within a fetched page and by the Pantry

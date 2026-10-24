@@ -24,9 +24,10 @@ import path from 'path';
 // keeps the two lists the same).
 export const NUTRIENT_KEYS = [
   'calories', 'kilojoules', 'fat', 'saturated-fat', 'trans-fat', 'polyunsaturated-fat', 'monounsaturated-fat',
-  'cholesterol', 'sodium', 'salt', 'carbohydrates', 'fiber', 'sugars', 'added-sugars', 'proteins',
+  'cholesterol', 'sodium', 'salt', 'carbohydrates', 'fiber', 'sugars', 'added-sugars', 'starch', 'proteins',
   'vitamin-d', 'calcium', 'iron', 'potassium', 'vitamin-a', 'vitamin-c', 'vitamin-e', 'vitamin-k',
-  'b1', 'b2', 'b3', 'b6', 'b9', 'b12', 'magnesium', 'zinc', 'phosphorus', 'caffeine', 'alcohol',
+  'b1', 'b2', 'b3', 'b6', 'b9', 'b12', 'b5', 'phosphorus', 'iodine', 'magnesium', 'zinc', 'selenium', 'copper', 'manganese', 'choline',
+  'caffeine', 'alcohol',
 ];
 
 // Per serving, by key; null takes a value out. Grams, except calories
@@ -34,7 +35,7 @@ export const NUTRIENT_KEYS = [
 // Every key optional (a record keyed by an enum wants all of them), and
 // no others.
 export const nutritionSchema = z.object(Object.fromEntries(NUTRIENT_KEYS.map(k => [k, z.number().min(0).max(100000).nullable().optional()]))).strict()
-  .describe(`Per serving. Keys: ${NUTRIENT_KEYS.join(', ')}. Grams, except calories (kcal), kilojoules (kJ), and cholesterol, sodium, calcium, iron, potassium, magnesium, zinc, phosphorus, caffeine, vitamin C and E, B1-B6 (mg) and vitamin A, D, K, B9, B12 (mcg). null removes a value.`);
+  .describe(`Per serving. Keys: ${NUTRIENT_KEYS.join(', ')}. Grams, except calories (kcal), kilojoules (kJ), and cholesterol, sodium, calcium, iron, potassium, magnesium, zinc, phosphorus, copper, manganese, choline, caffeine, vitamin C and E, B1-B6 (mg) and vitamin A, D, K, B9, B12, iodine, selenium (mcg). null removes a value.`);
 
 /**
  * Values merged onto what's there: a key sent as null goes, the rest stay.

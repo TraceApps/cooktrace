@@ -91,6 +91,19 @@ const _USDA_NUTRIENT_MAP = {
   1114: 'vitamin-d',        // mcg
   1109: 'vitamin-e',        // mg
   1185: 'vitamin-k',        // mcg
+  1165: 'b1',               // mg
+  1166: 'b2',               // mg
+  1167: 'b3',               // mg
+  1175: 'b6',               // mg
+  1177: 'b9',               // mcg (folate)
+  1178: 'b12',              // mcg
+  1170: 'b5',               // mg (pantothenic acid)
+  1009: 'starch',           // g
+  1100: 'iodine',           // mcg
+  1103: 'selenium',         // mcg
+  1098: 'copper',           // mg
+  1101: 'manganese',        // mg
+  1180: 'choline',          // mg (Choline, total)
 };
 
 // FoodData Central gives every nutrient per 100 g (or 100 ml), for every data
