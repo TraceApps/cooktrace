@@ -144,7 +144,12 @@ export function placeAnchoredMenu({
   const openAbove = below < Math.min(maxHeight, 200) && above > below;
   const height = Math.min(maxHeight, openAbove ? above : below);
   const top = openAbove ? aboveEnd - height : belowStart;
-  return { top: Math.round(top), maxHeight: Math.round(height), above: openAbove };
+  // Above the field, the menu hangs from its bottom edge, which sits on the
+  // field: a list that shrinks as you type (one match left) stays against
+  // the field instead of floating up where the full list's top was.
+  const bottom = openAbove ? viewportHeight - aboveEnd : null;
+  const edge = openAbove ? `bottom:${Math.round(bottom)}px;` : `top:${Math.round(top)}px;`;
+  return { top: Math.round(top), bottom: bottom == null ? null : Math.round(bottom), edge, maxHeight: Math.round(height), above: openAbove };
 }
 
 /**

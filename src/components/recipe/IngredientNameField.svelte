@@ -110,7 +110,7 @@
       viewportHeight: viewBottom, margin: offsetTop + 8,
       maxHeight: 240, fold: get(fold),
     });
-    popStyle = `top:${place.top}px;left:${r.left}px;width:${r.width}px;max-height:${place.maxHeight}px;`;
+    popStyle = `${place.edge}left:${r.left}px;width:${r.width}px;max-height:${place.maxHeight}px;`;
   }
   function _onViewportChange() { if (open) _reposition(); }
 

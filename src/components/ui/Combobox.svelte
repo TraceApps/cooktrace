@@ -61,7 +61,7 @@
   let popoverEl;
   // The same cap the stylesheet gives it, so the list is no taller than before.
   const POPOVER_MAX_H = 280;
-  let popoverPos = { left: 0, top: 0, width: 0, maxHeight: POPOVER_MAX_H };
+  let popoverPos = { left: 0, edge: 'top:0px;', width: 0, maxHeight: POPOVER_MAX_H };
   // In-progress text the user is typing — bindable so callers can pull
   // it for an external "Add" button without forcing the user to press
   // Enter or pick a suggestion first.
@@ -113,7 +113,7 @@
       anchorTop: r.top, anchorBottom: r.bottom,
       viewportHeight: window.innerHeight, maxHeight: POPOVER_MAX_H, fold: get(fold),
     });
-    popoverPos = { left: r.left, top: place.top, width: r.width, maxHeight: place.maxHeight };
+    popoverPos = { left: r.left, edge: place.edge, width: r.width, maxHeight: place.maxHeight };
   }
 
   function openPopover() {
@@ -285,7 +285,7 @@
   <div use:portal
     class="cb-popover"
     bind:this={popoverEl}
-    style="left:{popoverPos.left}px; top:{popoverPos.top}px; width:{popoverPos.width}px; max-height:{popoverPos.maxHeight}px;"
+    style="left:{popoverPos.left}px; {popoverPos.edge} width:{popoverPos.width}px; max-height:{popoverPos.maxHeight}px;"
     role="listbox">
     {#each filtered as opt, i (opt.name)}
       <button type="button" class="cb-row" class:active={i === highlightIndex}

@@ -138,7 +138,7 @@
       anchorTop: r.top, anchorBottom: r.bottom,
       viewportHeight: window.innerHeight, maxHeight: 320, fold: get(fold),
     });
-    popStyle = `top:${place.top}px;left:${r.left}px;width:${r.width}px;max-height:${place.maxHeight}px;`;
+    popStyle = `${place.edge}left:${r.left}px;width:${r.width}px;max-height:${place.maxHeight}px;`;
   }
   function _onScrollOrResize() { if (open) _repositionPopover(); }
   onMount(() => {
