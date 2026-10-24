@@ -1,13 +1,13 @@
 <!--
-  BuildWeekSheet: a week of dinners in one go. Choose how many and for how
-  many people, and what matters (using up what's expiring, not repeating
+  BuildWeekSheet: a week of dinners in one go. Choose how many (and, if you
+  like, for how many people), and what matters (using up what's expiring, not repeating
   what was cooked lately, quick ones); the picks come ranked, each with
   why, a Swap for the next best, and the totals update as you go. Add to
   Week plans them on the week's free days (the rest for any day).
 
   With a household (Settings), a recipe that's a problem for someone home
   that day is left out (said so, with Include Them), one someone home
-  doesn't like ranks lower, and each dinner's servings are who's home.
+  doesn't like ranks lower. Servings are only set when you set them here.
 
   Props: open (bindable), weekStart (YYYY-MM-DD), planned (the week's
   planned cooks), recipes (array), pantry, today, members (the household)
@@ -19,13 +19,14 @@
   import { _, locale } from 'svelte-i18n';
   import Sheet from '../ui/Sheet.svelte';
   import ServingsStepper from '../ui/ServingsStepper.svelte';
+  import OptionalServings from '../ui/OptionalServings.svelte';
   import { NtApi } from '../../lib/api.js';
   import { resolveAssetUrl } from '../../lib/platform.js';
   import { showError, showSuccess } from '../../stores/toast.js';
   import { buildWeek, freeDays, picksNeeds } from '../../lib/plan-ideas.js';
   import { fromIso, isoDay, planHorizon } from '../../lib/week.js';
   import AllergenChips from '../allergens/AllergenChips.svelte';
-  import { cardAllergens, conflicts, hasConflict, dislikesIn, homeOn } from '../../lib/allergens.js';
+  import { cardAllergens, conflicts, hasConflict, dislikesIn } from '../../lib/allergens.js';
 
   export let open = false;
   export let weekStart = '';
@@ -38,14 +39,13 @@
   const dispatch = createEventDispatcher();
 
   let count = 5;
-  let servings = 2;
+  let servings = null;   // not set: each dinner shops as the recipe is written
   let useExpiring = true;
   let notRecent = true;
   let quick = false;
   let skip = {};
   let saving = false;
   let wasOpen = false;
-  let servingsSet = false;
   let leaveOut = true;
 
   $: weekEnd = weekStart ? isoDay(new Date(fromIso(weekStart).getFullYear(), fromIso(weekStart).getMonth(), fromIso(weekStart).getDate() + 6)) : '';
@@ -53,8 +53,7 @@
   // Each time it opens: as many dinners as free days (up to five), fresh picks.
   $: if (open && !wasOpen) {
     wasOpen = true; count = Math.max(1, Math.min(days.length || 5, 5)); skip = {};
-    servingsSet = false; leaveOut = true;
-    if (members.length) servings = members.length;
+    servings = null; leaveOut = true;
   }
   $: if (!open) wasOpen = false;
   $: options = { useExpiring, notRecent, quick };
@@ -94,7 +93,6 @@
     s.add(id);
     skip = { ...skip, [i]: s };
   }
-  const servingsFor = day => (servingsSet || !members.length ? servings : Math.max(1, homeOn(members, day || null).length));
   function toggle(name) {
     if (name === 'expiring') useExpiring = !useExpiring;
     else if (name === 'recent') notRecent = !notRecent;
@@ -112,7 +110,7 @@
           date: day || weekStart,
           kind: 'planned',
           meal_type: 'dinner',
-          servings: servingsFor(day),
+          ...(servings != null ? { servings } : {}),
           any_day: !day,
         });
       }
@@ -138,7 +136,7 @@
       <div class="opt-row">
         <span class="material-symbols-rounded" aria-hidden="true">group</span>
         <span class="opt-label">{$_('build_week.servings')}</span>
-        <ServingsStepper bind:value={servings} label={$_('build_week.servings')} on:change={() => (servingsSet = true)} />
+        <OptionalServings bind:value={servings} label={$_('build_week.servings')} />
       </div>
       <div class="chips">
         <button type="button" class="chip" class:on={useExpiring} aria-pressed={useExpiring} on:click={() => toggle('expiring')}>
@@ -171,11 +169,6 @@
           <li class="pick">
             <span class="pick-day">
               {dayLabel(i)}
-              {#if members.length && !servingsSet}
-                <span class="pick-serves" aria-label={$_('cookdiary_page.servings_count', { values: { count: servingsFor(days[i]) } })}>
-                  <span class="material-symbols-rounded" aria-hidden="true">person</span>{servingsFor(days[i])}
-                </span>
-              {/if}
             </span>
             {#if p.recipe.imgUrl || p.recipe.img_url}
               <img src={p.recipe.imgUrl || resolveAssetUrl(p.recipe.img_url)} alt="" loading="lazy" />
@@ -244,8 +237,6 @@
     background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius-lg);
   }
   .pick-day { width: 34px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-2); }
-  .pick-serves { display: inline-flex; align-items: center; font-weight: 600; letter-spacing: 0; color: var(--text-3); }
-  .pick-serves .material-symbols-rounded { font-size: 12px; }
   .pick img, .pick .ph { width: 52px; height: 52px; border-radius: var(--radius-md); object-fit: cover; flex: none; }
   .ph { display: flex; align-items: center; justify-content: center; background: var(--surface-2); color: var(--text-3); font-size: 22px; }
   .pick-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }

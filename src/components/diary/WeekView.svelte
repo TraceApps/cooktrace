@@ -2,7 +2,8 @@
   WeekView: one week of the Cook Diary, cooked and planned together.
 
   Days behind you show what was cooked; today and the days ahead show the
-  planned cooks, each with a servings stepper, and today's (or an earlier
+  planned cooks (a servings stepper on the ones with servings set; Edit Plan
+  sets or clears them), and today's (or an earlier
   day's) plan can be marked cooked. Planned cooks for "any day" of the week
   sit in a tray above the days. The summary says what the plan needs and
   builds or updates the shopping list for the week.
@@ -50,7 +51,8 @@
     const p = e.kind === 'cooked' ? (e.photo_url || e.recipe_img_url) : e.recipe_img_url;
     return p ? resolveAssetUrl(p) : '';
   }
-  const servingsOf = e => (Number(e.servings) > 0 ? Math.round(Number(e.servings)) : 2);
+  // A plan's servings when someone set them; a plan with none shows none.
+  const servingsOf = e => (Number(e.servings) > 0 ? Math.round(Number(e.servings)) : null);
 
   // A plan dragged to another day, today or later, with a mouse or a
   // trackpad (#81). On a touch screen a long press opens its menu, where
@@ -140,7 +142,7 @@
           {#if photo(e)}<img src={photo(e)} alt="" loading="lazy" />{:else}<span class="ph material-symbols-rounded" aria-hidden="true">restaurant</span>{/if}
           <span class="tray-text">
             <span class="name" dir="auto">{e.recipe_name || 'Recipe'}</span>
-            <span class="sub">{$_('cookdiary_page.servings_count', { values: { count: servingsOf(e) } })}</span>
+            {#if servingsOf(e)}<span class="sub">{$_('cookdiary_page.servings_count', { values: { count: servingsOf(e) } })}</span>{/if}
             {#if members.length}<AllergenChips summary={allergensOf(e)} recipe={recipeOf(e)} {members} />{/if}
           </span>
         </button>
@@ -197,8 +199,10 @@
                     {#if members.length}<AllergenChips summary={allergensOf(e)} recipe={recipeOf(e)} {members} date={d.iso} />{/if}
                   </span>
                 </button>
-                <ServingsStepper value={servingsOf(e)} label={$_('cookdiary_page.servings')}
-                  on:change={(ev) => dispatch('servings', { entry: e, value: ev.detail })} />
+                {#if servingsOf(e)}
+                  <ServingsStepper value={servingsOf(e)} label={$_('cookdiary_page.servings')}
+                    on:change={(ev) => dispatch('servings', { entry: e, value: ev.detail })} />
+                {/if}
               </div>
               {#if d.isToday || d.isPast}
                 <button class="btn btn-primary mark" on:click={() => dispatch('cooked', e)}>

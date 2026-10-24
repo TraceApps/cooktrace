@@ -12,6 +12,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Custom nutrients, the same as in NutriTrace.** Settings > Nutrition has Add custom nutrient (a name and a unit) for anything not on a label, such as Omega-3. It gets a field in the pantry item editor, the item's All Nutrients list and the recipe editor, a row on the Nutrition Facts box, and recipe totals from linked pantry items add it up. The list follows your account to your other devices.
 - **More label nutrients** (from [NutriTrace #281](https://github.com/TraceApps/nutritrace/issues/281)). Starch, Selenium, Copper, Manganese, Choline, Iodine and Pantothenic Acid (B5) are built in, in Nutrition Facts order, and the vitamins and minerals now follow that order. Open Food Facts and USDA fill them in, along with the other vitamins and minerals Open Food Facts carries, and the label scanner and AI agents can set them too.
 
+### Changed
+
+- **Servings on a plan are optional, and never filled in.** Planning a cook (from the Diary, a recipe or a card), Build My Week and Trace set none unless you say how many, so a plan shows no servings and the shopping list buys the recipe as written. Tap **Set Servings** (in Plan a Cook or Edit Plan, or the Servings row in Build My Week) to cook for a different number, and the list scales to it; the close button takes it off again. Plans that already have servings keep them.
+
 ### Fixed
 
 - **A suggestion list that opens above its field stays against it as you type.** Near the bottom of the screen, the unit list and ingredient suggestions in the recipe editor opened above the field and, as typing narrowed them to one match, floated rows above it.

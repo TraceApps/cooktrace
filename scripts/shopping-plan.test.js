@@ -204,3 +204,14 @@ test("a recipe's trash icon in By Recipe takes out only that recipe's share", ()
   // An item added before sources were kept goes with its recipe, as before.
   assert.deepEqual(withoutRecipe([{ id: 9, name: 'Salt', recipe_id: 5, sources: null }], 5).deletes, [9]);
 });
+
+test('a plan with no servings shops for the recipe as written, and setting or clearing them follows', () => {
+  const none = plan(shak, 10, '2030-01-07', null);
+  const rows = asRows(mergeIntoList([], none, { window: WEEK }));
+  assert.equal(byName(rows, 'tomato').quantity, 3, 'Shakshuka for 2 as written: 3 tomatoes');
+  const four = mergeIntoList(rows, plan(shak, 10, '2030-01-07', 4), { cooks: [10] });
+  assert.equal(four.updates.find(u => u.id === byName(rows, 'tomato').id).quantity, 6, 'set to 4: doubled');
+  for (const u of four.updates) Object.assign(rows.find(r => r.id === u.id), u);
+  const cleared = mergeIntoList(rows, plan(shak, 10, '2030-01-07', null), { cooks: [10] });
+  assert.equal(cleared.updates.find(u => u.id === byName(rows, 'tomato').id).quantity, 3, 'cleared: as written again');
+});

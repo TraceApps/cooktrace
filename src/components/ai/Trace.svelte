@@ -28,7 +28,7 @@
     traceChefHat, smartLogVoiceLang,
   } from '../../stores/settings.js';
   import { household } from '../../stores/settings.js';
-  import { cleanHousehold, homeOn, allergenKey } from '../../lib/allergens.js';
+  import { cleanHousehold, allergenKey } from '../../lib/allergens.js';
   // Voice input language from Settings; 'auto' means the device locale.
   function _resolveVoiceLang() {
     const v = smartLogVoiceLang.get();
@@ -526,10 +526,8 @@
             const id = parseInt(args?.recipe_id, 10);
             const date = args?.date;
             if (!Number.isFinite(id) || !date) return { error: 'recipe_id and date required' };
-            // Not said: who's home that day, when the household is set up.
-            const members = cleanHousehold($household);
-            let servings = parseInt(args?.servings, 10);
-            if (!(servings > 0) && members.length) servings = Math.max(1, homeOn(members, args?.any_day ? null : date).length);
+            // Only when the user said: a plan has no servings otherwise.
+            const servings = parseInt(args?.servings, 10);
             const r = await NtApi.createDiaryEntry({
               recipe_id: id, kind: 'planned',
               // Any day of a week is dated the week's first day.

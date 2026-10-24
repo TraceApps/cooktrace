@@ -9,6 +9,10 @@
    * one, it lists your recipes to pick from (`pickId` picked first).
    * Dispatches `planned` with the new diary entry.
    *
+   * Servings are optional and never filled in: a plan has none unless
+   * someone sets them (with none, the shopping list buys the recipe as
+   * written).
+   *
    * Given a planned `entry`, it edits that plan instead (#81): its day (any
    * day, today or later), meal and servings, the recipe staying as it is.
    * Dispatches `saved` with what the server said (its `list`, when the
@@ -24,12 +28,12 @@
   import { NtApi } from '../../lib/api.js';
   import { household } from '../../stores/settings.js';
   import { showError, showSuccess } from '../../stores/toast.js';
-  import { cleanHousehold, homeOn, cardAllergens } from '../../lib/allergens.js';
+  import { cleanHousehold, cardAllergens } from '../../lib/allergens.js';
   import { firstDayOfWeek, weekStartOf, isoDay, fromIso } from '../../lib/week.js';
   import { foldText } from '../../lib/search-text.js';
   import AllergenChips from '../allergens/AllergenChips.svelte';
   import DateInput from '../ui/DateInput.svelte';
-  import ServingsStepper from '../ui/ServingsStepper.svelte';
+  import OptionalServings from '../ui/OptionalServings.svelte';
 
   export let open = false;
   /** The recipe to plan; null lists your recipes to pick from. */
@@ -50,14 +54,12 @@
   let planDate = today();
   let anyDay = false;
   let mealType = null;      // 'breakfast' | 'lunch' | 'dinner' | 'snack' | null
-  let servings = 2;         // how many to cook for: the list scales to it
-  let servingsSet = false;  // changed by hand: picking a recipe keeps it
+  let servings = null;      // how many to cook for, when someone says: the list scales to it
   let recipeId = null;
   let recipes = [];         // for the list, loaded when it's first needed
   let search = '';
   let busy = false;
   let wasOpen = false;
-  let servingsFrom = null; // editing: the servings it opened on
 
   $: MEALS = [
     { id: 'breakfast', label: $_('cookdiary_page.week.meal_breakfast'), icon: 'free_breakfast' },
@@ -82,11 +84,9 @@
       anyDay = !!entry.any_day;
       mealType = entry.meal_type || null;
       // A plan without servings shops for the recipe as written; it keeps
-      // none unless they're changed here.
-      const n = Math.round(Number(entry.servings ?? entryRecipe?.servings));
-      servings = Number.isFinite(n) && n > 0 ? n : 2;
-      servingsFrom = servings;
-      servingsSet = true;
+      // none unless they're set here.
+      const n = Math.round(Number(entry.servings));
+      servings = Number.isFinite(n) && n > 0 ? n : null;
       search = '';
       recipeId = entry.recipe_id;
       return;
@@ -95,8 +95,7 @@
     anyDay = false;
     mealType = null;
     search = '';
-    servingsSet = false;
-    servings = 2;
+    servings = null;
     recipeId = null;
     if (recipe) { pick(recipe.id, recipe); return; }
     if (recipes.length === 0) {
@@ -109,19 +108,12 @@
     if (pickId != null) pick(Number(pickId));
   }
 
-  // Who you cook for (Settings > Household): servings start at who's home
-  // that day (everyone, for any day of the week). Without a household, at
-  // the recipe's own. Either way a change by hand stays.
+  // Who you cook for (Settings > Household): used for the allergen chips,
+  // never to fill in servings.
   $: members = cleanHousehold($household);
-  $: if (open && !servingsSet && members.length) {
-    servings = Math.max(1, homeOn(members, anyDay ? null : planDate).length);
-  }
-  function pick(id, r = recipes.find(x => x.id === id)) {
-    recipeId = id;
-    if (servingsSet || members.length) return;
-    const n = Math.round(Number(r?.servings));
-    servings = Number.isFinite(n) && n > 0 ? n : 2;
-  }
+  function pick(id) { recipeId = id; }
+  // Where Set begins: the recipe's own servings.
+  $: startServings = (recipe || entryRecipe || recipes.find(x => x.id === recipeId))?.servings ?? null;
 
   $: shown = search.trim()
     ? recipes.filter(r => foldText(r.name).includes(foldText(search).trim()))
@@ -146,7 +138,8 @@
           date: anyDay ? isoDay(weekStartOf(fromIso(planDate), firstDay)) : planDate,
           any_day: anyDay,
           meal_type: mealType || null,
-          ...(entry.servings != null || servings !== servingsFrom ? { servings } : {}),
+          // Set, changed or cleared here; unset stays unset.
+          servings: servings ?? null,
         });
         open = false;
         dispatch('saved', result || {});
@@ -164,7 +157,8 @@
         date: anyDay ? isoDay(weekStartOf(fromIso(planDate), firstDay)) : planDate,
         kind: 'planned',
         meal_type: mealType || null,
-        servings,
+        // Only when someone set it.
+        ...(servings != null ? { servings } : {}),
         any_day: anyDay,
       });
       showSuccess($_('cookdiary_page.toast.planned'));
@@ -226,9 +220,8 @@
           </div>
         </div>
         <div class="field servings-field">
-          <span class="field-label">{$_('cookdiary_page.servings')}</span>
-          <ServingsStepper bind:value={servings} label={$_('cookdiary_page.servings')}
-            on:change={() => servingsSet = true} />
+          <span class="field-label">{$_('cookdiary_page.servings')} <span class="field-hint">{$_('cookdiary_page.optional')}</span></span>
+          <OptionalServings bind:value={servings} start={startServings} label={$_('cookdiary_page.servings')} />
         </div>
         {#if !shownRecipe}
           <label class="field">

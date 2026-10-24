@@ -1755,6 +1755,8 @@
     "servings":                  "Servings",
     "servings_count":            "{count, plural, one {# serving} other {# servings}}",
     "plan_it":                   "Plan It",
+    "servings_set":              "Set Servings",
+    "servings_clear":            "Clear Servings",
     "edit_plan":                 "Edit Plan",
     "move_plan":                 "Move to Another Day",
     "save_plan":                 "Save",

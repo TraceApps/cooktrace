@@ -240,7 +240,7 @@ export const TOOLS = [
         date:      { type: 'string',  description: 'YYYY-MM-DD' },
         notes:     { type: 'string',  description: 'Optional notes.' },
         meal_type: { type: 'string',  description: "Optional meal slot — 'breakfast' | 'lunch' | 'dinner' | 'snack'." },
-        servings:  { type: 'integer', description: "Optional servings to cook; the shopping list scales the recipe to it. Leave out to use who's home that day (the household), or the recipe's own." },
+        servings:  { type: 'integer', description: "Optional servings to cook; the shopping list scales the recipe to it. Only set it when the user says how many; leave it out otherwise, and the plan has no servings and the list buys the recipe as written." },
         any_day:   { type: 'boolean', description: "Optional: true to plan it for any day of the week the date falls in (the user said 'sometime this week'), not a set day." },
       },
       required: ['recipe_id', 'date'],

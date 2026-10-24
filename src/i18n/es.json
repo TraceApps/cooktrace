@@ -1799,6 +1799,8 @@
     "servings": "Porciones",
     "servings_count": "{count, plural, one {# porción} other {# porciones}}",
     "plan_it": "Planificar",
+    "servings_set": "Indicar Porciones",
+    "servings_clear": "Quitar Porciones",
     "edit_plan": "Editar Plan",
     "move_plan": "Mover a Otro Día",
     "save_plan": "Guardar",
