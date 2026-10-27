@@ -44,7 +44,7 @@ import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { isEmptyForGuard } from '../lib/recipe-guards.js';
 import { autoShareNewRecipe } from '../lib/auto-share.js';
-import { dispatchWebhookEvent } from '../lib/webhooks.js';
+import { dispatchWebhookEvent, isHistoryRow } from '../lib/webhooks.js';
 import { mapSmartFilterCategory } from '../lib/smart-cookbook.js';
 import { saveRecipeVersion, mergeRecipe, sameContent, VERSION_FIELDS } from '../lib/recipe-versions.js';
 import { mergeFields } from '../lib/field-merge.js';
@@ -322,6 +322,9 @@ router.post('/push', wrap((req, res) => {
         }
         const val = (col) => values[spec.cols.indexOf(col)];
         const deleted = spec.softDelete && translated.deleted_at != null;
+        // A cook the app's Upload left to the sync (isHistoryRow): history,
+        // not a meal cooked now, so no meal.cooked for it.
+        const history = name === 'cook_diary' && isHistoryRow(row);
         // A row the app made, sent before (two syncs at once, a retry, an
         // answer lost on the way back): the one made then, as an edit of it.
         const createKey = row.server_id ? null : cleanCreateKey(row.client_key);
@@ -412,7 +415,7 @@ router.post('/push', wrap((req, res) => {
             });
             idMaps[name][row.client_id] = row.server_id;
             if (m.write && !deleted) {
-              if (name === 'cook_diary' && existing.kind !== 'cooked' && m.row.kind === 'cooked') {
+              if (name === 'cook_diary' && !history && existing.kind !== 'cooked' && m.row.kind === 'cooked') {
                 tableEvents.push(_mealCookedEvent(c => (c in m.row ? m.row[c] : existing[c])));
               } else if (name === 'pantry_items' && _on(existing.in_stock) && !_on(m.row.in_stock)) {
                 tableEvents.push(['pantry.out_of_stock', { pantry_item_id: row.server_id, name: m.row.name ?? existing.name }]);
@@ -451,7 +454,7 @@ router.post('/push', wrap((req, res) => {
           // saves through this push, so without these its changes never
           // reached webhooks.
           if (!deleted) {
-            if (name === 'cook_diary' && existing.kind !== 'cooked' && val('kind') === 'cooked') {
+            if (name === 'cook_diary' && !history && existing.kind !== 'cooked' && val('kind') === 'cooked') {
               tableEvents.push(_mealCookedEvent(val));
             } else if (name === 'pantry_items' && _on(existing.in_stock) && !_on(val('in_stock'))) {
               tableEvents.push(['pantry.out_of_stock', { pantry_item_id: row.server_id, name: val('name') ?? existing.name }]);
@@ -484,7 +487,7 @@ router.post('/push', wrap((req, res) => {
             try { autoShareNewRecipe(u, serverId); }
             catch (e) { console.warn('[sync] auto-share fan-out failed for recipe', serverId, e?.message); }
           }
-          if (name === 'cook_diary' && !deleted && val('kind') === 'cooked') {
+          if (name === 'cook_diary' && !history && !deleted && val('kind') === 'cooked') {
             tableEvents.push(_mealCookedEvent(val));
           }
         }

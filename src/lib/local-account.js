@@ -34,7 +34,7 @@
  */
 import { writable, get } from 'svelte/store';
 import { getServerUrl, getAuthToken } from './platform.js';
-import { dbGetMeta as dbGetSyncMeta, dbSetMeta as dbSetSyncMeta, dbCountUnsynced, dbClearUserData, dbKeepForNewServer } from './db-native.js';
+import { dbGetMeta as dbGetSyncMeta, dbSetMeta as dbSetSyncMeta, dbCountUnsynced, dbClearUserData, dbKeepForNewServer, dbForgetHistoryCooks } from './db-native.js';
 import { resetUserState } from './user-state.js';
 
 const META_KEY = 'account';
@@ -214,6 +214,8 @@ export async function setLocalOwner() {
   await _syncIdle();
   await forgetServerCookies();
   await dbSetSyncMeta(META_KEY, JSON.stringify({ local: true }));
+  // Cooks an earlier connect left to the sync are this phone's own now too.
+  await dbForgetHistoryCooks();
 }
 
 /**

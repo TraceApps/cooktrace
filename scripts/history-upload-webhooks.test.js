@@ -234,3 +234,43 @@ test('the app\'s Upload marks its cooks as history', () => {
   const post = src.slice(at, src.indexOf('});', at));
   assert.match(post, /history_upload: true/, 'the cooks go up marked');
 });
+
+// A cook as the app's sync push sends it (src/lib/sync.js pushChanges): its
+// id here as client_id, its key, the recipe's server id.
+function pushCook(d, recipeId, { marked = false } = {}) {
+  const { id, ...row } = d;
+  return { ...row, recipe_id: recipeId, client_id: id, server_id: null, client_key: key('cook_diary', d), ...(marked ? { history_upload: true } : {}) };
+}
+async function push(token, rows) {
+  const r = await call(token, 'POST', '/api/sync/push', { tables: { cook_diary: rows }, settings: [], fk_ids: 'server', client_now: new Date().toISOString() });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.ok(Array.isArray(r.data.tables?.cook_diary), JSON.stringify(r.data));
+  return r.data;
+}
+
+test('cooks an Upload left to the sync, marked, send no meal.cooked; a new cook through the sync sends once', opts, async () => {
+  const token = await account();
+  const recipe = (await call(token, 'POST', '/api/recipes', { name: 'Stew', ingredients: [], instructions: [] })).data;
+  const h = history();
+  const left = await sent(() => push(token, h.diary.slice(0, 8).map(d => pushCook(d, recipe.id, { marked: true }))));
+  assert.deepEqual(left.count, none, 'the cooks the Upload left');
+  assert.equal(left.out.tables.cook_diary.length, 8, 'all went in');
+  // A cook logged on the connected phone, keyed as every new row is.
+  const now = await sent(() => push(token, [pushCook({ id: 50, date: '2026-04-01', kind: 'cooked', created_at: '2026-04-01 19:00:00' }, recipe.id)]));
+  assert.deepEqual(now.count, { ...none, 'meal.cooked': 1 });
+  // A plan left by the Upload, sent as a plan, then marked cooked on the phone.
+  const plan = await push(token, [pushCook({ id: 51, date: '2026-04-02', kind: 'planned', created_at: '2026-04-02 09:00:00' }, recipe.id)]);
+  const serverId = plan.tables.cook_diary[0].server_id;
+  const cooked = await sent(() => push(token, [{ client_id: 51, server_id: serverId, recipe_id: recipe.id, date: '2026-04-02', kind: 'cooked', updated_at: new Date().toISOString() }]));
+  assert.deepEqual(cooked.count, { ...none, 'meal.cooked': 1 });
+});
+
+test('the app marks only the cooks an Upload left, noted when the phone connects', () => {
+  const dbn = readFileSync(new URL('../src/lib/db-native.js', import.meta.url), 'utf8');
+  const keep = dbn.slice(dbn.indexOf('export async function dbKeepForNewServer'), dbn.indexOf('export function dbInstallId'));
+  assert.match(keep, /kind = 'cooked'/, 'the cooks cooked by then');
+  assert.match(keep, /HISTORY_COOKS/, 'noted');
+  const sync = readFileSync(new URL('../src/lib/sync.js', import.meta.url), 'utf8');
+  const fn = sync.slice(sync.indexOf('async function pushChanges'), sync.indexOf('async function pullChanges'));
+  assert.match(fn, /table === 'cook_diary' && !row\.server_id && historyCooks\.has\(/, 'only a cook going up as new, and one of those');
+});

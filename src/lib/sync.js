@@ -20,7 +20,7 @@ import {
   dbSetServerId, dbApplyPull,
   dbGetMeta, dbSetMeta, dbMarkSettingsSynced, dbMarkTableSynced, dbRememberEcho,
   SYNC_PARENTS, SYNC_FIELDS, rowBase, rowChanges, dbInstallId, dbCountUnsynced, createKeyOf, mapIngredientLinks,
-  dbClearDisabledUnitsChanged,
+  dbClearDisabledUnitsChanged, dbHistoryCooks,
 } from './db-native.js';
 import { mapSmartFilterCategory } from './smart-cookbook.js';
 import { mapSourceIds } from './shopping-plan.js';
@@ -525,6 +525,10 @@ async function pushChanges({ token = getAuthToken(), signal = null, gen = accoun
   // its own id here), so a retry, two syncs at once or a lost answer never
   // makes it twice (server/lib/create-keys.js).
   const install = await dbInstallId();
+  // Cooks an Upload left to the sync (db-native.js dbKeepForNewServer):
+  // they go up marked history_upload, so the server sends no meal.cooked
+  // for them (server/lib/webhooks.js isHistoryRow).
+  const historyCooks = await dbHistoryCooks();
 
   const tablesToSend = {};
   let total = 0;
@@ -536,6 +540,7 @@ async function pushChanges({ token = getAuthToken(), signal = null, gen = accoun
     for (const r of rows) {
       const row = { ...r, client_id: r.id, server_id: r.server_id || null };
       if (!row.server_id && install) row.client_key = createKeyOf(install, table, r);
+      if (table === 'cook_diary' && !row.server_id && historyCooks.has(Number(r.id))) row.history_upload = true;
       delete row.id;
       delete row.sync_status;
       // Which fields this phone changed on the copy it had: only those

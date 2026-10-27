@@ -594,6 +594,71 @@ const scenarios = {
     };
   },
 
+  // Upload with cooks it can't send: a recipe that fails to go up (its two
+  // cooks are skipped), a cook whose request never reaches the server, and
+  // one whose answer is lost after the server made it. They go up with the
+  // next sync. The receiver at HOOKS lists the webhooks the server sent: the
+  // dates of the meal.cooked, after the Upload, after the syncs, and after a
+  // cook logged later. Before the first sync, a cook is logged and the
+  // Upload's plan left to the sync is marked cooked: both are meals cooked
+  // now.
+  async uploadLeftoverCooks() {
+    const la = await import('../../src/lib/local-account.js');
+    const A = await me(token);
+    const tok = token, url = server;
+    const cooked = async () => {
+      let list = [], last = -1;
+      for (let i = 0; i < 40; i++) {
+        await sleep(300);
+        list = await (await realFetch(`${process.env.HOOKS}/seen`)).json();
+        if (list.length === last) break;
+        last = list.length;
+      }
+      out.unsigned = list.filter(d => !d.signed).length;
+      return list.filter(d => d.event === 'meal.cooked').map(d => d.data.date).sort();
+    };
+    process.env.CT_SERVER = ''; signIn(null);
+    await la.setLocalOwner();
+    const tacos = await api.createRecipe({ name: 'Tacos', ingredients: [], steps: [] });
+    const soup = await api.createRecipe({ name: 'Lost Soup', ingredients: [], steps: [] });
+    for (const date of ['2026-02-01', '2026-02-02', '2026-02-03', '2026-02-04']) await api.createDiaryEntry({ recipe_id: tacos.id, date, kind: 'cooked' });
+    for (const date of ['2026-02-05', '2026-02-06']) await api.createDiaryEntry({ recipe_id: soup.id, date, kind: 'cooked' });
+    const plan = await api.createDiaryEntry({ recipe_id: soup.id, date: '2026-02-07', kind: 'planned' });
+    // The network during the Upload.
+    const inner = globalThis.fetch;
+    const bodyOf = init => { try { return JSON.parse(init?.body || '{}'); } catch { return {}; } };
+    const once = new Set();
+    globalThis.fetch = async (u, init) => {
+      const s = String(u), b = init?.method === 'POST' ? bodyOf(init) : {};
+      const hit = tag => !once.has(tag) && once.add(tag);
+      if (s.endsWith('/api/recipes') && b.name === 'Lost Soup' && hit('soup')) throw new TypeError('Failed to fetch');
+      if (s.endsWith('/api/cook-diary') && b.date === '2026-02-03' && hit('dropped')) throw new TypeError('Failed to fetch');
+      if (s.endsWith('/api/cook-diary') && b.date === '2026-02-04' && hit('lost')) { await (await inner(u, init)).text(); throw new TypeError('Failed to fetch'); }
+      return inner(u, init);
+    };
+    signIn(tok);
+    const { uploadLocalToServer } = await import('../../src/lib/migrate.js');
+    const summary = await uploadLocalToServer({ serverUrl: url, authToken: tok });
+    globalThis.fetch = inner;
+    out.errors = summary.errors.map(e => `${e.stage}: ${e.name}`).sort();
+    out.afterUpload = await cooked();
+    // Settings > Connect, as SettingsServerConnection._finalizeConnect does.
+    await la.claimForServer(url, A.id, { uploaded: summary.uploaded, created: A.created_at });
+    process.env.CT_SERVER = url;
+    await la.prepareLocalAccount(A, { confirm: async () => true });
+    await api.createDiaryEntry({ recipe_id: tacos.id, date: '2026-03-01', kind: 'cooked' });
+    await api.updateDiaryEntry(plan.id, { kind: 'cooked' });
+    await sync(); await sync();
+    out.afterSync = await cooked();
+    await api.markCooked(tacos.id, { date: '2026-03-02' });
+    await sync();
+    out.afterNew = await cooked();
+    const diary = await web('GET', '/api/cook-diary');
+    out.server = diary.map(d => `${d.date} ${d.kind} ${d.recipe_name}`).sort();
+    out.waiting = (await db.query(`SELECT COUNT(*) AS n FROM cook_diary WHERE sync_status = 'pending'`)).values[0].n;
+    out.noteLeft = (await db.query(`SELECT COUNT(*) AS n FROM sync_meta WHERE key = 'history_upload_cooks'`)).values[0].n;
+  },
+
   // A setting changed here that never went up counts as a change waiting:
   // another account signing in is asked before it's dropped.
   async settingWaits() {

@@ -21,6 +21,8 @@
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createHmac } from 'node:crypto';
+import { createServer as createHttpServer } from 'node:http';
 import { mkdtempSync, rmSync, copyFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -44,13 +46,13 @@ const freePort = () => new Promise((res, rej) => {
   s.on('error', rej);
 });
 
-async function startServer() {
+async function startServer(extraEnv = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'ct-android-sync-'));
   const port = await freePort();
   const proc = spawn(process.execPath, ['index.js'], {
     cwd: new URL('server/', root),
     env: { ...process.env, PORT: String(port), DB_PATH: join(dir, 'app.db'), UPLOADS_PATH: join(dir, 'uploads'),
-      JWT_SECRET: 'android-sync-test-secret-0123456789abcdef', INSECURE_COOKIES: '1', NODE_ENV: 'test' },
+      JWT_SECRET: 'android-sync-test-secret-0123456789abcdef', INSECURE_COOKIES: '1', NODE_ENV: 'test', ...extraEnv },
     stdio: ['ignore', 'ignore', 'pipe'],
   });
   let errors = '';
@@ -273,6 +275,56 @@ test('Disconnect, use the phone alone, connect as another account with Upload: n
   assert.deepEqual(r.bobPhone, ['Alice Synced', 'Made Alone']);
   assert.deepEqual(r.serverCatDupes, [], "the account's categories are matched, not made twice");
   assert.deepEqual(r.phoneCats, r.serverCats, 'the phone has the same categories, and its pulls go through');
+});
+
+// A webhook receiver: what reached it, each delivery's signature checked,
+// listed at /seen.
+async function hookReceiver() {
+  const got = [];
+  const secrets = new Set();
+  const srv = createHttpServer((req, res) => {
+    let raw = '';
+    req.on('data', c => { raw += c; });
+    req.on('end', () => {
+      if (req.method === 'GET') { res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(got)); return; }
+      let env = {};
+      try { env = JSON.parse(raw); } catch { /* counted as unsigned */ }
+      const sig = req.headers['x-cooktrace-signature'];
+      got.push({ event: env.event, data: env.data, signed: [...secrets].some(s => sig === `sha256=${createHmac('sha256', s).update(raw).digest('hex')}`) });
+      res.writeHead(200).end('ok');
+    });
+  });
+  const port = await freePort();
+  await new Promise(r => srv.listen(port, '127.0.0.1', r));
+  return { url: `http://127.0.0.1:${port}`, got, secrets, close: () => new Promise(r => srv.close(r)) };
+}
+
+test("cooks an Upload couldn't send go up with the next sync and send no meal.cooked; cooks logged now still send once", { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const hooks = await hookReceiver();
+  const srv = await startServer({ WEBHOOKS_ENABLED: '1', ALLOW_PRIVATE_WEBHOOK_URLS: '1', API_RATE_LIMIT_PER_MIN: '1000' });
+  try {
+    const made = await fetch(srv.base + '/api/admin/webhooks', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${srv.token}` },
+      body: JSON.stringify({ url: `${hooks.url}/hook`, events: ['meal.cooked'] }),
+    }).then(r => r.json());
+    assert.ok(made.secret, JSON.stringify(made));
+    hooks.secrets.add(made.secret);
+    const r = await phone(srv, 'uploadLeftoverCooks', { HOOKS: hooks.url });
+    assert.deepEqual(r.errors, ['diary: 2026-02-03', 'diary: 2026-02-04', 'diary: 2026-02-05', 'diary: 2026-02-06', 'diary: 2026-02-07', 'recipes: Lost Soup']);
+    assert.deepEqual(r.afterUpload, [], 'the Upload sent none');
+    // The plan left to the sync and marked cooked now, and the cook logged
+    // now: one each. The four cooks the Upload left: none.
+    assert.deepEqual(r.afterSync, ['2026-02-07', '2026-03-01'], 'the sync sent only the cooks made now');
+    assert.deepEqual(r.afterNew, ['2026-02-07', '2026-03-01', '2026-03-02'], 'a cook logged later sends once');
+    assert.equal(r.unsigned, 0);
+    assert.deepEqual(r.server, [
+      '2026-02-01 cooked Tacos', '2026-02-02 cooked Tacos', '2026-02-03 cooked Tacos', '2026-02-04 cooked Tacos',
+      '2026-02-05 cooked Lost Soup', '2026-02-06 cooked Lost Soup', '2026-02-07 cooked Lost Soup',
+      '2026-03-01 cooked Tacos', '2026-03-02 cooked Tacos',
+    ], 'every cook on the server, once');
+    assert.equal(r.waiting, 0);
+    assert.equal(r.noteLeft, 0, 'the note of the cooks left goes once they are all up');
+  } finally { srv.stop(); await hooks.close(); }
 });
 
 test('the same server at another address is the same account; one that cannot tell is asked', { skip, timeout: TEST_TIMEOUT_MS }, async () => {

@@ -211,9 +211,21 @@ async function _deliverWithRetry(row, event, data) {
 const _UPLOAD_KEY = /^[^:\s]+:[a-z_]+:\d+(@|$)/;
 export function isHistoryUpload(req) {
   const body = req?.body;
+  if (isHistoryRow(body)) return true;
   if (!body || typeof body !== 'object' || Array.isArray(body)) return false;
-  if (body.history_upload === true) return true;
   return typeof body.client_key === 'string' && _UPLOAD_KEY.test(body.client_key);
+}
+
+/**
+ * A row of the sync push (routes/sync.js) that is history: a cook the
+ * Upload couldn't send (its recipe didn't go up, or the connection
+ * dropped) goes up with the next sync instead, and the app marks it
+ * `history_upload: true` (src/lib/sync.js pushChanges). Only the mark
+ * counts here: every row the sync sends as new carries a key of the
+ * Upload's shape, a cook logged on the phone just now too.
+ */
+export function isHistoryRow(row) {
+  return !!row && typeof row === 'object' && !Array.isArray(row) && row.history_upload === true;
 }
 
 /**

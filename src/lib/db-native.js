@@ -815,6 +815,31 @@ export async function dbClearDisabledUnitsChanged(mark) {
   await db.run(`DELETE FROM sync_meta WHERE key = ? AND value = ?`, [DISABLED_UNITS_CHANGED, String(mark)]);
 }
 
+// The cooks an Upload left to the sync (dbKeepForNewServer), by id here.
+const HISTORY_COOKS = 'history_upload_cooks';
+/** No cooks noted (Disconnect: what's here is the phone's own now). */
+export async function dbForgetHistoryCooks() {
+  if (!isNative) return;
+  const db = await getDb();
+  await db.run(`DELETE FROM sync_meta WHERE key = ?`, [HISTORY_COOKS]);
+}
+/** Those of them still waiting to go up, as a Set of ids here. Once every
+ *  one has its server id (or is gone), the note of them goes too. */
+export async function dbHistoryCooks() {
+  if (!isNative) return new Set();
+  const raw = await dbGetMeta(HISTORY_COOKS);
+  if (!raw) return new Set();
+  let ids;
+  try { ids = JSON.parse(raw); } catch { ids = null; }
+  ids = Array.isArray(ids) ? ids.map(Number).filter(Number.isFinite) : [];
+  const db = await getDb();
+  const waiting = new Set(((await db.query(`SELECT id FROM cook_diary WHERE server_id IS NULL`, []))?.values || []).map(r => Number(r.id)));
+  const left = new Set(ids.filter(id => waiting.has(id)));
+  if (!left.size) await dbForgetHistoryCooks();
+  else if (left.size < ids.length) await dbSetMeta(HISTORY_COOKS, JSON.stringify([...left]));
+  return left;
+}
+
 export async function dbSetMeta(key, value) {
   if (!isNative) return;
   const db = await getDb();
@@ -1461,6 +1486,7 @@ export async function dbClearUserData() {
   for (const t of _ACCOUNT_TABLES) await db.run(`DELETE FROM ${t}`, []);
   await db.run(`DELETE FROM sync_meta WHERE key = 'last_pull_at'`, []);
   await db.run(`DELETE FROM sync_meta WHERE key = ?`, [DISABLED_UNITS_CHANGED]);
+  await db.run(`DELETE FROM sync_meta WHERE key = ?`, [HISTORY_COOKS]);
   // Read back: a copy that still holds anything is never shown as cleared
   // (lib/local-account.js shows the error screen instead).
   for (const t of _ACCOUNT_TABLES) {
@@ -1482,6 +1508,18 @@ export async function dbClearUserData() {
 export async function dbKeepForNewServer(uploaded = {}) {
   if (!isNative) return;
   const db = await getDb();
+  // The cooks the Upload couldn't send (their recipe didn't go up, or the
+  // connection dropped) go up with the next sync: history, as the Upload's
+  // own, so the sync marks them (lib/sync.js pushChanges) and the server
+  // sends no meal.cooked for them. Only those cooked by now: a plan marked
+  // cooked from here on is a meal cooked now. Ids are never reused
+  // (AUTOINCREMENT), so a cook logged later is never taken for one. Noted
+  // first, before anything is queued.
+  const sent = new Set((Array.isArray(uploaded.cook_diary) ? uploaded.cook_diary : []).map(p => Number(p?.[0])));
+  const leftCooks = ((await db.query(`SELECT id FROM cook_diary WHERE deleted_at IS NULL AND kind = 'cooked'`, []))?.values || [])
+    .map(r => Number(r.id)).filter(id => !sent.has(id));
+  if (leftCooks.length) await dbSetMeta(HISTORY_COOKS, JSON.stringify(leftCooks));
+  else await dbForgetHistoryCooks();
   for (const t of SYNC_TABLES) {
     if (t !== 'ai_chat_history') await db.run(`DELETE FROM ${t} WHERE deleted_at IS NOT NULL`, []);
     await db.run(`UPDATE ${t} SET server_id = NULL, server_synced_at = NULL, server_base = NULL, sync_status = 'pending'`, []);

@@ -49,7 +49,9 @@ none:
   the Upload of an app before 1.4.1 still sends `meal.cooked` for each
   cook it brings. A cook the Upload couldn't send (its recipe didn't go
   up, or the connection dropped) goes up with the next sync instead, and
-  sends `meal.cooked` then.
+  sends none either; with an app from 1.5.0-dev01 or before it sends
+  `meal.cooked` then. A cook logged on the phone after it connects sends
+  `meal.cooked` as usual, and so does a plan marked cooked then.
 - Restoring a backup.
 
 Not yet built: a `pantry.low_stock` event. Pantry items only carry an

@@ -143,7 +143,7 @@ test('every dispatchWebhookEvent( call site across the modified routes has a mat
 
 test('the Android sync upload fires the same webhook events as the REST routes', () => {
   const syncJs = readFileSync(new URL('../server/routes/sync.js', import.meta.url), 'utf8');
-  assert.match(syncJs, /import \{ dispatchWebhookEvent \} from '\.\.\/lib\/webhooks\.js'/);
+  assert.match(syncJs, /import \{ dispatchWebhookEvent, isHistoryRow \} from '\.\.\/lib\/webhooks\.js'/);
   assert.match(syncJs, /'meal\.cooked'/, 'sync.js should build meal.cooked for cooked diary rows');
   assert.match(syncJs, /'pantry\.out_of_stock'/, 'sync.js should fire pantry.out_of_stock on an in_stock 1 to 0 update');
   assert.match(syncJs, /'shopping_list\.completed'/, 'sync.js should fire shopping_list.completed when a push finishes the list');
