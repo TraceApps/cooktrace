@@ -18,7 +18,7 @@ import db from '../db.js';
 import { saveRow } from '../lib/rest-merge.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
-import { dispatchWebhookEvent } from '../lib/webhooks.js';
+import { dispatchWebhookEvent, isHistoryUpload } from '../lib/webhooks.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
 import { linkableRecipeId } from '../lib/link-checks.js';
 import { cookedVersion } from '../lib/recipe-history.js';
@@ -203,7 +203,9 @@ router.post('/', wrap((req, res) => {
 
   const row = db.prepare(`SELECT * FROM cook_diary WHERE id = ?`).get(result.lastInsertRowid);
 
-  if (kind === 'cooked') {
+  // Not for a cook the app's Upload brings (isHistoryUpload): it is
+  // history, not a meal cooked now.
+  if (kind === 'cooked' && !isHistoryUpload(req)) {
     try {
       dispatchWebhookEvent(u, 'meal.cooked', {
         date, recipe_id: recipeId, recipe_name: recipe.name, kind, servings, rating, meal_type: mealType,

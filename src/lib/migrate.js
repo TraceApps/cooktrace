@@ -276,6 +276,9 @@ export async function uploadLocalToServer({ serverUrl, authToken, onProgress } =
         ...rest,
         client_key: key('cook_diary', d),
         recipe_id: remappedRecipeId,
+        // History, not a meal cooked now: the server sends no meal.cooked
+        // for it (server/lib/webhooks.js isHistoryUpload).
+        history_upload: true,
       });
       went('cook_diary', id, created);
       summary.success.diary++;

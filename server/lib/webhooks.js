@@ -194,6 +194,29 @@ async function _deliverWithRetry(row, event, data) {
 }
 
 /**
+ * A save that is part of the Android app's Upload (src/lib/migrate.js): a
+ * phone used without a server sending what it holds to the server it just
+ * connected to, one POST per row, through the same routes the app and the
+ * web save through. That is history arriving, not something done now, so
+ * it sends no webhooks; before this, every cooked entry in an uploaded cook
+ * diary sent meal.cooked.
+ *
+ * The app marks those saves `history_upload: true` (servers before this
+ * one ignore the field). The 1.4.1 app doesn't, but gives every row it
+ * uploads a key of its own, `<install>:<table>:<id>` (db-native.js
+ * createKeyOf), which nothing else sends to these routes: the sync sends
+ * its keys to /api/sync/push, and the web and the watch send none. An app
+ * before 1.4.1 sends no key, and its cooks still send.
+ */
+const _UPLOAD_KEY = /^[^:\s]+:[a-z_]+:\d+(@|$)/;
+export function isHistoryUpload(req) {
+  const body = req?.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return false;
+  if (body.history_upload === true) return true;
+  return typeof body.client_key === 'string' && _UPLOAD_KEY.test(body.client_key);
+}
+
+/**
  * Fire `event` to every enabled webhook this user has subscribed to it.
  * Fire-and-forget: does not await delivery, callers should not await
  * this either (or if they do, only to know dispatch was scheduled, not

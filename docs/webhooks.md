@@ -36,6 +36,22 @@ signatures on the receiving end and cannot be retrieved again later.
 | `shopping_list.completed` | Every unchecked item on the shopping list has been checked off. |
 | `pantry.out_of_stock` | A pantry item that was in stock is marked out of stock. |
 
+## What sends them, and what doesn't
+
+Webhooks are for something done now. These bring in history, and send
+none:
+
+- **Upload**, when an Android app used without a server connects to one
+  and sends the recipes, pantry, cook diary and shopping list it holds:
+  the cooks in its diary send no `meal.cooked`. Uploading again sends
+  none either. Marking an uploaded plan cooked afterwards sends
+  `meal.cooked` as usual. This needs a server from after 1.5.0-dev01;
+  the Upload of an app before 1.4.1 still sends `meal.cooked` for each
+  cook it brings. A cook the Upload couldn't send (its recipe didn't go
+  up, or the connection dropped) goes up with the next sync instead, and
+  sends `meal.cooked` then.
+- Restoring a backup.
+
 Not yet built: a `pantry.low_stock` event. Pantry items only carry an
 `in_stock` flag and a unit-less quantity today, there is no threshold
 concept to detect "running low" against. Revisit if that concept gets

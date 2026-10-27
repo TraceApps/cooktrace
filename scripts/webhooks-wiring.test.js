@@ -93,7 +93,7 @@ test('a test-delivery endpoint exists so a webhook can be verified without waiti
 });
 
 test('meal.cooked is dispatched from both cook-diary.js and recipes.js insert paths', () => {
-  assert.match(cookDiaryJs, /import \{ dispatchWebhookEvent \} from '\.\.\/lib\/webhooks\.js'/);
+  assert.match(cookDiaryJs, /import \{ dispatchWebhookEvent, isHistoryUpload \} from '\.\.\/lib\/webhooks\.js'/);
   assert.match(cookDiaryJs, /dispatchWebhookEvent\(u, 'meal\.cooked'/);
   assert.match(recipesJs, /import \{ dispatchWebhookEvent \} from '\.\.\/lib\/webhooks\.js'/);
   assert.match(recipesJs, /dispatchWebhookEvent\(u, 'meal\.cooked'/);
