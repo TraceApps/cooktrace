@@ -2,11 +2,13 @@ package com.cooktrace.app.wear
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.ConnectionSpec
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
@@ -29,6 +31,16 @@ object CookApi {
         // second doesn't leave the screen spinning.
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
+        // https:// with no cleartext at all: a redirect to http:// fails, as
+        // it did before the watch allowed cleartext (TraceApps/nutritrace#194).
+        .connectionSpecs(listOf(ConnectionSpec.MODERN_TLS))
+        .build()
+
+    // Plain http:// to the confirmed server only, never following a redirect.
+    private val plainClient = client.newBuilder()
+        .connectionSpecs(listOf(ConnectionSpec.CLEARTEXT))
+        .followRedirects(false)
+        .followSslRedirects(false)
         .build()
 
     /** Everything on the list, the server's own order: aisle, then name. */
@@ -50,13 +62,22 @@ object CookApi {
 
     private suspend fun send(cfg: Pairing.Config, method: String, path: String, body: JSONObject?): String =
         withContext(Dispatchers.IO) {
+            // https:// as saved; plain http:// only to a server on your own
+            // network that the phone confirmed (LocalAddress.workerBase).
+            // Refused, it fails like no connection.
+            // An https:// address goes as saved, as it always has, before the
+            // parser below (which refuses international names) sees it.
+            val base = (if (cfg.serverUrl.trim().startsWith("https://", ignoreCase = true)) cfg.serverUrl.trim() else null)
+                ?: LocalAddress.workerBase(cfg.serverUrl, cfg.httpOk)
+                ?: throw IOException("plain HTTP to this server isn't confirmed on the phone")
+            val plain = base.startsWith("http:")
             val request = Request.Builder()
-                .url(cfg.serverUrl.trimEnd('/') + path)
+                .url(base.trimEnd('/') + path)
                 .header("Authorization", "Bearer " + cfg.token)
                 .header("Accept", "application/json")
                 .method(method, body?.toString()?.toRequestBody(JSON))
                 .build()
-            client.newCall(request).execute().use { res ->
+            (if (plain) plainClient else client).newCall(request).execute().use { res ->
                 val text = res.body?.string().orEmpty()
                 if (!res.isSuccessful) {
                     val message = runCatching { JSONObject(text).optString("error") }.getOrNull()

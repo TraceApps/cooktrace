@@ -23,11 +23,14 @@
     setAuthToken, getAuthToken,
   } from '../../lib/platform.js';
   import {
-    checkServer, passwordSignIn, accountFor, explainSignInError, createSignInOptions,
+    checkServer, discoverSignIn, passwordSignIn, accountFor, explainSignInError, createSignInOptions,
     openSsoForConnect, forgetSsoConnect, ssoConnectResult, keepSsoLogoutHint,
   } from '../../lib/server-signin.js';
   import { _ } from 'svelte-i18n';
   import { showError, showSuccess } from '../../stores/toast.js';
+  import { serverAddressCheck, confirmPlainHttp } from '../../lib/plain-http.js';
+  import { classifyServerAddress } from '../../lib/local-address.js';
+  import { askPlainHttp } from '../../stores/plainHttp.js';
   import { fullSync, pushAllFromDevice, syncState } from '../../lib/sync.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
   import { portal } from '../../lib/portal.js';
@@ -37,6 +40,8 @@
   // Local form state.
   let mode = isNative ? (getNativeMode() || 'local') : 'web';
   let connectedUrl = getServerUrl() || '';
+  // On plain http:// (from TraceApps/nutritrace#194): shown under the server's address.
+  $: plainHttp = classifyServerAddress(connectedUrl) === 'local';
   let serverUrl = '';
   let username = '';
   let password = '';
@@ -49,7 +54,12 @@
   // when it takes one. Typing clears them; a half-typed host isn't an error
   // (lib/server-signin.js).
   //   optionsState: '' (no address yet) | 'checking' | 'ok' | 'failed'
-  const signInOptions = createSignInOptions();
+  // Nothing is sent to a plain-http address before its warning
+  // (TraceApps/nutritrace#194): while typing it isn't looked up.
+  const _lookupAllowed = (url) => !isNative || ['https', 'confirmed'].includes(serverAddressCheck(url));
+  const signInOptions = createSignInOptions({
+    discover: (url) => _lookupAllowed(url) ? discoverSignIn(url) : Promise.reject(new Error('not asked yet')),
+  });
   onDestroy(() => signInOptions.stop());
   let providers = [], passwordLoginEnabled = true, optionsState = '', optionsError = '', optionsFor = '';
   $: ({ state: optionsState, providers, passwordLoginEnabled, error: optionsError, url: optionsFor } = $signInOptions);
@@ -87,10 +97,50 @@
   // ── Connect flow ─────────────────────────────────────────────────────
   const _cleanUrl = () => serverUrl.trim().replace(/\/$/, '');
 
+  // Plain http:// (from TraceApps/nutritrace#194): refused unless the server
+  // is on your own network, and then only after the warning. Nothing is sent
+  // before this.
+  async function _plainHttpOk(url) {
+    if (!isNative) return true;
+    const plain = serverAddressCheck(url);
+    if (plain === 'invalid') { showError($_('plain_http.invalid_address')); return false; }
+    if (plain === 'refuse') { await askPlainHttp(url, { kind: 'refuse' }); return false; }
+    if (plain === 'ask') {
+      if (!(await _askOnce(url))) return false;
+      confirmPlainHttp(url);
+    }
+    return true;
+  }
+
+  // Leaving the field asks first, so a tap on Connect right after (the field
+  // loses focus to it) waits for that same answer instead of a second sheet.
+  let _asking = null;
+  function _askOnce(url) {
+    if (_asking?.url !== url) {
+      const pending = { url, answer: askPlainHttp(url) };
+      _asking = pending;
+      pending.answer.finally(() => { if (_asking === pending) _asking = null; });
+    }
+    return _asking.answer;
+  }
+
+  // Leaving the address field: a local plain-http address is asked about
+  // first (its warning), then its sign-in options are read.
+  async function addressLeft() {
+    const url = _cleanUrl();
+    if (isNative && serverAddressCheck(url) === 'ask') {
+      if (!(await _askOnce(url))) return;
+      confirmPlainHttp(url);
+    }
+    if (!_lookupAllowed(url)) return; // a refused or half-typed address: Connect says why
+    signInOptions.left(serverUrl);
+  }
+
   async function connect() {
     if (!serverUrl.trim()) { showError($_('settings_server_conn.toast.enter_url')); return; }
     if (!username.trim() || !password.trim()) { showError($_('settings_server_conn.toast.enter_credentials')); return; }
     const url = _cleanUrl();
+    if (!(await _plainHttpOk(url))) return;
     busy = true;
     try {
       // The server is there, set up, and is CookTrace (a sign-in proxy's
@@ -114,6 +164,7 @@
   async function connectWithSso(providerId) {
     if (busy) return;
     const url = _cleanUrl();
+    if (!(await _plainHttpOk(url))) return;
     busy = true;
     try {
       await checkServer(url);
@@ -356,6 +407,9 @@
         <div class="state-body">
           <div class="state-title">{$_('settings_server_conn.state_connected')}</div>
           <div class="state-sub">{connectedUrl}</div>
+          {#if plainHttp}
+            <div class="not-encrypted"><span class="material-symbols-rounded" aria-hidden="true">lock_open</span>{$_('plain_http.not_encrypted')}</div>
+          {/if}
         </div>
       </div>
 
@@ -402,7 +456,7 @@
             placeholder="https://cooktrace.example.com"
             bind:value={serverUrl}
             on:input={() => signInOptions.typed(serverUrl)}
-            on:blur={() => signInOptions.left(serverUrl)}
+            on:blur={addressLeft}
             autocapitalize="off" autocorrect="off" />
         </label>
 
@@ -572,6 +626,16 @@
 {/if}
 
 <style>
+  .not-encrypted {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--warning, #f59e0b);
+  }
+  .not-encrypted .material-symbols-rounded { font-size: 15px; }
   .sv-conn { display: flex; flex-direction: column; gap: 14px; padding: 14px; }
   .row { display: flex; align-items: center; gap: 12px; }
   .state-row .state-icon {

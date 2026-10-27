@@ -212,7 +212,9 @@ test('the screens use it: setup, Settings, the sign-in page and the app link', (
   assert.match(setup, /if \(connecting\) return;\s*connecting = true;\s*setServerUrl\(validatedUrl\);/, 'one browser at a time');
 
   const sc = read('../src/components/settings/SettingsServerConnection.svelte');
-  assert.match(sc, /on:input=\{\(\) => signInOptions\.typed\(serverUrl\)\}\s*on:blur=\{\(\) => signInOptions\.left\(serverUrl\)\}/);
+  // Leaving the field looks the address up, after a plain-HTTP address's warning (TraceApps/nutritrace#194).
+  assert.match(sc, /on:input=\{\(\) => signInOptions\.typed\(serverUrl\)\}\s*on:blur=\{addressLeft\}/);
+  assert.match(sc, /async function addressLeft\(\) \{[\s\S]{0,400}signInOptions\.left\(serverUrl\);/);
   assert.match(sc, /async function connectWithSso\(providerId\) \{\s*if \(busy\) return;/);
   assert.match(sc, /const body = await passwordSignIn\(url, username\.trim\(\), password\);\s*_pendingLogoutHint = null;\s*forgetSsoConnect\(\);\s*await _signedIn\(url, body\.token, body\.user\);/);
   assert.match(sc, /const user = await accountFor\(url, token\);[\s\S]*?await _signedIn\(url, token, user\);/);

@@ -54,8 +54,10 @@ export async function scrapeRecipeNative(rawUrl) {
 }
 
 async function _fetchHtml(url) {
-  const { CapacitorHttp } = await import('@capacitor/core');
-  const res = await CapacitorHttp.get({
+  // Through lib/native-http.js: a recipe page on plain http:// is refused, as
+  // Android refused it before (plain HTTP goes only to your confirmed server).
+  const { NativeHttp } = await import('./native-http.js');
+  const res = await NativeHttp.get({
     url,
     headers: {
       'User-Agent': UA,

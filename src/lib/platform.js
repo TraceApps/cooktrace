@@ -9,6 +9,7 @@ import { Capacitor } from '@capacitor/core';
 import { get } from 'svelte/store';
 import { _ } from 'svelte-i18n';
 import { failed } from './messages.js';
+import { classifyServerAddress } from './local-address.js';
 
 /**
  * True when running inside the Capacitor native shell (Android / iOS).
@@ -101,28 +102,34 @@ export function healthNeedsSetup(res) {
 
 /**
  * Translate a connect-server error into something the user can act on.
- * Release-signed Android APKs ship with a strict network_security_config
- * that blocks cleartext (http://) traffic — the WebView and CapacitorHttp
- * surface this as a generic network error or "ERR_CLEARTEXT_NOT_PERMITTED".
- * If the user typed an http:// URL, point them at the HTTPS setup docs
- * instead of leaving them staring at a generic failure.
+ * `t` is svelte-i18n's translate function ($_); without it the current one.
+ *
+ * The Android app uses plain http:// only with a server on your own network,
+ * after the warning (lib/plain-http.js, from TraceApps/nutritrace#194); any
+ * other http:// address is refused before a request is made. So a plain-HTTP
+ * failure is either that refusal, or a local server the phone can't reach (a
+ * wrong address, or not on the same network or VPN), and the message says which.
  */
-export function explainConnectError(rawError, serverUrl) {
+export function explainConnectError(rawError, serverUrl, t) {
+  const say = (key, values, english) => {
+    try {
+      const said = (t || get(_))(key, values ? { values } : undefined);
+      if (said && said !== key) return said;
+    } catch { /* i18n not started */ }
+    return english;
+  };
+  const fallback = failed('fail.connect', rawError);
+  if (!isNative) return fallback;
+  const kind = classifyServerAddress(serverUrl);
+  if (kind === 'invalid') return say('plain_http.invalid_address', null, 'Enter an address that starts with http:// or https://.');
   const msg = (rawError?.message || String(rawError) || '').toLowerCase();
-  const isHttp = typeof serverUrl === 'string' && serverUrl.toLowerCase().startsWith('http://');
-  const looksLikeCleartextBlock =
-    msg.includes('cleartext') ||
-    msg.includes('err_cleartext') ||
-    (isNative && isHttp && (msg.includes('network') || msg.includes('not reachable') || msg.includes('failed to fetch')));
-  if (isHttp && looksLikeCleartextBlock) {
-    return get(_)('connect.https_only');
+  if (kind === 'public' || rawError?.code === 'PLAIN_HTTP_BLOCKED' || msg.includes('cleartext')) {
+    return say('plain_http.refused_short', null, 'Plain HTTP works only with a server on your own network. Use an https:// address for this server.');
   }
-  if (isHttp && isNative) {
-    // Plain http on native — even if it succeeded, surface the warning so
-    // users on debug builds know release builds will reject this URL.
-    return failed('fail.connect', rawError);
+  if (kind === 'local' && /network|not reachable|failed to fetch|connect|timed? ?out|unreachable/.test(msg)) {
+    return say('plain_http.unreachable', { url: serverUrl }, `Couldn't reach ${serverUrl}.`);
   }
-  return failed('fail.connect', rawError);
+  return fallback;
 }
 
 /**

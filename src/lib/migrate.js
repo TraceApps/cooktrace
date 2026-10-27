@@ -27,7 +27,7 @@
  * so re-running upload would produce duplicates — the dialog warns.
  */
 
-import { CapacitorHttp } from '@capacitor/core';
+import { NativeHttp } from './native-http.js';
 import { NtApi } from './api.js';
 import { isNative } from './platform.js';
 import { tr } from './messages.js';
@@ -396,11 +396,12 @@ function _empty() {
   return { recipes: 0, pantry: 0, diary: 0, shopping: 0, categories: 0, settings: 0, total: 0 };
 }
 
-// CapacitorHttp bypasses WebView CORS for the external server origin.
+// CapacitorHttp bypasses WebView CORS for the external server origin, through
+// lib/native-http.js: plain http:// only to a confirmed local server.
 async function _post(url, headers, body) { return _request('POST', url, headers, body); }
 async function _put(url, headers, body)  { return _request('PUT',  url, headers, body); }
 async function _request(method, url, headers, body) {
-  const res = await CapacitorHttp.request({
+  const res = await NativeHttp.request({
     method, url, headers,
     data: body || {},
   });

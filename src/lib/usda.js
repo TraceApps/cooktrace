@@ -53,8 +53,9 @@ function _wrapCapacitor(res) {
 
 async function _extFetch(url) {
   if (isNative && !getServerUrl()) {
-    const { CapacitorHttp } = await import('@capacitor/core');
-    const res = await CapacitorHttp.get({
+    // Through lib/native-http.js: plain http:// only to a confirmed local server.
+    const { NativeHttp } = await import('./native-http.js');
+    const res = await NativeHttp.get({
       url,
       headers: { 'Accept': 'application/json' },
       responseType: 'json',

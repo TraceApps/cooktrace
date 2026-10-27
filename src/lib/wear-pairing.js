@@ -16,6 +16,7 @@
 import { registerPlugin } from '@capacitor/core';
 import { isNative, getServerUrl, getAuthToken } from './platform.js';
 import { APP_VERSION } from './version.js';
+import { mirroredConfirmation } from './plain-http.js';
 
 // Registered at module level: a plugin proxy returned from an async function
 // confuses Capacitor's promise handling.
@@ -54,7 +55,10 @@ export async function pairWatch() {
   }
   try {
     // With this phone's release: a watch on an older one catches up to it.
-    await WearPairing.pair({ serverUrl, token, appVersion: APP_VERSION });
+    // httpOk: the server again when it is plain http:// on your own network
+    // and you said Connect Anyway to it; the watch uses plain HTTP only then
+    // (LocalAddress.kt, from TraceApps/nutritrace#194).
+    await WearPairing.pair({ serverUrl, token, appVersion: APP_VERSION, httpOk: mirroredConfirmation(serverUrl) });
     console.info('[wear] paired with the watch');
     return true;
   } catch (e) {

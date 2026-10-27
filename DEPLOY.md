@@ -54,6 +54,28 @@ Use numbered dev builds when reporting bugs ("I saw this on `v1.1.0-dev02`") or 
 
 Both channels use the shared TraceApps keystore, so upgrading between them (or from either back to stable) works in place.
 
+## Connecting from Android
+
+The Android app connects to your CookTrace server over HTTPS, or over plain HTTP to a server on your own network. Local mode (no server) needs neither. For HTTPS (a real domain with Let's Encrypt, a tunnel, or your own CA installed on the phone), see [HTTPS on your LAN](https://traceapps.github.io/docs/self-hosting/lan-https/).
+
+Enter the `http://` address, such as `http://192.168.1.20:3003`. The app first asks **Connect Without Encryption?**: the connection isn't encrypted, and anyone on the same network can read and change what's sent, including your password. Use it only on your home network or over a VPN. Choose **Connect Anyway** and the app remembers the answer for that server. Settings > Server Connection then shows **Not Encrypted** under the address.
+
+Plain HTTP works only with a server at one of these addresses:
+
+- a private IPv4 address: `10.x.x.x`, `172.16.x.x` to `172.31.x.x`, `192.168.x.x`;
+- a Tailscale address (`100.64.x.x` to `100.127.x.x`), loopback `127.x.x.x` or link-local `169.254.x.x`;
+- an IPv6 unique local (`fc00::/7`), link-local (`fe80::/10`) or `::1` address;
+- a one-word name, such as `http://cooktrace:3003`;
+- a name ending in `.local`, `.home.arpa`, `.internal` or `.lan`.
+
+Any other `http://` address (a public domain or IP) is refused before the app sends anything, and the app points to the HTTPS options. Over a VPN such as Tailscale or WireGuard, the tunnel already encrypts the traffic.
+
+`INSECURE_COOKIES` makes no difference to the app: it signs in with a token, not the cookie. Set it only if browsers also open CookTrace over plain HTTP.
+
+The Wear OS app uses plain HTTP only to the server the phone confirmed, and gets that with the server address the next time the phone app opens. Everything else the app and the watch reach directly (update checks, push services, AI providers, pictures from elsewhere) is still HTTPS-only, as before.
+
+Coming from a build that allowed plain HTTP without asking (a debug build you built yourself)? On first start the app asks the same question before it contacts the server. Until you choose Connect Anyway it works with what's on the phone, nothing syncs, and it asks again on the next start. A saved `http://` server that isn't on your own network is refused the same way; to switch it to an HTTPS address, disconnect in Settings > Server Connection and connect again.
+
 ## Pinning Android to a specific version
 
 Sideloaded APKs don't auto-update the way docker containers do. Every

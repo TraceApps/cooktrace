@@ -64,8 +64,18 @@ const events = [];
 globalThis.CustomEvent ??= class { constructor(type, o) { this.type = type; this.detail = o?.detail; } };
 globalThis.dispatchEvent = e => { events.push({ type: e?.type, detail: e?.detail }); return true; };
 globalThis.document ??= { addEventListener() {}, removeEventListener() {}, visibilityState: 'visible' };
+// The person said Connect Anyway to their server (src/lib/plain-http.js, from
+// TraceApps/nutritrace#194): the test servers here are plain HTTP on this
+// machine, whichever of its names a test uses.
+const _plainHttpOk = (...urls) => {
+  const out = [];
+  for (const u of [...urls, ...(globalThis.__plainHttpOk || [])]) {
+    try { const o = new URL(u).origin; out.push(o, o.replace('127.0.0.1', 'localhost'), o.replace('localhost', '127.0.0.1')); } catch { /* none */ }
+  }
+  return JSON.stringify(out);
+};
 const store = new Map();
-Object.defineProperty(globalThis, 'localStorage', { value: { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k), key: i => [...store.keys()][i] ?? null, get length() { return store.size; } }, configurable: true });
+Object.defineProperty(globalThis, 'localStorage', { value: { getItem: k => (k === 'ct:plainHttpOk' ? _plainHttpOk(process.env.CT_SERVER, server, store.get('ct:serverUrl')) : store.get(k) ?? null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k), key: i => [...store.keys()][i] ?? null, get length() { return store.size; } }, configurable: true });
 
 // The web: plain requests, on the server's clock.
 async function web(method, path, body, tok = token) {

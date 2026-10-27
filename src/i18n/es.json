@@ -2475,7 +2475,6 @@
     "strength_4": "Muy fuerte"
   },
   "connect": {
-    "https_only": "Esta app solo se conecta por HTTPS. Pon el servidor detrás de un proxy inverso (Caddy, Tailscale o Cloudflare Tunnel), o usa una versión de depuración. DEPLOY.md, Connecting from Android, tiene los pasos.",
     "needs_setup": "Este servidor aún no está configurado. Ábrelo en un navegador para crear la primera cuenta y después conéctate aquí."
   },
   "attach_image": {

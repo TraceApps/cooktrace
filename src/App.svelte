@@ -18,6 +18,7 @@
   import { cookModeActive } from './stores/cookMode.js';
   import Toast     from './components/ui/Toast.svelte';
   import ConfirmDialogMount from './components/ui/ConfirmDialogMount.svelte';
+  import PlainHttpSheetMount from './components/ui/PlainHttpSheetMount.svelte';
   import { DB }    from './lib/db.js';
   import { navStyle, applyAccentColor, accentColor, applyAppearance, appearance, disableAnimations, sidebarPersistent, language, pageBanners, bannerStyle, bannerAnimation, forceMobileLayout, reloadSettingStores } from './stores/settings.js';
   import { _, locale } from 'svelte-i18n';
@@ -513,6 +514,13 @@
                 // from NutriTrace #110.
                 showNativeSetup = needsNativeSetup();
                 window.location.hash = '#/';
+                // A plain-HTTP server confirmed on the setup screen isn't in the
+                // image and media policy set at start (from
+                // TraceApps/nutritrace#194); only a reload adds it.
+                const { mediaPolicyStale } = await import('./lib/plain-http.js');
+                if (mediaPolicyStale(document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content)) {
+                  window.location.reload();
+                }
               }
             }
           } catch (e) {
@@ -522,6 +530,26 @@
       });
     }
 
+    // A saved server on plain http:// that this build hasn't been told to use
+    // (from TraceApps/nutritrace#194): connected from a build that allowed
+    // plain HTTP. Asked here, before anything goes to the server; until it's
+    // confirmed nothing does (lib/plain-http.js), the app works from what's on
+    // the phone, and the next launch asks again. One that isn't on your own
+    // network is refused.
+    if (isNative && getServerUrl()) {
+      const saved = getServerUrl();
+      const { serverAddressCheck, confirmPlainHttp } = await import('./lib/plain-http.js');
+      const plain = serverAddressCheck(saved);
+      if (plain === 'ask' || plain === 'refuse') {
+        authLoaded = false;
+        const { askPlainHttp } = await import('./stores/plainHttp.js');
+        if (await askPlainHttp(saved, { kind: plain, stored: true })) {
+          confirmPlainHttp(saved);
+          window.location.reload();
+          return;
+        }
+      }
+    }
     try { await loadAuthState(); } finally { authLoaded = true; }
     // Never left on the blank page below: the setup redirect still has to run.
     try { await handleOidcCallback(); } catch (e) { console.warn('[app] OIDC sign-in callback failed:', e?.message || e); }
@@ -829,6 +857,7 @@
 
 {#if needsLogin}<Toast />{/if}
 <ConfirmDialogMount />
+{#if isNative}<PlainHttpSheetMount />{/if}
 
 <style>
   .account-check-error {

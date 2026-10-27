@@ -252,7 +252,7 @@
     auth:          ['authentication','auth','sso','single sign-on','single sign on','oidc','openid','authentik','keycloak','authelia','password login'],
     apitokens:     ['api tokens','api token','personal access token','pat','mcp','model context protocol','claude desktop','cursor','codex','agent','ai agent','bearer token','scopes','revoke token'],
     webhooks:      ['webhooks','webhook','automation','n8n','home assistant','ifttt','push','event','integration','integrations','http post','callback url','signature','hmac','secret'],
-    serverconn:    ['server','connection','sync','connect','disconnect','local mode','offline','standalone','android','native','url','login'],
+    serverconn:    ['server','connection','sync','connect','disconnect','local mode','offline','standalone','android','native','url','login','http','https','plain http','not encrypted','unencrypted','encryption'],
     updates:       ['updates','update','upgrade','version','new version','changelog','release','releases','apk','install','download','check for updates','auto-check','channel','stable','dev','dev-latest','beta','github','server update','docker','compose','docker-compose','check frequency','check interval','how often','hourly','daily','manual','manual only','cadence','banner','notification'],
     diagnostics:   ['diagnostics','logs','verbose','console','export','bug','report','troubleshoot','crash'],
     support:       ['support','donate','donation','sponsor','github sponsors','ko-fi','kofi','tip','star','report a bug','bug','translate','weblate','help'],

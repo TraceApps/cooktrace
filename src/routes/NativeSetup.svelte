@@ -4,6 +4,8 @@
   import { checkServer, discoverSignIn, passwordSignIn, openSso, explainSignInError, serverProblemText } from '../lib/server-signin.js';
   import { showError, showSuccess } from '../stores/toast.js';
   import { DB } from '../lib/db.js';
+  import { serverAddressCheck, confirmPlainHttp } from '../lib/plain-http.js';
+  import { askPlainHttp } from '../stores/plainHttp.js';
 
   // State machine:
   //   'choose'      → pick local vs server
@@ -50,6 +52,16 @@
   async function validateAndNext() {
     if (!serverUrl.trim()) { showError($_('native_setup_ct.toast.enter_url')); return; }
     const url = serverUrl.trim().replace(/\/$/, '');
+    // Plain http:// (from TraceApps/nutritrace#194): refused unless the server
+    // is on your own network, and then only after the warning. Nothing is
+    // sent before this.
+    const plain = serverAddressCheck(url);
+    if (plain === 'invalid') { showError($_('plain_http.invalid_address')); return; }
+    if (plain === 'refuse') { await askPlainHttp(url, { kind: 'refuse' }); return; }
+    if (plain === 'ask') {
+      if (!(await askPlainHttp(url))) return;
+      confirmPlainHttp(url);
+    }
     connecting = true;
     try {
       await checkServer(url);

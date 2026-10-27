@@ -76,8 +76,9 @@ async function _downloadImage(serverUrl) {
   try {
     // CapacitorHttp bypasses the WebView's CORS layer (regular fetch
     // would be blocked for cross-origin assets on Android).
-    const { CapacitorHttp } = await import('@capacitor/core');
-    const response = await CapacitorHttp.get({
+    // Through lib/native-http.js: plain http:// only to a confirmed local server.
+    const { NativeHttp } = await import('./native-http.js');
+    const response = await NativeHttp.get({
       url: serverUrl,
       responseType: 'blob',
     });
