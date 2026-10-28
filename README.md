@@ -59,6 +59,7 @@ Third app in the Trace family alongside [NutriTrace](https://github.com/traceapp
 - **Pantry.** Variants, expiration digests, barcode scanning (ML Kit native, QuaggaJS web), OFF + USDA quality signals, pantry-match pill on every recipe card. → [full guide](https://traceapps.github.io/docs/cooktrace/pantry/)
 - **Cook Diary + Meal Planner.** List, Week, Month and Photos views, plan-then-cook flow with servings, drag to re-plan. Build My Week picks a week of dinners from what's in your pantry, and Uses Up shows what's about to expire and the recipes that would use it. → [full guide](https://traceapps.github.io/docs/cooktrace/diary/)
 - **Shopping list.** Generate from a recipe (skips stocked items) or a whole week's plan, scaled to the servings planned and added up across recipes, aisle grouping.
+- **App icon shortcuts.** Long-press the app icon (Android, or the installed web app) for Shopping List, or Scan to Pantry to open the Pantry with its barcode scanner. → [full guide](https://traceapps.github.io/docs/cooktrace/shopping/#app-icon-shortcuts)
 - **Household and allergens.** Who you cook for, with allergies, diets and the days they're home; allergen warnings on every recipe, Safe for Everyone filtering. → [full guide](https://traceapps.github.io/docs/cooktrace/shopping/)
 
 ### Organizing

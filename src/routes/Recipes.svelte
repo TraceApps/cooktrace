@@ -5,7 +5,8 @@
   import { onMount, tick } from 'svelte';
   import { fold } from '../lib/fold.js';
   import { columnsAcrossFold, gridTemplateAcrossFold, columnForIndex } from '../lib/fold-core.js';
-  import { push } from 'svelte-spa-router';
+  import { push, replace, querystring } from 'svelte-spa-router';
+  import { shortcutFromQuery, shortcutTarget } from '../lib/app-shortcut.js';
   import { fade } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
   import { formatDuration } from '../lib/duration.js';
@@ -29,6 +30,16 @@
   import AllergenChips from '../components/allergens/AllergenChips.svelte';
   import { household } from '../stores/settings.js';
   import { cardAllergens, cleanHousehold, conflicts, hasConflict, avoids } from '../lib/allergens.js';
+
+  // App icon shortcuts (from TraceApps/nutritrace#278): /?new=shopping|scan
+  // (lib/app-shortcut.js) go on to their page, off this address first, so
+  // Back comes here and doesn't open it again.
+  $: _openShortcut(shortcutFromQuery($querystring));
+  function _openShortcut(kind) {
+    if (!kind) return;
+    replace('/');
+    push(shortcutTarget(kind));
+  }
 
   let createSheetOpen = false;
   // Measured page-header height: exposed as --header-h on page-shell so

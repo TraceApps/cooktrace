@@ -772,6 +772,13 @@
   $: _openFromQuery($querystring);
   function _openFromQuery(qs) {
     const q = new URLSearchParams(qs || '');
+    // The Scan to Pantry shortcut (from TraceApps/nutritrace#278): the
+    // scanner, as the search bar's button opens it.
+    if (q.get('scan') === '1') {
+      replace('/pantry');
+      scannerOpen = true;
+      return;
+    }
     const id = parseInt(q.get('open'), 10);
     if (!Number.isInteger(id) || id <= 0) return;
     openItem({ id }, { focus: q.get('focus') === 'used-in' ? 'used-in' : null });

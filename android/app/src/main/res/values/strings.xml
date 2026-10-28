@@ -4,4 +4,6 @@
     <string name="title_activity_main">CookTrace</string>
     <string name="package_name">com.cooktrace.app</string>
     <string name="custom_url_scheme">com.cooktrace.app</string>
+    <string name="shortcut_shopping">Shopping List</string>
+    <string name="shortcut_scan">Scan to Pantry</string>
 </resources>

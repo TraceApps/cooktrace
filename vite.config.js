@@ -110,6 +110,12 @@ export default defineConfig({
         orientation: 'portrait-primary',
         start_url: './',
         scope: './',
+        // Long-press the installed app's icon (from TraceApps/nutritrace#278):
+        // the shopping list, or scan an item into the pantry (src/lib/app-shortcut.js).
+        shortcuts: [
+          { name: 'Shopping List', short_name: 'Shopping List', url: './#/?new=shopping', icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }] },
+          { name: 'Scan to Pantry', short_name: 'Scan to Pantry', url: './#/?new=scan', icons: [{ src: 'icons/icon-192.png', sizes: '192x192' }] },
+        ],
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

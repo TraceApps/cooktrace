@@ -10,6 +10,7 @@
   import { slide } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
   import { apiUrl, isNative, getServerUrl, setAuthToken, resolveAssetUrl, iconUrl } from '../lib/platform.js';
+  import { isShortcutHash } from '../lib/app-shortcut.js';
 
   import { get } from 'svelte/store';
   import { responseJson, discoverSignIn, openSso, serverProblemText, webPageError } from '../lib/server-signin.js';
@@ -23,6 +24,8 @@
   // (so a saved token is stashed). Probed in onMount.
   let _biometricReady = false;
   async function biometricLogin() {
+    // An app icon shortcut waiting under this screen opens once signed in.
+    const shortcutWaiting = isShortcutHash(window.location.hash);
     try {
       const bio = await import('../lib/biometric.js');
       const ok = await bio.authenticate($_('login_ui.biometric_reason'));
@@ -42,7 +45,7 @@
         return;
       }
       await loadServerSettings();
-      push('/');
+      if (!shortcutWaiting) push('/');
     } catch (e) {
       console.warn('[login] biometric flow failed:', e);
       showError($_('login_ct.toast.biometric_failed'));
@@ -145,6 +148,9 @@
   }
 
   async function login() {
+    // An app icon shortcut waiting under this screen opens once signed in:
+    // read now, as Recipes may take it (and change the address) first.
+    const shortcutWaiting = isShortcutHash(window.location.hash);
     if (!username.trim() || !password) return;
     loading = true;
     try {
@@ -191,7 +197,7 @@
       }
       signInProblem.set(null);
       await loadServerSettings();
-      push('/');
+      if (!shortcutWaiting) push('/');
     } catch(e) {
       // A sign-in proxy's web page in place of the server: said as such.
       showError(e?.webPage ? e.message : $_('common.errors.cant_reach_server'));
