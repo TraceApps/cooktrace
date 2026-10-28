@@ -23,7 +23,7 @@ import { _ } from 'svelte-i18n';
 import { getOpenAIChatParams, openAIBase } from './openai-chat-params.js';
 import { createToolSupportMemory, sendWithToolFallback, isToolsUnsupported } from './tool-support.js';
 import { geminiToolResponse } from './gemini-tool-response.js';
-import { REPLY_MAX_TOKENS, sendForReply, sendWithLengthFallback, stoppedShort, stoppedShortError } from './trace-reply.js';
+import { REPLY_MAX_TOKENS, sendForReply, sendWithLengthFallback, stoppedShort, stoppedShortError, createRepeatGuard, toolStuckNote, TOOL_REPEATED } from './trace-reply.js';
 
 // An import (toolsRequired) that already saved something isn't asked again
 // after an empty reply: told to always save, the model could save the same
@@ -58,9 +58,17 @@ function _outOfRounds() {
   return Object.assign(new Error(message), { code: OUT_OF_ROUNDS_CODE });
 }
 
-// The last round's answer, or, when a model gave none at all, why there's none.
-function _finalAnswer(text) {
+// The last round's answer, or, when a model gave none at all, why there's
+// none: the tool it got stuck repeating, when it did (TraceApps/nutritrace#287).
+function _finalAnswer(text, stuck) {
   if (String(text || '').trim()) return text;
+  if (stuck) {
+    try {
+      const said = get(_)('trace_reply.stuck_on_tool');
+      if (said && !said.startsWith('trace_reply.')) return said;
+    } catch { /* i18n not ready: the English line */ }
+    return 'Trace kept asking for the same information and got no answer, so it stopped. Try asking another way.';
+  }
   try {
     const said = get(_)('trace_reply.out_of_rounds');
     if (said && !said.startsWith('trace_reply.')) return said;
@@ -518,9 +526,31 @@ const _lastRound = (round, history, start) => round === TOOL_ROUNDS || (round > 
 // HISTORY_MAX_BYTES: a model that asks for many at once can't pass it by much.
 export const TOOL_SKIPPED = "Not run: this answer has already gathered as much as it can hold. Answer from what you have, and say what's left.";
 const _room = (history, start) => ({ left: HISTORY_MAX_BYTES - (_bytes(history) - start) });
-async function _runTool(name, args, room) {
+// Tools that only read (TraceApps/nutritrace#287): the same call a second
+// time in one answer gets the result the model already has, and a third
+// makes the next request the last (trace-reply.js). Logging, planning,
+// adding, saving and importing aren't here: they run every time, since two
+// of the same can be meant, and running one starts the count over.
+export const READ_TOOLS = new Set([
+  'get_recipes', 'read_recipes', 'list_recipe_categories', 'get_recipe', 'get_recipe_history',
+  'get_pantry', 'list_pantry_categories', 'find_recipes_from_pantry', 'get_diary',
+  'get_shopping_list', 'get_cookbooks', 'get_cookbook',
+]);
+// A name that isn't one of the app's tools changes nothing either: a model
+// asking for a made-up tool again is counted the same way.
+const _repeatGuard = (tools) => {
+  const known = new Set([...TOOLS, ...(tools || [])].map((t) => t.name));
+  return createRepeatGuard((name) => READ_TOOLS.has(name) || !known.has(name));
+};
+// A call that failed (offline, say) may be made once more.
+const _failed = (r) => !!r && typeof r === 'object' && !Array.isArray(r) && r.error != null;
+// What the last request says: out of rounds, and the tool a model got stuck on.
+const _lastNote = (guard) => (guard.stuck ? `${OUT_OF_ROUNDS}\n\n${toolStuckNote(guard.stuck)}` : OUT_OF_ROUNDS);
+async function _runTool(name, args, room, guard) {
   if (room.left <= 0) return { error: TOOL_SKIPPED };
+  if (guard && guard.check(name, args) !== 'run') return { error: TOOL_REPEATED };
   const result = await _executeTool(name, args);
+  if (guard && _failed(result)) guard.forget(name, args);
   room.left -= _bytes(JSON.stringify(result)); // as it's sent: a JSON string inside the request
   return result;
 }
@@ -535,15 +565,16 @@ async function _callClaudeWithTools(apiKey, model, messages, systemPrompt, tools
   let currentMessages = [...messages];
   const startBytes = _bytes(currentMessages);
 
+  const guard = _repeatGuard(tools);
   for (let round = 0; round <= TOOL_ROUNDS; round++) {
-    const last = _lastRound(round, currentMessages, startBytes);
+    const last = _lastRound(round, currentMessages, startBytes) || !!guard.stuck;
     if (last && cb?.toolsRequired) throw _outOfRounds();
     const body = {
       model: model || AI_DEFAULT_MODELS.claude,
       max_tokens: REPLY_MAX_TOKENS,
       // Out of rounds: told to answer in the system prompt, so the
       // conversation itself stays in the order the provider expects.
-      system: last ? `${systemPrompt}\n\n${OUT_OF_ROUNDS}` : systemPrompt,
+      system: last ? `${systemPrompt}\n\n${_lastNote(guard)}` : systemPrompt,
       messages: currentMessages,
     };
     if (claudeTools.length) body.tools = claudeTools;
@@ -572,7 +603,7 @@ async function _callClaudeWithTools(apiKey, model, messages, systemPrompt, tools
 
     const toolUses = (data.content || []).filter(b => b.type === 'tool_use');
     const textBlocks = (data.content || []).filter(b => b.type === 'text');
-    if (last) return _finalAnswer(textBlocks.map(b => b.text).join('\n'));
+    if (last) return _finalAnswer(textBlocks.map(b => b.text).join('\n'), guard.stuck);
     if (toolUses.length === 0 || data.stop_reason !== 'tool_use') {
       return textBlocks.map(b => b.text).join('\n') || '';
     }
@@ -584,7 +615,7 @@ async function _callClaudeWithTools(apiKey, model, messages, systemPrompt, tools
     const toolResults = [];
     for (const tu of toolUses) {
       if (onToolCall) onToolCall(tu.name, tu.input);
-      const result = await _runTool(tu.name, tu.input, room);
+      const result = await _runTool(tu.name, tu.input, room, guard);
       if (onToolResult) onToolResult(tu.name, result);
       toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(result) });
     }
@@ -609,14 +640,15 @@ async function _callOpenAIWithTools(apiKey, model, messages, systemPrompt, tools
   ];
   const startBytes = _bytes(currentMessages);
 
+  const guard = _repeatGuard(tools);
   for (let round = 0; round <= TOOL_ROUNDS; round++) {
-    const last = _lastRound(round, currentMessages, startBytes);
+    const last = _lastRound(round, currentMessages, startBytes) || !!guard.stuck;
     if (last && toolsRequired) throw _outOfRounds();
     const selectedModel = model || AI_DEFAULT_MODELS.openai;
     const body = {
       model: selectedModel,
       // Out of rounds: told to answer in the system prompt (see Claude above).
-      messages: last ? [{ role: 'system', content: `${systemPrompt}\n\n${OUT_OF_ROUNDS}` }, ...currentMessages.slice(1)] : currentMessages,
+      messages: last ? [{ role: 'system', content: `${systemPrompt}\n\n${_lastNote(guard)}` }, ...currentMessages.slice(1)] : currentMessages,
       ...getOpenAIChatParams({
         baseUrl,
         model: selectedModel,
@@ -664,7 +696,7 @@ async function _callOpenAIWithTools(apiKey, model, messages, systemPrompt, tools
     const msg = choice.message;
     // A server that ignores tool_choice may still ask for a tool on the last
     // round: its text, if any, is the answer.
-    if (last) return _finalAnswer(msg.content);
+    if (last) return _finalAnswer(msg.content, guard.stuck);
     if (!msg.tool_calls || msg.tool_calls.length === 0) {
       return msg.content || '';
     }
@@ -673,7 +705,7 @@ async function _callOpenAIWithTools(apiKey, model, messages, systemPrompt, tools
     for (const tc of msg.tool_calls) {
       if (onToolCall) onToolCall(tc.function.name, JSON.parse(tc.function.arguments || '{}'));
       const args = JSON.parse(tc.function.arguments || '{}');
-      const result = await _runTool(tc.function.name, args, room);
+      const result = await _runTool(tc.function.name, args, room, guard);
       if (onToolResult) onToolResult(tc.function.name, result);
       currentMessages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
     }
@@ -722,12 +754,13 @@ async function _callGeminiWithTools(apiKey, model, messages, systemPrompt, tools
   });
   const startBytes = _bytes(contents);
 
+  const guard = _repeatGuard(tools);
   for (let round = 0; round <= TOOL_ROUNDS; round++) {
-    const last = _lastRound(round, contents, startBytes);
+    const last = _lastRound(round, contents, startBytes) || !!guard.stuck;
     if (last && cb?.toolsRequired) throw _outOfRounds();
     const body = {
       // Out of rounds: told to answer in the system prompt (see Claude above).
-      systemInstruction: { parts: [{ text: last ? `${systemPrompt}\n\n${OUT_OF_ROUNDS}` : systemPrompt }] },
+      systemInstruction: { parts: [{ text: last ? `${systemPrompt}\n\n${_lastNote(guard)}` : systemPrompt }] },
       contents,
     };
     if (geminiTools) body.tools = geminiTools;
@@ -750,7 +783,7 @@ async function _callGeminiWithTools(apiKey, model, messages, systemPrompt, tools
     const parts = candidate?.content?.parts || [];
     const functionCalls = parts.filter(p => p.functionCall);
     const textParts = parts.filter(p => p.text);
-    if (last) return _finalAnswer(textParts.map(p => p.text).join('\n'));
+    if (last) return _finalAnswer(textParts.map(p => p.text).join('\n'), guard.stuck);
     if (functionCalls.length === 0) {
       return textParts.map(p => p.text).join('\n') || '';
     }
@@ -759,7 +792,7 @@ async function _callGeminiWithTools(apiKey, model, messages, systemPrompt, tools
     const responseParts = [];
     for (const fc of functionCalls) {
       if (onToolCall) onToolCall(fc.functionCall.name, fc.functionCall.args || {});
-      const result = await _runTool(fc.functionCall.name, fc.functionCall.args || {}, room);
+      const result = await _runTool(fc.functionCall.name, fc.functionCall.args || {}, room, guard);
       if (onToolResult) onToolResult(fc.functionCall.name, result);
       responseParts.push({ functionResponse: { name: fc.functionCall.name, response: geminiToolResponse(result) } });
     }

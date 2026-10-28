@@ -39,8 +39,11 @@ test.after(() => { if (dir) rmSync(dir, { recursive: true, force: true }); });
 // Each provider asks for a tool until its request turns the tools off (or
 // until `stopAfter` rounds), then answers. `rejectChoice`: an OpenAI-
 // compatible server that refuses tool_choice; `ignoreChoice`: one that
-// ignores it and asks for a tool anyway, with no text.
-let stopAfter = Infinity, rejectChoice = false, rejectStatus = 400, ignoreChoice = false, multi = 1, argPad = '';
+// ignores it and asks for a tool anyway, with no text. Each call asks for
+// another page, as a model going through a library does, unless a test plans
+// the calls itself (`plan`, TraceApps/nutritrace#287).
+let stopAfter = Infinity, rejectChoice = false, rejectStatus = 400, ignoreChoice = false, multi = 1, argPad = '', plan = null;
+const callOf = (n, k) => (plan ? plan(n, k) : { name: 'get_recipes', args: { offset: n * 100 + k, ...(argPad ? { pad: argPad } : {}) } });
 const seen = [];
 const toolRounds = (b, path) => (path.startsWith('/claude')
   ? (b.messages || []).filter((m) => Array.isArray(m.content) && m.content.some((c) => c.type === 'tool_result')).length
@@ -63,17 +66,17 @@ const endpoint = http.createServer((req, res) => {
     if (req.url.startsWith('/claude')) {
       out = b.tool_choice?.type === 'none' || n >= stopAfter
         ? { content: [{ type: 'text', text: `answer after ${n}` }], stop_reason: 'end_turn' }
-        : { content: Array.from({ length: multi }, (_, k) => ({ type: 'tool_use', id: `t${n}_${k}`, name: 'get_recipes', input: { offset: n * 100 + k, ...(argPad ? { pad: argPad } : {}) } })), stop_reason: 'tool_use' };
+        : { content: Array.from({ length: multi }, (_, k) => { const c = callOf(n, k); return { type: 'tool_use', id: `t${n}_${k}`, name: c.name, input: c.args }; }), stop_reason: 'tool_use' };
     } else if (req.url.startsWith('/gemini')) {
       out = b.toolConfig?.functionCallingConfig?.mode === 'NONE' || n >= stopAfter
         ? { candidates: [{ content: { parts: [{ text: `answer after ${n}` }] }, finishReason: 'STOP' }] }
-        : { candidates: [{ content: { parts: Array.from({ length: multi }, () => ({ functionCall: { name: 'get_recipes', args: argPad ? { pad: argPad } : {} } })) }, finishReason: 'STOP' }] };
+        : { candidates: [{ content: { parts: Array.from({ length: multi }, (_, k) => { const c = callOf(n, k); return { functionCall: { name: c.name, args: c.args } }; }) }, finishReason: 'STOP' }] };
     } else {
       if (rejectChoice && b.tool_choice) return res.writeHead(rejectStatus, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: { message: "Unsupported value: 'tool_choice' none" } }));
       const answer = (b.tool_choice === 'none' && !ignoreChoice) || n >= stopAfter;
       out = { choices: [{ index: 0, finish_reason: answer ? 'stop' : 'tool_calls', message: answer
         ? { role: 'assistant', content: `answer after ${n}` }
-        : { role: 'assistant', content: null, tool_calls: Array.from({ length: multi }, (_, k) => ({ id: `c${n}_${k}`, type: 'function', function: { name: 'get_recipes', arguments: JSON.stringify(argPad ? { pad: argPad } : {}) } })) } }] };
+        : { role: 'assistant', content: null, tool_calls: Array.from({ length: multi }, (_, k) => { const c = callOf(n, k); return { id: `c${n}_${k}`, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.args) } }; }) } }] };
     }
     res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(out));
   });
@@ -92,7 +95,7 @@ const client = await import('../src/lib/aiChat.js');
 let calls = 0, toolResult = [];
 client.setToolHandler(async () => { calls++; return toolResult; });
 const TOOLS = [client.TOOLS.find((t) => t.name === 'get_recipes')];
-const fresh = (o = {}) => { seen.length = 0; calls = 0; stopAfter = o.stopAfter ?? Infinity; rejectChoice = !!o.rejectChoice; rejectStatus = o.rejectStatus ?? 400; ignoreChoice = !!o.ignoreChoice; toolResult = o.toolResult ?? []; multi = o.multi ?? 1; argPad = o.argPad ?? ''; };
+const fresh = (o = {}) => { seen.length = 0; calls = 0; stopAfter = o.stopAfter ?? Infinity; rejectChoice = !!o.rejectChoice; rejectStatus = o.rejectStatus ?? 400; ignoreChoice = !!o.ignoreChoice; toolResult = o.toolResult ?? []; multi = o.multi ?? 1; argPad = o.argPad ?? ''; plan = o.plan ?? null; };
 const ask = (provider, extra = {}) => client.callAI({
   provider, apiKey: 'k', model: provider === 'custom' ? 'local' : undefined, baseUrl: provider === 'custom' ? ENDPOINT : undefined,
   messages: [{ role: 'user', content: 'Which of my recipes use cilantro?' }], systemPrompt: 'You are Trace.', tools: TOOLS, ...extra,
@@ -411,4 +414,107 @@ test('MCP search_recipes, list_pantry and list_cook_diary page through everythin
   // The public REST API shares the diary lookup: the same fields, nothing taken away.
   const core = server.diary.listCookDiaryCore(1, { limit: 5 });
   assert.deepEqual([core.count, core.limit, core.total, core.items.length], [5, 5, 120, 5]);
+});
+
+// ── The same tool call again (TraceApps/nutritrace#287) ─────────────────
+// The report (NutriTrace): requests a second apart, the same tool call each
+// time, then nothing. Now the same call a second time isn't run again, and a
+// third time the next request is the last, saying which tool it got stuck on.
+const reply = await import('../src/lib/trace-reply.js');
+// The same call every time, its arguments' keys in another order every other round.
+const sameCall = (name = 'get_recipes') => (n) => ({ name, args: n % 2 ? { search: 'cilantro', category: 'Mains' } : { category: 'Mains', search: 'cilantro' } });
+const repeated = (s) => (reply.TOOL_REPEATED ? JSON.stringify(s.body).split(reply.TOOL_REPEATED).length - 1 : 0);
+const toolsOff = (provider, body) => (provider === 'custom' ? body.tool_choice === 'none' : provider === 'claude' ? body.tool_choice?.type === 'none' : body.toolConfig?.functionCallingConfig?.mode === 'NONE');
+
+test('#287: the same call a second time isn\'t run again: the model hears it has that answer already', async () => {
+  for (const provider of PROVIDERS) {
+    fresh({ plan: sameCall(), stopAfter: 2 });
+    assert.equal(await ask(provider), 'answer after 2', provider);
+    assert.equal(calls, 1, `${provider}: the tool ran once`);
+    assert.equal(seen.length, 3, provider);
+    assert.equal(repeated(seen[2]), 1, `${provider}: the second call has its answer`);
+    assert.ok(!toolsOff(provider, seen[2].body), provider);
+  }
+  assert.equal(reply.toolCallKey?.('get_recipe', { a: 1, b: { d: 2, c: [3, { f: 4, e: 5 }] } }), reply.toolCallKey?.('get_recipe', '{"b":{"c":[3,{"e":5,"f":4}],"d":2},"a":1}'));
+  assert.notEqual(reply.toolCallKey?.('get_recipe', { id: 1 }), reply.toolCallKey?.('get_recipe', { id: 2 }));
+});
+
+test('#287: a third time, the next request is the last, with the tools off, and it names the tool', async () => {
+  for (const provider of PROVIDERS) {
+    fresh({ plan: sameCall() });
+    assert.equal(await ask(provider), 'answer after 3', provider);
+    assert.equal(calls, 1, provider);
+    assert.equal(seen.length, 4, `${provider}: 4 requests, not 13`);
+    assert.ok(toolsOff(provider, seen[3].body) && !toolsOff(provider, seen[2].body), provider);
+    assert.ok(reply.toolStuckNote && systemOf(provider, seen[3].body) === `You are Trace.\n\n${client.OUT_OF_ROUNDS}\n\n${reply.toolStuckNote('get_recipes')}`, provider);
+    assert.match(systemOf(provider, seen[3].body), /stuck repeating get_recipes/);
+    fresh({ multi: 3, plan: () => ({ name: 'get_recipes', args: {} }) });
+    await ask(provider);
+    assert.deepEqual([calls, seen.length, repeated(seen[1])], [1, 2, 2], provider);
+    assert.ok(toolsOff(provider, seen[1].body), provider);
+  }
+  fresh({ plan: sameCall(), ignoreChoice: true });
+  assert.match(await ask('custom'), /kept asking for the same information/);
+  assert.match(JSON.parse(read('../src/i18n/en.json')).trace_reply.stuck_on_tool ?? '', /^Trace kept asking for the same information/);
+  // An import stuck on a read stops the way it does out of rounds: nothing to ignore.
+  fresh({ plan: sameCall() });
+  await assert.rejects(ask('claude', { toolsRequired: true }), { code: client.OUT_OF_ROUNDS_CODE });
+  assert.deepEqual([calls, seen.length], [1, 3]);
+});
+
+test('#287: different arguments, or another call in the same round, still run', async () => {
+  for (const provider of PROVIDERS) {
+    fresh({ multi: 3, stopAfter: 1, plan: (n, k) => ({ name: 'get_recipe', args: { id: k < 2 ? 1 : 2 } }) });
+    assert.match(await ask(provider), /^answer after/);
+    assert.equal(calls, 2, provider);
+    assert.equal(repeated(seen[1]), 1, provider);
+    fresh({ stopAfter: 10 });
+    assert.equal(await ask(provider), 'answer after 10');
+    assert.equal(calls, 10, provider);
+    assert.ok(seen.every((s) => repeated(s) === 0), provider);
+  }
+});
+
+test('#287: a tool that writes runs every time it is asked, and is never said to have run when it didn\'t', async () => {
+  // Every tool that doesn't only look (get_, list_, read_, find_) logs, plans,
+  // adds, saves or imports: none of them is counted.
+  const names = client.TOOLS.map((t) => t.name);
+  assert.ok(names.includes('create_recipe') && names.includes('read_recipes'));
+  assert.ok(client.READ_TOOLS instanceof Set, 'READ_TOOLS');
+  for (const name of names) assert.equal(client.READ_TOOLS.has(name), /^(get|list|read|find)_/.test(name), name);
+  for (const name of client.READ_TOOLS) assert.ok(names.includes(name), `${name} is a tool`);
+  const add = { name: 'add_to_shopping', args: { items: [{ name: 'Limes', quantity: 2 }] } };
+  for (const provider of PROVIDERS) {
+    fresh({ stopAfter: 3, plan: () => add });
+    assert.equal(await ask(provider), 'answer after 3');
+    assert.equal(calls, 3, provider);
+    fresh({ multi: 2, stopAfter: 1, plan: () => add });
+    await ask(provider);
+    assert.equal(calls, 2, provider);
+    // A list read again after a write reads it again: it has changed.
+    fresh({ stopAfter: 3, plan: (n) => (n === 1 ? add : { name: 'get_shopping_list', args: {} }) });
+    await ask(provider);
+    assert.equal(calls, 3, provider);
+    assert.ok(seen.every((s) => repeated(s) === 0 && !systemOf(provider, s.body).includes('stuck')), provider);
+    // An import that writes the same recipe twice saves it twice, and hears each was saved.
+    fresh({ multi: 2, stopAfter: provider === 'custom' ? 2 : 1, toolResult: { ok: true, recipe: { id: 1 } }, plan: () => ({ name: 'create_recipe', args: { title: 'Salsa', ingredients: ['lime'] } }) });
+    let saved = 0;
+    await ask(provider, { toolsRequired: true, onToolResult: (_n, r) => { if (r?.ok) saved++; } }).catch(() => {});
+    assert.deepEqual([calls, saved], [2, 2], provider);
+  }
+});
+
+test('#287: a made-up tool asked for again is counted too, and a lookup that failed may be tried once more', async () => {
+  for (const provider of PROVIDERS) {
+    // A tool the app doesn't have: nothing ran, nothing changed.
+    fresh({ plan: sameCall('get_recipes_entries') });
+    assert.equal(await ask(provider), 'answer after 3', provider);
+    assert.deepEqual([calls, seen.length], [1, 4], provider);
+    assert.match(systemOf(provider, seen[3].body), /stuck repeating get_recipes_entries/, provider);
+    // Offline the first time: asked again, it runs again; failing again, it counts.
+    fresh({ plan: sameCall(), toolResult: { error: 'Offline' } });
+    assert.equal(await ask(provider), 'answer after 4', provider);
+    assert.deepEqual([calls, seen.length], [2, 5], provider);
+    assert.equal(repeated(seen[3]), 1, provider);
+  }
 });
