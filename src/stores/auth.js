@@ -2,6 +2,7 @@ import { writable, get as getStore } from 'svelte/store';
 import { loadServerSettings } from './settings.js';
 import { isNative, getServerUrl, getAuthToken, apiUrl as _apiUrl } from '../lib/platform.js';
 import { readAuth, startState, failureKind } from '../lib/auth-load.js';
+import { deadlineSignal, isDeadlineError, noteQuiet, noteAnswered, SIGN_IN_CHECK_MS } from '../lib/request-deadline.js';
 
 function _authHeaders() {
   const h = {};
@@ -123,17 +124,22 @@ export async function loadAuthState() {
     return;
   }
 
-  // PWA: fetch from server (blocking — no cache to fall back on initially)
-  await _fetchAuthFromServer();
+  // PWA: fetch from server (blocking: no cache to fall back on initially).
+  // With an account kept here to open with, a server that doesn't answer
+  // isn't waited on long: the app opens as it does offline
+  // (lib/request-deadline.js).
+  const kept = localStorage.getItem('ct:cachedUser') || localStorage.getItem('ct:cachedUserMgmt') === '0';
+  await _fetchAuthFromServer({ waitMs: kept ? SIGN_IN_CHECK_MS : 8000 });
 }
 
 /** Fetch auth state from server — used by PWA (blocking) and as background refresh for native */
-async function _fetchAuthFromServer() {
+async function _fetchAuthFromServer({ waitMs = 8000 } = {}) {
   try {
     // Redirects not followed on the web: the server never sends one, so a
     // redirect is a sign-in proxy's (lib/auth-load.js).
-    const { status: statusData, me: meData } = await readAuth(fetch, _apiUrl, {
-      credentials: 'include', headers: _authHeaders(), signal: AbortSignal.timeout(8000),
+    const timed = (url, init) => fetch(url, init).then((res) => { noteAnswered(); return res; }, (err) => { if (isDeadlineError(err)) noteQuiet(); throw err; });
+    const { status: statusData, me: meData } = await readAuth(timed, _apiUrl, {
+      credentials: 'include', headers: _authHeaders(), signal: deadlineSignal(waitMs),
       ...(isNative ? {} : { redirect: 'manual' }),
     });
     const user       = meData.user || null;
@@ -374,6 +380,9 @@ export async function logout() {
       }
       await clearOffline();
     } catch { /* nothing queued, or no database */ }
+    // Pictures this account opened (service worker cache) go with it too, so
+    // the next account on this browser doesn't see them.
+    try { if (typeof caches !== 'undefined') await caches.delete('uploads-cache'); } catch { /* nothing cached */ }
   }
   try { await fetch(_apiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include', headers: _authHeaders(), ...(isNative ? { signal: AbortSignal.timeout(5000) } : {}) }); } catch {}
   // Clear auth state — but keep cached data (foods, images, server URL)

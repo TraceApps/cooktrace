@@ -8,6 +8,7 @@
  */
 
 import { isNative, getServerUrl, getAuthToken, resolveAssetUrl, apiUrl } from './platform.js';
+import { fetchWithDeadline } from './request-deadline.js';
 
 // Build the auth-related headers a mutating request needs. Callers
 // that bypass NtApi._fetch (multipart FormData uploads via a raw
@@ -28,7 +29,10 @@ function _mutatingAuthHeaders() {
 }
 
 const _CtApiHttp = {
-  async _fetch(method, path, body, isUpload = false) {
+  // `deadlineMs`: how long to wait for a server that doesn't answer, given
+  // by the offline layer where it has an answer of its own
+  // (lib/request-deadline.js). Otherwise as long as it takes.
+  async _fetch(method, path, body, isUpload = false, deadlineMs = null) {
     const headers = {};
     if (!isUpload) headers['Content-Type'] = 'application/json';
 
@@ -41,13 +45,13 @@ const _CtApiHttp = {
       if (csrf) headers['X-CSRF-Token'] = csrf;
     }
 
-    const res = await fetch(apiUrl(path), {
+    const res = await fetchWithDeadline((u, i) => fetch(u, i), apiUrl(path), {
       method,
       headers,
       credentials: 'include',
       cache: 'no-store',
       body: isUpload ? body : body != null ? JSON.stringify(body) : undefined,
-    });
+    }, deadlineMs);
     if (!res.ok) {
       const e = await res.json().catch(() => ({}));
       const err = new Error(e.error || `API error ${res.status}`);

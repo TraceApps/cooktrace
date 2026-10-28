@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { VitePWA } from 'vite-plugin-pwa';
+import { isAppPageLoad, treatServerErrorAsOffline, keepNoPageCopy, useCachedAppOnTimeout } from './src/lib/pwa-navigation.js';
 
 export default defineConfig({
   // Use relative asset URLs so the bundle works regardless of the path the
@@ -43,6 +44,10 @@ export default defineConfig({
       // under the user with no warning. See src/lib/pwa-update.js
       // for the Svelte-side bridge.
       registerType: 'prompt',
+      // Browsers fetch the manifest without the sign-in proxy's cookie unless
+      // told otherwise, and the proxy answers with its sign-in page
+      // (TraceApps/notetrace#37).
+      useCredentials: true,
       workbox: {
         // Precache the app itself, not just the fallback page: with only
         // offline.html here a reload with no connection served a shell whose
@@ -51,21 +56,35 @@ export default defineConfig({
         globIgnores: ['vendor/**', 'icons/**', '**/*.map'],
         // Some chunks (the editor, the importers) are over the 2 MiB default.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        // Page loads go to the server first (the first page route below), so
+        // no navigateFallback (null, or Vite PWA puts its own back), and '/'
+        // isn't answered from the cache as index.html: the precache answered
+        // it before any route ran, so a deploy waited a reload.
         navigateFallback: null,
-        navigateFallbackDenylist: [/.*/],
+        directoryIndex: null,
         cleanupOutdatedCaches: true,
         // Tapping a cook timer's "Timer done" opens the app (#77).
-        importScripts: ['sw-timers.js'],
+        importScripts: ['sw-timers.js', 'sw-retired-caches.js'],
         skipWaiting: true,
         clientsClaim: true,
         runtimeCaching: [
           {
-            urlPattern: ({ request }) => request.mode === 'navigate',
+            // The app page: from the server, the cached copy only offline
+            // (src/lib/pwa-navigation.js).
+            urlPattern: isAppPageLoad,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'pages-cache',
+              cacheName: 'app-page',
               networkTimeoutSeconds: 3,
+              precacheFallback: { fallbackURL: 'index.html' },
+              plugins: [{ fetchDidSucceed: treatServerErrorAsOffline, cacheWillUpdate: keepNoPageCopy, cachedResponseWillBeUsed: useCachedAppOnTimeout }],
             }
+          },
+          {
+            // The API, uploads and public recipe links opened as a page:
+            // never kept, so an export or a backup can't outlive the session.
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkOnly',
           },
           {
             // Recipe and pantry photos, kept as they are shown, so a recipe

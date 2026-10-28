@@ -260,3 +260,69 @@ test('the screens say this browser could not keep it, and Profile keeps who is s
   const profile = readFileSync(new URL('../src/routes/Profile.svelte', import.meta.url), 'utf8');
   assert.match(profile, /if \(data\?\.user\) currentUser\.set\(\{ \.\.\.get\(currentUser\), \.\.\.data\.user \}\);/);
 });
+
+// ── A server that takes the connection and never answers ─────────────
+// Past a deadline it counts as no connection, as one that's gone does: a
+// read answers from the copy (or says it needs a connection), a change goes
+// into the queue, and while the server is quiet a change doesn't wait for it
+// at all (lib/request-deadline.js).
+const deadline = await import('../src/lib/request-deadline.js');
+/** A server whose every answer runs out of time, saying how long each was given. */
+function silentHttp() {
+  const given = [];
+  return {
+    given,
+    async _fetch(method, path, body, isUpload, deadlineMs) {
+      given.push([method, String(path), deadlineMs ?? null]);
+      throw deadline.noAnswerError(new DOMException('The operation timed out.', 'TimeoutError'));
+    },
+  };
+}
+
+test('a silent server: reads wait only so long, and changes go into the queue', async () => {
+  setOnline(true);
+  deadline.noteAnswered();
+  const { mod, call } = await page();
+  const silent = silentHttp();
+  // A list read here before answers from that copy.
+  await call('GET', '/api/shopping', undefined, { _fetch: async () => [{ id: 3, name: 'Eggs' }] });
+  deadline.noteAnswered();
+  assert.deepEqual((await call('GET', '/api/shopping', undefined, silent)).map(r => r.name), ['Eggs']);
+  assert.deepEqual(silent.given.at(-1), ['GET', '/api/shopping', deadline.READ_MS]);
+  // A read with no copy says it needs a connection, as with none, and soon.
+  await assert.rejects(call('GET', '/api/recipes/shared-with-me', undefined, silent), (e) => e.offline === true);
+  assert.deepEqual(silent.given.at(-1), ['GET', '/api/recipes/shared-with-me', deadline.QUIET_READ_MS], 'quiet now: shorter');
+  // A change, while the server isn't known quiet: sent with no deadline
+  // (one cut off might have landed), and queued once it fails.
+  deadline.noteAnswered();
+  const made = await call('POST', '/api/shopping', { name: 'Milk' }, silent);
+  assert.equal(made.queued, true);
+  assert.deepEqual(silent.given.at(-1), ['POST', '/api/shopping', null]);
+  assert.equal(await mod.pendingCount(), 1);
+  // Quiet now: the next change goes straight into the queue.
+  const before = silent.given.length;
+  await call('POST', '/api/shopping', { name: 'Bread' }, silent);
+  assert.equal(silent.given.length, before, 'not sent while the server is quiet');
+  assert.equal(await mod.pendingCount(), 2);
+  deadline.noteAnswered();
+});
+
+test('server work with no offline answer waits as long as it takes', async () => {
+  setOnline(true);
+  deadline.noteAnswered();
+  const { call } = await page();
+  const given = [];
+  const http = { async _fetch(method, path, body, isUpload, deadlineMs) { given.push(deadlineMs ?? null); return { ok: true }; } };
+  await call('POST', '/api/kitchens', { name: 'Home' }, http);
+  await call('POST', '/api/recipes/import-url', { url: 'https://example.com/r' }, http);
+  assert.deepEqual(given, [null, null]);
+});
+
+test('the API layer stops waiting at the deadline it is given, and calls that no connection', async () => {
+  const { readFileSync } = await import('node:fs');
+  const api = readFileSync(new URL('../src/lib/api.js', import.meta.url), 'utf8');
+  assert.match(api, /async _fetch\(method, path, body, isUpload = false, deadlineMs = null\)/);
+  assert.match(api, /const res = await fetchWithDeadline\(/);
+  assert.match(api, /\}, deadlineMs\);/);
+});
+

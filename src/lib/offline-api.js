@@ -31,6 +31,20 @@ import {
 // no copy of it. This is what "Failed to fetch dynamically imported module"
 // looked like from the outside.
 import { embeddableDataUrl } from './image-embed.js';
+import { readDeadlineFor, queueUnsent, noteAnswered, sendingChange } from './request-deadline.js';
+
+// How long a read waits for a server that doesn't answer before the copy kept
+// here answers (request-deadline.js). Reads the server answers by asking
+// another service (Trace, NoteTrace, food databases, update checks) or that
+// carry a whole account wait as long as they take; whole lists (every recipe,
+// pantry item, cook) get longer, for a small server with a big collection.
+const _SLOW_READS = /^\/api\/(ai(?!\/history)|nt|proxy|off|updates|data|full-backup)(\/|\?|$)/;
+const _HEAVY_READS = /^\/api\/(recipes|pantry|cook-diary(\/(heatmap|stats))?)(\?|$)/;
+/** How long a read may wait for the server, or null to wait as long as it takes. */
+export function readDeadlineMsFor(path) {
+  const p = String(path || '');
+  return readDeadlineFor(_SLOW_READS.test(p) ? 'slow' : _HEAVY_READS.test(p) ? 'heavy' : 'read');
+}
 
 const RETRY_MIN_MS = 3_000;
 const RETRY_MAX_MS = 30_000;
@@ -439,6 +453,7 @@ async function _flushOnce() {
   // and loses signal again with nothing at all to look at.
   await _forgetTouched(collapseOps(ops));
   _resetBackoff();
+  noteAnswered();
   _publish({ syncing: false, error: null, online: true, refused: standing });
   _channel?.postMessage({ type: 'outbox', synced: true, ids: map });
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('ct:offline-synced'));
@@ -488,7 +503,7 @@ async function _refreshLists(prefixes) {
   for (const path of prefixes) {
     if (!isMirroredGet(path)) continue;
     try {
-      const answer = await _http._fetch('GET', path);
+      const answer = await _http._fetch('GET', path, undefined, false, readDeadlineMsFor(path));
       await _remember(mirrorKey(path), answer);
     } catch { /* the connection went again: the next read will fill it */ }
   }
@@ -514,7 +529,7 @@ export async function clearOffline() {
 function _wire() {
   if (typeof window === 'undefined' || window.__ctOfflineWired) return;
   window.__ctOfflineWired = true;
-  window.addEventListener('online', () => { _resetBackoff(); _publish({ online: true }); _scheduleFlush(0); });
+  window.addEventListener('online', () => { _resetBackoff(); noteAnswered(); _publish({ online: true }); _scheduleFlush(0); });
   window.addEventListener('offline', () => _publish({ online: false }));
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && _online()) _scheduleFlush(0);
@@ -597,7 +612,10 @@ export async function offlineFetch(http, method, path, body) {
 
   if (m === 'GET' || m === 'HEAD') {
     try {
-      const answer = await http._fetch(m, path, body);
+      // A server that doesn't answer isn't waited on for long: the copy
+      // answers, or the read says it needs a connection, as with none
+      // (lib/request-deadline.js).
+      const answer = await http._fetch(m, path, body, false, readDeadlineMsFor(path));
       if (isMirroredGet(path)) await _remember(mirrorKey(path), answer);
       _noteShown(path, answer);
       _publish({ online: true });
@@ -651,10 +669,11 @@ export async function offlineFetch(http, method, path, body) {
   // what is queued, so changes go up in the order they were made
   // (TraceApps/nutritrace#269).
   const isProfile = op.kind === 'profile';
-  const tried = _online() && (isProfile || !queued.length);
+  // A server that has just gone quiet isn't waited on again: the queue.
+  const tried = _online() && !queueUnsent() && (isProfile || !queued.length);
   if (tried) {
     try {
-      return isProfile && queued.some(o => o.key === 'profile') ? await _superseding('profile', direct) : await direct();
+      return await sendingChange(() => isProfile && queued.some(o => o.key === 'profile') ? _superseding('profile', direct) : direct());
     } catch (err) {
       if (!isOfflineError(err)) throw err;
       _publish({ online: false });
@@ -678,7 +697,7 @@ export async function offlineFetch(http, method, path, body) {
     // just tried that way (it may have landed), nor when it names something
     // only this browser has.
     if (!tried && _online() && !_namesTempId(target, body) && !(await _all('outbox')).length) {
-      try { return await direct(); } catch (err) { if (!isOfflineError(err)) throw err; _publish({ online: false }); }
+      try { return await sendingChange(direct); } catch (err) { if (!isOfflineError(err)) throw err; _publish({ online: false }); }
     }
     throw _storageError();
   }
