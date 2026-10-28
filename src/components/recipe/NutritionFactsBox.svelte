@@ -31,6 +31,16 @@
    *                         Not currently called with true from any
    *                         CookTrace surface, but kept in sync so the
    *                         shared component stays byte-for-byte.
+   *   portion, unit       : the serving the values are for, so the right
+   *                         column can read "Per 100 g" instead of % Daily
+   *                         Value when the user picks that (same setting as
+   *                         NutriTrace #297). A weight reads per 100 g, a
+   *                         volume per 100 ml; a count unit or no serving
+   *                         leaves the column blank, like a nutrient with
+   *                         no %DV.
+   *   per100Allowed       : false keeps % Daily Value whatever the setting;
+   *                         the public recipe page has no ingredient
+   *                         weights, and its viewer can't add them.
    */
   import { _ } from 'svelte-i18n';
   import {
@@ -38,12 +48,32 @@
     dvPercent, isDerived,
     displayEnergy, energyUnitSuffix,
   } from '../../lib/nutriments.js';
-  import { visibleNutriments, customNutriments, energyUnit } from '../../stores/settings.js';
+  import { visibleNutriments, customNutriments, energyUnit, nutritionFactsColumn } from '../../stores/settings.js';
+  import { factsColumn, per100, servingInBase } from '../../lib/facts-column.js';
 
   export let nutrition = {};
   export let servings = null;
   export let yieldText = '';
   export let recipeMassG = null;
+  export let portion = null;
+  export let unit = '';
+  export let per100Allowed = true;
+
+  // The right column is % Daily Value (default) or Per 100 g / ml.
+  $: per100Mode = per100Allowed && factsColumn($nutritionFactsColumn) === 'per100';
+  $: base = per100Mode ? servingInBase(portion, unit) : null;
+  $: baseUnit = base?.basis || 'g';
+  function colText(nut, v, per100Mode, base) {
+    if (!per100Mode) {
+      const dv = dvPercent(nut, v);
+      return dv != null ? `${dv}%` : '';
+    }
+    const p = per100(v, base);
+    return p != null ? fmt(p, nut.unit) : '';
+  }
+  $: caloriesPer100 = per100Mode && caloriesNut ? per100(nutrition[caloriesNut.id], base) : null;
+  $: baseAmountText = base
+    ? `${Math.round(base.amount * 10) / 10}${base.basis}` : '';
   export let servingDescription = '';
   export let servingsPerContainer = null;
   export let forceShowAll = false;
@@ -163,14 +193,20 @@
         {caloriesValDisplay}{#if $energyUnit === 'kJ'}<span class="cal-unit"> {caloriesUnitLabel}</span>{/if}
       </span>
     </div>
+    {#if caloriesPer100 != null}
+      <div class="cal-per100">{$_('nutrition_facts.per_100_energy', { values: { value: displayEnergy(caloriesPer100, $energyUnit) + ($energyUnit === 'kJ' ? ' ' + caloriesUnitLabel : ''), unit: baseUnit } })}</div>
+    {/if}
     <div class="rule mid"></div>
   {/if}
 
-  <div class="dv-header">{$_('nutrition_facts_box_ui.daily_value_header')}</div>
+  {#if per100Mode}
+    <div class="dv-header">{$_('nutrition_facts.per_100', { values: { unit: baseUnit } })}</div>
+  {:else}
+    <div class="dv-header">{$_('nutrition_facts_box_ui.daily_value_header')}</div>
+  {/if}
 
   {#each macroRows as nut (nut.id)}
     {@const v = nutrition[nut.id]}
-    {@const dv = dvPercent(nut, v)}
     {@const depth = _depth(nut)}
     {@const derived = isDerived(nutrition, nut.id)}
     <div class="row" class:bold={nut.bold && depth === 0} class:italic={nut.italic}
@@ -189,7 +225,7 @@
             title={nut.id === 'sodium' ? $_('nutrition_facts_box_ui.derived_from_salt') : $_('nutrition_facts_box_ui.derived_from_sodium')}>calculate</span>
         {/if}
       </span>
-      <span class="row-dv">{dv != null ? `${dv}%` : ''}</span>
+      <span class="row-dv" class:per100={per100Mode}>{colText(nut, v, per100Mode, base)}</span>
     </div>
   {/each}
 
@@ -197,21 +233,28 @@
     <div class="rule thick"></div>
     {#each vitMinRows as nut, i (nut.id)}
       {@const v = nutrition[nut.id]}
-      {@const dv = dvPercent(nut, v)}
       <div class="row vmin" class:no-bottom={i === vitMinRows.length - 1}>
         <span class="row-label">
           <span class="row-name">{nutLabel(nut)}</span>
           <span class="row-value">{fmt(v, nut.unit)}</span>
         </span>
-        <span class="row-dv">{dv != null ? `${dv}%` : ''}</span>
+        <span class="row-dv" class:per100={per100Mode}>{colText(nut, v, per100Mode, base)}</span>
       </div>
     {/each}
   {/if}
 
   <div class="rule thick"></div>
+  {#if per100Mode}
+    <p class="footnote">
+      {base
+        ? $_('nutrition_facts.per_100_from', { values: { unit: baseUnit, amount: baseAmountText } })
+        : $_(servings != null && !servingDescription ? 'nutrition_facts.per_100_unknown_recipe' : 'nutrition_facts.per_100_unknown')}
+    </p>
+  {:else}
   <p class="footnote">
     {$_('nutrition_facts_box_ui.footnote')}
   </p>
+  {/if}
 </div>
 {/if}
 
@@ -278,6 +321,12 @@
   .cal-name  { font-size: 26px; font-weight: 900; line-height: 1; }
   .cal-value { font-size: 38px; font-weight: 900; line-height: 1; }
   .cal-unit  { font-size: 14px; font-weight: 700; }
+  .cal-per100 {
+    text-align: right;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 0 0 4px;
+  }
 
   .dv-header {
     text-align: right;
@@ -316,6 +365,8 @@
     text-align: right;
     flex-shrink: 0;
   }
+
+  .row-dv.per100 { font-weight: 400; }
 
   /* Vitamins / minerals: smaller, name not bold, DV% bold. */
   .row.vmin {

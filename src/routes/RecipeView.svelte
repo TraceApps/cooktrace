@@ -658,6 +658,9 @@
   $: recipeMassG = (recipeMassResult && recipeMassResult.complete)
     ? recipeMassResult.perServingG
     : null;
+  $: recipeMassExactG = (recipeMassResult && recipeMassResult.complete)
+    ? recipeMassResult.exactG
+    : null;
 
   async function remove() {
     const ok = await confirmDialog({
@@ -1736,6 +1739,8 @@
             servings={recipe.servings}
             yieldText={recipe.yield_text}
             {recipeMassG}
+            portion={recipeMassExactG}
+            unit="g"
           />
           <div class="recompute-card">
             {#if !recomputeResult}

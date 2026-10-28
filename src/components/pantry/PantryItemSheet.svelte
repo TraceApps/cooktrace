@@ -1285,7 +1285,8 @@
 
           {#if hasNutrition && !editing}
             <div class="nutrition-wrap">
-              <NutritionFactsBox nutrition={item.nutrition} servingDescription={servingDescription} />
+              <NutritionFactsBox nutrition={item.nutrition} servingDescription={servingDescription}
+                portion={item.serving_size} unit={item.serving_unit} />
             </div>
           {/if}
           {#if editing}

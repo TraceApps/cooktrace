@@ -226,6 +226,7 @@
               nutrition={recipe.nutrition}
               servings={recipe.servings}
               yieldText={recipe.yield_text}
+              per100Allowed={false}
             />
           </section>
         </div>

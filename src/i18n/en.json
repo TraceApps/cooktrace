@@ -1093,7 +1093,11 @@
   "settings_nutrition_ct": {
     "visibility":                "Nutrition Facts Visibility",
     "defaults":                  "Defaults",
-    "show_all":                  "Show All"
+    "show_all":                  "Show All",
+    "facts_column":              "Right Column",
+    "facts_column_desc":         "% Daily Value, or the amount in 100 g (100 ml for drinks) so items with different serving sizes are easy to compare.",
+    "facts_column_dv":           "% Daily Value",
+    "facts_column_per100":       "Per 100 g"
   },
   "settings_auth_extra": {
     "toast": {
@@ -1376,7 +1380,12 @@
   "nutrition_facts": {
     "title":                     "Nutrition Facts",
     "serving_size":              "Serving Size",
-    "amount_per_serving":        "Amount Per Serving"
+    "amount_per_serving":        "Amount Per Serving",
+    "per_100":                   "Per 100 {unit}",
+    "per_100_energy":            "{value} per 100 {unit}",
+    "per_100_from":              "Per 100 {unit} values are worked out from a serving of {amount}.",
+    "per_100_unknown":           "Per 100 g needs to know what this weighs. Set the serving size in grams or milliliters to see it.",
+    "per_100_unknown_recipe":    "Per 100 g needs the weight of every ingredient: an amount in grams, or a pantry item with grams per cup or a serving in grams."
   },
   "recipes_page": {
     "toast": {

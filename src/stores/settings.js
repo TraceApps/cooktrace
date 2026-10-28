@@ -1,6 +1,7 @@
 import { writable, get, derived } from 'svelte/store';
 import { DB } from '../lib/db.js';
 import { settingPrefix } from '../lib/setting-key.js';
+import { FACTS_COLUMN_DEFAULT } from '../lib/facts-column.js';
 // Whose settings: the account (and server) they're kept for.
 const _userKey = () => settingPrefix();
 
@@ -31,6 +32,7 @@ export const USER_PREFS = new Set([
   'household',
   'visibleNutriments',         // string[] of nutriment ids shown in the FDA box
   'customNutriments',          // { id, label, unit }[] the user added (same as NutriTrace)
+  'nutritionFactsColumn',      // 'dv' | 'per100': the FDA box's right column (same as NutriTrace #297)
   'customUnits',               // string[] of user-defined unit abbreviations
   // NutriTrace federation (Phase 2)
   'ntInstanceUrl','ntInstanceToken','ntFederationEnabled','ntConnectionVerified',
@@ -447,6 +449,9 @@ export const household         = createSettingStore('household',         []);
 export const visibleNutriments = createSettingStore('visibleNutriments', null);
 export const customUnits       = createSettingStore('customUnits',       []);
 export const customNutriments  = createSettingStore('customNutriments',  []);
+// Right-hand column of the Nutrition Facts label: 'dv' (% Daily Value) or
+// 'per100' (Per 100 g / 100 ml). Same key as NutriTrace, see lib/facts-column.js.
+export const nutritionFactsColumn = createSettingStore('nutritionFactsColumn', FACTS_COLUMN_DEFAULT);
 
 // NutriTrace federation (used in Phase 2)
 export const ntInstanceUrl       = createSettingStore('ntInstanceUrl',       '');

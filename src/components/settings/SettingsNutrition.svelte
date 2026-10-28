@@ -1,7 +1,8 @@
 <script>
   import { _ } from 'svelte-i18n';
   import { NUTRIMENTS, DEFAULT_VISIBLE_NUTRIMENT_IDS, CUSTOM_NUTRIENT_UNITS, customNutrientId } from '../../lib/nutriments.js';
-  import { visibleNutriments, customNutriments } from '../../stores/settings.js';
+  import { visibleNutriments, customNutriments, nutritionFactsColumn } from '../../stores/settings.js';
+  import { factsColumn } from '../../lib/facts-column.js';
   import Sheet from '../ui/Sheet.svelte';
 
   // Effective set: user choice if any, else NT-style defaults.
@@ -56,6 +57,23 @@
     items: NUTRIMENTS.filter(n => n.category === cat),
   })).filter(g => g.items.length > 0);
 </script>
+
+<!-- The label's right column: % Daily Value or Per 100 g (100 ml for
+     drinks), one at a time. Same setting as NutriTrace #297. -->
+<div class="setting-card column-card">
+  <div class="setting-row inline">
+    <div>
+      <span class="setting-label">{$_('settings_nutrition_ct.facts_column')}</span>
+      <span class="setting-desc">{$_('settings_nutrition_ct.facts_column_desc')}</span>
+    </div>
+    <div class="select-wrap">
+      <select class="select" value={factsColumn($nutritionFactsColumn)} on:change={e => nutritionFactsColumn.set(e.target.value)}>
+        <option value="dv">{$_('settings_nutrition_ct.facts_column_dv')}</option>
+        <option value="per100">{$_('settings_nutrition_ct.facts_column_per100')}</option>
+      </select>
+    </div>
+  </div>
+</div>
 
 <div class="setting-card">
   <div class="setting-row stack">
@@ -145,6 +163,14 @@
   .setting-label { font-size: 14px; font-weight: 600; color: var(--text-1); display: block; }
   .setting-desc { font-size: 12px; color: var(--text-3); display: block; margin-top: 4px; line-height: 1.4; }
   .actions-row { display: flex; gap: 8px; }
+  .column-card { margin-bottom: 12px; }
+  .setting-row.inline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .select-wrap { width: 160px; flex-shrink: 0; }
   .seg {
     background: var(--surface-2);
     color: var(--text-2);

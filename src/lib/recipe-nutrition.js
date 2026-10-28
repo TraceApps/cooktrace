@@ -633,6 +633,9 @@ export function computeRecipeMass(recipe, pantryById) {
   const perServingG = Math.round(totalG / servings);
   return {
     perServingG: perServingG > 0 ? perServingG : null,
+    // Unrounded, for the label's Per 100 g column: a 2.6 g serving
+    // rounded to 3 g would read 13% low.
+    exactG: totalG > 0 ? totalG / servings : null,
     complete,
   };
 }
