@@ -750,10 +750,12 @@ When you write to the user's data, summarise what you did briefly and concretely
             onToolCall: (toolName) => { toolStatus = $_('trace_ui.calling_tool', { values: { tool: toolName.replace(/_/g, ' ') } }); },
             onToolsUnsupported,
           });
-      const reply2 = reply || $_('trace_ui.no_response');
-      messages = [...messages, { role: 'assistant', content: reply2, time: _fmtTime() }];
+      // No words: said as an error, never shown or saved as a blank answer
+      // (TraceApps/nutritrace#286).
+      if (!String(reply ?? '').trim()) throw new Error($_('trace_reply.stopped_empty'));
+      messages = [...messages, { role: 'assistant', content: reply, time: _fmtTime() }];
       if (toolsNote) messages = toolsNotice.add(messages, $_(toolsNote));
-      NtApi.post('/api/ai/history', { role: 'assistant', content: reply2 })
+      NtApi.post('/api/ai/history', { role: 'assistant', content: reply })
         .catch(e => console.warn('[Trace] history save (assistant) failed:', e?.message || e));
     } catch (e) {
       messages = [...messages, { role: 'assistant', content: `⚠ ${e.message || $_('trace_ui.request_failed')}`, time: _fmtTime() }];

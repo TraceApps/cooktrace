@@ -31,7 +31,7 @@
   } from '../../stores/settings.js';
   import { showError, showSuccess } from '../../stores/toast.js';
   import { portal } from '../../lib/portal.js';
-  import { callAI, TOOLS, AI_DEFAULT_MODELS, OUT_OF_ROUNDS_CODE } from '../../lib/aiChat.js';
+  import { callAI, TOOLS, AI_DEFAULT_MODELS, OUT_OF_ROUNDS_CODE, EMPTY_REPLY_CODE } from '../../lib/aiChat.js';
 
   export let open = false;
   export let envLocked = false;
@@ -214,8 +214,9 @@ Rules:
         errorMessage = $_('file_import_dialog_ui.no_recipe_saved');
       }
     } catch (e) {
-      // Saved, then out of rounds (the model kept going): the recipe is there.
-      if (createdRecipe && e?.code === OUT_OF_ROUNDS_CODE) { phase = 'done'; progressLine = ''; return; }
+      // Saved, then out of rounds (the model kept going), or nothing more to
+      // say (TraceApps/nutritrace#286): the recipe is there.
+      if (createdRecipe && (e?.code === OUT_OF_ROUNDS_CODE || e?.code === EMPTY_REPLY_CODE)) { phase = 'done'; progressLine = ''; return; }
       phase = 'error';
       errorMessage = toolsUnsupported ? $_('trace_ai_ct.tools_unsupported_import') : (e.message || $_('file_import_dialog_ui.ai_failed'));
     }

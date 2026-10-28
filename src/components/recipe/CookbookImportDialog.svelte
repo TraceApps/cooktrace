@@ -30,7 +30,7 @@
   } from '../../stores/settings.js';
   import { showSuccess, showError } from '../../stores/toast.js';
   import { portal } from '../../lib/portal.js';
-  import { callAI, TOOLS, AI_DEFAULT_MODELS } from '../../lib/aiChat.js';
+  import { callAI, TOOLS, AI_DEFAULT_MODELS, EMPTY_REPLY_CODE } from '../../lib/aiChat.js';
 
   export let open = false;
   export let envLocked = false;
@@ -242,6 +242,13 @@ Rules:
         showSuccess($_('done.cookbook_imported', { values: { count: createdRecipes.length } }));
       }
     } catch (e) {
+      // Saved some, then nothing more to say (TraceApps/nutritrace#286): done, as before.
+      if (createdRecipes.length > 0 && e?.code === EMPTY_REPLY_CODE) {
+        phase = 'done';
+        progressLine = '';
+        showSuccess($_('done.cookbook_imported', { values: { count: createdRecipes.length } }));
+        return;
+      }
       // If we collected SOME recipes before the error, surface the partial success.
       if (createdRecipes.length > 0) {
         phase = 'done';

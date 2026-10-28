@@ -125,7 +125,7 @@ test('Trace adds the note once per conversation and never sends it; the imports 
   const trace = readFileSync(new URL('../src/components/ai/Trace.svelte', import.meta.url), 'utf8');
   assert.match(trace, /tools: TOOLS,\n.*onToolCall.*\n\s*onToolsUnsupported,\n\s*\}\);/);
   assert.match(trace, /toolsNote = routed \? 'trace_ai_ct\.tools_unsupported_routed' : 'trace_ai_ct\.tools_unsupported';/);
-  assert.match(trace, /messages = \[\.\.\.messages, \{ role: 'assistant', content: reply2, time: _fmtTime\(\) \}\];\s*if \(toolsNote\) messages = toolsNotice\.add\(messages, \$_\(toolsNote\)\);/);
+  assert.match(trace, /messages = \[\.\.\.messages, \{ role: 'assistant', content: reply, time: _fmtTime\(\) \}\];\s*if \(toolsNote\) messages = toolsNotice\.add\(messages, \$_\(toolsNote\)\);/);
   assert.match(trace, /messages = \[\];\s*toolsNotice\.reset\(\);/, 'a cleared chat is a new conversation');
   assert.match(trace, /const apiMessages = forModel\(messages\)/, 'the note is never sent to a model');
   assert.match(trace, /\{#if m\.role === 'note'\}\s*<div class="msg-note" role="status">/);

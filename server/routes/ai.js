@@ -5,7 +5,7 @@ import { getAiConfig } from '../ai.js';
 import { makeRateLimiter } from '../middleware/rate-limit.js';
 import { getOpenAIChatParams, openAIBase } from '../lib/openai-chat-params.js';
 import { AI_DEFAULT_MODELS, geminiModelFor, modelFor } from '../lib/ai-models.js';
-import { REPLY_MAX_TOKENS, sendWithLengthFallback, stoppedShort, stoppedShortError } from '../lib/trace-reply.js';
+import { REPLY_MAX_TOKENS, sendForReply, stoppedShort, stoppedShortError } from '../lib/trace-reply.js';
 import db from '../db.js';
 
 const router = Router();
@@ -143,7 +143,8 @@ async function _callClaude(apiKey, model, messages, systemPrompt) {
   // The app's limit (it was 1,024 here, which cut a long rewrite off); a
   // model that can't write that many is asked again as before (lib/trace-reply.js).
   const body = { model, max_tokens: REPLY_MAX_TOKENS, system: systemPrompt, messages };
-  const { ok, status, data } = await sendWithLengthFallback(body, async (b) => {
+  // An empty reply is asked for once more (lib/trace-reply.js).
+  const { ok, status, data } = await sendForReply('claude', body, async (b) => {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -170,7 +171,8 @@ async function _callOpenAI(apiKey, model, messages, systemPrompt, baseUrl = 'htt
     messages: [{ role: 'system', content: systemPrompt }, ...messages],
     ...getOpenAIChatParams({ baseUrl, model, hasTools: false, maxTokens: REPLY_MAX_TOKENS }),
   };
-  const { ok, status, data } = await sendWithLengthFallback(body, async (b) => {
+  // An empty reply is asked for once more (lib/trace-reply.js).
+  const { ok, status, data } = await sendForReply('openai', body, async (b) => {
     const res = await fetch(`${baseUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: {
@@ -195,16 +197,21 @@ async function _callGemini(apiKey, model, messages, systemPrompt) {
     role: msg.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: msg.content }],
   }));
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents,
-    }),
+  const body = {
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    contents,
+  };
+  // An empty reply is asked for once more (lib/trace-reply.js).
+  const sent = await sendForReply('gemini', body, async (b) => {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(b),
+    });
+    return { ok: res.ok, status: res.status, data: await res.json() };
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error?.message || `Gemini API error ${res.status}`);
+  const data = sent.data;
+  if (!sent.ok) throw new Error(data.error?.message || `Gemini API error ${sent.status}`);
   const short = stoppedShort('gemini', data);
   if (short) throw stoppedShortError(short);
   return data.candidates[0].content.parts[0].text;

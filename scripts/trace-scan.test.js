@@ -175,9 +175,9 @@ test('an import that needs its tools hears that it stopped early, with what it s
   // The dialogs: the cookbook import says "stopped after N recipes" with it (its catch);
   // a single recipe saved before the rounds ran out is kept as saved.
   const cookbook = read('../src/components/recipe/CookbookImportDialog.svelte');
-  assert.match(cookbook, /toolsRequired: true,[\s\S]*\} catch \(e\) \{\s*\/\/ If we collected SOME recipes[\s\S]{0,120}if \(createdRecipes\.length > 0\)[\s\S]{0,120}stopped_after/);
-  assert.match(read('../src/components/recipe/FileImportDialog.svelte'), /if \(createdRecipe && e\?\.code === OUT_OF_ROUNDS_CODE\) \{ phase = 'done'/);
-  assert.match(read('../src/components/recipe/BulkFileImportDialog.svelte'), /if \(!\(aiSaved && e\?\.code === OUT_OF_ROUNDS_CODE\)\) \{/);
+  assert.match(cookbook, /toolsRequired: true,[\s\S]*\} catch \(e\) \{[\s\S]{0,400}\/\/ If we collected SOME recipes[\s\S]{0,120}if \(createdRecipes\.length > 0\)[\s\S]{0,120}stopped_after/);
+  assert.match(read('../src/components/recipe/FileImportDialog.svelte'), /if \(createdRecipe && \(e\?\.code === OUT_OF_ROUNDS_CODE \|\| e\?\.code === EMPTY_REPLY_CODE\)\) \{ phase = 'done'/);
+  assert.match(read('../src/components/recipe/BulkFileImportDialog.svelte'), /if \(!\(aiSaved && \(e\?\.code === OUT_OF_ROUNDS_CODE \|\| e\?\.code === EMPTY_REPLY_CODE\)\)\) \{/);
 });
 
 test('one round of many big answers stops at the room left: the rest are skipped and said', async () => {

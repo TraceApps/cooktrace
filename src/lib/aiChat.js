@@ -23,7 +23,14 @@ import { _ } from 'svelte-i18n';
 import { getOpenAIChatParams, openAIBase } from './openai-chat-params.js';
 import { createToolSupportMemory, sendWithToolFallback, isToolsUnsupported } from './tool-support.js';
 import { geminiToolResponse } from './gemini-tool-response.js';
-import { REPLY_MAX_TOKENS, sendWithLengthFallback, stoppedShort, stoppedShortError } from './trace-reply.js';
+import { REPLY_MAX_TOKENS, sendForReply, sendWithLengthFallback, stoppedShort, stoppedShortError } from './trace-reply.js';
+
+// An import (toolsRequired) that already saved something isn't asked again
+// after an empty reply: told to always save, the model could save the same
+// recipe twice. The dialog keeps what it saved (TraceApps/nutritrace#286).
+const _sendForReply = (format, body, send, cb, round) => (cb?.toolsRequired && round > 0
+  ? sendWithLengthFallback(body, send)
+  : sendForReply(format, body, send));
 
 // A reply that stopped short, said in the app's language (trace-reply.js).
 function _inLanguage(e) {
@@ -40,6 +47,8 @@ const _stoppedShort = (why) => _inLanguage(stoppedShortError(why));
 // An import that needs its tools (toolsRequired) and ran out of rounds or
 // room: an answer without them is no use to it, so it hears it stopped early.
 export const OUT_OF_ROUNDS_CODE = 'trace_out_of_rounds';
+// A reply with no words and no tool call, after it was asked for once more (trace-reply.js).
+export const EMPTY_REPLY_CODE = 'trace_stopped_empty';
 function _outOfRounds() {
   let message = 'That took more steps than one request allows. Try a smaller part at a time.';
   try {
@@ -540,8 +549,9 @@ async function _callClaudeWithTools(apiKey, model, messages, systemPrompt, tools
     if (claudeTools.length) body.tools = claudeTools;
     // The tools stay declared (the history has tool calls in it), but can't be called.
     if (last && claudeTools.length) body.tool_choice = { type: 'none' };
-    // A model that can't write that many is asked again as before (trace-reply.js).
-    const res = await sendWithLengthFallback(body, async (b) => {
+    // A model that can't write that many is asked again as before, and an
+    // empty reply once more (trace-reply.js).
+    const res = await _sendForReply('claude', body, async (b) => {
       const r = await fetchProvider('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -553,11 +563,12 @@ async function _callClaudeWithTools(apiKey, model, messages, systemPrompt, tools
         body: JSON.stringify(b),
       });
       return { ok: r.ok, status: r.status, data: await r.json() };
-    });
+    }, cb, round);
     const data = res.data;
     if (!res.ok) throw new Error(data.error?.message || `Claude API error ${res.status}`);
     const short = stoppedShort('claude', data);
-    if (short) throw _stoppedShort(short);
+    // Out of rounds, nothing at all is said as before (_finalAnswer), after it was asked for once more.
+    if (short && !(last && short === 'empty')) throw _stoppedShort(short);
 
     const toolUses = (data.content || []).filter(b => b.type === 'tool_use');
     const textBlocks = (data.content || []).filter(b => b.type === 'text');
@@ -617,15 +628,16 @@ async function _callOpenAIWithTools(apiKey, model, messages, systemPrompt, tools
     if (last && openaiTools.length) body.tool_choice = 'none';
     const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
     if (apiKey && apiKey !== 'no-key') headers['Authorization'] = `Bearer ${apiKey}`;
-    // A server that won't take the longer reply is asked again as before.
-    const send = (body) => sendWithLengthFallback(body, async (b) => {
+    // A server that won't take the longer reply is asked again as before,
+    // and an empty reply once more (trace-reply.js).
+    const send = (body) => _sendForReply('openai', body, async (b) => {
       const res = await fetchProvider(`${baseUrl}/v1/chat/completions`, {
         method: 'POST',
         headers,
         body: JSON.stringify(b),
       });
       return { ok: res.ok, status: res.status, data: await res.json() };
-    });
+    }, cb, round);
     // A model that can't use tools gets the request again without them,
     // unless the caller can't do without them.
     const sendOnce = async () => (toolsRequired
@@ -645,7 +657,8 @@ async function _callOpenAIWithTools(apiKey, model, messages, systemPrompt, tools
     if (toolsDropped) onToolsUnsupported?.({ routed: toolsRouted });
     // Cut off, a rewrite would be half a recipe and a tool call half its arguments.
     const short = stoppedShort('openai', data);
-    if (short) throw _stoppedShort(short);
+    // Out of rounds, nothing at all is said as before (_finalAnswer), after it was asked for once more.
+    if (short && !(last && short === 'empty')) throw _stoppedShort(short);
 
     const choice = data.choices[0];
     const msg = choice.message;
@@ -719,15 +732,20 @@ async function _callGeminiWithTools(apiKey, model, messages, systemPrompt, tools
     };
     if (geminiTools) body.tools = geminiTools;
     if (last && geminiTools) body.toolConfig = { functionCallingConfig: { mode: 'NONE' } };
-    const res = await fetchProvider(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error?.message || `Gemini API error ${res.status}`);
+    // An empty reply is asked for once more (trace-reply.js).
+    const sent = await _sendForReply('gemini', body, async (b) => {
+      const r = await fetchProvider(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(b),
+      });
+      return { ok: r.ok, status: r.status, data: await r.json() };
+    }, cb, round);
+    const data = sent.data;
+    if (!sent.ok) throw new Error(data.error?.message || `Gemini API error ${sent.status}`);
     const short = stoppedShort('gemini', data);
-    if (short) throw _stoppedShort(short);
+    // Out of rounds, nothing at all is said as before (_finalAnswer), after it was asked for once more.
+    if (short && !(last && short === 'empty')) throw _stoppedShort(short);
     const candidate = data.candidates?.[0];
     const parts = candidate?.content?.parts || [];
     const functionCalls = parts.filter(p => p.functionCall);
