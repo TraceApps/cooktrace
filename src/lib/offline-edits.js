@@ -321,19 +321,56 @@ export function collapseOps(ops) {
         continue;
       }
     }
-    // Two saves of one recipe go up as one, the latest body: it says the
+    // Two saves of one row go up as one, the latest body: it says the
     // first one's copy, and every field either changed, or the second
     // save's copy (which already showed the first) would hide the first.
-    byKey.set(op.key, prev?.sync && op.sync ? { ...op, sync: combineSaveBases(prev.sync, op.sync) } : op);
+    // A first save that couldn't say what it changed (sent as before) and a
+    // second that can: every field counts, the first's at its own time, so
+    // the second's list doesn't drop the first's changes and the first's
+    // older ones don't count as made with the second.
+    if (prev && op.sync && (prev.sync || prev.method === op.method)) {
+      byKey.set(op.key, { ...op, sync: combineSaveBases(prev.sync || null, op.sync, { first: prev, second: op }) });
+    } else byKey.set(op.key, op);
   }
   return [...byKey.values(), ...out].sort((a, b) => (a.seq || 0) - (b.seq || 0));
 }
 
-/** Two saves of one recipe as one: the first copy, every field changed. */
-export function combineSaveBases(first, second) {
-  const changed = Array.isArray(first.changed) && Array.isArray(second.changed)
-    ? [...new Set([...first.changed, ...second.changed])] : null;
-  return { ...second, base_synced_at: first.base_synced_at ?? second.base_synced_at, changed };
+const _iso = ms => (Number.isFinite(ms) ? new Date(ms).toISOString() : null);
+
+/** When each field a queued save changed was changed: what it says
+ *  (field_edits), else the fields it lists at its time, else every field
+ *  it sends at its time. */
+function _editTimes(op, sync) {
+  if (sync?.field_edits && typeof sync.field_edits === 'object') return { ...sync.field_edits };
+  const at = (typeof sync?.edited_at === 'string' && sync.edited_at) || _iso(op?.at);
+  if (!at) return {};
+  const t = op ? saveTarget(op.method, op.path) : null;
+  const fields = Array.isArray(sync?.changed) ? sync.changed
+    : Object.keys(op?.body || {}).filter(f => !f.startsWith('_') && (!t || (FIELDS[t.table] || []).includes(f)));
+  return Object.fromEntries(fields.map(f => [f, at]));
+}
+
+/**
+ * Two saves of one row as one: the first copy, every field either changed,
+ * each with the time of the save that last changed it (field_edits), so a
+ * field changed in the first save keeps its older time. A first save that
+ * couldn't say (no sync, or no copy's stamp) leaves no copy to go by: every
+ * field is judged by its time. `ops`: the two queued saves, for their
+ * bodies and times.
+ */
+export function combineSaveBases(first, second, { first: a = null, second: b = null } = {}) {
+  const edits = { ..._editTimes(a, first), ..._editTimes(b, second) };
+  const known = !!(a || first?.field_edits) && Object.keys(edits).length > 0;
+  // What the two changed: both lists; else, where the times say, every
+  // field either one changed or sent (never the rest of the second's body,
+  // which is only the copy it was made on).
+  const changed = first && Array.isArray(first.changed) && Array.isArray(second.changed)
+    ? [...new Set([...first.changed, ...second.changed])]
+    : (known ? Object.keys(edits) : null);
+  const base = first && typeof first.base_synced_at === 'string' ? first.base_synced_at : (first ? second.base_synced_at : null);
+  const out = { ...second, base_synced_at: base ?? null, changed };
+  if (known) out.field_edits = edits; else delete out.field_edits;
+  return out;
 }
 
 /**

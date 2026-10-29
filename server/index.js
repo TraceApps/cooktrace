@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { rememberAdminOrigin } from './lib/public-url.js';
+import { privateFieldsOut } from './lib/private-fields.js';
 import { corsOrigin } from './lib/cors.js';
 import { framingHeaders, parseFrameAncestors } from './lib/frame-ancestors.js';
 import { crossSiteGuard } from './lib/cross-site.js';
@@ -193,6 +194,8 @@ router.use((req, res, next) => {
 
 // Prevent browser/proxy caching of all API responses
 router.use('/api', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+// No answer carries when each field of a row changed (lib/private-fields.js).
+router.use('/api', privateFieldsOut);
 
 // Older docs gave the OIDC callback as /api/oidc/callback. An IdP set up from
 // them sends people here; forward to the real callback (which finds the

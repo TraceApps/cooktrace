@@ -68,3 +68,18 @@ export function serverIsNewer(serverUpdatedAt, editedAt) {
   const b = utcMs(editedAt);
   return Number.isFinite(a) && Number.isFinite(b) && a > b + TIE_MS;
 }
+
+/**
+ * When each field of an edit was edited ({ field: time }, as a device or a
+ * page sends them in field_edits), on the server's clock as editTime puts
+ * them. Times that can't be read are left out. Null when there are none.
+ */
+export function fieldEditTimes(map, offsetMs) {
+  if (!map || typeof map !== 'object' || Array.isArray(map)) return null;
+  const out = {};
+  for (const [f, v] of Object.entries(map)) {
+    if (typeof v !== 'string' || !Number.isFinite(utcMs(v))) continue;
+    out[f] = editTime(v, offsetMs);
+  }
+  return Object.keys(out).length ? out : null;
+}

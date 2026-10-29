@@ -146,6 +146,38 @@ can't clobber a newer server value. Client `updatePantryItem` only
 writes the fields the payload contains; writing every column on
 every partial update silently wiped FKs.
 
+### Two edits of one row: the newer edit of each field
+
+When the same row is changed in two places (the phone offline, the web, a
+second phone), the server keeps the newer edit of each field, not of the
+whole row, with the rule every Trace app shares (`server/lib/field-sync.js`,
+the same file in `src/lib`, pinned by `scripts/field-sync.test.js`): fields
+that belong together stay together (`server/lib/sync-fields.js`
+`SYNC_GROUPS`), a delete made before a later edit loses, an edit made
+before a delete doesn't bring the row back, and times count in whole
+seconds (a tie between two edits goes to the one arriving, between an
+edit and a delete to the delete).
+
+- Each synced row keeps `field_stamps` (`{ field: [synced_at, edited_at] }`,
+  server only), kept by triggers in `db.js` and set per field by a merged
+  edit (`server/lib/field-stamps.js` `stampEach`). No answer carries it
+  (`server/lib/private-fields.js`); a full backup does, and a restore keeps it.
+- `server/lib/field-merge.js` puts CookTrace's own check in front of the
+  shared rule: an edit says which copy it was made on (the server's
+  `synced_at` of it), and a field not changed here since that copy is the
+  edit's to change, whatever the clocks say. Only a field changed here too
+  is decided by time. An edit whose time can't be right goes in, at the
+  time it arrives. A recipe's content that doesn't stay is kept as an
+  earlier version (`server/lib/recipe-versions.js`).
+- An edit says when each field it changed was changed (`field_edits`, on a
+  pushed row and in a web save's `_sync`), so a field changed before a
+  later change of another keeps its own time. The Android app keeps them in
+  `edit_times` (triggers in `src/lib/db-native.js`, cleared once the row's
+  push lands); the web app's queue keeps each queued save's time when two
+  saves of one row go up as one (`src/lib/offline-edits.js`
+  `combineSaveBases`). Apps and servers from before send or read none, and
+  every field an edit changed counts at the edit's time, as before.
+
 ### Only the app's own addresses get CORS
 
 `server/lib/cors.js` (identical in all four Trace apps) decides which pages

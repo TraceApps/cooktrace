@@ -12,3 +12,14 @@ export function stampFields(table, id, fields, at = new Date().toISOString().rep
     `UPDATE ${table} SET field_stamps = json_set(COALESCE(field_stamps, '{}'), ${fields.map(() => `?, json_array(json_extract(COALESCE(field_stamps, '{}'), ?), ?)`).join(', ')}) WHERE id = ?`
   ).run(...fields.flatMap(f => [`$.${f}`, `$.${f}[0]`, at]), id);
 }
+
+/** Each field stamped with its own edit time ({ field: time }, as
+ *  mergeFields' fieldTimes gives them). */
+export function stampEach(table, id, times) {
+  const byAt = new Map();
+  for (const [f, at] of Object.entries(times || {})) {
+    if (!byAt.has(at)) byAt.set(at, []);
+    byAt.get(at).push(f);
+  }
+  for (const [at, fields] of byAt) stampFields(table, id, fields, at);
+}

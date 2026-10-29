@@ -1,16 +1,16 @@
 /**
  * A save through the REST API (the web app, also replaying saves made with
  * no connection) that says which copy it was made on and what it changed
- * (_sync: { base_synced_at, changed, edited_at, client_now }) merges with
- * the row as a phone's sync does (lib/field-merge.js): what it didn't
- * change stays, and of what it did, the newer of it and a change here
- * since stays. A save that can't say (an older page) writes as before.
+ * (_sync: { base_synced_at, changed, edited_at, field_edits, client_now })
+ * merges with the row as a phone's sync does (lib/field-merge.js): what it
+ * didn't change stays, and of what it did, the newer edit of each field
+ * stays. A save that can't say (an older page) writes as before.
  */
 import db from '../db.js';
 import { mergeFields } from './field-merge.js';
 import { SYNC_FIELDS, SYNC_GROUPS } from './sync-fields.js';
-import { clockOffset, editTime } from './sync-clock.js';
-import { stampFields } from './field-stamps.js';
+import { clockOffset, editTime, fieldEditTimes } from './sync-clock.js';
+import { stampEach } from './field-stamps.js';
 
 const _now = () => new Date().toISOString().replace('T', ' ').slice(0, 19);
 
@@ -36,10 +36,11 @@ export function saveRow(table, id, existing, next, sync) {
     fields, groups: SYNC_GROUPS[table], changed,
     base: typeof sync.base_synced_at === 'string' ? sync.base_synced_at : null,
     editedAt: editTime(typeof sync.edited_at === 'string' ? sync.edited_at : null, clockOffset(sync.client_now)),
+    fieldEdits: fieldEditTimes(sync.field_edits, clockOffset(sync.client_now)),
   });
   if (!m.write) return { wrote: false, kept: m.devicePulls };
   db.prepare(`UPDATE ${table} SET ${cols.map(c => `${c} = ?`).join(', ')}, updated_at = ? WHERE id = ?`)
     .run(...cols.map(c => (c in m.row ? m.row[c] : next[c])), m.updatedAt, id);
-  stampFields(table, id, m.applied, m.fieldAt);
+  stampEach(table, id, m.fieldTimes);
   return { wrote: true, kept: m.devicePulls };
 }

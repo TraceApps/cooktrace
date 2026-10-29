@@ -18,7 +18,7 @@ import { isNative, getServerUrl, getAuthToken, apiUrl } from './platform.js';
 import {
   dbGetPendingChanges, dbGetPendingSettingsForPush,
   dbSetServerId, dbApplyPull,
-  dbGetMeta, dbSetMeta, dbMarkSettingsSynced, dbMarkTableSynced, dbRememberEcho,
+  dbGetMeta, dbSetMeta, dbEditTimes, dbMarkSettingsSynced, dbMarkTableSynced, dbRememberEcho,
   SYNC_PARENTS, SYNC_FIELDS, rowBase, rowChanges, dbInstallId, dbCountUnsynced, createKeyOf, mapIngredientLinks,
   dbClearDisabledUnitsChanged, dbHistoryCooks,
 } from './db-native.js';
@@ -509,6 +509,28 @@ async function _toServerIds(db, row, fks, cache) {
   return row;
 }
 
+const _fmtTime = ms => new Date(ms).toISOString().replace('T', ' ').slice(0, 19);
+/**
+ * When each field a row changed was changed here (db-native.js edit_times),
+ * on the clock the row's own edit time is on (edit_clock): one kept before
+ * the server's clock was known is moved onto it, once it is. A field with
+ * no time of its own goes with the row's. Null when there's none to say.
+ */
+export function fieldEditsOf(row, changed, times, clockOffset) {
+  if (!times || !Array.isArray(changed)) return null;
+  const out = {};
+  const onServer = row?.edit_clock === 'server';
+  for (const f of changed) {
+    const t = times[f];
+    if (!t?.at) continue;
+    if (onServer && t.clock !== 'server') {
+      const ms = Date.parse(String(t.at).replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(t.at) ? '' : 'Z'));
+      if (clockOffset != null && Number.isFinite(ms)) out[f] = _fmtTime(ms + clockOffset);
+    } else if (onServer || t.clock !== 'server') out[f] = t.at;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 async function pushChanges({ token = getAuthToken(), signal = null, gen = accountGeneration() } = {}) {
   // False once another account's sign-in has begun (lib/local-account.js
   // accountGeneration): nothing more is written for this push after that.
@@ -533,10 +555,18 @@ async function pushChanges({ token = getAuthToken(), signal = null, gen = accoun
   const tablesToSend = {};
   let total = 0;
   let deferred = 0;
+  // The server's clock against this phone's, for edit times kept before it
+  // was known (fieldEditsOf), read once there's a row to send.
+  let clockOffset;
   for (const [table, rows] of Object.entries(pending)) {
     if (!Array.isArray(rows) || rows.length === 0) continue;
     if (table === 'disabled_units' || table === 'recipe_cookbook_links' || table === 'deletes') continue;
     const out = [];
+    const editTimes = await dbEditTimes(table);
+    if (clockOffset === undefined && editTimes.size) {
+      const v = await dbGetMeta(CLOCK_OFFSET_KEY);
+      clockOffset = v != null && Number.isFinite(Number(v)) ? Number(v) : null;
+    }
     for (const r of rows) {
       const row = { ...r, client_id: r.id, server_id: r.server_id || null };
       if (!row.server_id && install) row.client_key = createKeyOf(install, table, r);
@@ -548,6 +578,10 @@ async function pushChanges({ token = getAuthToken(), signal = null, gen = accoun
       // an item checked off here doesn't put back anything else.
       const changed = rowChanges(table, r);
       if (changed) row.changed = changed;
+      // And when each of them was changed, so one changed before a later
+      // change of another keeps its own time.
+      const fieldEdits = changed ? fieldEditsOf(r, changed, editTimes.get(r.id), clockOffset ?? null) : null;
+      if (fieldEdits) row.field_edits = fieldEdits;
       delete row.server_base;
       await _toServerIds(db, row, SYNC_PARENTS[table] || {}, ids);
       // An ingredient's pantry link holds this phone's id; the server's id

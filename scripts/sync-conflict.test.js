@@ -116,7 +116,7 @@ test("the web app's recipe saves say which copy they were made on, and which fie
   // Two saves queued for one recipe go up as one: the first copy, both changes.
   const op = (seq, sync) => ({ seq, kind: 'recipe-update', key: 'recipe:4', id: 4, body: {}, sync });
   const [one] = collapseOps([op(1, { base_synced_at: 'A', changed: ['name'], edited_at: '1' }), op(2, { base_synced_at: 'B', changed: ['rating'], edited_at: '2' })]);
-  assert.deepEqual(one.sync, { base_synced_at: 'A', changed: ['name', 'rating'], edited_at: '2' });
+  assert.deepEqual(one.sync, { base_synced_at: 'A', changed: ['name', 'rating'], edited_at: '2', field_edits: { name: '1', rating: '2' } }, 'each field with the time of the save that changed it');
   const sent = withSaveBase({ name: 'B', _base: pageBase, _changed: ['name'], _sync: { stale: true } }, b, 'NOW');
   assert.equal(sent._sync.client_now, 'NOW');
   assert.equal(sent._sync.stale, undefined);
@@ -155,7 +155,7 @@ test('every web save of a synced row says its copy and what it changed', async (
   // Two queued saves of one item: the first copy, every changed field.
   const op = (seq, sync) => ({ seq, kind: 'shopping-update', key: 'shopping:7', id: 7, body: {}, sync });
   const [one] = collapseOps([op(1, { base_synced_at: 'S1', changed: ['name'], edited_at: '1' }), op(2, { base_synced_at: 'S2', changed: ['quantity'], edited_at: '2' })]);
-  assert.deepEqual(one.sync, { base_synced_at: 'S1', changed: ['name', 'quantity'], edited_at: '2' });
+  assert.deepEqual(one.sync, { base_synced_at: 'S1', changed: ['name', 'quantity'], edited_at: '2', field_edits: { name: '1', quantity: '2' } });
   const api = read('../src/lib/offline-api.js');
   assert.match(api, /_noteShown\(path, answer\)/, 'rows read are remembered by their stamp');
   assert.match(api, /return _straight\(http, m, target, withSaveBase\(body, sync\)\)/, 'saves that go straight up say their copy too');

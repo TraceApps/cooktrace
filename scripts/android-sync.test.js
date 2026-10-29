@@ -180,6 +180,17 @@ for (const [label, env] of [
   });
 }
 
+for (const [label, env] of [['the server clock known', { KNOWN_CLOCK: '1' }], ['before the phone knows the server clock', {}], ['a phone clock 10 minutes slow', { KNOWN_CLOCK: '1', PHONE_SKEW_MS: String(-10 * MIN) }]]) {
+  test(`each field keeps its own edit time: the web's newer name and the phone's newer notes both stay (${label})`, { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+    const r = await run('fieldTimes', env);
+    assert.deepEqual(r.server, { name: 'Soup (web)', notes: 'phone notes' });
+    assert.deepEqual(r.phone, { name: 'Soup (web)', notes: 'phone notes', pending: false });
+    assert.deepEqual(r.versions, ['Soup (phone)'], "the phone's lost rename is kept as a version");
+    assert.deepEqual(r.sentTimes, ['name', 'notes'], 'the phone kept when each field changed');
+    assert.equal(r.left, 0, 'sent, the times go');
+  });
+}
+
 test('other rows merge field by field: checked off on the phone, renamed on the web', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const r = await run('shoppingFields');
   assert.deepEqual(r.server, { name: 'Oat Milk', checked: true });

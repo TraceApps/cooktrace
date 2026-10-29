@@ -1117,7 +1117,8 @@ export function rekeyRevisions() {
 // a share link changes none of a recipe's fields an edit competes with, and
 // reordering a list changes only sort_order. Kept by triggers, so every
 // write path counts. Rows from before have none: every field then counts as
-// changed at the row's own times.
+// changed at the row's own times. A row restored from a backup keeps the
+// stamps it was backed up with (a new row has none, and gets them here).
 {
   const STAMP = `strftime('%Y-%m-%d %H:%M:%f', 'now')`;
   for (const [t, fields] of Object.entries(SYNC_FIELDS)) {
@@ -1129,6 +1130,7 @@ export function rekeyRevisions() {
     db.exec(`
       DROP TRIGGER IF EXISTS trg_${t}_fields_ins;
       CREATE TRIGGER trg_${t}_fields_ins AFTER INSERT ON ${t}
+      FOR EACH ROW WHEN NEW.field_stamps IS NULL
       BEGIN UPDATE ${t} SET field_stamps = json_object(${all}) WHERE id = NEW.id; END;
     `);
     for (const f of fields) {

@@ -206,6 +206,28 @@ const scenarios = {
     out.server = s.category?.name ?? null;
     out.phone = (await db.query(`SELECT name FROM recipe_categories WHERE id = ?`, [p.category_id])).values[0]?.name ?? null;
   },
+  // Offline, the phone renames a recipe, the web renames it after, and the
+  // phone changes its notes after that: each field keeps its own time, so
+  // the web's newer name stays and the phone's newer notes go in. `clock`:
+  // the phone knows the server's clock (a push since it started), so its
+  // edit times are stamped on it.
+  async fieldTimes() {
+    const id = await newRecipe(); await sync();
+    if (process.env.KNOWN_CLOCK) { const x0 = await localRecipe(id); await api.updateRecipe(x0.id, { ...x0, rating: 1 }); await sync(); }
+    let x = await localRecipe(id); await api.updateRecipe(x.id, { ...x, name: 'Soup (phone)' });
+    await sleep(2100); await webSave(id, { name: 'Soup (web)' }); await sleep(2100);
+    x = await localRecipe(id); await api.updateRecipe(x.id, { ...x, notes: 'phone notes' });
+    const row = await local(id);
+    out.sentTimes = (await db.query(`SELECT field FROM edit_times WHERE tbl = 'recipes' AND row_id = ? ORDER BY field`, [row.id]).catch(() => null))?.values.map(r => r.field) ?? null;
+    out.clock = row.edit_clock ?? null;
+    await sync(); await sync();
+    const s = await web('GET', `/api/recipes/${id}`);
+    const p = await local(id);
+    out.server = { name: s.name, notes: s.notes };
+    out.phone = { name: p.name, notes: p.notes, pending: p.sync_status === 'pending' };
+    out.left = (await db.query(`SELECT COUNT(*) AS n FROM edit_times`).catch(() => null))?.values[0].n ?? null;
+    out.versions = await versions(id);
+  },
   // An item checked off on the phone while the web renamed it: both stay.
   async shoppingFields() {
     const it = await web('POST', '/api/shopping', { name: 'Milk' }); await sync();

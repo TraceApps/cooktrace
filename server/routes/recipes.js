@@ -23,8 +23,8 @@ import { importRecipeFromText, importPaprikaArchive, scanRecipeZip, scanLoadedZi
 import { extractText, detectFileType } from '../lib/text-extractors.js';
 import { guardNestedRecipeFields } from '../lib/recipe-guards.js';
 import { saveRecipeVersion, versionColumns, mergeRecipe, sameContent, VERSION_FIELDS, META_FIELDS, RECIPE_MERGE_FIELDS } from '../lib/recipe-versions.js';
-import { clockOffset, editTime } from '../lib/sync-clock.js';
-import { stampFields } from '../lib/field-stamps.js';
+import { clockOffset, editTime, fieldEditTimes } from '../lib/sync-clock.js';
+import { stampFields, stampEach } from '../lib/field-stamps.js';
 import { saveRow } from '../lib/rest-merge.js';
 import { parseRecipeText, HIGH_CONFIDENCE_THRESHOLD } from '../lib/heuristic-recipe-parser.js';
 import JSZip from 'jszip';
@@ -687,6 +687,7 @@ export function updateRecipe(id, body, { u, role = null } = {}) {
       base: typeof sync.base_synced_at === 'string' ? sync.base_synced_at : null,
       changed,
       editedAt: editTime(typeof sync.edited_at === 'string' ? sync.edited_at : null, clockOffset(sync.client_now)),
+      fieldEdits: fieldEditTimes(sync.field_edits, clockOffset(sync.client_now)),
     });
     for (const k of m.keep) {
       saveRecipeVersion(id, existing.user_id, k.row, {
@@ -700,7 +701,7 @@ export function updateRecipe(id, body, { u, role = null } = {}) {
     for (const f of [...VERSION_FIELDS, ...META_FIELDS]) { data[f] = m.row[f]; guarded[f] = m.row[f]; }
     editedAt = m.updatedAt;
     keptServer = m.devicePulls;
-    applied = { fields: m.applied, at: m.fieldAt };
+    applied = { fields: m.applied, times: m.fieldTimes };
   } else if (!sameContent(guarded, existing)) {
     // A save that can't say which copy it was made on (an older page, an
     // API client): it goes in as before, and the copy it replaces is kept,
@@ -730,7 +731,7 @@ export function updateRecipe(id, body, { u, role = null } = {}) {
     editedAt,
     id,
   );
-  if (applied) stampFields('recipes', id, applied.fields, applied.at);
+  if (applied) stampEach('recipes', id, applied.times);
   // A change to what you cook is a new version (lib/recipe-history.js).
   recordRevision(id, { by: u, at: editedAt });
   const row = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(id);

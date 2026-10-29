@@ -49,9 +49,9 @@ import { mapSmartFilterCategory } from '../lib/smart-cookbook.js';
 import { saveRecipeVersion, mergeRecipe, sameContent, VERSION_FIELDS } from '../lib/recipe-versions.js';
 import { mergeFields } from '../lib/field-merge.js';
 import { SYNC_FIELDS, SYNC_GROUPS } from '../lib/sync-fields.js';
-import { stampFields } from '../lib/field-stamps.js';
+import { stampEach } from '../lib/field-stamps.js';
 import { repairVariantTree } from '../lib/pantry-tree.js';
-import { clockOffset, editTime, latestTime, utcMs } from '../lib/sync-clock.js';
+import { clockOffset, editTime, fieldEditTimes, latestTime, utcMs } from '../lib/sync-clock.js';
 import { cleanCreateKey, findByCreateKey, setCreateKey } from '../lib/create-keys.js';
 import { ownIngredientLinks, ownId, linkableRecipeId } from '../lib/link-checks.js';
 import { cleanSourceIds } from '../lib/shopping-plan.js';
@@ -383,6 +383,10 @@ router.post('/push', wrap((req, res) => {
               base: row.server_synced_at,
               changed: Array.isArray(row.changed) ? new Set(row.changed) : null,
               editedAt,
+              // When each field was edited, where the app says (field_edits,
+              // on the same clock as its updated_at): a field changed before
+              // a later change of another keeps its own time.
+              fieldEdits: fieldEditTimes(row.field_edits, corrected ? 0 : offsetMs),
             };
             const m = name === 'recipes'
               ? mergeRecipe(existing, incoming, opts)
@@ -400,7 +404,7 @@ router.post('/push', wrap((req, res) => {
               db.prepare(
                 `UPDATE ${name} SET ${cols.map(c => `${c} = ?`).join(', ')}, updated_at = ?${byOwner ? ', last_edited_by = NULL' : ''} WHERE id = ?`
               ).run(...cols.map(c => m.row[c] ?? null), m.updatedAt, row.server_id);
-              stampFields(name, row.server_id, cols, m.fieldAt);
+              stampEach(name, row.server_id, m.fieldTimes);
               if (name === 'recipes') recipesWritten.set(row.server_id, m.updatedAt);
             } else if (m.devicePulls) {
               // Nothing of the edit stays: the copy here is stamped again so

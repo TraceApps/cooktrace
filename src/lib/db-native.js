@@ -408,6 +408,10 @@ export async function dbInit() {
   await _migrateRecipeTotalMinutes();
   await _migrateServerCopy();
   await _migrateShoppingAisle();
+  // After every column is there: a column a migration adds (1.5's shopping
+  // list sort_order, sources and notes, a cook's any_day) gets its trigger
+  // on the first start after an update, not the next one.
+  await _keepEditTimes();
   await _backfillShoppingNames();
   await _migrateIngredientLinks();
   await _migrateRevisionKeys();
@@ -613,6 +617,50 @@ async function _migrateServerCopy() {
     }
     if (reset) await db.run(`DELETE FROM sync_meta WHERE key = 'last_pull_at'`);
   } catch (e) { console.warn('[db-native] server copy columns:', e?.message); }
+}
+
+// When each field of a row the server has was changed here and not sent
+// yet (edit_times), so a push says each field's own time: a name changed
+// before a later change of the notes keeps the time it was changed, and a
+// newer change of the name made elsewhere meanwhile stays. Triggers keep
+// it, so every write here counts; a pull's write (synced) doesn't. The
+// time is the edit's as the row keeps it (on the server's clock, as the
+// edit-clock triggers above stamp it, when that's known: `clock`). A
+// delete is the row's own edit, with the row's time. One statement per
+// call (the Android plugin runs only the first of a script's lines).
+async function _keepEditTimes() {
+  try {
+    const db = await getDb();
+    await db.run(`CREATE TABLE IF NOT EXISTS edit_times (tbl TEXT NOT NULL, row_id INTEGER NOT NULL, field TEXT NOT NULL, at TEXT, clock TEXT, PRIMARY KEY (tbl, row_id, field))`, []);
+    const have = new Set(((await db.query(`SELECT name FROM sqlite_master WHERE type = 'trigger' AND name GLOB 'et_*'`, []))?.values || []).map(r => r.name));
+    const shift = `printf('%+.3f seconds', CAST((SELECT value FROM sync_meta WHERE key = 'clock_offset_ms') AS REAL) / 1000.0)`;
+    const onServer = `(EXISTS (SELECT 1 FROM sync_meta WHERE key = 'clock_offset_ms') AND NEW.edit_clock IS OLD.edit_clock AND NEW.updated_at IS NOT OLD.updated_at)`;
+    for (const t of SYNC_TABLES) {
+      const fields = (SYNC_FIELDS[t] || []).filter(f => f !== 'deleted_at');
+      const cols = new Set(((await db.query(`PRAGMA table_info(${t})`, []))?.values || []).map(c => c.name));
+      if (!cols.size) continue;
+      for (const f of fields.filter(x => cols.has(x) && !have.has(`et_${t}_${x}`))) {
+        await db.run(`CREATE TRIGGER IF NOT EXISTS et_${t}_${f} AFTER UPDATE OF ${f} ON ${t} FOR EACH ROW WHEN OLD.${f} IS NOT NEW.${f} AND NEW.sync_status = 'pending' AND NEW.server_id IS NOT NULL BEGIN INSERT OR REPLACE INTO edit_times (tbl, row_id, field, at, clock) VALUES ('${t}', NEW.id, '${f}', CASE WHEN ${onServer} THEN strftime('%Y-%m-%d %H:%M:%S', NEW.updated_at, ${shift}) ELSE NEW.updated_at END, CASE WHEN ${onServer} THEN 'server' ELSE NEW.edit_clock END); END`, []);
+      }
+      if (!have.has(`et_${t}_gone`)) {
+        await db.run(`CREATE TRIGGER IF NOT EXISTS et_${t}_gone AFTER DELETE ON ${t} FOR EACH ROW BEGIN DELETE FROM edit_times WHERE tbl = '${t}' AND row_id = OLD.id; END`, []);
+      }
+    }
+  } catch (e) { console.warn('[db-native] edit times:', e?.message); }
+}
+
+/** When each field of `table`'s rows waiting to go up was changed here:
+ *  Map of row id to { field: { at, clock } }. */
+export async function dbEditTimes(table) {
+  if (!isNative) return new Map();
+  const db = await getDb();
+  const out = new Map();
+  for (const r of (await db.query(`SELECT row_id, field, at, clock FROM edit_times WHERE tbl = ?`, [table]))?.values || []) {
+    if (!r.at) continue;
+    if (!out.has(r.row_id)) out.set(r.row_id, {});
+    out.get(r.row_id)[r.field] = { at: r.at, clock: r.clock ?? null };
+  }
+  return out;
 }
 
 // Mirror of the server migration: pantry_items gains generic_parent_id
@@ -1010,6 +1058,8 @@ export async function dbSetServerId(table, clientId, serverId, snapshotUpdatedAt
   if (!isNative || !table || !clientId) return;
   const db = await getDb();
   if (snapshotUpdatedAt) {
+    // What it changed went up with it (not when it changed again meanwhile).
+    await db.run(`DELETE FROM edit_times WHERE tbl = ? AND row_id = ? AND (SELECT updated_at FROM ${table} WHERE id = ?) IS ?`, [table, clientId, clientId, snapshotUpdatedAt]);
     await db.run(
       `UPDATE ${table} SET server_id = ?, sync_status = 'synced' WHERE id = ? AND updated_at = ?`,
       [serverId, clientId, snapshotUpdatedAt]
@@ -1446,6 +1496,8 @@ export async function dbMarkTableSynced(table, rows) {
   if (!isNative || !rows || !rows.length) return;
   const db = await getDb();
   for (const r of rows) {
+    // What it changed went up with it (not when it changed again meanwhile).
+    await db.run(`DELETE FROM edit_times WHERE tbl = ? AND row_id = ? AND (SELECT updated_at FROM ${table} WHERE id = ?) IS ?`, [table, r.id, r.id, r.updated_at]);
     await db.run(
       `UPDATE ${table} SET sync_status = 'synced' WHERE id = ? AND updated_at = ?`,
       [r.id, r.updated_at]
@@ -1484,6 +1536,7 @@ export async function dbClearUserData() {
   // first statement of each line it splits a script into, so a script of
   // deletes silently left most tables as they were.
   for (const t of _ACCOUNT_TABLES) await db.run(`DELETE FROM ${t}`, []);
+  await db.run(`DELETE FROM edit_times`, []);
   await db.run(`DELETE FROM sync_meta WHERE key = 'last_pull_at'`, []);
   await db.run(`DELETE FROM sync_meta WHERE key = ?`, [DISABLED_UNITS_CHANGED]);
   await db.run(`DELETE FROM sync_meta WHERE key = ?`, [HISTORY_COOKS]);
@@ -1533,6 +1586,8 @@ export async function dbKeepForNewServer(uploaded = {}) {
   await db.run(`UPDATE recipe_cookbook_links SET sync_status = 'pending'`, []);
   await db.run(`DELETE FROM sync_deletes`, []);
   await db.run(`DELETE FROM sync_echoes`, []);
+  // Every row goes up whole, as new: no field has a time of its own.
+  await db.run(`DELETE FROM edit_times`, []);
   await db.run(`DELETE FROM sync_meta WHERE key = 'last_pull_at'`, []);
   // The server's disabled units win on connecting, as before: a set marked
   // here would replace (or, empty, clear) the account's on the first push.
