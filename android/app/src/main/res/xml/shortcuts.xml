@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Long-press the app icon (from TraceApps/nutritrace#278): the shopping list, or scan an item into the pantry. -->
+<!-- Each opens AppShortcutActivity, which hands the link to the running app
+     instead of letting the launcher restart it. Keep the shortcut ids: pinned
+     shortcuts are kept by id. -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
         android:shortcutId="shopping"
@@ -9,7 +12,7 @@
         <intent
             android:action="android.intent.action.VIEW"
             android:targetPackage="com.cooktrace.app"
-            android:targetClass="com.cooktrace.app.MainActivity"
+            android:targetClass="com.cooktrace.app.AppShortcutActivity"
             android:data="cooktrace://new/shopping" />
     </shortcut>
     <shortcut
@@ -20,7 +23,7 @@
         <intent
             android:action="android.intent.action.VIEW"
             android:targetPackage="com.cooktrace.app"
-            android:targetClass="com.cooktrace.app.MainActivity"
+            android:targetClass="com.cooktrace.app.AppShortcutActivity"
             android:data="cooktrace://new/scan" />
     </shortcut>
 </shortcuts>
