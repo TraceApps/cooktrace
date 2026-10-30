@@ -102,7 +102,15 @@ multi-user deploy:
 
 Recommended:
 
-- `RECOVERY_TOKEN` — used by the login-page lockout-recovery flow.
+- `RECOVERY_TOKEN`: Locked Out? on the sign-in page. It resets two-step
+  sign-in for one account (16 characters or more for this) or disables user
+  management. See [Two-step sign-in](#two-step-sign-in).
+- `TWO_STEP_KEY`: the key that locks two-step sign-in secrets, kept apart
+  from `JWT_SECRET`. Unset, CookTrace makes `two-step.key` next to the
+  database (the `/data/db` volume) the first time someone sets up two-step
+  sign-in. Set it (or `TWO_STEP_KEY_FILE`, 32 characters or more) only to
+  keep it outside the data folder. If it changes or is lost, codes from
+  authenticator apps stop working until reset; recovery codes still sign in.
 - `TOKEN_ENC_KEY` — at-rest key for OIDC client secrets. Defaults to a
   key derived from `JWT_SECRET`.
 - `PUBLIC_URL`: the full address people open the app at, subpath included
@@ -131,6 +139,24 @@ Optional integrations:
 
 - `PUBLIC_API_ENABLED` / `PUBLIC_API_WRITE_ENABLED`: general-purpose REST routes for your own scripts and automations. See `docs/public-api.md`.
 - `WEBHOOKS_ENABLED` / `ALLOW_PRIVATE_WEBHOOK_URLS`: outgoing webhooks. See `docs/webhooks.md`.
+
+## Two-step sign-in
+
+People who sign in with a password can turn on two-step sign-in in Settings > Profile: after the password, CookTrace asks for a 6-digit code from an authenticator app. Their secrets are locked with `two-step.key` in the database folder (or `TWO_STEP_KEY`), never stored in the clear; recovery codes are kept only as hashes. Back up the key file with the database: a backup restored on a server with another key keeps everyone's recovery codes working, but codes from authenticator apps can't be checked until two-step sign-in is reset.
+
+Getting back in, always for one account and never with SQL:
+
+1. **A recovery code**, on the sign-in page (Use a Recovery Code).
+2. **An admin**: Settings > Users, the person's Reset Two-Step Sign-In button. The admin gives their own password (and their own code when they use two-step sign-in), and can't reset their own this way.
+3. **The owner**: Locked Out? on the sign-in page, with `RECOVERY_TOKEN` (16 characters or more) and the username. Or on the server:
+
+   ```bash
+   docker exec -it cooktrace npm run reset-2fa -- <username>
+   ```
+
+   Run it with no username to list the accounts that have two-step sign-in on.
+
+Every reset is logged, and the person is emailed when the server sends email. Single sign-on never links itself by email (Auto-Link) to an account that uses two-step sign-in, or that must set it up; a provider linked to an account before is trusted to do its own two-step sign-in. Admins can require two-step sign-in for everyone in Settings > Users: anyone who signs in with a password sets it up right after their password. Single sign-on accounts, API tokens and saved sign-ins (biometric unlock) are unchanged.
 
 ## Reverse proxy
 

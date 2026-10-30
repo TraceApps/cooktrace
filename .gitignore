@@ -33,6 +33,8 @@ data/
 server/cooktrace.db
 server/cooktrace.db-shm
 server/cooktrace.db-wal
+# Two-step sign-in key, next to the database (nutritrace#222)
+two-step.key
 server/uploads/
 
 # Editor

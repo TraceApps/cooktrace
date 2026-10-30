@@ -9,3 +9,4 @@ android
 *.apk
 *.aab
 *.keystore
+**/two-step.key

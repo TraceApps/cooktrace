@@ -26,6 +26,7 @@
   const _isLocal = (isNative && !getServerUrl()) || !get(userMgmtActive);
   import DateInput from '../components/ui/DateInput.svelte';
   import Toggle from '../components/settings/Toggle.svelte';
+  import TwoStepSettings from '../components/two-step/TwoStepSettings.svelte';
   import { biometricLoginEnabled } from '../stores/settings.js';
   import * as biometric from '../lib/biometric.js';
 
@@ -461,6 +462,11 @@
         </div>
       {/if}
     </div>
+    {/if}
+
+    <!-- Two-step sign-in (nutritrace#222): accounts on a server only. -->
+    {#if !_isLocal}
+      <TwoStepSettings />
     {/if}
 
     <!-- Sign In with Biometric (Android only, server mode only). Hidden when

@@ -23,6 +23,8 @@ import { logger } from '../logger.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { isValidTimeZone, processTimeZone } from '../lib/zoned-time.js';
 import { effectiveTimeZone, nextBackupAt, backupFileStamp, newestFirst } from '../lib/backup-schedule.js';
+// Makes the two-step sign-in tables a backup reads and restores (nutritrace#222).
+import { logAfterRestore as logTwoStepAfterRestore } from '../lib/two-step.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -249,6 +251,11 @@ function dumpDatabase() {
     // TODO(review): should invite_tokens be included in backups? Rows
     // may be expired or already-used by the time the restore runs.
     invite_tokens:         _selectIfExists('invite_tokens'),
+    // Two-step sign-in (nutritrace#222): secrets stay locked with this
+    // server's two-step key, which is never in the archive; recovery codes
+    // are hashes.
+    user_two_step:   db.prepare('SELECT * FROM user_two_step').all(),
+    user_two_step_recovery: db.prepare('SELECT * FROM user_two_step_recovery').all(),
   };
 }
 
@@ -373,6 +380,31 @@ function restoreFromZip(zip) {
     // See TODO(review) in dumpDatabase — pending invitations only.
     _restoreTable('invite_tokens',         data.invite_tokens);
 
+    // Two-step sign-in (nutritrace#222): secrets as stored (locked with this
+    // server's two-step key, so on another server they can't be opened and
+    // the person signs in with a recovery code or has it reset) and the
+    // hashes of recovery codes. A backup from before it has none: two-step
+    // sign-in is off for everyone after restoring it. The users above
+    // cascaded the old rows away; rows for an account the archive lacks are
+    // skipped.
+    db.prepare('DELETE FROM user_two_step').run();
+    db.prepare('DELETE FROM user_two_step_recovery').run();
+    const restoredUsers = new Set(db.prepare('SELECT id FROM users').all().map(r => r.id));
+    const insTwoStep = db.prepare(`
+      INSERT OR IGNORE INTO user_two_step (user_id, secret_enc, enabled, last_step, created_at, enabled_at)
+      VALUES (@user_id, @secret_enc, @enabled, @last_step, COALESCE(@created_at, datetime('now')), @enabled_at)
+    `);
+    for (const t of (data.user_two_step || []).filter(x => restoredUsers.has(x.user_id))) insTwoStep.run({
+      enabled: 0, last_step: 0, created_at: null, enabled_at: null, ...t,
+    });
+    const insRecovery = db.prepare(`
+      INSERT OR IGNORE INTO user_two_step_recovery (id, user_id, code_hash, used_at, created_at)
+      VALUES (@id, @user_id, @code_hash, @used_at, COALESCE(@created_at, datetime('now')))
+    `);
+    for (const r of (data.user_two_step_recovery || []).filter(x => restoredUsers.has(x.user_id))) insRecovery.run({
+      id: null, used_at: null, created_at: null, ...r,
+    });
+
     // OIDC — restore only when target tables exist.
     try {
       const insProvider = db.prepare(`
@@ -442,6 +474,7 @@ function restoreFromZip(zip) {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.writeFileSync(dest, bytes);
   }
+  logTwoStepAfterRestore();
 }
 
 function _columnsOf(table) {

@@ -235,7 +235,7 @@
   // reachable even when the section body isn't mounted — the search
   // runs on the index, before drill-in.
   const SECTION_KEYWORDS = {
-    profile:       ['profile','my profile','account','name','avatar','log out','logout','sign out','password','change password'],
+    profile:       ['profile','my profile','account','name','avatar','log out','logout','sign out','password','change password','two-step sign-in','two-step','two step','2fa','mfa','two-factor','two factor','totp','authenticator','authenticator app','one-time code','recovery code','recovery codes'],
     appearance:    ['appearance','theme','dark','light','accent','color','navigation','sidebar','persistent','start page','animations','reduce motion','banner','page banner','force mobile','mobile layout','mobile view','phone layout','narrow layout'],
     regional:      ['regional','language','translation','locale','date','time','12h','24h','units','energy','kcal','kj','calories','kilojoules','imperial','metric','measurement system'],
     cooking:       ['cooking','servings','default servings','yield','recipe','recipes','url import','url import engine','scraper','recipe scrapers','recipe-scrapers','enhanced','smart','json-ld','schema.org','parser','auto add ingredients','auto-create pantry','pantry catalog','shopping','shopping list','aisle','aisles','group by','grouping','checked','hide checked','sort','reorder','shared recipes','main list','kitchen recipes','mixed view'],
@@ -248,7 +248,7 @@
     backup:        ['backup','export','import','restore','json','full backup','reset','danger zone'],
     import:        ['import','mealie','tandoor','paprika','recipe import','migration','migrate','transfer','bulk','zip','from another app'],
     kitchens:      ['kitchens','kitchen','share','sharing','family','roommates','crew','group','members','auto-share','auto share','auto sharing','share recipes','share cookbook','cookbook sharing','via kitchen'],
-    users:         ['users','user management','accounts','login','admin','register','invite'],
+    users:         ['users','user management','accounts','login','admin','register','invite','two-step sign-in','require two-step','require for everyone','reset two-step','2fa','mfa','two-factor','authenticator'],
     auth:          ['authentication','auth','sso','single sign-on','single sign on','oidc','openid','authentik','keycloak','authelia','password login'],
     apitokens:     ['api tokens','api token','personal access token','pat','mcp','model context protocol','claude desktop','cursor','codex','agent','ai agent','bearer token','scopes','revoke token'],
     webhooks:      ['webhooks','webhook','automation','n8n','home assistant','ifttt','push','event','integration','integrations','http post','callback url','signature','hmac','secret'],

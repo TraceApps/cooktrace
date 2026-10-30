@@ -13,6 +13,7 @@
  */
 import { get, writable } from 'svelte/store';
 import { _ } from 'svelte-i18n';
+import { twoStepChallenge } from './two-step.js';
 import { healthNeedsSetup, explainConnectError } from './platform.js';
 
 const WEB_PAGE = "Something other than CookTrace answered with a web page: often a sign-in proxy (Authentik, Authelia, Cloudflare Access), or this isn't your server's address. Let the app reach /api on your server.";
@@ -159,7 +160,12 @@ export async function discoverSignIn(url) {
   };
 }
 
-/** Username and password sign-in: the server's { token, user }. */
+/**
+ * Username and password sign-in: the server's { token, user }. When the
+ * account uses two-step sign-in (nutritrace#222), the error carries
+ * `twoStep` ({ kind, pendingToken }) for
+ * components/two-step/TwoStepChallenge.svelte.
+ */
 export async function passwordSignIn(url, username, password) {
   const http = await _http();
   const res = await http.post({
@@ -168,7 +174,12 @@ export async function passwordSignIn(url, username, password) {
     data: { username, password },
   });
   const body = serverJson(res);
-  if (!_ok(res)) throw new Error(body.error || _say('native_setup_ui.login_failed', 'Sign-in failed'));
+  if (!_ok(res)) {
+    const err = new Error(body.error || _say('native_setup_ui.login_failed', 'Sign-in failed'));
+    const twoStep = twoStepChallenge(body);
+    if (twoStep) err.twoStep = twoStep;
+    throw err;
+  }
   return body;
 }
 

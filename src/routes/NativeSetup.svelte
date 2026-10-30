@@ -6,6 +6,7 @@
   import { DB } from '../lib/db.js';
   import { serverAddressCheck, confirmPlainHttp } from '../lib/plain-http.js';
   import { askPlainHttp } from '../stores/plainHttp.js';
+  import TwoStepChallenge from '../components/two-step/TwoStepChallenge.svelte';
 
   // State machine:
   //   'choose'      → pick local vs server
@@ -104,18 +105,32 @@
     connecting = true;
     try {
       const loginData = await passwordSignIn(validatedUrl, username.trim(), password);
-
-      setServerUrl(validatedUrl);
-      setAuthToken(loginData.token);
-      setNativeMode('server');
-      DB.setSetting('setupComplete', true);
-      showSuccess($_('native_setup_ct.toast.connected_to_server'));
-      window.location.reload();
+      passwordSignedIn(loginData);
     } catch (e) {
+      // Two-step sign-in (nutritrace#222): the code, or its setup, comes next.
+      if (e?.twoStep) { challenge = e.twoStep; return; }
       showError(explainSignInError(e, validatedUrl));
     } finally {
       connecting = false;
     }
+  }
+
+  // The password (and the code, when asked) was right: connected.
+  function passwordSignedIn(loginData) {
+    setServerUrl(validatedUrl);
+    setAuthToken(loginData.token);
+    setNativeMode('server');
+    DB.setSetting('setupComplete', true);
+    showSuccess($_('native_setup_ct.toast.connected_to_server'));
+    window.location.reload();
+  }
+
+  // Two-step sign-in's second step, while it's open.
+  let challenge = null;
+  function twoStepRestart(e) {
+    challenge = null;
+    password = '';
+    if (e.detail?.message) showError(e.detail.message);
   }
 
   // Step 2 (OIDC branch): opens the Authentik/Keycloak/etc. sign-in flow in
@@ -215,6 +230,12 @@
             {connecting ? $_('updates.checking') : $_('wizard_ct.next')}
           </button>
         </div>
+      </div>
+
+    {:else if step === 'server-auth' && challenge}
+      <div class="setup-form">
+        <TwoStepChallenge {challenge} serverUrl={validatedUrl} account={username.trim()}
+          on:done={(e) => passwordSignedIn(e.detail)} on:restart={twoStepRestart} />
       </div>
 
     {:else if step === 'server-auth'}
