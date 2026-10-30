@@ -22,6 +22,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Locked Out? says what disabling user management deletes.** It said your food and diary data would be kept; it deletes every account and its recipes, pantry and plans. The words now say so.
 - **Sync keeps the newer edit of each field, the same as in every Trace app.** A field changed offline before a newer change of the same field made on another device no longer replaces it just because another field of the same recipe, pantry item, shopping item, cook or cookbook was changed later: a recipe renamed on the web and given new notes on the phone keeps both, and the rename that lost is kept as an earlier version, as before. An edit made before a recipe or item was deleted on another device no longer brings it back; one made after still does. Two changes of one item saved offline in the web app keep their own times when they go up together. A server restored from a backup keeps when each field was last changed. Apps from before this update still sync, and their changes count as made when their row was last changed, as before.
 - **The app's icon on an iPhone home screen fills its square.** Added from Safari, it showed a white rim around the rounded icon, because iOS fills the see-through corners of the icon with white. Remove the icon from the home screen and add it again to get the new one.
 - **Choosing Light or Dark sticks when your system switches themes.** The app went light or dark with your device until it was reopened, and with System the browser bar lost your accent color.
@@ -37,6 +38,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Security
 
+- **Linking a sign-in provider asks for your password first.** Profile > Linked Accounts > Link now asks for your password, and your two-step code when that's on, before it starts; the server checks it, not just the page. Before, anyone holding a signed-in session could link their own single sign-on account and keep signing in with it, even after a password change. An account that only signs in through single sign-on can link another provider, or set a first password, within 15 minutes of signing in. The link has to finish in the browser it started in. A changed email waits too: Profile asks you to confirm it with your password, and until then single sign-on doesn't link to your account by it and a password reset goes to your previous email. (from [nutritrace#222](https://github.com/TraceApps/nutritrace/issues/222))
 - **The server log no longer shows your USDA API key when USDA answers with an error.** The server logged the full address of a failed pantry lookup, key included. Keys, tokens, passwords and a `user:password@` part in an address are now shown as `***` in every log line that prints one, photo downloads included.
 
 ---
