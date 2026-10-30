@@ -217,8 +217,6 @@
       "failed": "Inloggningen misslyckades"
     },
     "recovery": {
-      "confirm": "Detta kommer att radera alla användarkonton. Dina mat- och dagboksdata kommer att sparas. Vill du fortsätta?",
-      "explainer": "Om du aldrig avsiktligt skapar användarkonton kan du inaktivera användarhantering. <strong>Detta kommer att radera alla användarkonton.</strong> Dina mat- och dagboksdata kommer att sparas.",
       "token_prompt": "Ange <code>RECOVERY_TOKEN</code> från din servermiljö:",
       "token_placeholder": "Återställningstoken",
       "action": "Inaktivera användarhantering och återställ",
