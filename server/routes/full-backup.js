@@ -25,6 +25,7 @@ import { isValidTimeZone, processTimeZone } from '../lib/zoned-time.js';
 import { effectiveTimeZone, nextBackupAt, backupFileStamp, newestFirst } from '../lib/backup-schedule.js';
 // Makes the two-step sign-in tables a backup reads and restores (nutritrace#222).
 import { logAfterRestore as logTwoStepAfterRestore } from '../lib/two-step.js';
+import { keepSessionVersions } from '../lib/session-version.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -270,7 +271,8 @@ function _selectIfExists(table) {
 function restoreFromZip(zip) {
   const data = JSON.parse(zip.readAsText('database.json'));
 
-  db.transaction(() => {
+  // Signed-out sessions stay signed out (lib/session-version.js).
+  keepSessionVersions(() => db.transaction(() => {
     // Defer FK checks until COMMIT so self-referential FKs on
     // pantry_items (generic_parent_id, nutrition_source_variant_id)
     // don't trip when a child row inserts before its parent within the
@@ -439,7 +441,7 @@ function restoreFromZip(zip) {
         email_verified: 0, last_login_at: null, created_at: null,
       }));
     } catch {} // tables don't exist — skip silently
-  })();
+  })(), data.users);
   // A backup from before the recipe history (or without it): each recipe
   // starts its history with what it holds now. One from before amounts
   // were compared exactly: its versions get their exact keys.

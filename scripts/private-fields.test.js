@@ -72,7 +72,7 @@ test('no answer from the server carries field_stamps (real server)', { timeout: 
       '/api/cookbooks', `/api/cookbooks/${cb.id}`, '/api/units', '/api/recipes/categories', '/api/pantry/categories', '/api/data/export',
       '/api/sync/pull?since=1970-01-01', '/api/sync/pull?since=1970-01-01&synced_at=1&schema=2']) await call('GET', p);
     // The public API and an agent, with a token.
-    const tok = await call('POST', '/api/admin/api-tokens', { name: 'check', scopes: ['read:recipes', 'read:pantry', 'shopping', 'mcp:read', 'mcp:write'] });
+    const tok = await call('POST', '/api/admin/api-tokens', { name: 'check', scopes: ['read:recipes', 'read:pantry', 'shopping', 'mcp:read', 'mcp:write'], password: 'Str0ng-Pass-88!y' });
     const bearer = `Bearer ${tok.raw}`;
     for (const p of ['/api/v1/recipes', `/api/v1/recipes/${recipe.id}`, '/api/v1/pantry', '/api/v1/shopping', '/api/v1/cook-diary']) await call('GET', p, undefined, bearer);
     const mcp = body => call('POST', '/api/mcp', { jsonrpc: '2.0', ...body }, bearer, { Accept: 'application/json, text/event-stream' });

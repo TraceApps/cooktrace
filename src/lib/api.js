@@ -58,6 +58,9 @@ const _CtApiHttp = {
       // The status matters to anything deciding whether to try again: a 503
       // is worth repeating, a 400 never will be (lib/offline-edits.js).
       err.status = res.status;
+      // Signed out on this device (a password change elsewhere, Sign Out
+      // Everywhere, nutritrace#222): to the sign-in page, saying why.
+      if (res.status === 401 && e.session_ended) import('./fresh-session.js').then((m) => m.endSessionHere()).catch(() => {});
       throw err;
     }
     return res.json();

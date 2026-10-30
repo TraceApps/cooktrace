@@ -82,7 +82,7 @@ test('v1 recipe items carry nutrition for the recipe amount', { skip: !ready && 
     const byName = new Map(pantry.map((p) => [p.name, p]));
     const items = LINES.map((l) => ({ ...l, pantry_item_id: byName.get(l.name).id }));
     const recipe = await call('POST', '/api/recipes', { name: 'Pancakes', servings: 1, ingredients: [{ group: '', items }] });
-    const raw = (await call('POST', '/api/admin/api-tokens', { name: 'nt', scopes: ['read:recipes'] })).raw;
+    const raw = (await call('POST', '/api/admin/api-tokens', { name: 'nt', scopes: ['read:recipes'], password: PW })).raw;
     token = raw;
     const got = await call('GET', `/api/v1/recipes/${recipe.id}`);
     const it = Object.fromEntries(got.items.map((x) => [x.name, x]));

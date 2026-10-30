@@ -111,6 +111,9 @@ Recommended:
   sign-in. Set it (or `TWO_STEP_KEY_FILE`, 32 characters or more) only to
   keep it outside the data folder. If it changes or is lost, codes from
   authenticator apps stop working until reset; recovery codes still sign in.
+- `OIDC_APP_LINK_TOKEN`: `off` refuses single sign-on from Android builds
+  that take their sign-in in the deep link (from before the one-time code).
+  On by default. See [Sessions](#sessions).
 - `TOKEN_ENC_KEY` — at-rest key for OIDC client secrets. Defaults to a
   key derived from `JWT_SECRET`.
 - `PUBLIC_URL`: the full address people open the app at, subpath included
@@ -157,6 +160,14 @@ Getting back in, always for one account and never with SQL:
    Run it with no username to list the accounts that have two-step sign-in on.
 
 Every reset is logged, and the person is emailed when the server sends email. Single sign-on never links itself by email (Auto-Link) to an account that uses two-step sign-in, or that must set it up; a provider linked to an account before is trusted to do its own two-step sign-in. Linking a provider from Profile asks for the password (and code) first, and finishes only in the browser it started in; an email changed in Profile waits for the same check before single sign-on links by it or a password reset goes to it. Admins can require two-step sign-in for everyone in Settings > Users: anyone who signs in with a password sets it up right after their password. Single sign-on accounts, API tokens and saved sign-ins (biometric unlock) are unchanged.
+
+## Sessions
+
+A sign-in lasts until it expires (Settings > Users > Session Duration, up to a year) or until the account signs its sessions out. Changing the password (in Profile, with an emailed reset link, or by an admin), turning two-step sign-in on or off, any reset of it, and **Sign Out Everywhere** in Settings > Profile sign out every browser, phone and watch signed in to the account. The device that made the change stays signed in. The others go to the sign-in page, which says they were signed out, and anything they saved offline waits there and goes up at the next sign-in. A paired watch signs in again with the phone: it keeps what it logged, and takes the phone's new sign-in the next time the phone is opened. Sessions from before this keep working until one of those happens.
+
+API tokens and MCP tokens are separate credentials: none of this signs them out, and each has its own Revoke in Settings > API Tokens. Creating a token asks for the password (and the two-step code when that's on); an account that signs in with single sign-on only must have signed in within the last 15 minutes. A token can expire after 30 days, 90 days or a year, or never; tokens made before this keep working.
+
+The Android app finishes single sign-on with a one-time code that only it can swap for its sign-in. Android builds from before that code get their sign-in in the deep link itself (`cooktrace://oidc-callback`), which another app on the phone could catch. They still sign in, and the server log says so each time; set `OIDC_APP_LINK_TOKEN=off` to refuse them (they're told to update CookTrace). Off will become the default after the next main release.
 
 ## Reverse proxy
 

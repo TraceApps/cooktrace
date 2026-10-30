@@ -158,7 +158,9 @@ test('a sign-in link: Settings takes only the code it asked for, never a bare to
   assert.deepEqual(S.ssoCallbackAction({ token: 't', connecting, challengeSent: true }), { do: 'refuse' });
   // First run and the sign-in page still take an older server's bare token.
   assert.deepEqual(S.ssoCallbackAction({ token: 't', challengeSent: true }), { do: 'token' });
-  assert.deepEqual(S.ssoCallbackAction({ token: 't', connecting, challengeSent: false }), { do: 'token' }, 'no code was asked for');
+  // A bare token nobody here asked for is another app's (nutritrace#222).
+  assert.deepEqual(S.ssoCallbackAction({ token: 't', connecting, challengeSent: false }), { do: 'refuse' });
+  assert.deepEqual(S.ssoCallbackAction({ token: 't', challengeSent: false }), { do: 'refuse' }, 'no sign-in under way');
   assert.deepEqual(S.ssoCallbackAction({}), { do: 'none' });
 });
 

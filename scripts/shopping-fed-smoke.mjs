@@ -35,7 +35,7 @@ const login = await call('POST', '/api/auth/login', { body: creds });
 const session = login.json?.token;
 ok(!!session, 'first user signs in');
 
-const mk = async (scopes) => (await call('POST', '/api/admin/api-tokens', { token: session, body: { name: `smoke ${scopes.join(' ')}`, scopes } })).json?.raw;
+const mk = async (scopes) => (await call('POST', '/api/admin/api-tokens', { token: session, body: { name: `smoke ${scopes.join(' ')}`, scopes, password: creds.password } })).json?.raw;
 const shop = await mk(['shopping']);
 const other = await mk(['mcp:read']);
 ok(!!shop && !!other, 'tokens created');

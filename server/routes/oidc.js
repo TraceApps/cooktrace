@@ -12,11 +12,12 @@ import {
   listProviders, publicProvider, getProvider, getClient,
   generateAuthChecks, persistState, consumeState,
   resolveUser, applyAdminMapping, linkUser, unlinkUser, listUserLinks,
-  isPasswordLoginEnabled, isValidAppChallenge, persistHandoff, consumeHandoff,
+  isPasswordLoginEnabled, isValidAppChallenge, persistHandoff, consumeHandoff, appLinkTokenAllowed,
 } from '../lib/oidc.js';
 import db from '../db.js';
 import { claimAnonymousData } from '../lib/claim-anonymous-data.js';
 import { consumeLinkGrant, newLinkBinding, linkBindingMatches } from '../lib/link-grant.js';
+import { sessionVersion } from '../lib/session-version.js';
 import { oidcReturnHash } from '../lib/oidc-return.js';
 
 const router = Router();
@@ -229,8 +230,6 @@ async function handleCallback(req, res) {
     logger.info(`[oidc] first-user OIDC bootstrap: ${result.user.username} → admin`);
   }
 
-  // Mint identical ct_token to password path
-  const token = signToken(result.user);
   if (stored.mobile) {
     // Native (Capacitor) flow — Bearer token cannot be set as a cookie that
     // crosses back into the WebView. Hand the token off to the app via a
@@ -245,13 +244,22 @@ async function handleCallback(req, res) {
       // Single-use code the app swaps for the token at POST /handoff.
       const code = persistHandoff({
         appChallenge: stored.appChallenge,
-        token,
+        userId: result.user.id,
+        sv: sessionVersion(result.user.id),
         idTokenHint: tokenSet?.id_token,
         providerId: provider.id,
       });
       return res.redirect(`cooktrace://oidc-callback/?code=${encodeURIComponent(code)}`);
     }
-    // Older app builds (no app_challenge) still get the token in the link.
+    // Older app builds (no app_challenge) still get the token in the link,
+    // said in the log, unless OIDC_APP_LINK_TOKEN=off (lib/oidc.js).
+    if (!appLinkTokenAllowed()) {
+      logger.warn(`[oidc] refused an older CookTrace app's single sign-on for ${result.user.username} (id ${result.user.id}): it takes the session in the sign-in link, and OIDC_APP_LINK_TOKEN is off`);
+      const msg = encodeURIComponent('Update CookTrace to sign in with single sign-on.');
+      return res.redirect(`cooktrace://oidc-callback/?error=${msg}`);
+    }
+    logger.warn(`[oidc] an older CookTrace app signed ${result.user.username} (id ${result.user.id}) in with the session in the sign-in link. Update the app; OIDC_APP_LINK_TOKEN=off refuses this.`);
+    const token = signToken(result.user);
     let deepLink = `cooktrace://oidc-callback/?token=${encodeURIComponent(token)}`;
     if (tokenSet?.id_token) {
       deepLink += `&id_token_hint=${encodeURIComponent(tokenSet.id_token)}`;
@@ -259,7 +267,7 @@ async function handleCallback(req, res) {
     }
     return res.redirect(deepLink);
   }
-  res.cookie('ct_token', token, { ...COOKIE_OPTS, maxAge: sessionMaxAge() });
+  res.cookie('ct_token', signToken(result.user), { ...COOKIE_OPTS, maxAge: sessionMaxAge() });
   // Save enough OIDC session context for RP-initiated logout later.
   if (tokenSet?.id_token) {
     res.cookie(LOGOUT_COOKIE, JSON.stringify({ providerId: provider.id, idTokenHint: tokenSet.id_token }), {
@@ -282,8 +290,11 @@ router.get('/callback', wrap(handleCallback));
  */
 router.post('/handoff', wrap((req, res) => {
   const data = consumeHandoff(req.body?.code, req.body?.verifier);
-  if (!data) return res.status(400).json({ error: 'Sign-in expired. Please try again.' });
-  res.json({ token: data.token, id_token_hint: data.idTokenHint, provider_id: data.providerId });
+  const user = data ? db.prepare('SELECT * FROM users WHERE id = ?').get(data.userId) : null;
+  // Signed out everywhere since the code was made (a password change, Sign
+  // Out Everywhere): the code went with the rest.
+  if (!user || sessionVersion(user.id) !== data.sv) return res.status(400).json({ error: 'Sign-in expired. Please try again.' });
+  res.json({ token: signToken(user), id_token_hint: data.idTokenHint, provider_id: data.providerId });
 }));
 
 function _redirectToLogin(res, returnPath, error, ok) {

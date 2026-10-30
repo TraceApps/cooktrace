@@ -89,7 +89,7 @@ async function _setup(dir, srv) {
   const admin = await jwtOf('cook', 'Str0ng-Pass-88!y');
   const member = await jwtOf('pat', 'Str0ng-Pass-77!z', admin);
   // API tokens are an admin's to make.
-  const tokenFor = async (jwt, scopes) => (await json('POST', '/api/admin/api-tokens', { name: 'agent', scopes }, jwt)).raw;
+  const tokenFor = async (jwt, scopes) => (await json('POST', '/api/admin/api-tokens', { name: 'agent', scopes, password: 'Str0ng-Pass-88!y' }, jwt)).raw;
   let id = 0;
   const mcp = tok => async (name, args = {}) => {
     const r = await fetch(srv.base + '/api/mcp', {

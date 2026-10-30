@@ -149,6 +149,7 @@ The most-asked knobs. Full list at [docs/self-hosting/env-vars](https://traceapp
 | `MAX_SESSION_HOURS` | `8760` | Session-length cap in hours. Lower for shared / kiosk machines. |
 | `RECOVERY_TOKEN` | - | Passphrase for Locked Out? on the login page: reset two-step sign-in for one account (16 characters or more), or disable user management (lockout recovery). |
 | `TWO_STEP_KEY` | a generated `two-step.key` next to the database | Key that locks two-step sign-in secrets. Leave it unset unless you keep secrets outside the data folder. See [DEPLOY.md](DEPLOY.md#two-step-sign-in). |
+| `OIDC_APP_LINK_TOKEN` | on | `off` refuses single sign-on from older Android builds that take their sign-in in the deep link. On by default. See [DEPLOY.md](DEPLOY.md#sessions). |
 | `IMPORT_ZIP_MAX_MB` | `512` | Upload cap for Mealie / Tandoor / Paprika bulk-import zips. |
 | `BACKUP_UPLOAD_MAX_MB` | `512` | Upload cap for restore-from-zip. |
 | `BACKUP_SCHEDULE` | - | `off` \| `daily` \| `weekly` \| `monthly`. Locks the UI field when set. |
