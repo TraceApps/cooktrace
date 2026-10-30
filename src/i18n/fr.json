@@ -359,8 +359,6 @@
     "sso_or": "ou",
     "no_signin_methods": "Aucune méthode de connexion disponible. Interroge ton administrateur.",
     "recovery": {
-      "confirm": "Ceci supprimera tous les comptes utilisateurs. Tes données d'aliments et de journal seront conservées. Continuer ?",
-      "explainer": "Si tu n'as jamais défini de comptes utilisateurs volontairement, tu peux désactiver la gestion des utilisateurs. <strong>Ceci supprimera tous les comptes utilisateurs.</strong> Tes données d'aliments et de journal seront conservées.",
       "token_prompt": "Saisis le <code>RECOVERY_TOKEN</code> de l'environnement de ton serveur :",
       "token_placeholder": "Jeton de récupération",
       "action": "Désactiver la gestion des utilisateurs et réinitialiser",
