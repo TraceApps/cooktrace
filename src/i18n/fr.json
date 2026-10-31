@@ -1112,8 +1112,6 @@
       "name": "Nom",
       "name_ph": "ex. claude-desktop",
       "scopes": "Portées",
-      "expires_label": "Expire après (jours)",
-      "expires_ph": "jamais",
       "cancel": "Annuler",
       "create": "Créer",
       "creating": "Création…"
