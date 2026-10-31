@@ -162,6 +162,14 @@ edit and a delete to the delete).
   server only), kept by triggers in `db.js` and set per field by a merged
   edit (`server/lib/field-stamps.js` `stampEach`). No answer carries it
   (`server/lib/private-fields.js`); a full backup does, and a restore keeps it.
+  A column a backup's rows don't have gets its default. A restore's
+  inserts get `synced_at` now (the triggers), so every device
+  pulls the restored rows again. Rows of the soft-deleted tables a device
+  may hold that the backup doesn't are put back and deleted as the app
+  deletes one, only for the same accounts (`keepGone` in
+  `server/routes/full-backup.js`); categories and units are deleted before
+  their accounts so each gets a `sync_deletions` record, and records
+  devices haven't pulled yet are kept through the accounts' delete.
 - `server/lib/field-merge.js` puts CookTrace's own check in front of the
   shared rule: an edit says which copy it was made on (the server's
   `synced_at` of it), and a field not changed here since that copy is the

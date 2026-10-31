@@ -252,6 +252,9 @@ function dumpDatabase() {
     // TODO(review): should invite_tokens be included in backups? Rows
     // may be expired or already-used by the time the restore runs.
     invite_tokens:         _selectIfExists('invite_tokens'),
+    // Integrations set up by hand: API tokens (hashed) and webhooks.
+    api_tokens:            _selectIfExists('api_tokens'),
+    webhooks:              _selectIfExists('webhooks'),
     // Two-step sign-in (nutritrace#222): secrets stay locked with this
     // server's two-step key, which is never in the archive; recovery codes
     // are hashes.
@@ -278,12 +281,25 @@ function restoreFromZip(zip) {
     // don't trip when a child row inserts before its parent within the
     // same transaction. Standard SQLite pattern for tree restores.
     db.pragma('defer_foreign_keys = ON');
+    // What devices may hold of the tables that say a row is gone only with
+    // its deleted_at, read before the wipe (keepGone, below).
+    const before = rowsBefore(data);
     // Wipe in dependency order, children before parents.
     db.prepare('DELETE FROM cook_diary').run();
     db.prepare('DELETE FROM shopping_list').run();
     db.prepare('DELETE FROM recipes').run();
     db.prepare('DELETE FROM pantry_items').run();
     db.prepare('DELETE FROM ai_chat_history').run();
+    // Categories and units are deleted here, while their accounts are
+    // there, so each gets its sync_deletions record (db.js) and devices drop
+    // one the backup doesn't hold; one it holds is put back under the same
+    // id, which the pull doesn't send as gone. The accounts' delete below
+    // would take them without a record, and takes the records too (they
+    // belong to an account): kept here and put back after (keepGone).
+    for (const t of ['recipe_categories', 'pantry_categories', 'custom_units']) {
+      try { db.prepare(`DELETE FROM ${t}`).run(); } catch { /* not in this build */ }
+    }
+    before.sync_deletions = _selectIfExists('sync_deletions');
     db.prepare('DELETE FROM user_settings').run();
     db.prepare('DELETE FROM app_config').run();
     if (_selectIfExists('user_oidc_links').length === 0) {} // no-op probe
@@ -333,7 +349,7 @@ function restoreFromZip(zip) {
       const colList = cols.join(', ');
       const ph = cols.map(c => '@' + c).join(', ');
       const ins = db.prepare(`INSERT OR IGNORE INTO ${table} (${colList}) VALUES (${ph})`);
-      const defaults = Object.fromEntries(cols.map(c => [c, null]));
+      const defaults = _defaultsOf(table);
       for (const r of rows) ins.run(_withDefaults(r, defaults));
     }
     _bulkRestoreSchemaDriven('ai_chat_history', data.ai_chat_history);
@@ -348,15 +364,17 @@ function restoreFromZip(zip) {
     // backup made on a slightly different schema version still
     // restores cleanly — extra columns get nulled, missing columns
     // skipped.
+    // Emptied first even when the backup holds none of it: a kitchen or an
+    // invite made since (their owner's delete leaves them) doesn't stay.
     function _restoreTable(table, rows) {
-      if (!Array.isArray(rows) || rows.length === 0) return;
       const cols = _columnsOf(table);
       if (cols.length === 0) return; // table not present in this build
       try { db.prepare(`DELETE FROM ${table}`).run(); } catch {}
+      if (!Array.isArray(rows) || rows.length === 0) return;
       const colList = cols.join(', ');
       const ph = cols.map(c => '@' + c).join(', ');
       const ins = db.prepare(`INSERT OR IGNORE INTO ${table} (${colList}) VALUES (${ph})`);
-      const defaults = Object.fromEntries(cols.map(c => [c, null]));
+      const defaults = _defaultsOf(table);
       for (const r of rows) ins.run(_withDefaults(r, defaults));
     }
     _restoreTable('recipe_categories',     data.recipe_categories);
@@ -381,6 +399,17 @@ function restoreFromZip(zip) {
     _restoreTable('recipe_revisions',      data.recipe_revisions);
     // See TODO(review) in dumpDatabase — pending invitations only.
     _restoreTable('invite_tokens',         data.invite_tokens);
+    // What other apps and scripts use to reach this server, set up by hand:
+    // API tokens (hashed) and webhooks (the secret locked with this server's
+    // key: on a server with another key a delivery fails until the webhook
+    // is made again, and Settings says so). The accounts' delete above took
+    // the old ones; only those of an account the backup holds come back.
+    {
+      const users = new Set(db.prepare('SELECT id FROM users').all().map(r => r.id));
+      const mine = rows => (Array.isArray(rows) ? rows : []).filter(r => users.has(r?.user_id));
+      _restoreTable('api_tokens',          mine(data.api_tokens));
+      _restoreTable('webhooks',            mine(data.webhooks));
+    }
 
     // Two-step sign-in (nutritrace#222): secrets as stored (locked with this
     // server's two-step key, so on another server they can't be opened and
@@ -441,6 +470,10 @@ function restoreFromZip(zip) {
         email_verified: 0, last_login_at: null, created_at: null,
       }));
     } catch {} // tables don't exist — skip silently
+
+    // Rows a device may hold that the backup doesn't: kept as deleted, so
+    // devices drop them.
+    keepGone(before);
   })(), data.users);
   // A backup from before the recipe history (or without it): each recipe
   // starts its history with what it holds now. One from before amounts
@@ -477,6 +510,92 @@ function restoreFromZip(zip) {
     fs.writeFileSync(dest, bytes);
   }
   logTwoStepAfterRestore();
+}
+
+// Tables whose rows a device pulls whole and that say a row is gone only by
+// its deleted_at (routes/sync.js TABLES, softDelete), parents first, with
+// who has to be the same before and after the restore for a row to be
+// theirs (an account: its id, username and when it was made).
+const KEEP_GONE = ['cookbooks', 'recipes', 'pantry_items', 'cook_diary', 'shopping_list', 'recipe_comments', 'recipe_revisions'];
+// The rows of `t` the backup doesn't hold (by `key`), read one at a time so
+// the rest never sits in memory beside the backup.
+function _notIn(data, t, key = 'id') {
+  const backed = new Set((Array.isArray(data?.[t]) ? data[t] : []).map(r => r?.[key]));
+  const out = [];
+  try { for (const r of db.prepare(`SELECT * FROM ${t}`).iterate()) if (!backed.has(r[key])) out.push(r); } catch { /* not in this build */ }
+  return out;
+}
+
+function rowsBefore(data) {
+  const out = Object.fromEntries(KEEP_GONE.map(t => [t, _notIn(data, t)]));
+  out.users = new Map(db.prepare('SELECT id, username, created_at FROM users').all().map(u => [u.id, `${u.username}\n${u.created_at}`]));
+  return out;
+}
+
+/**
+ * A row a device may hold that the restore took away is put back deleted,
+ * as the app deletes one (deleted_at and updated_at now, which db.js stamps
+ * like any delete), so every device that pulls it drops its copy (a recipe
+ * made after the backup, a shopping item added since), and an older edit
+ * queued on a phone doesn't bring it back. Only for the same people: an
+ * account that is someone else in the backup, or isn't in it, gets nothing
+ * of the other's. A link to a row that isn't there is left empty (or the
+ * row stays out, when it needs one), so the restore's foreign keys hold. A
+ * recipe's share link goes, so it no longer opens it.
+ */
+function keepGone(before) {
+  const usersNow = new Map(db.prepare('SELECT id, username, created_at FROM users').all().map(u => [u.id, `${u.username}\n${u.created_at}`]));
+  // A row with no account is the one user's of a server without accounts:
+  // the same only when there were none before and are none now (restored
+  // onto a server with accounts, it would be handed to one of them).
+  const solo = before.users.size === 0 && usersNow.size === 0;
+  const same = id => (id == null ? solo : usersNow.has(id) && usersNow.get(id) === before.users.get(id));
+  for (const t of KEEP_GONE) {
+    const info = db.prepare(`PRAGMA table_info(${t})`).all();
+    if (!info.length || !before[t]?.length) continue;
+    const cols = info.map(c => c.name);
+    const notNull = new Set(info.filter(c => c.notnull).map(c => c.name));
+    const fks = db.prepare(`PRAGMA foreign_key_list(${t})`).all()
+      .map(f => ({ from: f.from, there: db.prepare(`SELECT 1 FROM ${f.table} WHERE ${f.to || 'id'} = ?`) }));
+    const has = db.prepare(`SELECT 1 FROM ${t} WHERE id = ?`);
+    const ins = db.prepare(`INSERT OR IGNORE INTO ${t} (${cols.join(', ')}) VALUES (${cols.map(c => '@' + c).join(', ')})`);
+    const del = db.prepare(`UPDATE ${t} SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`);
+    for (const r of before[t]) {
+      if (has.get(r.id) || !same(r.user_id)) continue;
+      const row = { ...Object.fromEntries(cols.map(c => [c, null])), ...r };
+      let ok = true;
+      for (const f of fks) {
+        if (row[f.from] == null || f.there.get(row[f.from])) continue;
+        if (notNull.has(f.from)) { ok = false; break; }
+        row[f.from] = null;
+      }
+      if (!ok) continue;
+      if (t === 'recipes') row.share_token = null;
+      let put = ins.run(row).changes;
+      // A cookbook whose name a restored one has now: kept under another
+      // slug (the slug is unique per account), so devices still drop it.
+      if (!put && t === 'cookbooks' && row.slug != null && !has.get(r.id)) put = ins.run({ ...row, slug: `${row.slug}-gone-${r.id}` }).changes;
+      if (put && r.deleted_at == null) del.run(r.id);
+    }
+  }
+  // Deletions devices are still to hear of (before the restore, and the
+  // restore's own), for the same people.
+  const insGone = db.prepare(`INSERT OR IGNORE INTO sync_deletions (id, user_id, table_name, row_id, synced_at) VALUES (@id, @user_id, @table_name, @row_id, @synced_at)`);
+  for (const g of before.sync_deletions || []) if (same(g.user_id)) insGone.run(g);
+}
+
+// A column a backup's row doesn't have (one added since it was made) gets
+// the column's own default, as an upgrade gives the rows it already has:
+// NULL into a NOT NULL column would make INSERT OR IGNORE drop the whole row.
+function _defaultsOf(table) {
+  const out = {};
+  for (const c of db.prepare(`PRAGMA table_info(${table})`).all()) {
+    out[c.name] = null;
+    if (c.dflt_value != null) {
+      try { out[c.name] = db.prepare(`SELECT ${c.dflt_value} AS v`).get().v; } catch { /* left empty */ }
+    }
+  }
+  return out;
 }
 
 function _columnsOf(table) {
