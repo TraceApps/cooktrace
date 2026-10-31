@@ -1168,8 +1168,6 @@
       "name": "Название",
       "name_ph": "например: claude-desktop",
       "scopes": "Права",
-      "expires_label": "Срок действия (дней)",
-      "expires_ph": "бессрочно",
       "cancel": "Отмена",
       "create": "Создать",
       "creating": "Создание…"
