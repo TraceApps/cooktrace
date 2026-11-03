@@ -480,7 +480,7 @@ Borderline. Complete rewrite, cleaner API. Deferred unless iterating on OIDC. Mo
 
 ### ~~multer 1.4.5-lts.1 → 2.2.0~~ *(done, rc.3, cleared three DoS CVEs on the LTS line)*
 
-**Skip**: better-sqlite3 already on 11.x (further bumps need no CookTrace-specific reason).
+**Done**: better-sqlite3 13.0.3 with the Node 24 move (nutritrace#302).
 
 ---
 

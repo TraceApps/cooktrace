@@ -14,7 +14,7 @@
     "@zxcvbn-ts/language-en": "^3.0.2",
     "adm-zip": "^0.6.1",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^11.7.0",
+    "better-sqlite3": "^13.0.3",
     "cheerio": "^1.0.0",
     "cookie-parser": "^1.4.6",
     "dotenv": "^16.4.5",
