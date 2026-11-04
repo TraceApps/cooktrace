@@ -227,24 +227,36 @@ export async function bulkSet(settingsObj) {
   }
 }
 
+/**
+ * The server's values into this device's settings, the setting stores
+ * following at once (wl:setting); nothing is sent back. `skip(key)` keeps a
+ * key as it is here (a sync's pull: a change made here that hasn't gone up).
+ */
+export function applyServerSettings(values, { skip = () => false } = {}) {
+  _suppressSync = true;
+  try {
+    // CRITICAL: skip DEVICE_PREFS keys. These are local-only (form-factor
+    // or hardware specific) and should never be overwritten by server
+    // values. Stale rows can exist from before the device-pref filter
+    // was added on the write path; without this filter every settings
+    // poll would overwrite a tablet's `sidebarPersistent: true` with a
+    // phone's `false` and the persistent-sidebar toggle would silently
+    // turn off mid-session.
+    for (const [key, value] of Object.entries(values || {})) {
+      if (DEVICE_PREFS.has(key) || skip(key)) continue;
+      DB.setSetting(key, value, true);
+    }
+  } finally { _suppressSync = false; }
+}
+
 export async function loadServerSettings() {
   if (!_shouldSyncToServer()) return;
   try {
     const res = await fetch(_settingsUrl(), { credentials: 'include', headers: _authHeaders(), signal: AbortSignal.timeout(8000) });
     if (!res.ok) return;
     const serverSettings = await res.json();
+    applyServerSettings(serverSettings);
     _suppressSync = true;
-    // CRITICAL: skip DEVICE_PREFS keys. These are local-only (form-factor
-    // or hardware specific) and should never be overwritten by server
-    // values. Stale rows can exist from before the device-pref filter
-    // was added on the write path — without this filter every settings
-    // poll would overwrite a tablet's `sidebarPersistent: true` with a
-    // phone's `false` and the persistent-sidebar toggle would silently
-    // turn off mid-session.
-    for (const [key, value] of Object.entries(serverSettings)) {
-      if (DEVICE_PREFS.has(key)) continue;
-      DB.setSetting(key, value, true);
-    }
     // Only into a copy that is this account's: signing in as someone else
     // loads their settings before the app has checked whose copy the phone
     // holds (lib/local-account.js), and they'd land in the last account's.

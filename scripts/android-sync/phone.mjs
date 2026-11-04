@@ -606,6 +606,51 @@ const scenarios = {
     out.afterServer = get(currentUser)?.username ?? null;
   },
 
+  // A setting changed on the web reaches the phone's setting stores with
+  // the sync that brings it, with no restart, and doesn't go back up; one
+  // changed on the phone that hasn't gone up yet stays, and a device's own
+  // setting (appearance) is never taken from the server.
+  async settingsLive() {
+    const la = await import('../../src/lib/local-account.js');
+    const { DB } = await import('../../src/lib/db.js');
+    const A = await me(token);
+    localStorage.setItem('ct:serverUrl', server);
+    localStorage.setItem('wl:userId', String(A.id));
+    await la.prepareLocalAccount(A, { confirm: async () => true });
+    const settings = await import('../../src/stores/settings.js');
+    const { get } = await import('svelte/store');
+    const mirrorSettingNow = (k, v) => settings.mirrorSetting(k, v);
+    await sync();
+    out.before = DB.getSetting('measurementSystem', 'imperial');
+    await web('PUT', '/api/settings', { key: 'measurementSystem', value: 'metric' });
+    await web('PUT', '/api/settings', { key: 'household', value: [{ name: 'Sam', allergies: ['peanut'] }] });
+    await web('PUT', '/api/settings', { key: 'appearance', value: 'dark' });
+    events.length = 0;
+    const at = sent.length;
+    await sync();
+    out.after = DB.getSetting('measurementSystem', 'imperial');
+    out.household = DB.getSetting('household', null);
+    out.appearance = DB.getSetting('appearance', 'system');
+    out.told = events.filter(e => e.type === 'wl:setting').map(e => e.detail.key).sort();
+    // A change made on the phone, not yet up when the web changes it too.
+    settings.defaultServings.set(6);
+    await sleep(100); // its copy on the phone (mirrorSetting)
+    await web('PUT', '/api/settings', { key: 'defaultServings', value: 3 });
+    await sync();
+    out.ownServings = { here: DB.getSetting('defaultServings', 2), store: get(settings.defaultServings) };
+    await sleep(900); // the direct save (scheduleSave) has gone too
+    out.serverServings = (await web('GET', '/api/settings')).defaultServings;
+    out.sentBack = sent.slice(at).filter(e => e.method === 'PUT' && e.url.startsWith('/api/settings')).length;
+    // A list and a household set on the phone go up as they are.
+    settings.household.set([{ name: 'Ana', allergies: ['milk'] }]);
+    DB.setSetting('allergens', ['gluten', 'egg']);
+    await mirrorSettingNow('allergens', ['gluten', 'egg']);
+    await sleep(100);
+    await sync();
+    const there = await web('GET', '/api/settings');
+    out.upAsIs = { household: there.household, allergens: there.allergens };
+  },
+
   // Settings are kept per account and server: another account never reads
   // the last one's.
   async settingsPerAccount() {

@@ -776,7 +776,9 @@ async function _backfillShoppingNames() {
 export async function dbUpsertSetting(key, value) {
   if (!isNative) return;
   const db = await getDb();
-  const v = value == null ? null : String(value);
+  // JSON, as the server keeps it and a pull writes it: String() sent a list
+  // up as "a,b" and a household as "[object Object]".
+  const v = value == null ? null : JSON.stringify(value);
   await db.run(
     `INSERT INTO user_settings (user_id, key, value, sync_status)
      VALUES (?, ?, ?, 'pending')
@@ -1095,7 +1097,7 @@ export async function dbRememberEcho(table, rowId, updatedAt) {
   );
 }
 
-export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => true, touched = null } = {}) {
+export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => true, touched = null, settings = null } = {}) {
   // live(): false once the copy is changing hands (another account signing
   // in, lib/local-account.js): nothing more of this pull is written.
   if (!isNative || !payload?.tables) return true;
@@ -1483,6 +1485,8 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
            sync_status = 'synced'`,
         [LOCAL_USER_ID, s.key, v, s.updated_at || new Date().toISOString()]
       );
+      // What was written, for the open setting stores (lib/sync.js).
+      settings?.push({ key: s.key, value: v });
     }
   }
   return true;

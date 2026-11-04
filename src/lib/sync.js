@@ -777,6 +777,22 @@ async function pushChanges({ token = getAuthToken(), signal = null, gen = accoun
   return { pushed: total, serverKept, deferred };
 }
 
+// Settings the pull wrote to the phone's copy, into the open setting stores
+// too: they read this device's own copy (localStorage), and a setting
+// changed on another device showed only after a restart. Not one changed
+// here that hasn't gone up: dbApplyPull already left those pending, and a
+// change made since it looked (isRecentlyChanged) stays too.
+async function _applyPulledSettings(rows, live) {
+  const { applyServerSettings, isRecentlyChanged } = await import('../stores/settings.js');
+  if (!live()) return;
+  const values = {};
+  for (const { key, value } of rows) {
+    // Kept as the server keeps them, JSON text (as GET /api/settings reads them).
+    try { values[key] = JSON.parse(value); } catch { values[key] = value; }
+  }
+  applyServerSettings(values, { skip: isRecentlyChanged });
+}
+
 async function pullChanges({ token = getAuthToken(), signal = null, gen = accountGeneration() } = {}) {
   // False once another account's sign-in has begun: checked before every
   // write (lib/local-account.js accountGeneration, dbApplyPull's live()).
@@ -803,8 +819,10 @@ async function pullChanges({ token = getAuthToken(), signal = null, gen = accoun
   // still has what it wrote announced. The two sets sent whole every time
   // are added by dbApplyPull when it really changes them.
   for (const k of pullKinds(body.tables)) _touched.add(k);
-  const done = await dbApplyPull(body, { clockOffsetMs, live, touched: _touched });
+  const settings = [];
+  const done = await dbApplyPull(body, { clockOffsetMs, live, touched: _touched, settings });
   if (done === false || !live()) return { pulled: 0, changed: 0, stopped: true };
+  if (settings.length) await _applyPulledSettings(settings, live);
   await dbSetMeta(LAST_PULL_KEY, body.now || new Date().toISOString());
   if (knew < SYNC_SCHEMA) await dbSetMeta(PULL_SCHEMA_KEY, String(SYNC_SCHEMA));
   let pulled = 0;

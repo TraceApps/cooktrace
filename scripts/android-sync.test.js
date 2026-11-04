@@ -378,6 +378,20 @@ test('every sync says which kinds of rows it changed, so an open page reads only
   assert.ok(!r.afterFailed?.includes('cookbooks'), 'and does not say it twice: ' + JSON.stringify(r.afterFailed));
 });
 
+test('a setting changed on the web applies on the phone with the sync, and one changed on the phone first stays', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('settingsLive');
+  assert.equal(r.before, 'imperial');
+  assert.equal(r.after, 'metric', 'no restart needed');
+  assert.deepEqual(r.household, [{ name: 'Sam', allergies: ['peanut'] }], 'a list arrives as a list, not JSON text');
+  assert.equal(r.appearance, 'system', "the phone's own appearance is never the server's");
+  assert.deepEqual(r.told, ['household', 'measurementSystem'], 'the open setting stores hear of it');
+  assert.deepEqual(r.ownServings, { here: 6, store: 6 }, 'a change made here that has not gone up stays');
+  assert.equal(r.serverServings, 6, 'and goes up');
+  assert.equal(r.sentBack, 1, "a pulled setting isn't sent back (the one PUT is the phone's own change)");
+  assert.deepEqual(r.upAsIs, { household: [{ name: 'Ana', allergies: ['milk'] }], allergens: ['gluten', 'egg'] },
+    'a list or a household changed on the phone reaches the server whole, not as "[object Object]"');
+});
+
 test("settings are kept per account and server: another account never reads the last one's", { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const r = await run('settingsPerAccount');
   assert.equal(r.bobReads, null);
