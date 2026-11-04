@@ -17,7 +17,7 @@ for (const page of ['Recipes', 'Pantry', 'Shopping', 'CookDiary']) {
     assert.match(body, /finally \{\s*if \(seq === _loadSeq\) loading = false;/);
     assert.match(body, /if \(seq === _loadSeq && !quiet\) \{[^}]*showError\(loadError\)/s, 'a quiet read keeps quiet, and an older read never speaks');
     assert.doesNotMatch(body.replace(/if \(seq === _loadSeq && !quiet\) \{[^}]*\}/s, ''), /showError\(/, 'no other toast');
-    assert.match(src, /onSyncChanges\(\(\) => \{?\s*load\(\{ quiet: true \}\)/);
+    assert.match(src, /onSyncChanges\((\(\)|d) => \{?\s*load\(\{ quiet: true \}\)/);
   });
 }
 

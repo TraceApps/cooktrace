@@ -12,6 +12,7 @@
    */
   import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
+  import { onSyncChanges, newestRead, syncTouched } from '../lib/sync-refresh.js';
   import { fade } from 'svelte/transition';
   import { flip } from 'svelte/animate';
   import { push } from 'svelte-spa-router';
@@ -52,22 +53,47 @@
   let moveTargetId = '';
   let allCookbooks = [];
 
-  async function load() {
-    loading = true;
-    loadError = null;
-    try { cookbook = await NtApi.getCookbook(id); }
-    catch (e) { loadError = failed('fail.load_cookbook', e); showError(loadError); }
-    finally { loading = false; }
+  // quiet: read again after a sync, without the loading state. Two reads at
+  // once (the page opening while a sync ends): only the newest one speaks.
+  const newest = newestRead();
+  async function load({ quiet = false } = {}) {
+    const isNewest = newest();
+    quiet = quiet && !loading; // the first read is still out: this one speaks if it fails
+    if (!quiet) { loading = true; loadError = null; }
+    try {
+      const got = await NtApi.getCookbook(id);
+      // A cookbook deleted elsewhere answers nothing: a quiet read leaves
+      // what is shown, rather than emptying the page.
+      if (isNewest() && (got || !quiet)) cookbook = got;
+    }
+    catch (e) {
+      // A quiet read that fails keeps what is shown, unsaid.
+      if (isNewest() && !quiet) { loadError = failed('fail.load_cookbook', e); showError(loadError); }
+    }
+    finally { if (isNewest()) loading = false; }
   }
   $: if (Number.isFinite(id)) load();
+
+  // A sync that changed the cookbook, its recipes or its links shows here at
+  // once. Mid-drag the list is the drag's: it is read again when the drop
+  // is saved. The pickers' lists are read again the next time they open.
+  let dragging = false;
+  let syncWaiting = false;
+  let recipesFresh = false;
+  let cookbooksFresh = false;
+  onMount(() => onSyncChanges(d => {
+    if (syncTouched(d, ['recipes'])) recipesFresh = false;
+    if (syncTouched(d, ['cookbooks', 'recipe_cookbook_links'])) cookbooksFresh = false;
+    if (dragging) syncWaiting = true; else load({ quiet: true });
+  }, ['cookbooks', 'recipes', 'recipe_cookbook_links', 'pantry_items']));
 
   async function openAddDialog() {
     addOpen = true;
     addQuery = '';
     addSelected = new Set();
-    if (allRecipes.length === 0) {
-      allRecipesLoading = true;
-      try { allRecipes = await NtApi.getRecipes(); }
+    if (allRecipes.length === 0 || !recipesFresh) {
+      allRecipesLoading = allRecipes.length === 0;
+      try { allRecipes = await NtApi.getRecipes(); recipesFresh = true; }
       catch (e) { showError(failed('fail.load_recipes', e)); allRecipes = []; }
       finally { allRecipesLoading = false; }
     }
@@ -150,6 +176,7 @@
   // in sync with the live drag.
   const FLIP_MS = 180;
   function handleDndConsider(e) {
+    dragging = true;
     cookbook = { ...cookbook, recipes: e.detail.items };
   }
   async function handleDndFinalize(e) {
@@ -160,6 +187,8 @@
     cookbook = { ...cookbook, recipes: next };
     try { await NtApi.reorderCookbookRecipes(cookbook.id, next.map(x => x.id)); }
     catch (e2) { showError(failed('fail.save_order', e2)); }
+    dragging = false;
+    if (syncWaiting) { syncWaiting = false; load({ quiet: true }); }
   }
 
   // Wraps svelte-dnd-action's own `dragHandle` action so it can be
@@ -198,8 +227,8 @@
     moveOpen = true;
     moveAction = 'copy';
     moveTargetId = '';
-    if (allCookbooks.length === 0) {
-      try { allCookbooks = await NtApi.getCookbooks(); }
+    if (allCookbooks.length === 0 || !cookbooksFresh) {
+      try { allCookbooks = await NtApi.getCookbooks(); cookbooksFresh = true; }
       catch { allCookbooks = []; }
     }
   }

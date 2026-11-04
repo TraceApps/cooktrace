@@ -1,7 +1,7 @@
 <script>
   import { failed } from '../lib/messages.js';
   import { closeOnBack } from '../lib/back-stack.js';
-  import { onSyncChanges } from '../lib/sync-refresh.js';
+  import { onSyncChanges, syncTouched, newestRead } from '../lib/sync-refresh.js';
   import { onMount } from 'svelte';
   import { push, replace, querystring } from 'svelte-spa-router';
   import { fade, slide } from 'svelte/transition';
@@ -39,6 +39,7 @@
   // Recipe filter — when set, narrows list / month / photos views to a
   // single recipe. Picker lists your recipes (loaded lazily).
   let planRecipes = [];
+  let planRecipesFresh = false; // a sync that changed the recipes makes it old: read again at the next open
   let filterRecipeId = null;
   let filterPickerOpen = false;
   let filterSearch = '';
@@ -77,12 +78,13 @@
   async function openFilterPicker() {
     filterPickerOpen = true;
     filterSearch = '';
-    if (planRecipes.length === 0) {
+    if (planRecipes.length === 0 || !planRecipesFresh) {
       try {
         const list = await NtApi.getRecipes();
         planRecipes = list.slice().sort((a, b) =>
           (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' })
         );
+        planRecipesFresh = true;
       }
       catch { planRecipes = []; }
     }
@@ -149,7 +151,7 @@
   let heatmap = [];
   async function loadHeatmap() {
     try { heatmap = await NtApi.getCookDiaryHeatmap(364); }
-    catch { heatmap = []; }
+    catch { /* the map shown stays */ }
   }
   function onHeatmapCellClick(ev) {
     const iso = ev.detail?.date;
@@ -240,7 +242,17 @@
   }
   onMount(() => { load(); loadStats(); loadHeatmap(); });
   // A sync that brought changes down shows them here at once.
-  onMount(() => onSyncChanges(() => { load({ quiet: true }); loadStats(); loadHeatmap(); }));
+  onMount(() => onSyncChanges(d => {
+    load({ quiet: true }); loadStats(); loadHeatmap();
+    if (syncTouched(d, ['recipes'])) planRecipesFresh = false;
+    // The week's summary reads the recipes, the pantry and the list. While
+    // the Build a Week sheet is open on them they wait until it closes.
+    if (view === 'week' && syncTouched(d, ['recipes', 'pantry_items', 'shopping_list'])) {
+      if (buildWeekOpen) weekExtrasWaiting = true; else loadWeekExtras();
+    }
+  }));
+  let weekExtrasWaiting = false;
+  $: if (!buildWeekOpen && weekExtrasWaiting) { weekExtrasWaiting = false; if (view === 'week') loadWeekExtras(); }
   // Reads again when the view, month or week changes. It names the week's
   // dates (not just the week) so it runs after they're worked out: naming
   // weekAnchor alone ran it first, with the week before's dates.
@@ -327,12 +339,15 @@
   let weekRecipes = new Map();
   let weekPantry = [];
   let weekList = [];
+  const newestWeek = newestRead();
   async function loadWeekExtras() {
+    const isNewest = newestWeek();
     const [recipes, pantry, list] = await Promise.all([
       NtApi.getRecipes().catch(() => null),
       NtApi.getPantry().catch(() => null),
       NtApi.getShoppingList().catch(() => null),
     ]);
+    if (!isNewest()) return;
     if (recipes) weekRecipes = new Map(recipes.map(r => [r.id, r]));
     if (pantry) weekPantry = pantry;
     if (list) weekList = list;

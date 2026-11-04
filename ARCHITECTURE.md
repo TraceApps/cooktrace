@@ -22,6 +22,7 @@ The important reads:
 - `src/lib/db.js`, IndexedDB for PWA settings storage
 - `src/lib/db-native.js`, on-device SQLite for Android local mode
 - `src/lib/sync.js`, push/pull orchestrator for Android server mode
+- `src/lib/sync-refresh.js`, what a sync changed (`ct:sync-complete` carries `kinds`, the tables a pull wrote) and `onSyncChanges(fn, kinds)`, which an open page uses to read its rows again
 - `server/db.js`, schema, migrations, sole SQLite entry point
 - `server/routes/`, Express handlers, one file per domain
 - `src/routes/`, top-level Svelte page components

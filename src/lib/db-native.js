@@ -1095,7 +1095,7 @@ export async function dbRememberEcho(table, rowId, updatedAt) {
   );
 }
 
-export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => true } = {}) {
+export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => true, touched = null } = {}) {
   // live(): false once the copy is changing hands (another account signing
   // in, lib/local-account.js): nothing more of this pull is written.
   if (!isNative || !payload?.tables) return true;
@@ -1394,6 +1394,7 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
     const theirs = [...new Set(payload.tables.disabled_units.map(r => r?.abbr).filter(Boolean))].sort();
     const ours = ((await db.query(`SELECT abbr FROM disabled_units WHERE user_id = ?`, [LOCAL_USER_ID]))?.values || []).map(r => r.abbr).sort();
     if (theirs.join('\n') !== ours.join('\n')) {
+      touched?.add('disabled_units');
       await db.run(`DELETE FROM disabled_units WHERE user_id = ?`, [LOCAL_USER_ID]);
       for (const abbr of theirs) {
         await db.run(`INSERT OR IGNORE INTO disabled_units (user_id, abbr) VALUES (?, ?)`, [LOCAL_USER_ID, abbr]);
@@ -1439,6 +1440,7 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
     const same = here.length === wanted.length
       && here.map(key).sort().join('|') === wanted.map(key).sort().join('|');
     if (!same) {
+      touched?.add('recipe_cookbook_links');
       if (known.length) {
         await db.run(
           `DELETE FROM recipe_cookbook_links

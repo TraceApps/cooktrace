@@ -44,6 +44,7 @@
   import { cookModeActive } from '../stores/cookMode.js';
   import { currentUser } from '../stores/auth.js';
   import { onDestroy, onMount, tick } from 'svelte';
+  import { onSyncChanges, syncTouched, newestRead } from '../lib/sync-refresh.js';
   import { fold } from '../lib/fold.js';
   import { get } from 'svelte/store';
   import { activeCooks, startCook, endCook, isCooking, describeCook, cookList } from '../stores/cooks.js';
@@ -145,6 +146,17 @@
       pantryById = new Map((rows || []).map(p => [p.id, p]));
     } catch { pantryById = new Map(); }
     finally { _pantryLoading = false; }
+  }
+  // After a sync changed the pantry: read it again, if it was read before.
+  // A read that fails keeps the map as it is.
+  const newestPantry = newestRead();
+  async function _refreshPantry() {
+    if (!pantryById) return;
+    const isNewest = newestPantry();
+    try {
+      const rows = await NtApi.getPantry();
+      if (isNewest()) pantryById = new Map((rows || []).map(p => [p.id, p]));
+    } catch { /* what is shown stays */ }
   }
   async function openConvertMenu(key) {
     await _ensurePantryLoaded();
@@ -291,12 +303,16 @@
       && (c.date === day || (c.any_day && c.date <= day && day <= _planEnds(c))));
   }
 
-  async function loadCooks() {
+  // quiet: read again after a sync, without the loading state; a quiet read
+  // that fails keeps the list. Only the newest read sets it.
+  const newestCooks = newestRead();
+  async function loadCooks({ quiet = false } = {}) {
+    const isNewest = newestCooks();
     todayIso = isoDay(new Date());
-    cooksLoading = true;
-    try { cooks = await NtApi.getCooks(id); }
-    catch { cooks = []; }
-    finally { cooksLoading = false; }
+    if (!quiet) cooksLoading = true;
+    try { const got = await NtApi.getCooks(id); if (isNewest()) cooks = got; }
+    catch { if (isNewest() && !quiet) cooks = []; }
+    finally { if (isNewest()) cooksLoading = false; }
   }
 
   // Cook mode — wake-lock + bigger fonts + sectioned step focus.
@@ -605,8 +621,12 @@
   async function load() {
     loading = true;
     loadError = null;
+    const isNewest = newestRecipe();
     try {
-      recipe = await NtApi.getRecipe(id);
+      // (A read from a sync that began after this one has the newer copy; this
+      // one still shows if that one failed and nothing is shown yet.)
+      const got = await NtApi.getRecipe(id);
+      if (isNewest() || !recipe) recipe = got;
     } catch (e) {
       loadError = failed('fail.load_recipe', e);
       showError(loadError);
@@ -761,12 +781,14 @@
   // sees it; on a phone, from its own copy (offline too).
   let history = null;
   let historyOpen = false;
-  async function loadHistory() {
+  const newestHistory = newestRead();
+  async function loadHistory({ quiet = false } = {}) {
     const rid = id;
+    const isNewest = newestHistory();
     try {
       const h = await NtApi.getRecipeRevisions(rid);
-      if (rid === id) history = h;
-    } catch { if (rid === id) history = null; }
+      if (rid === id && isNewest()) history = h;
+    } catch { if (rid === id && isNewest() && !quiet) history = null; }
   }
   $: versionNumberOf = rev => history?.revisions?.find(v => v.rev === rev)?.number ?? null;
   function openConflicts() { historyOpen = false; openVersions(); }
@@ -790,13 +812,15 @@
     if (!isNative) return editable ? id : 0;
     return getServerUrl() ? Number(recipe.server_id) || 0 : 0;
   }
-  async function loadVersions() {
+  const newestVersions = newestRead();
+  async function loadVersions({ quiet = false } = {}) {
     const rid = _versionsRecipeId();
+    const isNewest = newestVersions();
     if (!rid) { versions = []; return; }
     try {
       const rows = await NtApi.getRecipeVersions(rid);
-      if (_versionsRecipeId() === rid) versions = Array.isArray(rows) ? rows : [];
-    } catch { versions = []; }
+      if (_versionsRecipeId() === rid && isNewest()) versions = Array.isArray(rows) ? rows : [];
+    } catch { if (isNewest() && !quiet) versions = []; }
   }
   $: unseenVersions = versions.filter(v => v.reason === 'conflict' && !v.seen).length;
   // Saves made here with no connection went up just now: the recipe on
@@ -811,6 +835,34 @@
     window.addEventListener('ct:offline-synced', _onOfflineSynced);
     onDestroy(() => window.removeEventListener('ct:offline-synced', _onOfflineSynced));
   }
+
+  // Android: a sync that changed this recipe, its cooks, versions or the
+  // pantry it is read against shows here at once, quietly. While you cook
+  // (steps and ingredients ticked off) the recipe under you stays as it is,
+  // and is read when you finish. A recipe deleted elsewhere stays shown.
+  const newestRecipe = newestRead();
+  let syncHeld = false;
+  async function refreshAfterSync(d) {
+    const rid = id;
+    const wantRecipe = !d || syncTouched(d, ['recipes', 'recipe_categories']);
+    const wantHistory = !d || syncTouched(d, ['recipes', 'recipe_revisions']);
+    if (wantRecipe || wantHistory) {
+      // The recipe first: one deleted elsewhere (or a failed read) leaves
+      // everything as shown, and its history is not asked for (reading a
+      // recipe's history records its current version).
+      const isNewest = newestRecipe();
+      let fresh = null;
+      try { fresh = await NtApi.getRecipe(rid); } catch { /* what is shown stays */ }
+      if (!fresh || Number(fresh.id) !== rid || id !== rid) return;
+      if (wantRecipe && isNewest()) recipe = fresh;
+    }
+    if (!d || syncTouched(d, ['recipes', 'cook_diary'])) loadCooks({ quiet: true });
+    if (wantHistory) { loadHistory({ quiet: true }); loadVersions({ quiet: true }); }
+    if (!d || syncTouched(d, ['pantry_items'])) _refreshPantry();
+  }
+  onMount(() => onSyncChanges(d => { if (cookMode) syncHeld = true; else refreshAfterSync(d); },
+    ['recipes', 'recipe_categories', 'cook_diary', 'recipe_revisions', 'pantry_items']));
+  $: if (!cookMode && syncHeld) { syncHeld = false; refreshAfterSync(null); }
   async function _markVersionsSeen() {
     if (!unseenVersions) return;
     versions = versions.map(v => ({ ...v, seen: true }));

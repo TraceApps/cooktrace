@@ -833,24 +833,26 @@
     try {
       const [recipesRes, catsRes, cookbooksRes, sharedRes, sharedCbRes] = await Promise.all([
         NtApi.getRecipes(),
-        NtApi.getRecipeCategories().catch(() => []),
-        NtApi.getCookbooks().catch(() => []),
+        NtApi.getRecipeCategories().catch(() => null),
+        NtApi.getCookbooks().catch(() => null),
         NtApi.getRecipesSharedWithMe().catch(e => {
           console.warn('[recipes] getRecipesSharedWithMe failed', e);
-          return [];
+          return null;
         }),
         NtApi.getCookbooksSharedWithMe().catch(e => {
           console.warn('[recipes] getCookbooksSharedWithMe failed', e);
-          return [];
+          return null;
         }),
       ]);
       if (seq !== _loadSeq) return;
       loadError = null;
       recipes = recipesRes;
-      categories = catsRes || [];
-      cookbooks = cookbooksRes || [];
-      sharedRecipes = sharedRes || [];
-      sharedCookbooks = sharedCbRes || [];
+      // (A list that failed to read is empty, except after a sync: that
+      // keeps what is shown.)
+      if (catsRes || !quiet) categories = catsRes || [];
+      if (cookbooksRes || !quiet) cookbooks = cookbooksRes || [];
+      if (sharedRes || !quiet) sharedRecipes = sharedRes || [];
+      if (sharedCbRes || !quiet) sharedCookbooks = sharedCbRes || [];
       activeCategorySlug = _readCategoryFromHash();
       viewMode = _readViewFromHash();
       // Explicit re-measure after the toggle buttons render: the

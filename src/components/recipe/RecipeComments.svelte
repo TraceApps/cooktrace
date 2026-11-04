@@ -13,6 +13,7 @@
   import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { NtApi } from '../../lib/api.js';
+  import { onSyncChanges, newestRead } from '../../lib/sync-refresh.js';
   import { currentUser, userMgmtActive } from '../../stores/auth.js';
   import { showError, showSuccess } from '../../stores/toast.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
@@ -88,18 +89,31 @@
     ? threads
     : threads.slice(threads.length - COLLAPSED_LIMIT);
 
-  async function load() {
-    loading = true;
+  // quiet: read again after a sync, without the loading state; a quiet read
+  // that fails keeps the comments. Only the newest read sets them.
+  const newest = newestRead();
+  async function load({ quiet = false } = {}) {
+    const isNewest = newest();
+    quiet = quiet && !loading; // the first read is still out: this one speaks if it fails
+    if (!quiet) loading = true;
     try {
-      comments = await NtApi.getRecipeComments(recipeId);
+      const got = await NtApi.getRecipeComments(recipeId);
+      if (isNewest()) comments = got;
     } catch (e) {
-      showError(failed('fail.load_comments', e));
-      comments = [];
+      if (isNewest() && !quiet) {
+        showError(failed('fail.load_comments', e));
+        comments = [];
+      }
     } finally {
-      loading = false;
+      if (isNewest()) loading = false;
     }
   }
-  onMount(load);
+  onMount(() => { load(); });
+  // A sync that brought comments shows them here, except under a comment
+  // being edited: that waits until the edit is saved or dropped.
+  let syncWaiting = false;
+  onMount(() => onSyncChanges(() => { if (editingId != null) syncWaiting = true; else load({ quiet: true }); }, ['recipe_comments']));
+  $: if (editingId == null && syncWaiting) { syncWaiting = false; load({ quiet: true }); }
 
   async function submit() {
     const body = draft.trim();

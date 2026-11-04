@@ -16,6 +16,7 @@
   import { onMount } from 'svelte';
   import { UNIT_GROUPS } from '../../lib/units.js';
   import { NtApi } from '../../lib/api.js';
+  import { onSyncChanges, newestRead } from '../../lib/sync-refresh.js';
   import { refreshUnitsOverlay } from '../../stores/unitsOverlay.js';
   import { showError, showSuccess } from '../../stores/toast.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
@@ -83,23 +84,37 @@
   $: totalMatches = filteredGroups.reduce((s, g) => s + g.units.length, 0) + filteredCustom.length;
   $: filteredEmpty = !!needle && totalMatches === 0;
 
-  async function load() {
-    loading = true;
+  // quiet: read again after a sync, without the loading state; a quiet read
+  // that fails keeps the lists. Only the newest read sets them.
+  const newest = newestRead();
+  async function load({ quiet = false } = {}) {
+    const isNewest = newest();
+    quiet = quiet && !loading; // the first read is still out: this one speaks if it fails
+    if (!quiet) loading = true;
     try {
       const res = await NtApi.getUnits();
+      if (!isNewest()) return;
       disabled = new Set(res.disabled || []);
       custom = res.custom || [];
       usage = res.usage || {};
     } catch (e) {
-      showError(failed('fail.load_units', e));
-      disabled = new Set();
-      custom = [];
-      usage = {};
+      if (isNewest() && !quiet) {
+        showError(failed('fail.load_units', e));
+        disabled = new Set();
+        custom = [];
+        usage = {};
+      }
     } finally {
-      loading = false;
+      if (isNewest()) loading = false;
     }
   }
-  onMount(load);
+  onMount(() => { load(); });
+  // A sync that changed the units (or the recipes that use them) shows here,
+  // except under a unit being edited or added: that waits until it is done.
+  let syncWaiting = false;
+  $: busy = editingId !== null || creating;
+  onMount(() => onSyncChanges(() => { if (busy) syncWaiting = true; else load({ quiet: true }); }, ['custom_units', 'disabled_units', 'recipes']));
+  $: if (!busy && syncWaiting) { syncWaiting = false; load({ quiet: true }); }
 
   async function toggleBuiltin(abbr) {
     const next = !disabled.has(abbr);

@@ -30,7 +30,8 @@
    *     startInEdit={false} prefill={null}
    *     on:changed={e => ...} on:deleted={e => ...} on:created={e => ...} />
    */
-  import { createEventDispatcher, tick } from 'svelte';
+  import { createEventDispatcher, tick, onMount } from 'svelte';
+  import { onSyncChanges } from '../../lib/sync-refresh.js';
   import { fade } from 'svelte/transition';
   import { _, locale } from 'svelte-i18n';
   import Sheet from '../ui/Sheet.svelte';
@@ -358,9 +359,13 @@
   ];
 
   // ── Categories ─────────────────────────────────────────────────────
+  // A sync that changed the categories makes the list old: it is read again
+  // the next time an item opens (never under one that is open).
+  let categoriesFresh = false;
+  onMount(() => onSyncChanges(() => { categoriesFresh = false; }, ['pantry_categories']));
   async function _loadPantryCategories() {
-    if (pantryCategories.length) return;
-    try { pantryCategories = await NtApi.getPantryCategories(); }
+    if (pantryCategories.length && categoriesFresh) return;
+    try { pantryCategories = await NtApi.getPantryCategories(); categoriesFresh = true; }
     catch { pantryCategories = []; }
   }
 

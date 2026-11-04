@@ -12,6 +12,7 @@
   import { onMount } from 'svelte';
   import { push } from 'svelte-spa-router';
   import { NtApi } from '../../lib/api.js';
+  import { onSyncChanges, newestRead } from '../../lib/sync-refresh.js';
   import { showError, showSuccess } from '../../stores/toast.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
   import { resolveAssetUrl } from '../../lib/platform.js';
@@ -49,23 +50,34 @@
     : cookbooks;
   $: filteredEmpty = cookbooks.length > 0 && filtered.length === 0;
 
-  async function load() {
-    loading = true;
+  // quiet: read again after a sync, without the loading state; a quiet read
+  // that fails keeps the lists. Only the newest read sets them.
+  const newest = newestRead();
+  async function load({ quiet = false } = {}) {
+    const isNewest = newest();
+    quiet = quiet && !loading; // the first read is still out: this one speaks if it fails
+    if (!quiet) loading = true;
     try {
       const [cbs, cats, tags] = await Promise.all([
         NtApi.getCookbooks(),
-        NtApi.getRecipeCategories().catch(() => []),
-        NtApi.getRecipeTags().catch(() => []),
+        NtApi.getRecipeCategories().catch(() => null),
+        NtApi.getRecipeTags().catch(() => null),
       ]);
+      if (!isNewest()) return;
       cookbooks = cbs;
-      categories = cats || [];
-      tagOptions = tags || [];
+      if (cats || !quiet) categories = cats || [];
+      if (tags || !quiet) tagOptions = tags || [];
     } catch (e) {
-      showError(failed('fail.load_cookbooks', e));
-      cookbooks = [];
-    } finally { loading = false; }
+      if (isNewest() && !quiet) { showError(failed('fail.load_cookbooks', e)); cookbooks = []; }
+    } finally { if (isNewest()) loading = false; }
   }
-  onMount(load);
+  onMount(() => { load(); });
+  // A sync that changed the cookbooks, their recipes or the lists the smart filter picks from shows here, except under a row being edited,
+  // dragged or saved: that waits until it is done.
+  let syncWaiting = false;
+  $: busy = editingId !== null || draggingId != null || creating || reordering || coverUploading;
+  onMount(() => onSyncChanges(() => { if (busy) syncWaiting = true; else load({ quiet: true }); }, ['cookbooks', 'recipe_cookbook_links', 'recipes', 'recipe_categories']));
+  $: if (!busy && syncWaiting) { syncWaiting = false; load({ quiet: true }); }
 
   async function create() {
     const name = newName.trim();
@@ -162,14 +174,17 @@
     const next = [...cookbooks];
     [next[idx], next[target]] = [next[target], next[idx]];
     cookbooks = next;
+    reordering = true;
     try { await NtApi.reorderCookbooks(next.map(c => c.id)); }
     catch (e) { showError(failed('fail.save_order', e)); }
+    finally { reordering = false; }
   }
 
   // ── Drag-and-drop reorder ───────────────────────────────────────────
   // Native HTML5 DnD. Drag the row's grip handle, drop on another row
   // to insert before it. After the visual reorder we fire the same
   // bulk PUT as the arrow buttons.
+  let reordering = false;
   let draggingId = null;
   let dragOverId = null;
   function _onDragStart(cb, e) {
@@ -204,8 +219,10 @@
     const insertAt = sourceIdx < targetIdx ? targetIdx - 1 : targetIdx;
     next.splice(insertAt, 0, moved);
     cookbooks = next;
+    reordering = true;
     try { await NtApi.reorderCookbooks(next.map(c => c.id)); }
     catch (e) { showError(failed('fail.save_order', e)); }
+    finally { reordering = false; }
   }
   function _onDragEnd() {
     draggingId = null;

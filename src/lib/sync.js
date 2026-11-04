@@ -26,6 +26,7 @@ import { mapSmartFilterCategory } from './smart-cookbook.js';
 import { mapSourceIds } from './shopping-plan.js';
 import { localDataIsThisAccount, accountGeneration } from './local-account.js';
 import { SYNC_SCHEMA } from './sync-fields.js';
+import { pullKinds } from './sync-refresh.js';
 
 let _syncInFlight = null;
 // A sync that isn't the quiet 30s one was asked for: do the pictures pass.
@@ -260,9 +261,16 @@ async function _handleSyncAuthError(said = null) {
 function _shouldRun() {
   return isNative && !!getServerUrl();
 }
+// The kinds of rows (lib/sync-refresh.js) a pull changed on this phone that
+// no page has been told of yet. Whatever announces next sends them, and
+// starts the list again: a sync that fails after its pull still tells the
+// open pages what the pull changed, since the next pull won't bring it again.
+const _touched = new Set();
 function _notify(payload) {
+  const kinds = [..._touched];
+  _touched.clear();
   if (typeof window === 'undefined') return;
-  try { window.dispatchEvent(new CustomEvent('ct:sync-complete', { detail: payload })); }
+  try { window.dispatchEvent(new CustomEvent('ct:sync-complete', { detail: { ...payload, kinds } })); }
   catch {}
 }
 
@@ -791,7 +799,11 @@ async function pullChanges({ token = getAuthToken(), signal = null, gen = accoun
   const body = await res.json();
   if (!live() || !(await localDataIsThisAccount(token))) return { pulled: 0, changed: 0, stopped: true };
   const clockOffsetMs = Number(await dbGetMeta(CLOCK_OFFSET_KEY)) || 0;
-  const done = await dbApplyPull(body, { clockOffsetMs, live });
+  // Recorded before the rows are written, so a pull that stops partway
+  // still has what it wrote announced. The two sets sent whole every time
+  // are added by dbApplyPull when it really changes them.
+  for (const k of pullKinds(body.tables)) _touched.add(k);
+  const done = await dbApplyPull(body, { clockOffsetMs, live, touched: _touched });
   if (done === false || !live()) return { pulled: 0, changed: 0, stopped: true };
   await dbSetMeta(LAST_PULL_KEY, body.now || new Date().toISOString());
   if (knew < SYNC_SCHEMA) await dbSetMeta(PULL_SCHEMA_KEY, String(SYNC_SCHEMA));
@@ -830,6 +842,7 @@ export async function stopSync() {
   const running = [..._runs];
   for (const r of running) r.ctl.abort();
   await Promise.allSettled(running.map(r => r.promise).filter(Boolean));
+  _touched.clear(); // the account's copy is changing hands: no page waits on its rows
 }
 
 /**
@@ -975,7 +988,9 @@ async function _fullSync({ silent, forceCheck, showFailureBanner, token, signal,
     return result;
   } catch (e) {
     if (e?.stopped || !live()) {
-      // Stopped for a change of account: not an error to show.
+      // Stopped for a change of account: not an error to show, and no page
+      // is waiting on the rows of the account that went.
+      _touched.clear();
       syncState.update(s => ({ ...s, syncing: false, phase: '', progress: '' }));
       return { ok: false, reason: 'stopped' };
     }
@@ -984,7 +999,9 @@ async function _fullSync({ silent, forceCheck, showFailureBanner, token, signal,
       ...s, syncing: false, phase: '', error: err,
       ...(showFailureBanner ? { showErrorBanner: true } : {}),
     }));
-    if (!silent) _notify({ ok: false, error: err });
+    // (Also a quiet one that had already changed rows here: the open pages
+    // read them now rather than at the next sync that ends well.)
+    if (!silent || _touched.size) _notify({ ok: false, error: err });
     return { ok: false, error: err };
   }
 }

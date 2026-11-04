@@ -10,6 +10,7 @@
   import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { NtApi } from '../../lib/api.js';
+  import { onSyncChanges, newestRead } from '../../lib/sync-refresh.js';
   import { showError, showSuccess } from '../../stores/toast.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
   import IconPicker from '../ui/IconPicker.svelte';
@@ -35,13 +36,24 @@
     : categories;
   $: filteredEmpty = categories.length > 0 && filtered.length === 0;
 
-  async function load() {
-    loading = true;
-    try { categories = await NtApi.getPantryCategories(); }
-    catch (e) { showError(failed('fail.load_categories', e)); categories = []; }
-    finally { loading = false; }
+  // quiet: read again after a sync, without the loading state; a quiet read
+  // that fails keeps the list. Only the newest read sets it.
+  const newest = newestRead();
+  async function load({ quiet = false } = {}) {
+    const isNewest = newest();
+    quiet = quiet && !loading; // the first read is still out: this one speaks if it fails
+    if (!quiet) loading = true;
+    try { const got = await NtApi.getPantryCategories(); if (isNewest()) categories = got; }
+    catch (e) { if (isNewest() && !quiet) { showError(failed('fail.load_categories', e)); categories = []; } }
+    finally { if (isNewest()) loading = false; }
   }
-  onMount(load);
+  onMount(() => { load(); });
+  // A sync that changed the categories (or the pantry items they count) shows here, except under a row being edited,
+  // dragged or saved: that waits until it is done.
+  let syncWaiting = false;
+  $: busy = editingId !== null || draggingId != null || creating || reordering;
+  onMount(() => onSyncChanges(() => { if (busy) syncWaiting = true; else load({ quiet: true }); }, ['pantry_categories', 'pantry_items']));
+  $: if (!busy && syncWaiting) { syncWaiting = false; load({ quiet: true }); }
 
   function startEdit(c) {
     editingId = c.id;
@@ -82,6 +94,7 @@
   }
 
   // ── Drag-and-drop reorder ───────────────────────────────────────
+  let reordering = false;
   let draggingId = null;
   let dragOverId = null;
   function _onDragStart(c, e) {
@@ -115,8 +128,10 @@
     const insertAt = sourceIdx < targetIdx ? targetIdx - 1 : targetIdx;
     next.splice(insertAt, 0, moved);
     categories = next;
+    reordering = true;
     try { await NtApi.reorderPantryCategories(next.map(c => c.id)); }
     catch (err) { showError(failed('fail.save_order', err)); }
+    finally { reordering = false; }
   }
   function _onDragEnd() { draggingId = null; dragOverId = null; }
 

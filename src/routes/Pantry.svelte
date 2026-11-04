@@ -704,12 +704,12 @@
     try {
       const [pantryRes, catsRes] = await Promise.all([
         NtApi.getPantry(),
-        NtApi.getPantryCategories().catch(() => []),
+        NtApi.getPantryCategories().catch(() => null),
       ]);
       if (seq !== _loadSeq) return;
       loadError = null;
       items = pantryRes;
-      pantryCategories = catsRes || [];
+      if (catsRes || !quiet) pantryCategories = catsRes || []; // (a quiet read that fails keeps them)
     } catch (e) {
       // Only the newest read speaks; a quiet one after a sync that fails
       // keeps what's shown, unsaid.

@@ -2,7 +2,7 @@
   import { textDir } from '../lib/text-dir.js';
   import { failed } from '../lib/messages.js';
   import { closeOnBack } from '../lib/back-stack.js';
-  import { onSyncChanges } from '../lib/sync-refresh.js';
+  import { onSyncChanges, syncTouched, newestRead } from '../lib/sync-refresh.js';
   import { onMount } from 'svelte';
   import { fade, slide } from 'svelte/transition';
   import { push } from 'svelte-spa-router';
@@ -89,6 +89,7 @@
   // Add-from-recipe state
   let pickerOpen = false;
   let pickerRecipes = [];
+  let pickerRecipesFresh = false; // a sync that changed the recipes makes the list old: read again at the next open
   let pickerSearch = '';
   let pickerOnlyMissing = true;
   let pickerBusy = false;
@@ -213,21 +214,30 @@
     }
     finally { if (seq === _loadSeq) loading = false; }
   }
-  async function loadPantry() {
+  // (quiet: after a sync, a read that fails keeps what is shown.)
+  const newestPantry = newestRead();
+  async function loadPantry({ quiet = false } = {}) {
+    const isNewest = newestPantry();
     try {
       const list = await NtApi.getPantry();
+      if (!isNewest()) return;
       pantryOptions = (list || [])
         .map(p => ({ name: p.name }))
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-    } catch { pantryOptions = []; }
+    } catch { if (isNewest() && !quiet) pantryOptions = []; }
   }
-  async function loadCategories() {
-    try { categories = await NtApi.getPantryCategories() || []; }
-    catch { categories = []; }
+  const newestCategories = newestRead();
+  async function loadCategories({ quiet = false } = {}) {
+    const isNewest = newestCategories();
+    try { const got = await NtApi.getPantryCategories() || []; if (isNewest()) categories = got; }
+    catch { if (isNewest() && !quiet) categories = []; }
   }
   onMount(() => { load(); loadPantry(); loadCategories(); });
   // A sync that brought changes down shows them here at once.
-  onMount(() => onSyncChanges(() => { load({ quiet: true }); loadPantry(); loadCategories(); }));
+  onMount(() => onSyncChanges(d => {
+    load({ quiet: true }); loadPantry({ quiet: true }); loadCategories({ quiet: true });
+    if (syncTouched(d, ['recipes'])) pickerRecipesFresh = false;
+  }));
 
   // Known-aisle list = defaults from categories (default_aisle if set,
   // else the category name) + whatever aisles are currently in the
@@ -698,8 +708,8 @@
 
   async function openPicker() {
     pickerOpen = true;
-    if (pickerRecipes.length === 0) {
-      try { pickerRecipes = await NtApi.getRecipes(); }
+    if (pickerRecipes.length === 0 || !pickerRecipesFresh) {
+      try { pickerRecipes = await NtApi.getRecipes(); pickerRecipesFresh = true; }
       catch { pickerRecipes = []; }
     }
   }

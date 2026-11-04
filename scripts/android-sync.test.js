@@ -357,6 +357,27 @@ test('the first sync tells the pages it brought data down, so the list shows it 
   assert.equal(r.told[1].changed, 0, 'nothing new, nothing to read again');
 });
 
+test('every sync says which kinds of rows it changed, so an open page reads only what it shows', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('syncKinds');
+  assert.deepEqual(r.idle, [], 'nothing changed, nothing to read again');
+  assert.deepEqual(r.recipeDeleted, ['recipes'], 'a recipe deleted on the web');
+  assert.deepEqual(r.cookbookRenamed, ['cookbooks']);
+  assert.deepEqual(r.linkRemoved, ['recipe_cookbook_links'], 'a recipe taken out of a cookbook: only the links, which are sent whole every time');
+  assert.deepEqual(r.unitOff, ['disabled_units']);
+  assert.deepEqual(r.unitOffAgain, [], 'the same set again is no change');
+  assert.deepEqual(r.customUnit, ['custom_units']);
+  assert.deepEqual(r.customUnitGone, ['custom_units'], 'deleted outright');
+  assert.deepEqual(r.categoryGone, ['recipe_categories', 'recipes'], 'its recipes let go of it');
+  assert.deepEqual(r.pantryCategoryGone, ['pantry_categories', 'pantry_items']);
+  assert.deepEqual(r.comment, ['recipe_comments']);
+  assert.deepEqual(r.cooked, ['cook_diary', 'recipes'], 'a cook counts on its recipe');
+  assert.deepEqual(r.listed, ['shopping_list']);
+  assert.deepEqual(r.pantryGone, ['pantry_items']);
+  assert.equal(r.failedSync.ok, false);
+  assert.ok(r.failedSync.told.some(t => t.kinds.includes('cookbooks')), 'a sync that fails after its pull still says what the pull wrote: ' + JSON.stringify(r.failedSync));
+  assert.ok(!r.afterFailed?.includes('cookbooks'), 'and does not say it twice: ' + JSON.stringify(r.afterFailed));
+});
+
 test("settings are kept per account and server: another account never reads the last one's", { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const r = await run('settingsPerAccount');
   assert.equal(r.bobReads, null);

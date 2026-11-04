@@ -14,6 +14,8 @@
   import { pop, push, querystring } from 'svelte-spa-router';
   import { fade } from 'svelte/transition';
   import { NtApi } from '../lib/api.js';
+  import { onMount } from 'svelte';
+  import { onSyncChanges, newestRead } from '../lib/sync-refresh.js';
   import { isNative, getServerUrl, resolveAssetUrl } from '../lib/platform.js';
   import { currentUser } from '../stores/auth.js';
   import { dateFormat } from '../stores/settings.js';
@@ -58,17 +60,30 @@
     finally { busy = false; }
   }
 
-  async function load() {
-    loading = true; loadError = null;
+  // quiet: read again after a sync, without the loading state; a quiet read
+  // that fails keeps what is shown. Only the newest read sets it.
+  const newest = newestRead();
+  async function load({ quiet = false } = {}) {
+    const isNewest = newest();
+    quiet = quiet && !loading; // the first read is still out: this one speaks if it fails
+    if (!quiet) { loading = true; loadError = null; }
     try {
-      [recipe, history] = await Promise.all([NtApi.getRecipe(id), NtApi.getRecipeRevisions(id)]);
+      const [r, h] = await Promise.all([NtApi.getRecipe(id), NtApi.getRecipeRevisions(id)]);
+      if (isNewest()) { recipe = r; history = h; loadError = null; }
     } catch (e) {
-      loadError = failed('fail.load_history', e);
+      if (isNewest() && !quiet) loadError = failed('fail.load_history', e);
     } finally {
-      loading = false;
+      if (isNewest()) loading = false;
     }
   }
   $: if (Number.isFinite(id) && rev) load();
+  // A sync that changed the recipe, its versions or its cooks shows here at
+  // once, except under a name being typed, a cook being logged or an action
+  // in progress: those wait until they are done.
+  let syncWaiting = false;
+  onMount(() => onSyncChanges(() => { if (naming || logOpen || busy) syncWaiting = true; else load({ quiet: true }); },
+    ['recipes', 'recipe_revisions', 'cook_diary']));
+  $: if (!naming && !logOpen && !busy && syncWaiting) { syncWaiting = false; load({ quiet: true }); }
 
   $: versions = history?.revisions || [];
   $: v = versions.find(x => x.rev === rev) || null;

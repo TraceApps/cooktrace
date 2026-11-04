@@ -496,6 +496,75 @@ const scenarios = {
     out.told = events.filter(e => e.type === 'ct:sync-complete').map(e => ({ ok: e.detail?.ok, changed: e.detail?.changed }));
   },
 
+  // Every sync says which kinds of rows it changed on the phone
+  // (lib/sync-refresh.js), so an open page reads again only what it shows:
+  // rows the web changed or deleted, the two sets sent whole (cookbook links,
+  // turned-off units) only when they really changed, nothing when nothing
+  // did, and a sync that fails after its pull still says what the pull wrote.
+  async syncKinds() {
+    const la = await import('../../src/lib/local-account.js');
+    const A = await me(token);
+    await la.prepareLocalAccount(A, { confirm: async () => true });
+    const one = await newRecipe({ name: 'One' });
+    const two = await newRecipe({ name: 'Two' });
+    const cat = await web('POST', '/api/recipes/categories', { name: 'Mains' });
+    await web('PUT', `/api/recipes/${two}`, { ...(await web('GET', `/api/recipes/${two}`)), category_id: cat.id });
+    const pcat = await web('POST', '/api/pantry/categories', { name: 'Spices' });
+    const book = await web('POST', '/api/cookbooks', { name: 'Book' });
+    await web('POST', `/api/cookbooks/${book.id}/recipes`, { recipe_ids: [one, two] });
+    const salt = await web('POST', '/api/pantry', { name: 'Salt', category_id: pcat.id });
+    await sync();
+    // What the pages are told after each change on the web, by the sync that brings it.
+    const told = async () => {
+      events.length = 0;
+      await sync();
+      const e = events.filter(x => x.type === 'ct:sync-complete');
+      return e.length ? [...e[e.length - 1].detail.kinds].sort() : null;
+    };
+    out.idle = await told();
+    await web('DELETE', `/api/recipes/${one}`);
+    out.recipeDeleted = await told();
+    await web('PUT', `/api/cookbooks/${book.id}`, { name: 'Book renamed' });
+    out.cookbookRenamed = await told();
+    await web('DELETE', `/api/cookbooks/${book.id}/recipes/${two}`);
+    out.linkRemoved = await told();
+    await web('PATCH', '/api/units/builtin/tsp', { disabled: true });
+    out.unitOff = await told();
+    await web('PATCH', '/api/units/builtin/tsp', { disabled: true }); // the same again
+    out.unitOffAgain = await told();
+    const unit = await web('POST', '/api/units', { abbr: 'pn', full_name: 'pinch', category: 'Custom' });
+    out.customUnit = await told();
+    await web('DELETE', `/api/units/${unit.id}`);
+    out.customUnitGone = await told();
+    await web('DELETE', `/api/recipes/categories/${cat.id}`);
+    out.categoryGone = await told();
+    await web('DELETE', `/api/pantry/categories/${pcat.id}`);
+    out.pantryCategoryGone = await told();
+    await web('POST', `/api/recipes/${two}/comments`, { body: 'Nice' });
+    out.comment = await told();
+    await web('POST', '/api/cook-diary', { recipe_id: two, date: '2026-03-01', kind: 'cooked' });
+    out.cooked = await told();
+    await web('POST', '/api/shopping', { name: 'Milk' });
+    out.listed = await told();
+    await web('DELETE', `/api/pantry/${salt.id}`);
+    out.pantryGone = await told();
+    // A sync that fails after its pull: the open pages hear of what the pull
+    // wrote then, not at the next sync (which brings nothing again).
+    const x = await localRecipe(two);
+    await api.updateRecipe(x.id, { ...x, name: 'Two (phone)' });
+    await web('PUT', `/api/cookbooks/${book.id}`, { name: 'Book again' });
+    const inner = globalThis.fetch;
+    globalThis.fetch = async (u, init) => {
+      if (String(u).includes('/api/sync/push')) throw new TypeError('Failed to fetch');
+      return inner(u, init);
+    };
+    events.length = 0;
+    const bad = await fullSync({ silent: true }, true);
+    globalThis.fetch = inner;
+    out.failedSync = { ok: bad.ok, told: events.filter(e => e.type === 'ct:sync-complete').map(e => ({ ok: e.detail.ok, kinds: [...e.detail.kinds].sort() })) };
+    out.afterFailed = await told();
+  },
+
   // The phone's cookie jar still holds Alice's sign-in when Bob signs in:
   // the server answers Bob's requests as Bob, and the jar is emptied when
   // the phone changes hands.

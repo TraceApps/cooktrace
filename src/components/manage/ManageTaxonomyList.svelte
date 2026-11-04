@@ -21,6 +21,7 @@
   import { showError, showSuccess } from '../../stores/toast.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
   import Spinner from '../ui/Spinner.svelte';
+  import { onSyncChanges, newestRead } from '../../lib/sync-refresh.js';
 
   import { foldText } from '../../lib/search-text.js';
 
@@ -67,13 +68,23 @@
   $: usedTotal = items.reduce((s, i) => s + (i.count || 0), 0);
   $: unusedCount = items.reduce((s, i) => s + ((i.count || 0) === 0 ? 1 : 0), 0);
 
-  async function load() {
-    loading = true;
-    try { items = await loadFn(); }
-    catch (e) { showError(failed('fail.load_list', e)); items = []; }
-    finally { loading = false; }
+  // quiet: read again after a sync, without the loading state; a quiet read
+  // that fails keeps the list. Only the newest read sets it.
+  const newest = newestRead();
+  async function load({ quiet = false } = {}) {
+    const isNewest = newest();
+    quiet = quiet && !loading; // the first read is still out: this one speaks if it fails
+    if (!quiet) loading = true;
+    try { const got = await loadFn(); if (isNewest()) items = got; }
+    catch (e) { if (isNewest() && !quiet) { showError(failed('fail.load_list', e)); items = []; } }
+    finally { if (isNewest()) loading = false; }
   }
-  onMount(load);
+  onMount(() => { load(); });
+  // A sync that changed the recipes (tags and gear are read off them) shows
+  // here, except under a name being edited: that waits until it is done.
+  let syncWaiting = false;
+  onMount(() => onSyncChanges(() => { if (editingName !== null) syncWaiting = true; else load({ quiet: true }); }, ['recipes']));
+  $: if (editingName === null && syncWaiting) { syncWaiting = false; load({ quiet: true }); }
 
   function startEdit(item) {
     editingName = item.name;

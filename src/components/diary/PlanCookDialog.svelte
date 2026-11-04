@@ -18,7 +18,8 @@
    * Dispatches `saved` with what the server said (its `list`, when the
    * shopping list followed).
    */
-  import { createEventDispatcher, tick } from 'svelte';
+  import { createEventDispatcher, tick, onMount } from 'svelte';
+  import { onSyncChanges } from '../../lib/sync-refresh.js';
   import { fade } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
   import { portal } from '../../lib/portal.js';
@@ -57,6 +58,10 @@
   let servings = null;      // how many to cook for, when someone says: the list scales to it
   let recipeId = null;
   let recipes = [];         // for the list, loaded when it's first needed
+  // A sync that changed the recipes makes the list old: it is read again the
+  // next time the dialog opens (never under one that is open).
+  let recipesFresh = false;
+  onMount(() => onSyncChanges(() => { recipesFresh = false; }, ['recipes']));
   let search = '';
   let busy = false;
   let wasOpen = false;
@@ -98,11 +103,12 @@
     servings = null;
     recipeId = null;
     if (recipe) { pick(recipe.id, recipe); return; }
-    if (recipes.length === 0) {
+    if (recipes.length === 0 || !recipesFresh) {
       try {
         const list = await NtApi.getRecipes();
         recipes = list.slice().sort((a, b) =>
           (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }));
+        recipesFresh = true;
       } catch { recipes = []; }
     }
     if (pickId != null) pick(Number(pickId));
