@@ -22,7 +22,7 @@ The important reads:
 - `src/lib/db.js`, IndexedDB for PWA settings storage
 - `src/lib/db-native.js`, on-device SQLite for Android local mode
 - `src/lib/sync.js`, push/pull orchestrator for Android server mode
-- `src/lib/sync-refresh.js`, what a sync changed (`ct:sync-complete` carries `kinds`, the tables a pull wrote) and `onSyncChanges(fn, kinds)`, which an open page uses to read its rows again. Settings a pull writes go into the setting stores as well (`applyServerSettings` in `src/stores/settings.js`), except any changed on the phone that hasn't gone up yet
+- `src/lib/sync-refresh.js`, what a sync changed (`ct:sync-complete` carries `kinds`, the tables a pull wrote) and `onSyncChanges(fn, kinds)`, which an open page uses to read its rows again. Settings a pull writes go into the setting stores as well (`applyServerSettings` in `src/stores/settings.js`), except any changed on the phone that hasn't gone up yet. An open editor (recipe, pantry item) takes a synced change into the fields not changed in it (`takeUntouched`) and says so when its row was deleted; views read only from the server (Trace's chat, kitchens, users) read again when the app is back in front (`onBackInView`)
 - `server/db.js`, schema, migrations, sole SQLite entry point
 - `server/routes/`, Express handlers, one file per domain
 - `src/routes/`, top-level Svelte page components

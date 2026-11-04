@@ -79,3 +79,58 @@ export function newestRead() {
   const start = () => { const mine = ++latest; return () => mine === latest; };
   return start;
 }
+
+// ── An editor open on a row a sync changed ──────────────────────────────
+
+const _same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/**
+ * The fields of an editor's form that were changed since it opened: `now`
+ * and `opened` are the form's values now and as it opened (or as it last
+ * took a newer copy), in the same shape.
+ */
+export function touchedFields(now, opened) {
+  return [...new Set([...Object.keys(now || {}), ...Object.keys(opened || {})])]
+    .filter(k => !_same(now?.[k], opened?.[k]));
+}
+
+/**
+ * An editor whose form is one object: `now` takes `fresh` (the newer copy,
+ * as a form) in every field not changed since `opened`. Returns the form,
+ * what it now counts as opened (a copy: a form's fields are changed in
+ * place) and the fields kept.
+ */
+export function takeUntouched(now, opened, fresh) {
+  const touched = touchedFields(now, opened);
+  const form = {}, nextOpened = {};
+  for (const k of new Set([...Object.keys(now || {}), ...Object.keys(fresh || {})])) {
+    const keep = touched.includes(k);
+    form[k] = keep ? now[k] : fresh[k];
+    nextOpened[k] = keep ? opened[k] : fresh[k];
+  }
+  return { form, opened: JSON.parse(JSON.stringify(nextOpened)), touched };
+}
+
+/**
+ * Calls `fn()` when the app comes back in front (the window shown again or
+ * focused), for what a sync doesn't bring: views read from the server
+ * only. Showing and focusing together count once. Returns the function
+ * that stops listening.
+ */
+export function onBackInView(fn) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return () => {};
+  let last = 0;
+  const handler = () => {
+    if (document.visibilityState === 'hidden') return;
+    const now = Date.now();
+    if (now - last < 1000) return;
+    last = now;
+    fn();
+  };
+  document.addEventListener('visibilitychange', handler);
+  window.addEventListener('focus', handler);
+  return () => {
+    document.removeEventListener('visibilitychange', handler);
+    window.removeEventListener('focus', handler);
+  };
+}

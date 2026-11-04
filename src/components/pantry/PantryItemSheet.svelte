@@ -31,7 +31,7 @@
    *     on:changed={e => ...} on:deleted={e => ...} on:created={e => ...} />
    */
   import { createEventDispatcher, tick, onMount } from 'svelte';
-  import { onSyncChanges } from '../../lib/sync-refresh.js';
+  import { onSyncChanges, takeUntouched, newestRead } from '../../lib/sync-refresh.js';
   import { fade } from 'svelte/transition';
   import { _, locale } from 'svelte-i18n';
   import Sheet from '../ui/Sheet.svelte';
@@ -201,7 +201,7 @@
       if (asEdit && !editing) _startEdit();
       return;
     }
-    loading = true; loadError = null; item = null;
+    loading = true; loadError = null; item = null; gone = false;
     _openedAt = Date.now();
     try {
       const row = await NtApi.getPantryItem(id);
@@ -267,7 +267,7 @@
   let _savedStock = null;   // { quantity, in_stock } last known saved
   let _stockTimer = null;
   function _applyStock(next, { wait = 0 } = {}) {
-    if (!item || !next) return;
+    if (!item || !next || gone) return;
     if (_savedStock == null) _savedStock = { quantity: item.quantity, in_stock: item.in_stock };
     item = { ...item, ...next };
     dispatch('changed', item);
@@ -276,6 +276,7 @@
   }
   async function _saveStock() {
     _stockTimer = null;
+    if (gone) { _savedStock = null; return; }
     if (!item || _savedStock == null) return;
     const id = item.id;
     const before = _savedStock;
@@ -310,7 +311,13 @@
 
   function _startEdit() {
     if (!item) return;
-    draft = {
+    draft = _draftOf(item);
+    draftOpened = _copy(draft);
+    _lastServingSize = Number(draft.serving_size) || null;
+    editing = true;
+  }
+  function _draftOf(item) {
+    return {
       ..._blank(), ...item,
       brand: item.brand ?? '',
       barcode: item.barcode ?? '',
@@ -323,9 +330,40 @@
       nutrition: item.nutrition && typeof item.nutrition === 'object' ? { ...item.nutrition } : {},
       expires_on: item.expires_on ?? '',
     };
-    _lastServingSize = Number(draft.serving_size) || null;
-    editing = true;
   }
+
+  // Android: a sync that changed this item shows here. The view reads it
+  // again (after a stock change waiting to go); the form fills in only
+  // the fields not changed in it, so what you changed stays yours.
+  // Removed on another device, it says so, and nothing more is saved into it.
+  let draftOpened = null; // the form as it opened (or last took a newer copy)
+  let gone = false;
+  const _copy = o => JSON.parse(JSON.stringify(o));
+  const newestFresh = newestRead();
+  let freshWaiting = false;
+  async function _takeFresh() {
+    if (!open || !item || itemId == null || item.id !== itemId || loading || gone) return;
+    if (saving || _stockTimer || _savedStock != null) { freshWaiting = true; return; }
+    const id = itemId;
+    const isNewest = newestFresh();
+    let row;
+    try { row = await NtApi.getPantryItem(id); } catch { return; /* what is shown stays */ }
+    if (!isNewest() || itemId !== id || !item || item.id !== id) return;
+    if (saving || _stockTimer || _savedStock != null) { freshWaiting = true; return; }
+    if (!row) { gone = true; return; }
+    if (editing && draft && draftOpened) {
+      const took = takeUntouched(draft, draftOpened, _draftOf(row));
+      item = row;
+      draft = took.form;
+      draftOpened = took.opened;
+      if (!took.touched.includes('serving_size')) _lastServingSize = Number(draft.serving_size) || null;
+    } else {
+      item = row;
+    }
+    dispatch('changed', { ...row });
+  }
+  onMount(() => onSyncChanges(() => { _takeFresh(); }, ['pantry_items']));
+  $: if (freshWaiting && !saving && !_stockTimer && _savedStock == null) { freshWaiting = false; _takeFresh(); }
 
   function _reset() {
     if (_stockTimer) { clearTimeout(_stockTimer); _saveStock(); }
@@ -334,6 +372,9 @@
     usedInAll = false;
     item = null;
     draft = null;
+    draftOpened = null;
+    gone = false;
+    freshWaiting = false;
     loadError = null;
     editing = false;
     saving = false;
@@ -879,7 +920,7 @@
 
   // Allergens changed from the item's view: saved at once.
   async function saveAllergens(e) {
-    if (!item || itemId == null) return;
+    if (!item || itemId == null || gone) return;
     try {
       await NtApi.updatePantryItem(itemId, { ...e.detail, _base: item });
       item = { ...item, ...e.detail };
@@ -890,6 +931,7 @@
 
   // ── Save / Cancel / Delete ─────────────────────────────────────────
   async function saveEdit() {
+    if (gone) return;
     if (!draft.name?.trim()) { showError($_('pantry_sheet_extra.toast.name_required')); return; }
     saving = true;
     try {
@@ -936,6 +978,8 @@
     if (itemId == null) { open = false; return; }
     editing = false;
     draft = null;
+    // The view shows the newest copy, not the one the form was measured against.
+    _takeFresh();
   }
 
   async function deleteItem() {
@@ -1010,7 +1054,7 @@
           aria-label={$_('common.cancel')} title={$_('common.cancel')}>
           <span class="material-symbols-rounded">undo</span>
         </button>
-        <button class="btn-icon success" on:click={saveEdit} disabled={saving || imgUploading}
+        <button class="btn-icon success" on:click={saveEdit} disabled={saving || imgUploading || gone}
           aria-label={saving ? $_('common.saving') : $_('common.save')} title={saving ? $_('common.saving') : $_('common.save')}>
           <span class="material-symbols-rounded">{saving ? 'progress_activity' : 'check'}</span>
         </button>
@@ -1038,6 +1082,12 @@
       {/if}
     </div>
   {:else if item}
+    {#if gone}
+      <div class="gone-banner" role="status">
+        <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+        <span>{$_('pantry_editor_ui.gone')}</span>
+      </div>
+    {/if}
     <div class="sheet-content">
       <!-- Two-column layout on desktop: identity (large photo + brand
            + meta pills) on the left, stats + nutrition on the right.
@@ -1195,7 +1245,7 @@
                   <!-- Flips stock right here, the same write as the card's
                        check button. A generic's stock is its variants'. -->
                   <button type="button" class="pill stock-switch" class:in={isInStock} class:out={!isInStock}
-                    role="switch" aria-checked={isInStock} aria-label={$_('pantry.filters.in_stock')} on:click={toggleStock}>
+                    role="switch" aria-checked={isInStock} aria-label={$_('pantry.filters.in_stock')} on:click={toggleStock} disabled={gone}>
                     <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
                     <span aria-hidden="true">{isInStock ? $_('pantry.filters.in_stock') : $_('pantry_item_sheet_ui.out_of_stock_label')}</span>
                   </button>
@@ -1232,7 +1282,7 @@
                      it out of stock. An untracked amount shows a dash, not
                      "Not set", so the card reads cleanly. -->
                 <div class="stepper">
-                  <button type="button" class="step-btn" on:click={() => stepStock(-1)} disabled={!canStepDown}
+                  <button type="button" class="step-btn" on:click={() => stepStock(-1)} disabled={!canStepDown || gone}
                     aria-label={$_('pantry_item_sheet_ui.on_hand_less')}>
                     <span class="material-symbols-rounded">remove</span>
                   </button>
@@ -1243,7 +1293,7 @@
                       {item.quantity}
                     {/if}
                   </span>
-                  <button type="button" class="step-btn" on:click={() => stepStock(1)}
+                  <button type="button" class="step-btn" on:click={() => stepStock(1)} disabled={gone}
                     aria-label={$_('pantry_item_sheet_ui.on_hand_more')}>
                     <span class="material-symbols-rounded">add</span>
                   </button>
@@ -1810,6 +1860,16 @@
 {/if}
 
 <style>
+  /* Same look as the recipe editor's draft banner. */
+  .gone-banner {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; margin-bottom: 14px;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+    border-radius: var(--radius-md);
+    font-size: 13px; color: var(--text-1);
+  }
+  .gone-banner .material-symbols-rounded { color: var(--accent); font-size: 18px; }
   .state { padding: 40px 0; display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--text-3); }
   .state.error { color: var(--danger); }
   .spin { animation: spin 1.2s linear infinite; }

@@ -2574,6 +2574,7 @@
     "tooltip_count": "{count, plural, one {# cook} other {# cooks}} · {date}"
   },
   "pantry_editor_ui": {
+    "gone": "This item was removed on another device, so changes here can't be saved.",
     "remove_title": "Remove from Pantry?",
     "remove_message": "\"{name}\" will be removed. Recipes referencing it stay; this just drops it from your pantry.",
     "remove": "Remove",
@@ -3220,6 +3221,7 @@
     "next": "Next"
   },
   "recipe_editor_ui": {
+    "gone": "This recipe was deleted on another device, so changes here can't be saved.",
     "loading_pantry": "Loading pantry…",
     "autocalc_no_data": "No pantry rows had nutrition data. Add serving + nutrition to pantry items first.",
     "replace_nutrition_title": "Replace Existing Nutrition?",

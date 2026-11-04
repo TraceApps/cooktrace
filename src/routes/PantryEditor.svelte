@@ -29,6 +29,7 @@
   import { offEnabled, customNutriments, offUsername, offPassword, offUploadCountry } from '../stores/settings.js';
   import { DB } from '../lib/db.js';
   import { isNative } from '../lib/platform.js';
+  import { onSyncChanges, takeUntouched, newestRead } from '../lib/sync-refresh.js';
 
   export let params = {};
 
@@ -340,20 +341,8 @@
     try {
       const row = await NtApi.getPantryItem(id);
       loadedBase = row;
-      item = {
-        ..._blank(),
-        ...row,
-        brand: row.brand ?? '',
-        barcode: row.barcode ?? '',
-        quantity: row.quantity ?? '',
-        img_url: row.img_url ?? '',
-        category: row.category ?? '',
-        category_id: row.category_id ?? null,
-        serving_size: row.serving_size ?? '',
-        serving_unit: row.serving_unit ?? 'g',
-        g_per_cup: row.g_per_cup ?? '',
-        nutrition: row.nutrition && typeof row.nutrition === 'object' ? { ...row.nutrition } : {},
-      };
+      item = _formOf(row);
+      opened = _copy(item);
       _lastServingSize = Number(item.serving_size) || null;
     } catch (e) {
       showError(failed('fail.load_item', e));
@@ -364,7 +353,47 @@
   }
   onMount(() => { load(); _loadPantryCategories(); });
 
+  // The form's values for a row, and as the form opened (or last took a
+  // newer copy): what differs from that is what was changed here.
+  function _formOf(row) {
+    return {
+      ..._blank(),
+      ...row,
+      brand: row.brand ?? '',
+      barcode: row.barcode ?? '',
+      quantity: row.quantity ?? '',
+      img_url: row.img_url ?? '',
+      category: row.category ?? '',
+      category_id: row.category_id ?? null,
+      serving_size: row.serving_size ?? '',
+      serving_unit: row.serving_unit ?? 'g',
+      g_per_cup: row.g_per_cup ?? '',
+      nutrition: row.nutrition && typeof row.nutrition === 'object' ? { ...row.nutrition } : {},
+    };
+  }
+  let opened = null;
+  const _copy = o => JSON.parse(JSON.stringify(o));
+  // Android: a sync that changed this item fills in the fields not changed
+  // here; what you changed stays yours. Removed on another device, it says
+  // so, and Save is off (it would write into an item that is gone).
+  let gone = false;
+  const newestFresh = newestRead();
+  async function _takeFresh() {
+    if (!isEdit || loading || saving || !opened || gone) return;
+    const isNewest = newestFresh();
+    let row;
+    try { row = await NtApi.getPantryItem(id); } catch { return; /* what is shown stays */ }
+    if (!isNewest() || saving) return;
+    if (!row) { gone = true; return; }
+    const took = takeUntouched(item, opened, _formOf(row));
+    item = took.form;
+    opened = took.opened;
+    if (!took.touched.includes('serving_size')) _lastServingSize = Number(item.serving_size) || null;
+  }
+  onMount(() => onSyncChanges(() => { _takeFresh(); }, ['pantry_items']));
+
   async function save() {
+    if (gone) return;
     if (!item.name?.trim()) {
       showError($_('pantry_editor_ct.toast.name_required'));
       return;
@@ -462,7 +491,7 @@
       <span class="material-symbols-rounded">arrow_back</span>
     </button>
     <h2 class="editor-title">{isEdit ? $_('pantry_editor.title_edit') : $_('pantry_editor.title_add')}</h2>
-    <button class="btn btn-primary editor-save" on:click={save} disabled={saving || imgUploading}>
+    <button class="btn btn-primary editor-save" on:click={save} disabled={saving || imgUploading || gone}>
       {imgUploading ? $_('pantry_editor.actions.uploading') : saving ? $_('common.saving') : $_('common.save')}
     </button>
   </header>
@@ -473,6 +502,12 @@
         <span class="material-symbols-rounded spin">progress_activity</span>
       </div>
     {:else}
+      {#if gone}
+        <div class="gone-banner" role="status">
+          <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+          <span>{$_('pantry_editor_ui.gone')}</span>
+        </div>
+      {/if}
       <!-- Photo — capped + centered (no `expand`) so the preview is a
            tasteful ~360–420px square instead of stretching to the full
            editor-card width. Mirrors NT FoodEditor's photo card. -->
@@ -733,6 +768,16 @@
   }
   .editor-title { font-size: 17px; font-weight: 600; flex: 1; color: var(--text-1); margin: 0; }
   .editor-save { height: 36px; padding: 0 16px; font-size: 13px; }
+  /* Same look as the recipe editor's draft banner. */
+  .gone-banner {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; margin-bottom: 14px;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+    border-radius: var(--radius-md);
+    font-size: 13px; color: var(--text-1);
+  }
+  .gone-banner .material-symbols-rounded { color: var(--accent); font-size: 18px; }
 
   /* Match NT FoodEditor: stretch to full viewport width with the
      standard --page-px gutter — the editor cards (and the photo /

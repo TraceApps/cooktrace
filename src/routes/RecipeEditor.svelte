@@ -9,7 +9,9 @@
   import { NtApi } from '../lib/api.js';
   import { recipeBaseOf } from '../lib/offline-edits.js';
   import { showError, showSuccess } from '../stores/toast.js';
-  import { resolveAssetUrl } from '../lib/platform.js';
+  import { resolveAssetUrl, isNative } from '../lib/platform.js';
+  import { CtApiNative } from '../lib/api-native.js';
+  import { onSyncChanges, syncTouched, touchedFields, newestRead } from '../lib/sync-refresh.js';
   import { defaultServings } from '../stores/settings.js';
   import StarRating from '../components/ui/StarRating.svelte';
   import UnitPicker from '../components/ui/UnitPicker.svelte';
@@ -342,73 +344,125 @@
     try {
       const r = await NtApi.getRecipe(id);
       loadedBase = recipeBaseOf(r);
-      name        = r.name || '';
-      description = r.description || '';
-      imgUrl      = r.imgUrl || '';
-      rating      = r.rating ?? null;
-      yieldText   = r.yield_text || '';
-      servings    = r.servings || 2;
-      prepMinutes  = r.prep_minutes  ?? '';
-      cookMinutes  = r.cook_minutes  ?? '';
-      restMinutes  = r.rest_minutes  ?? '';
-      totalMinutes = r.total_minutes ?? '';
-      // Server returns ingredients in grouped shape: [{name, items: [...]}].
-      // Each item is mapped to controlled-input strings.
-      ingredientGroups = (r.ingredients?.length ? r.ingredients : [_blankGroup()])
-        .map(g => ({
-          name: g.name || '',
-          items: (g.items?.length ? g.items : [_blankIngredient()])
-            .map(i => {
-              // Backfill a stable id for legacy recipes so per-step link
-              // refs have something to point at once the user edits.
-              const row = {
-                id: i.id || _newIngId(),
-                qty: i.qty ?? '', unit: i.unit ?? '', name: i.name ?? '', note: i.note ?? '',
-              };
-              // Carry the manual Pantry link forward — without this the
-              // round-trip silently drops it and the row falls back to
-              // auto-name resolve, losing the user's pick.
-              if (i.pantry_item_id != null) row.pantry_item_id = i.pantry_item_id;
-              return row;
-            }),
-        }));
-      // Steps support an optional `title` (short summary like "Preheat Oven")
-      // shown as "Step N: Title" in the view. Old string-only steps still load.
-      // `refIds` is the per-step "linked ingredients" set (issue #40) —
-      // preserved as-is when present, kept empty for legacy steps.
-      steps       = r.steps?.length
-        ? r.steps.map(s => typeof s === 'string'
-            ? { title: '', text: s, refIds: [], imgUrl: '' }
-            : {
-                title: s.title || '',
-                text: s.text || '',
-                refIds: Array.isArray(s.refIds) ? [...s.refIds] : [],
-                // imgUrl was set by the step-photo picker but never
-                // hydrated back on load, so any saved step photo was
-                // silently dropped on the next edit. Fix while we're
-                // here since we're rewriting this block anyway.
-                imgUrl: s.imgUrl || '',
-              })
-        : [{ title: '', text: '', refIds: [], imgUrl: '' }];
-      tags        = Array.isArray(r.tags)  ? [...r.tags]  : [];
-      tools       = Array.isArray(r.tools) ? [...r.tools] : [];
-      categoryId  = r.category_id != null ? String(r.category_id) : '';
-      categoryName = r.category?.name || '';
-      sourceUrl   = r.source_url || '';
-      videoUrl    = r.video_url  || '';
-      notes       = r.notes || '';
-      // Hydrate nutrition with whatever the recipe has — `_derived` flags + numbers.
-      const incomingNut = (r.nutrition && typeof r.nutrition === 'object') ? r.nutrition : {};
-      nutrition = { ...incomingNut };
-      // Auto-expand the panel if any value is set.
-      nutritionOpen = Object.entries(incomingNut)
-        .some(([k, v]) => k !== '_derived' && v != null && v !== '');
+      _fill(r);
+      _phoneCopy = isNative && r?.sync_status !== undefined;
+      opened = _copy(_formRaw());
     } catch (e) {
       showError(failed('fail.load_recipe', e));
       push('/recipes');
     } finally {
       loading = false;
     }
+  }
+  // Android: a sync that changed this recipe fills in the fields not changed
+  // here; what you changed stays yours. Deleted on another device, it says
+  // so, and Save is off (it would write into a recipe that is gone). What
+  // the save is measured against stays as it opened: the phone's own copy
+  // keeps track of its edits itself (lib/api.js). Read
+  // from the phone's own copy: a recipe only on the server (shared with
+  // you) isn't brought by a sync, and the server knows it by another id.
+  let _phoneCopy = false;
+  let opened = null; // the form as it opened (or last took a newer copy), by the fields a save names
+  // The form's fields as they are, half-typed rows and spaces included (a
+  // save's cleaned copy would count a new empty ingredient as no change).
+  function _formRaw() {
+    return {
+      name, description, imgUrl, rating, yield_text: yieldText, servings,
+      prep_minutes: prepMinutes, cook_minutes: cookMinutes, rest_minutes: restMinutes, total_minutes: totalMinutes,
+      ingredients: ingredientGroups, steps, tags, tools, category_id: categoryId, nutrition,
+      source_url: sourceUrl, video_url: videoUrl, notes,
+    };
+  }
+  let gone = false;
+  const _copy = o => JSON.parse(JSON.stringify(o));
+  const newestFresh = newestRead();
+  async function _takeFresh() {
+    if (!isEdit || !_phoneCopy || loading || saving || !opened || gone) return;
+    const rid = id;
+    const isNewest = newestFresh();
+    let r;
+    try { r = await CtApiNative.getRecipe(rid); } catch { return; /* what is shown stays */ }
+    if (!isNewest() || saving || id !== rid) return;
+    if (!r) { gone = true; return; }
+    const touched = touchedFields(_formRaw(), opened);
+    // Steps point at ingredients by id (and an older recipe's ingredients
+    // get new ids each time they're read): one changed here keeps both.
+    if (touched.includes('steps') !== touched.includes('ingredients')) touched.push(touched.includes('steps') ? 'ingredients' : 'steps');
+    _fill(r, f => !touched.includes(f), { openPanel: false });
+    const now = _copy(_formRaw());
+    for (const f of touched) now[f] = opened[f];
+    opened = now;
+  }
+  onMount(() => onSyncChanges(d => {
+    if (syncTouched(d, ['recipe_categories'])) _loadCategories();
+    if (syncTouched(d, ['recipes', 'recipe_categories'])) _takeFresh();
+  }, ['recipes', 'recipe_categories']));
+
+  // Sets the form from a recipe: every field, or those `take(field)` says
+  // (the fields as a save names them).
+  function _fill(r, take = () => true, { openPanel = true } = {}) {
+    if (take('name')) name = r.name || '';
+    if (take('description')) description = r.description || '';
+    if (take('imgUrl')) imgUrl = r.imgUrl || '';
+    if (take('rating')) rating = r.rating ?? null;
+    if (take('yield_text')) yieldText = r.yield_text || '';
+    if (take('servings')) servings = r.servings || 2;
+    if (take('prep_minutes')) prepMinutes = r.prep_minutes  ?? '';
+    if (take('cook_minutes')) cookMinutes = r.cook_minutes  ?? '';
+    if (take('rest_minutes')) restMinutes = r.rest_minutes  ?? '';
+    if (take('total_minutes')) totalMinutes = r.total_minutes ?? '';
+    // Server returns ingredients in grouped shape: [{name, items: [...]}].
+    // Each item is mapped to controlled-input strings.
+    if (take('ingredients')) ingredientGroups = (r.ingredients?.length ? r.ingredients : [_blankGroup()])
+      .map(g => ({
+        name: g.name || '',
+        items: (g.items?.length ? g.items : [_blankIngredient()])
+          .map(i => {
+            // Backfill a stable id for legacy recipes so per-step link
+            // refs have something to point at once the user edits.
+            const row = {
+              id: i.id || _newIngId(),
+              qty: i.qty ?? '', unit: i.unit ?? '', name: i.name ?? '', note: i.note ?? '',
+            };
+            // Carry the manual Pantry link forward — without this the
+            // round-trip silently drops it and the row falls back to
+            // auto-name resolve, losing the user's pick.
+            if (i.pantry_item_id != null) row.pantry_item_id = i.pantry_item_id;
+            return row;
+          }),
+      }));
+    // Steps support an optional `title` (short summary like "Preheat Oven")
+    // shown as "Step N: Title" in the view. Old string-only steps still load.
+    // `refIds` is the per-step "linked ingredients" set (issue #40) —
+    // preserved as-is when present, kept empty for legacy steps.
+    if (take('steps')) steps = r.steps?.length
+      ? r.steps.map(s => typeof s === 'string'
+          ? { title: '', text: s, refIds: [], imgUrl: '' }
+          : {
+              title: s.title || '',
+              text: s.text || '',
+              refIds: Array.isArray(s.refIds) ? [...s.refIds] : [],
+              // imgUrl was set by the step-photo picker but never
+              // hydrated back on load, so any saved step photo was
+              // silently dropped on the next edit. Fix while we're
+              // here since we're rewriting this block anyway.
+              imgUrl: s.imgUrl || '',
+            })
+      : [{ title: '', text: '', refIds: [], imgUrl: '' }];
+    if (take('tags')) tags = Array.isArray(r.tags)  ? [...r.tags]  : [];
+    if (take('tools')) tools = Array.isArray(r.tools) ? [...r.tools] : [];
+    if (take('category_id')) categoryId = r.category_id != null ? String(r.category_id) : '';
+    if (take('category_id')) categoryName = r.category?.name || '';
+    if (take('source_url')) sourceUrl = r.source_url || '';
+    if (take('video_url')) videoUrl = r.video_url  || '';
+    if (take('notes')) notes = r.notes || '';
+    // Hydrate nutrition with whatever the recipe has — `_derived` flags + numbers.
+    if (!take('nutrition')) return;
+    const incomingNut = (r.nutrition && typeof r.nutrition === 'object') ? r.nutrition : {};
+    nutrition = { ...incomingNut };
+    // Auto-expand the panel if any value is set (as it opens: not under you).
+    if (openPanel) nutritionOpen = Object.entries(incomingNut)
+      .some(([k, v]) => k !== '_derived' && v != null && v !== '');
   }
   // Video upload — reuses /api/upload but with a friendlier "this might
   // take a minute" message since video files are far bigger than recipe
@@ -845,108 +899,113 @@
 
   // ImagePicker handles upload / camera / URL internally — no local helpers needed.
 
+  // What the form holds, as a save sends it.
+  function _formPayload() {
+    // Save groups as { name, items: [...] } — drop empty groups, drop
+    // ingredients with no name.
+    const cleanedIngredients = ingredientGroups
+      .map(g => ({
+        name:  (g.name ?? '').toString().trim(),
+        items: g.items
+          .map(i => {
+            const cleaned = {
+              // Stable id survives across save/load so per-step
+              // ref_ids keep pointing at the same ingredient even
+              // after renames / reorders (issue #40).
+              id:   i.id || _newIngId(),
+              qty:  (i.qty  ?? '').toString().trim(),
+              unit: (i.unit ?? '').toString().trim(),
+              name: (i.name ?? '').toString().trim(),
+              note: (i.note ?? '').toString().trim(),
+            };
+            // Persist the manual Pantry link if the user set one via
+            // the Link picker. Without this, the field gets stripped
+            // on save and the row falls back to auto-name-resolve on
+            // the next load — losing the user's brand / nutrition pick.
+            if (i.pantry_item_id != null) cleaned.pantry_item_id = i.pantry_item_id;
+            return cleaned;
+          })
+          .filter(i => i.name),
+      }))
+      .filter(g => g.items.length > 0 || g.name);
+
+    // Build a set of ingredient ids that survived the cleanup so we
+    // can prune any dangling refIds pointing at removed rows.
+    const _liveIngIds = new Set(
+      cleanedIngredients.flatMap(g => g.items.map(i => i.id))
+    );
+
+    const cleanedSteps = steps
+      .map(s => {
+        const cleaned = {
+          title: (s.title ?? '').toString().trim(),
+          text:  (s.text  ?? '').toString().trim(),
+        };
+        // Preserve per-step linked ingredients (issue #40). Filter
+        // against live ingredient ids so removed rows don't leave
+        // dangling refs. Only persist when non-empty to keep the
+        // JSON shape identical to legacy for recipes that never use
+        // the feature.
+        if (Array.isArray(s.refIds) && s.refIds.length > 0) {
+          const kept = s.refIds.filter(id => _liveIngIds.has(id));
+          if (kept.length > 0) cleaned.refIds = kept;
+        }
+        // Preserve step photo (was silently dropped on every save
+        // before this patch — the picker set steps[i].imgUrl but
+        // save() didn't include it in the persisted object).
+        if (s.imgUrl) cleaned.imgUrl = s.imgUrl;
+        return cleaned;
+      })
+      .filter(s => s.title || s.text || s.imgUrl);
+
+    // Combobox stores chip arrays directly. Trim + drop empties on
+    // save so any noise from inline create doesn't persist.
+    const cleanedTags  = (tags  || []).map(t => String(t).trim()).filter(Boolean);
+    const cleanedTools = (tools || []).map(t => String(t).trim()).filter(Boolean);
+
+    // Drop empty/zero nutrition fields so we don't store noise. The
+    // `_derived` flag is server-managed and stripped here — the server
+    // re-derives on save.
+    const cleanedNutrition = {};
+    for (const [k, v] of Object.entries(nutrition)) {
+      if (k === '_derived') continue;
+      if (v == null || v === '') continue;
+      const n = Number(v);
+      if (Number.isFinite(n) && n > 0) cleanedNutrition[k] = n;
+    }
+
+    return {
+      name: name.trim(),
+      description: description.trim() || null,
+      imgUrl: imgUrl || null,
+      rating: rating ?? null,
+      yield_text: yieldText.trim() || null,
+      servings: parseInt(servings, 10) || null,
+      prep_minutes:  prepMinutes  === '' ? null : parseInt(prepMinutes,  10),
+      cook_minutes:  cookMinutes  === '' ? null : parseInt(cookMinutes,  10),
+      rest_minutes:  restMinutes  === '' ? null : parseInt(restMinutes,  10),
+      total_minutes: totalMinutes === '' ? null : parseInt(totalMinutes, 10),
+      ingredients: cleanedIngredients,
+      steps: cleanedSteps,
+      tags: cleanedTags,
+      tools: cleanedTools,
+      category_id: categoryId === '' ? null : parseInt(categoryId, 10),
+      nutrition: cleanedNutrition,
+      source_url: sourceUrl.trim() || null,
+      video_url:  videoUrl.trim()  || null,
+      notes: notes.trim() || null,
+    };
+  }
+
   async function save() {
+    if (gone) return;
     if (!name.trim()) {
       showError($_('recipe_editor_ct.toast.name_required'));
       return;
     }
     saving = true;
     try {
-      // Save groups as { name, items: [...] } — drop empty groups, drop
-      // ingredients with no name.
-      const cleanedIngredients = ingredientGroups
-        .map(g => ({
-          name:  (g.name ?? '').toString().trim(),
-          items: g.items
-            .map(i => {
-              const cleaned = {
-                // Stable id survives across save/load so per-step
-                // ref_ids keep pointing at the same ingredient even
-                // after renames / reorders (issue #40).
-                id:   i.id || _newIngId(),
-                qty:  (i.qty  ?? '').toString().trim(),
-                unit: (i.unit ?? '').toString().trim(),
-                name: (i.name ?? '').toString().trim(),
-                note: (i.note ?? '').toString().trim(),
-              };
-              // Persist the manual Pantry link if the user set one via
-              // the Link picker. Without this, the field gets stripped
-              // on save and the row falls back to auto-name-resolve on
-              // the next load — losing the user's brand / nutrition pick.
-              if (i.pantry_item_id != null) cleaned.pantry_item_id = i.pantry_item_id;
-              return cleaned;
-            })
-            .filter(i => i.name),
-        }))
-        .filter(g => g.items.length > 0 || g.name);
-
-      // Build a set of ingredient ids that survived the cleanup so we
-      // can prune any dangling refIds pointing at removed rows.
-      const _liveIngIds = new Set(
-        cleanedIngredients.flatMap(g => g.items.map(i => i.id))
-      );
-
-      const cleanedSteps = steps
-        .map(s => {
-          const cleaned = {
-            title: (s.title ?? '').toString().trim(),
-            text:  (s.text  ?? '').toString().trim(),
-          };
-          // Preserve per-step linked ingredients (issue #40). Filter
-          // against live ingredient ids so removed rows don't leave
-          // dangling refs. Only persist when non-empty to keep the
-          // JSON shape identical to legacy for recipes that never use
-          // the feature.
-          if (Array.isArray(s.refIds) && s.refIds.length > 0) {
-            const kept = s.refIds.filter(id => _liveIngIds.has(id));
-            if (kept.length > 0) cleaned.refIds = kept;
-          }
-          // Preserve step photo (was silently dropped on every save
-          // before this patch — the picker set steps[i].imgUrl but
-          // save() didn't include it in the persisted object).
-          if (s.imgUrl) cleaned.imgUrl = s.imgUrl;
-          return cleaned;
-        })
-        .filter(s => s.title || s.text || s.imgUrl);
-
-      // Combobox stores chip arrays directly. Trim + drop empties on
-      // save so any noise from inline create doesn't persist.
-      const cleanedTags  = (tags  || []).map(t => String(t).trim()).filter(Boolean);
-      const cleanedTools = (tools || []).map(t => String(t).trim()).filter(Boolean);
-
-      // Drop empty/zero nutrition fields so we don't store noise. The
-      // `_derived` flag is server-managed and stripped here — the server
-      // re-derives on save.
-      const cleanedNutrition = {};
-      for (const [k, v] of Object.entries(nutrition)) {
-        if (k === '_derived') continue;
-        if (v == null || v === '') continue;
-        const n = Number(v);
-        if (Number.isFinite(n) && n > 0) cleanedNutrition[k] = n;
-      }
-
-      const payload = {
-        name: name.trim(),
-        description: description.trim() || null,
-        imgUrl: imgUrl || null,
-        rating: rating ?? null,
-        yield_text: yieldText.trim() || null,
-        servings: parseInt(servings, 10) || null,
-        prep_minutes:  prepMinutes  === '' ? null : parseInt(prepMinutes,  10),
-        cook_minutes:  cookMinutes  === '' ? null : parseInt(cookMinutes,  10),
-        rest_minutes:  restMinutes  === '' ? null : parseInt(restMinutes,  10),
-        total_minutes: totalMinutes === '' ? null : parseInt(totalMinutes, 10),
-        ingredients: cleanedIngredients,
-        steps: cleanedSteps,
-        tags: cleanedTags,
-        tools: cleanedTools,
-        category_id: categoryId === '' ? null : parseInt(categoryId, 10),
-        nutrition: cleanedNutrition,
-        source_url: sourceUrl.trim() || null,
-        video_url:  videoUrl.trim()  || null,
-        notes: notes.trim() || null,
-        ...(isEdit && loadedBase ? { _base: loadedBase } : {}),
-      };
+      const payload = { ..._formPayload(), ...(isEdit && loadedBase ? { _base: loadedBase } : {}) };
 
       const saved = isEdit
         ? await NtApi.updateRecipe(id, payload)
@@ -972,7 +1031,7 @@
 <div class="page-shell editor-page">
   <header class="editor-header">
     <h2 class="editor-title">{isEdit ? $_('recipe_editor_ui.edit_recipe') : $_('recipe_editor_ui.new_recipe')}</h2>
-    <button class="btn btn-primary editor-save" on:click={save} disabled={saving || imgUploading}>
+    <button class="btn btn-primary editor-save" on:click={save} disabled={saving || imgUploading || gone}>
       {imgUploading ? $_('recipe_editor_ui.uploading') : saving ? $_('common.saving') : $_('common.save')}
     </button>
     <button class="btn-icon close-btn" on:click={cancel} aria-label={$_('common.close')} title={$_('common.close')}>
@@ -988,6 +1047,12 @@
     {:else}
       <div class="form-wrap">
         <div class="form">
+          {#if gone}
+            <div class="draft-banner" role="status">
+              <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+              <span class="draft-msg">{$_('recipe_editor_ui.gone')}</span>
+            </div>
+          {/if}
           {#if _draftRestorable && !_draftRestored}
             <div class="draft-banner" transition:slide={{ duration: 180 }}>
               <span class="material-symbols-rounded">restore</span>

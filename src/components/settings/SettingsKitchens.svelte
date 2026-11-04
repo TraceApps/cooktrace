@@ -11,6 +11,7 @@
    */
   import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
+  import { onBackInView } from '../../lib/sync-refresh.js';
   import { NtApi } from '../../lib/api.js';
   import { showSuccess, showError } from '../../stores/toast.js';
   import { confirmDialog } from '../../stores/confirmDialog.js';
@@ -39,27 +40,33 @@
   // { name, username } — name is the display label, username is what
   // the invite endpoint requires. Load once alongside kitchens.
   let peers = [];
-  async function loadPeers() {
+  async function loadPeers({ quiet = false } = {}) {
     try { peers = await NtApi.getUsersList(); }
     catch (e) {
       // Non-fatal — the Combobox falls back to freeform-invite. Log
       // instead of silent swallow so a 401/403/500 doesn't look like
       // "no other users" to the user.
       console.warn('[kitchens] getUsersList failed', e);
-      peers = [];
+      if (!quiet) peers = [];
     }
   }
 
-  async function load() {
-    loading = true;
+  // quiet (the app back in front): no loading state, and a read that
+  // fails keeps what is shown.
+  async function load({ quiet = false } = {}) {
+    if (!quiet) loading = true;
     try {
-      const [ks] = await Promise.all([NtApi.getKitchens(), loadPeers()]);
+      const [ks] = await Promise.all([NtApi.getKitchens(), loadPeers({ quiet })]);
       kitchens = ks;
+      if (quiet && openId != null && kitchens.some(k => k.id === openId)) loadMembers(openId, { quiet });
     }
-    catch (e) { showError(failed('fail.load_kitchens', e)); kitchens = []; }
-    finally { loading = false; }
+    catch (e) { if (!quiet) { showError(failed('fail.load_kitchens', e)); kitchens = []; } }
+    finally { if (!quiet) loading = false; }
   }
-  onMount(load);
+  onMount(() => { load(); });
+  // Kitchens live on the server only (a sync doesn't bring them): back in
+  // front, they are read again, unless something here is on its way.
+  onMount(() => onBackInView(() => { if (!loading && !creating && !busy) load({ quiet: true }); }));
 
   async function createKitchen() {
     const name = newName.trim();
@@ -74,9 +81,9 @@
     finally { creating = false; }
   }
 
-  async function loadMembers(id) {
+  async function loadMembers(id, { quiet = false } = {}) {
     try { members[id] = await NtApi.getKitchenMembers(id); members = members; }
-    catch (e) { showError(failed('fail.load_members', e)); }
+    catch (e) { if (!quiet) showError(failed('fail.load_members', e)); }
   }
   async function toggleOpen(id) {
     if (openId === id) { openId = null; return; }

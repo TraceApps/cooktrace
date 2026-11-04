@@ -44,6 +44,7 @@
   import { portal } from '../../lib/portal.js';
   import { NtApi } from '../../lib/api.js';
   import { isNative } from '../../lib/platform.js';
+  import { onBackInView } from '../../lib/sync-refresh.js';
   import { callAI, callAIProxy, TOOLS, setToolHandler, AI_DEFAULT_MODELS } from '../../lib/aiChat.js';
 
   import { foldText } from '../../lib/search-text.js';
@@ -945,11 +946,22 @@ When you write to the user's data, summarise what you did briefly and concretely
   // No-op if nothing's persisted; never throws — failure logs to
   // console.warn for diagnostics.
   let _historyLoading = false;
-  async function _loadChatHistory() {
+  async function _loadChatHistory({ quiet = false } = {}) {
     if (_historyLoading) return;
     _historyLoading = true;
     try {
       const rows = await NtApi.get('/api/ai/history');
+      // quiet (the app back in front): only a conversation that moved on
+      // elsewhere replaces this one, one that still holds every message
+      // shown (an error or a note shown here is never saved), and never
+      // under a reply on its way.
+      const movedOn = () => {
+        if (!Array.isArray(rows) || rows.length <= messages.length) return false;
+        let i = 0;
+        for (const r of rows) if (i < messages.length && r.role === messages[i].role && r.content === messages[i].content) i++;
+        return i === messages.length;
+      };
+      if (quiet && (busy || !movedOn())) return;
       if (Array.isArray(rows)) {
         messages = rows.map(r => ({
           role: r.role,
@@ -969,6 +981,8 @@ When you write to the user's data, summarise what you did briefly and concretely
   // B) shows up the next time browser A opens the chat without
   // requiring a full page refresh.
   let _wasPanelOpen = false;
+  // The chat isn't brought by a sync: back in front, it is read again.
+  onMount(() => onBackInView(() => { if (panelOpen && !busy) _loadChatHistory({ quiet: true }); }));
   $: if (panelOpen && !_wasPanelOpen) {
     _wasPanelOpen = true;
     _loadChatHistory();

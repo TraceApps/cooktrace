@@ -1,6 +1,7 @@
 <script>
   import { failed } from '../../lib/messages.js';
   import { onMount } from 'svelte';
+  import { onBackInView } from '../../lib/sync-refresh.js';
   import { slide } from 'svelte/transition';
   import { _ } from 'svelte-i18n';
   import Toggle from './Toggle.svelte';
@@ -117,9 +118,9 @@
   let inviteLoading = false;
   let inviteResult = null; // { inviteUrl, sent }
   let pendingInvites = []; // { token, email, role, expires_at }
-  async function loadPendingInvites() {
+  async function loadPendingInvites({ quiet = false } = {}) {
     try { pendingInvites = await NtApi.get('/api/auth/invites'); }
-    catch { pendingInvites = []; }
+    catch { if (!quiet) pendingInvites = []; }
   }
   async function revokeInvite(token) {
     if (!await confirmDialog({
@@ -150,6 +151,14 @@
   // exported loadData() was orphaned — users list stayed empty and
   // pending invites never appeared even after creating them.
   onMount(loadData);
+  // Users and invites live on the server only (a sync doesn't bring them):
+  // back in front, they are read again, quietly, unless a user is being
+  // added or edited here.
+  onMount(() => onBackInView(() => {
+    if (!$userMgmtActive || umLoading || editingUserId !== null) return;
+    loadUsers({ quiet: true });
+    if ($currentUser?.role === 'admin') loadPendingInvites({ quiet: true });
+  }));
 
   async function loadSessionConfig() {
     try {
@@ -284,10 +293,10 @@
     enableUmLoading = false;
   }
 
-  async function loadUsers() {
+  async function loadUsers({ quiet = false } = {}) {
     try {
       umUsers = await NtApi.get('/api/auth/users');
-    } catch(e) { umError = failed('fail.load_users', e); }
+    } catch(e) { if (!quiet) umError = failed('fail.load_users', e); }
   }
 
   async function addUser() {

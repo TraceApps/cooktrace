@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-import { pullKinds, syncTouched, onSyncChanges, newestRead, REPLACE_SETS } from '../src/lib/sync-refresh.js';
+import { pullKinds, syncTouched, onSyncChanges, newestRead, REPLACE_SETS, touchedFields, takeUntouched, onBackInView } from '../src/lib/sync-refresh.js';
 
 test('pullKinds: the tables a pull brought rows for, deletes included', () => {
   assert.deepEqual(pullKinds({}), []);
@@ -74,6 +74,62 @@ test('newestRead: only the newest read stands', () => {
   assert.equal(third(), true);
 });
 
+// ── An open editor and a sync that changed its row ──
+
+test('touchedFields: what the form changed since it opened', () => {
+  const opened = { name: 'Flour', brand: '', quantity: 2, nutrition: { kcal: 364 } };
+  assert.deepEqual(touchedFields(opened, JSON.parse(JSON.stringify(opened))), []);
+  assert.deepEqual(touchedFields({ ...opened, brand: 'King' }, opened), ['brand']);
+  assert.deepEqual(touchedFields({ ...opened, nutrition: { kcal: 360 } }, opened), ['nutrition'], 'inside a field too');
+  assert.deepEqual(touchedFields({ name: 'Flour', brand: null }, { name: 'Flour' }), [], 'nothing and null are the same');
+});
+
+test('takeUntouched: the newer copy fills only what the form left as it was', () => {
+  const opened = { name: 'Flour', brand: '', notes: 'old', quantity: 2 };
+  const now = { ...opened, notes: 'mine' };
+  const fresh = { name: 'Bread Flour', brand: 'King', notes: 'theirs', quantity: 2, unit: 'kg' };
+  const took = takeUntouched(now, opened, fresh);
+  assert.deepEqual(took.form, { name: 'Bread Flour', brand: 'King', notes: 'mine', quantity: 2, unit: 'kg' }, 'what was typed here stays');
+  assert.deepEqual(took.touched, ['notes']);
+  assert.deepEqual(took.opened, { name: 'Bread Flour', brand: 'King', notes: 'old', quantity: 2, unit: 'kg' }, 'and still counts as changed');
+  // The next sync: still the same field kept, and a later web change to it is still not taken.
+  const again = takeUntouched(took.form, took.opened, { ...fresh, notes: 'theirs again', quantity: 5 });
+  assert.equal(again.form.notes, 'mine');
+  assert.equal(again.form.quantity, 5);
+  // Its opened copy is its own: a form changed in place doesn't change it.
+  const form = took.form; form.name = 'typed';
+  assert.equal(took.opened.name, 'Bread Flour');
+});
+
+test('onBackInView: once when the app is back in front, not while hidden', () => {
+  const on = new Map();
+  const target = () => ({
+    addEventListener: (t, f) => { on.set(t, [...(on.get(t) || []), f]); },
+    removeEventListener: (t, f) => { on.set(t, (on.get(t) || []).filter(x => x !== f)); },
+  });
+  globalThis.window = target();
+  globalThis.document = { ...target(), visibilityState: 'visible' };
+  const realNow = Date.now;
+  let clock = 1_000_000;
+  Date.now = () => clock;
+  try {
+    let n = 0;
+    const off = onBackInView(() => { n++; });
+    const fire = t => (on.get(t) || []).forEach(f => f());
+    fire('visibilitychange'); fire('focus');
+    assert.equal(n, 1, 'shown and focused together count once');
+    clock += 5000;
+    globalThis.document.visibilityState = 'hidden';
+    fire('visibilitychange');
+    assert.equal(n, 1, 'going away is not coming back');
+    globalThis.document.visibilityState = 'visible';
+    fire('visibilitychange');
+    assert.equal(n, 2);
+    off();
+    assert.equal((on.get('focus') || []).length + (on.get('visibilitychange') || []).length, 0, 'nothing left behind');
+  } finally { Date.now = realNow; delete globalThis.window; delete globalThis.document; }
+});
+
 // ── Wiring: every listener is taken away, every page that reads once listens ──
 
 const root = new URL('../', import.meta.url).pathname;
@@ -122,7 +178,9 @@ const PAGES = {
   'src/components/manage/ManageTaxonomyList.svelte': ['recipes'],
   'src/stores/unitsOverlay.js': ['custom_units', 'disabled_units'],
   'src/components/diary/PlanCookDialog.svelte': ['recipes'],
-  'src/components/pantry/PantryItemSheet.svelte': ['pantry_categories'],
+  'src/components/pantry/PantryItemSheet.svelte': ['pantry_categories', 'pantry_items'],
+  'src/routes/RecipeEditor.svelte': ['recipes'],
+  'src/routes/PantryEditor.svelte': ['pantry_items'],
 };
 // The text of each onSyncChanges(...) call in a source, up to its closing parenthesis.
 function callsOf(src) {
@@ -148,5 +206,14 @@ for (const [page, kinds] of Object.entries(PAGES)) {
     // The kinds are the array that ends the call: onSyncChanges(fn, ['a', 'b']).
     const listened = new Set(calls.flatMap(c => [...((c.match(/,\s*\[([^\]]*)\]\s*\)$/) || [])[1] || '').matchAll(/'([a-z_]+)'/g)].map(m => m[1])));
     for (const k of kinds) assert.ok(listened.has(k), `${k} is among the kinds it listens for (${[...listened]})`);
+  });
+}
+
+// The views a sync doesn't bring (read from the server only) read again when
+// the app is back in front, from a plain onMount so the listener goes too.
+for (const view of ['src/components/ai/Trace.svelte', 'src/components/settings/SettingsKitchens.svelte', 'src/components/settings/SettingsUserManagement.svelte']) {
+  test(`${view} reads again when the app is back in front`, () => {
+    const src = readFileSync(join(root, view), 'utf8');
+    assert.match(src, /onMount\(\(\) => onBackInView\(/);
   });
 }
