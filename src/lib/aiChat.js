@@ -112,6 +112,29 @@ export const AI_MODELS = {
   custom:  [],
 };
 
+/** What a model is called in the picker. Same wording as the other Trace apps. */
+export const AI_MODEL_LABELS = {
+  'claude-haiku-5-5':          'Claude Haiku 5.5 (fast, cheapest)',
+  'claude-sonnet-5-5':         'Claude Sonnet 5.5 (balanced)',
+  'claude-opus-5-5':           'Claude Opus 5.5 (smarter)',
+  'claude-fable-5-1':          'Claude Fable 5.1 (most capable)',
+  'claude-sonnet-5':           'Claude Sonnet 5 (previous)',
+  'claude-opus-5':             'Claude Opus 5 (previous)',
+  'claude-fable-5':            'Claude Fable 5 (previous)',
+  'claude-opus-4-8':           'Claude Opus 4.8 (previous)',
+  'gpt-6-luna':                'GPT-6 Luna (fast, cheapest)',
+  'gpt-5.6-terra':             'GPT-5.6 Terra (balanced)',
+  'gpt-5.6-sol':               'GPT-5.6 Sol (most capable)',
+  'gpt-5.6-luna':              'GPT-5.6 Luna (previous)',
+  'gpt-4o-mini':               'GPT-4o mini (previous)',
+  'gpt-4o':                    'GPT-4o (previous)',
+  'gemini-3.1-flash-lite':     'Gemini 3.1 Flash Lite (cheapest)',
+  'gemini-3.5-flash-lite':     'Gemini 3.5 Flash Lite (cheap)',
+  'gemini-3.8-flash':          'Gemini 3.8 Flash (fast)',
+  'gemini-3.1-pro-preview':    'Gemini 3.1 Pro Preview (most capable)',
+  'gemini-3.6-flash':          'Gemini 3.6 Flash (previous)',
+};
+
 // Model IDs that changed name: a saved old name is sent as the new one.
 // gemini-3.1-pro never existed (only the preview does), and Google points
 // the shut-down gemini-3-pro-preview at it. gpt-5.6 is the alias of

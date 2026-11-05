@@ -69,6 +69,22 @@ test('the picker is the same as the other Trace apps\' (NoteTrace has the same s
     '"gemini":["gemini-3.1-flash-lite","gemini-3.5-flash-lite","gemini-3.8-flash","gemini-3.1-pro-preview","gemini-3.6-flash","__custom__"],"custom":[]}');
 });
 
+test('the picker names each model as the other Trace apps do, not by its ID', () => {
+  for (const p of ['claude', 'openai', 'gemini']) {
+    const labels = ids(p).map(m => client.AI_MODEL_LABELS[m]);
+    assert.ok(labels.every(Boolean), `${p}: every model has a label`);
+    assert.equal(labels.filter(l => /cheapest/.test(l)).length, 1, `${p}: one cheapest`);
+    assert.equal(labels.filter(l => /most capable/.test(l)).length, 1, `${p}: one most capable`);
+  }
+  assert.equal(client.AI_MODEL_LABELS['claude-haiku-5-5'], 'Claude Haiku 5.5 (fast, cheapest)');
+  assert.equal(client.AI_MODEL_LABELS['gemini-3.1-pro-preview'], 'Gemini 3.1 Pro Preview (most capable)');
+  // Settings > Trace shows them, a model the server sets too; a custom one by its ID.
+  const ui = readFileSync(new URL('../src/components/settings/SettingsTrace.svelte', import.meta.url), 'utf8');
+  assert.match(ui, /AI_MODEL_LABELS\[m\] \|\| m/);
+  assert.match(ui, /<option value=\{m\}>\{_modelLabel\(m\)\}<\/option>/);
+  assert.match(ui, /envLocks\.ai_model \? _modelLabel\(envLocks\.ai_model\)/);
+});
+
 test('defaults: Claude Haiku 5.5 when none is chosen; a chosen model is kept', () => {
   const { custom, ...defaults } = client.AI_DEFAULT_MODELS;
   assert.deepEqual(defaults, { claude: 'claude-haiku-5-5', openai: 'gpt-5.6-luna', gemini: 'gemini-3.8-flash' });

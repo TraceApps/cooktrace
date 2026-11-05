@@ -2,7 +2,7 @@
   import { failed } from '../../lib/messages.js';
   import { _ } from 'svelte-i18n';
   import { aiEnabled, aiProvider, aiApiKey, aiModel, aiBaseUrl, aiAssistantName, aiKeyVerified, smartLogEnabled, smartLogVoiceLang, traceChefHat, envLocks as envLocksStore } from '../../stores/settings.js';
-  import { AI_PROVIDERS, AI_DEFAULT_MODELS, AI_MODELS, AI_MODEL_CUSTOM, renamedModel, callAI, callAIProxy } from '../../lib/aiChat.js';
+  import { AI_PROVIDERS, AI_DEFAULT_MODELS, AI_MODELS, AI_MODEL_LABELS, AI_MODEL_CUSTOM, renamedModel, callAI, callAIProxy } from '../../lib/aiChat.js';
   import { showError, showSuccess } from '../../stores/toast.js';
   import ConnectionStatus from './ConnectionStatus.svelte';
 
@@ -120,7 +120,7 @@
     _invalidate();
   }
   function _modelLabel(m) {
-    return m === AI_MODEL_CUSTOM ? $_('settings_trace_ui.model_custom') : m;
+    return m === AI_MODEL_CUSTOM ? $_('settings_trace_ui.model_custom') : (AI_MODEL_LABELS[m] || m);
   }
   // Required fields the user must fill in for a meaningful test. A function,
   // not a $: value: a field saved on blur tests at once, before a reactive
@@ -309,7 +309,7 @@
       {#if envLocks.ai}
         <div class="select-wrap" style="width:220px">
           <select aria-label={$_('settings_trace_ct.model')} class="select sel-sm" value="locked" disabled>
-            <option value="locked">{envLocks.ai_model || $_('settings_trace_ct.server_default')}</option>
+            <option value="locked">{envLocks.ai_model ? _modelLabel(envLocks.ai_model) : $_('settings_trace_ct.server_default')}</option>
           </select>
         </div>
       {:else if providerModels.length > 0 && $aiProvider !== 'custom'}

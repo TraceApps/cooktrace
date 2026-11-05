@@ -39,6 +39,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **A setting changed on another device applies on the Android app at its next sync**, such as your units, household or language. It used to show only after the app was restarted. A setting you just changed on the phone, not yet saved to the server, stays as you set it. And a list changed on the phone, such as your household or allergens, now reaches your other devices whole: the sync sent it up as plain text, and the household came back empty.
 - **An open editor on the Android app takes in what a sync changed.** With a recipe or pantry item open for editing (or a pantry item open to view), a change made on the web now fills in the fields you haven't touched, and what you typed stays as you typed it. Before, the editor kept the old values, and saving put them back. If the recipe or item was deleted on another device, the editor says so instead of saving into it. Trace's chat, Kitchens and Users, which come from the server and not the sync, read again when you come back to the app.
 - **The connection banner in Settings follows your language.** Connected, Not connected, Test and Testing were always in English.
+- **Settings > Trace names each model the way the other Trace apps do**, such as Claude Haiku 5.5 (fast, cheapest), instead of by its ID (claude-haiku-5-5). A model set by the server shows the same way, and a custom model still shows its ID.
 
 ### Security
 
