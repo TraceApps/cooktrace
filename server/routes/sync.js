@@ -617,15 +617,27 @@ router.post('/push', wrap((req, res) => {
 
   // ── user_settings: key-value, server-side already has its own table.
   if (Array.isArray(req.body?.settings)) {
+    // A change made after a reset (Settings > Clear All Settings) brings
+    // the setting back; one made before it, or with no readable time, leaves
+    // it reset, and the row is stamped again so the phone's next pull
+    // resets it there too.
     const ins = db.prepare(
       `INSERT INTO user_settings (user_id, key, value, updated_at)
        VALUES (?, ?, ?, ?)
        ON CONFLICT(user_id, key) DO UPDATE SET
          value = excluded.value,
-         updated_at = excluded.updated_at`
+         updated_at = excluded.updated_at,
+         deleted_at = NULL`
     );
+    const reset = db.prepare(`SELECT deleted_at FROM user_settings WHERE user_id IS ? AND key = ? AND deleted_at IS NOT NULL`);
+    const restamp = db.prepare(`UPDATE user_settings SET deleted_at = deleted_at WHERE user_id IS ? AND key = ?`);
     const txn = db.transaction(() => {
       for (const s of req.body.settings) {
+        const was = reset.get(u, s.key);
+        if (was) {
+          const at = utcMs(editTime(s.updated_at || null, offsetMs));
+          if (!s.updated_at || !Number.isFinite(at) || at <= utcMs(was.deleted_at)) { restamp.run(u, s.key); continue; }
+        }
         ins.run(u, s.key, typeof s.value === 'string' ? s.value : JSON.stringify(s.value), s.updated_at || _now());
       }
     });
@@ -739,9 +751,10 @@ router.get('/pull', wrap((req, res) => {
     (out.deletions[r.table_name] ||= []).push(r.row_id);
   }
 
-  // Settings: only the keys that changed since the last pull.
+  // Settings: only the keys that changed since the last pull, and the ones
+  // reset (deleted_at), for the phone to go back to its default.
   out.settings = db.prepare(
-    `SELECT key, value, updated_at FROM user_settings
+    `SELECT key, value, updated_at, deleted_at FROM user_settings
       WHERE ${userClause(u)} AND synced_at >= ?`
   ).all(...userArgs(u), since);
 

@@ -1492,6 +1492,16 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
       ))?.values?.[0];
       if (localRow?.sync_status === 'pending') continue;
 
+      // Reset on another device (Clear All Settings): this phone goes back
+      // to its default too. Only a setting the phone has a copy of: one
+      // set here before it ever synced is left as it is.
+      if (s.deleted_at) {
+        if (localRow) {
+          await db.run(`DELETE FROM user_settings WHERE user_id = ? AND key = ?`, [LOCAL_USER_ID, s.key]);
+          settings?.push({ key: s.key, reset: true });
+        }
+        continue;
+      }
       const v = typeof s.value === 'string' ? s.value : (s.value == null ? null : JSON.stringify(s.value));
       await db.run(
         `INSERT INTO user_settings (user_id, key, value, updated_at, sync_status)

@@ -3,7 +3,8 @@
  * push follows too): a pushed copy with no readable updated_at (none, text
  * that isn't a time, a number like 1e20) can't be told from a stale one, so
  * it never brings back a row deleted here, and no such time fails the push.
- * An edit made after the delete still does.
+ * An edit made after the delete still does. Settings follow the same rule
+ * against Clear All Settings, and a reset comes down with the pull.
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -104,4 +105,25 @@ test('no pushed time fails the push: the other rows in it go in', { skip }, asyn
   ] });
   assert.equal(r.status, 200);
   assert.equal(r.body.tables.shopping_list.length, 3);
+});
+
+test('Clear All Settings: the pull says which settings were reset, and only a change made after it brings one back', { skip }, async () => {
+  await call('PUT', '/api/settings', { key: 'measurementSystem', value: 'metric' });
+  await call('PUT', '/api/settings', { key: 'defaultServings', value: 3 });
+  await call('PUT', '/api/settings', { key: 'energyUnit', value: 'kJ' });
+  const before = new Date(Date.now() - 2000).toISOString();
+  await call('DELETE', '/api/settings');
+  const reset = (await call('GET', '/api/sync/pull?since=1970-01-01&synced_at=1&schema=2')).body.tables.settings;
+  assert.ok(reset.length >= 3 && reset.every(s => s.deleted_at), 'every setting comes down as reset');
+  await sleep(1100);
+  const r = await push({}, { settings: [
+    { key: 'measurementSystem', value: 'metric', updated_at: before },          // made before the reset
+    { key: 'energyUnit', value: 'kJ' },                                           // no time of its own
+    { key: 'defaultServings', value: 6, updated_at: new Date().toISOString() },  // made after it
+  ] });
+  assert.equal(r.status, 200);
+  assert.deepEqual((await call('GET', '/api/settings')).body, { defaultServings: 6 });
+  const after = Object.fromEntries((await call('GET', '/api/sync/pull?since=1970-01-01&synced_at=1&schema=2')).body.tables.settings.map(s => [s.key, s.deleted_at]));
+  assert.equal(after.defaultServings, null);
+  assert.ok(after.measurementSystem && after.energyUnit, 'still reset');
 });

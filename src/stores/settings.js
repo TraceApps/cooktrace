@@ -240,8 +240,10 @@ export async function bulkSet(settingsObj) {
  * The server's values into this device's settings, the setting stores
  * following at once (wl:setting); nothing is sent back. `skip(key)` keeps a
  * key as it is here (a sync's pull: a change made here that hasn't gone up).
+ * `reset` lists keys reset on the server (Clear All Settings): they go back
+ * to their defaults here.
  */
-export function applyServerSettings(values, { skip = () => false } = {}) {
+export function applyServerSettings(values, { skip = () => false, reset = [] } = {}) {
   _suppressSync = true;
   try {
     // CRITICAL: skip DEVICE_PREFS keys. These are local-only (form-factor
@@ -254,6 +256,11 @@ export function applyServerSettings(values, { skip = () => false } = {}) {
     for (const [key, value] of Object.entries(values || {})) {
       if (DEVICE_PREFS.has(key) || skip(key)) continue;
       DB.setSetting(key, value, true);
+    }
+    for (const key of reset) {
+      if (DEVICE_PREFS.has(key) || skip(key)) continue;
+      DB.removeSetting(key);
+      window.dispatchEvent(new CustomEvent('wl:setting', { detail: { key } }));
     }
   } finally { _suppressSync = false; }
 }

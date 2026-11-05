@@ -786,11 +786,13 @@ async function _applyPulledSettings(rows, live) {
   const { applyServerSettings, isRecentlyChanged } = await import('../stores/settings.js');
   if (!live()) return;
   const values = {};
-  for (const { key, value } of rows) {
+  const reset = [];
+  for (const { key, value, reset: wasReset } of rows) {
+    if (wasReset) { reset.push(key); continue; }
     // Kept as the server keeps them, JSON text (as GET /api/settings reads them).
     try { values[key] = JSON.parse(value); } catch { values[key] = value; }
   }
-  applyServerSettings(values, { skip: isRecentlyChanged });
+  applyServerSettings(values, { skip: isRecentlyChanged, reset });
 }
 
 async function pullChanges({ token = getAuthToken(), signal = null, gen = accountGeneration() } = {}) {

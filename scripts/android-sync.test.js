@@ -400,6 +400,19 @@ test('a setting saved straight to the server is not left waiting for the sync', 
   assert.equal(r.pushedAgain, 0, 'the next sync has nothing to send');
 });
 
+test('Clear All Settings on the web resets the phone too, and a change made on the phone after it stays', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('settingsReset');
+  assert.deepEqual(r.before, { units: 'metric', servings: 3 });
+  assert.equal(r.after.units, 'imperial', 'back to the default');
+  assert.deepEqual(r.after.household, []);
+  assert.deepEqual(r.told, ['household', 'measurementSystem'], 'the open setting stores hear of it at the first sync');
+  assert.equal(r.after.servings, 6, 'a change made on the phone after the reset stays');
+  assert.deepEqual(r.server, { defaultServings: 6 }, 'and goes up; nothing reset comes back');
+  assert.deepEqual(r.after.allergens, [], 'a change made on the phone before the reset is reset too');
+  assert.ok(r.rows.every(x => x.sync_status === 'synced'), 'nothing is left waiting: ' + JSON.stringify(r.rows));
+  assert.equal(r.sentBack, 0);
+});
+
 test("settings are kept per account and server: another account never reads the last one's", { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const r = await run('settingsPerAccount');
   assert.equal(r.bobReads, null);

@@ -673,6 +673,52 @@ const scenarios = {
     out.pushedAgain = sent.slice(at).filter(e => e.url.startsWith('/api/sync/push')).length;
   },
 
+  // Settings > Clear All Settings on the web: the phone goes back to its
+  // defaults at the next sync, and nothing it had goes back up. A change
+  // made on the phone after the reset, not yet up, stays and goes up; one
+  // made before the reset is reset too.
+  async settingsReset() {
+    const la = await import('../../src/lib/local-account.js');
+    const { DB } = await import('../../src/lib/db.js');
+    const A = await me(token);
+    localStorage.setItem('ct:serverUrl', server);
+    localStorage.setItem('wl:userId', String(A.id));
+    await la.prepareLocalAccount(A, { confirm: async () => true });
+    const settings = await import('../../src/stores/settings.js');
+    for (const [key, value] of Object.entries({ measurementSystem: 'metric', household: [{ name: 'Sam' }], defaultServings: 3, allergens: ['milk'] })) {
+      await web('PUT', '/api/settings', { key, value });
+    }
+    await sync();
+    out.before = { units: DB.getSetting('measurementSystem', 'imperial'), servings: DB.getSetting('defaultServings', 2) };
+    // Changed on the phone with the direct save failing: waiting for the sync.
+    const offline = async (store, value) => {
+      failNext = (url, init) => url.endsWith('/api/settings') && init?.method === 'PUT';
+      store.set(value);
+      await sleep(900);
+    };
+    await offline(settings.allergens, ['egg']); // before the reset
+    await sleep(2100);
+    await web('DELETE', '/api/settings');
+    await sleep(2100);
+    await offline(settings.defaultServings, 6); // after it
+    events.length = 0;
+    const at = sent.length;
+    await sync();
+    out.told = events.filter(e => e.type === 'wl:setting').map(e => e.detail.key).sort();
+    // The next sync, once the change made before the reset is no longer one
+    // just made (isRecentlyChanged: a pull doesn't undo a change of the last
+    // 10 seconds).
+    await sleep(5000);
+    await sync();
+    out.after = {
+      units: DB.getSetting('measurementSystem', 'imperial'), household: DB.getSetting('household', []),
+      allergens: DB.getSetting('allergens', []), servings: DB.getSetting('defaultServings', 2),
+    };
+    out.rows = (await db.query(`SELECT key, sync_status FROM user_settings ORDER BY key`)).values;
+    out.server = await web('GET', '/api/settings');
+    out.sentBack = sent.slice(at).filter(e => e.method === 'PUT' && e.url.startsWith('/api/settings')).length;
+  },
+
   // Settings are kept per account and server: another account never reads
   // the last one's.
   async settingsPerAccount() {
