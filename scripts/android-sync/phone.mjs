@@ -671,6 +671,12 @@ const scenarios = {
     const at = sent.length;
     await sync();
     out.pushedAgain = sent.slice(at).filter(e => e.url.startsWith('/api/sync/push')).length;
+    // The phone's copy holds another value than the one that went (changed
+    // again, or another account's change still waiting): it stays waiting.
+    await dbn.dbUpsertSetting('timeFormat', '12h');
+    settings.scheduleSave('timeFormat', '24h');
+    await sleep(900);
+    out.other = await status('timeFormat');
   },
 
   // Settings > Clear All Settings on the web: the phone goes back to its

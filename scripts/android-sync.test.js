@@ -397,6 +397,7 @@ test('a setting saved straight to the server is not left waiting for the sync', 
   assert.equal(r.server, 5);
   assert.equal(r.single, 'synced', 'a setting changed on its own');
   assert.deepEqual(r.bulk, ['synced', 'synced'], 'settings saved together');
+  assert.equal(r.other, 'pending', 'a copy that holds another value than the one sent stays waiting');
   assert.equal(r.pushedAgain, 0, 'the next sync has nothing to send');
 });
 
