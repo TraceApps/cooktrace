@@ -392,6 +392,14 @@ test('a setting changed on the web applies on the phone with the sync, and one c
     'a list or a household changed on the phone reaches the server whole, not as "[object Object]"');
 });
 
+test('a setting saved straight to the server is not left waiting for the sync', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('settingsDirectSave');
+  assert.equal(r.server, 5);
+  assert.equal(r.single, 'synced', 'a setting changed on its own');
+  assert.deepEqual(r.bulk, ['synced', 'synced'], 'settings saved together');
+  assert.equal(r.pushedAgain, 0, 'the next sync has nothing to send');
+});
+
 test("settings are kept per account and server: another account never reads the last one's", { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const r = await run('settingsPerAccount');
   assert.equal(r.bobReads, null);

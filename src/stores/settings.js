@@ -142,6 +142,9 @@ export function scheduleSave(key, value) {
   _saveQueue[key] = setTimeout(async () => {
     if (_userKey() !== forUser) return;
     if (!_shouldSyncToServer()) return;
+    // The phone's copy as it is before it goes, so only that copy is marked
+    // sent: one changed again meanwhile stays waiting for the sync.
+    const stamps = isNative ? await _settingStamps([key]) : [];
     try {
       const url = _settingsUrl();
       _dlog(`[settings] pushing ${key}=${JSON.stringify(value)} to ${url}`);
@@ -156,13 +159,18 @@ export function scheduleSave(key, value) {
       if (isNative) {
         try {
           const { dbMarkSettingsSynced } = await import('../lib/db-native.js');
-          await dbMarkSettingsSynced([key]);
+          await dbMarkSettingsSynced(stamps);
         } catch {}
       }
     } catch (e) {
       console.warn(`[settings] direct push failed for ${key}:`, e.message);
     }
   }, 600);
+}
+
+// The phone's copy of these settings now (lib/db-native.js dbSettingStamps).
+async function _settingStamps(keys) {
+  try { return await (await import('../lib/db-native.js')).dbSettingStamps(keys); } catch { return []; }
 }
 
 /**
@@ -205,6 +213,7 @@ export async function bulkSet(settingsObj) {
   }
 
   if (!_shouldSyncToServer() || userPrefEntries.length === 0) return;
+  const stamps = isNative ? await _settingStamps(userPrefEntries.map(([k]) => k)) : [];
   try {
     const url = _settingsUrl() + '/bulk';
     const bulkObj = Object.fromEntries(userPrefEntries);
@@ -219,7 +228,7 @@ export async function bulkSet(settingsObj) {
     if (isNative) {
       try {
         const { dbMarkSettingsSynced } = await import('../lib/db-native.js');
-        await dbMarkSettingsSynced(userPrefEntries.map(([k]) => k));
+        await dbMarkSettingsSynced(stamps);
       } catch {}
     }
   } catch (e) {
@@ -271,7 +280,7 @@ export async function loadServerSettings() {
           await dbUpsertSetting(key, value);
           keys.push(key);
         }
-        if (keys.length) await dbMarkSettingsSynced(keys);
+        if (keys.length) await dbMarkSettingsSynced(await _settingStamps(keys));
       } catch (e) {
         console.warn('[settings] native SQLite mirror failed:', e.message);
       }

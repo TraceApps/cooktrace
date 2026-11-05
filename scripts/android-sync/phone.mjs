@@ -651,6 +651,28 @@ const scenarios = {
     out.upAsIs = { household: there.household, allergens: there.allergens };
   },
 
+  // A setting saved straight to the server (scheduleSave, bulkSet) counts as
+  // sent on the phone, so the sync has nothing left to send for it.
+  async settingsDirectSave() {
+    const la = await import('../../src/lib/local-account.js');
+    const A = await me(token);
+    localStorage.setItem('ct:serverUrl', server);
+    localStorage.setItem('wl:userId', String(A.id));
+    await la.prepareLocalAccount(A, { confirm: async () => true });
+    const settings = await import('../../src/stores/settings.js');
+    await sync();
+    const status = async key => (await db.query(`SELECT sync_status FROM user_settings WHERE key = ?`, [key])).values[0]?.sync_status ?? null;
+    settings.defaultServings.set(5);
+    await sleep(900); // the direct save has gone
+    out.server = (await web('GET', '/api/settings')).defaultServings;
+    out.single = await status('defaultServings');
+    await settings.bulkSet({ measurementSystem: 'metric', energyUnit: 'kJ' });
+    out.bulk = [await status('measurementSystem'), await status('energyUnit')];
+    const at = sent.length;
+    await sync();
+    out.pushedAgain = sent.slice(at).filter(e => e.url.startsWith('/api/sync/push')).length;
+  },
+
   // Settings are kept per account and server: another account never reads
   // the last one's.
   async settingsPerAccount() {

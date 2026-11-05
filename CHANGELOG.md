@@ -41,6 +41,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **The connection banner in Settings follows your language.** Connected, Not connected, Test and Testing were always in English.
 - **Settings > Trace names each model the way the other Trace apps do**, such as Claude Haiku 5.5 (fast, cheapest), instead of by its ID (claude-haiku-5-5). A model set by the server shows the same way, and a custom model still shows its ID.
 - **A pushed change with no time of its own no longer brings back something deleted elsewhere.** A third-party client re-sending a recipe, pantry item, cook, shopping item or cookbook through `POST /api/sync/push` with no readable `updated_at` (none, or one that isn't a time) brought it back after it was deleted. It now stays deleted, as an older change would, and a change made after the delete still brings it back.
+- **A setting changed in the Android app no longer counts as waiting once it's saved.** A change saved straight to the server stayed marked as not sent until the next sync sent it again, and signing in as another account before then asked about it as a change that hadn't gone up.
 
 ### Security
 

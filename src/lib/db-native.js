@@ -798,18 +798,35 @@ export async function dbUpsertSetting(key, value) {
  * won't match — the row stays pending and the next sync re-pushes the
  * fresh value. See NT commit b364c24 for the full race description.
  *
- * `rows` is an array of `{key, updated_at}` taken from the push snapshot.
+ * `rows` is an array of `{key, updated_at}` taken from the push snapshot
+ * (dbSettingStamps adds `value`: a change made in the same second, with
+ * the same updated_at, stays pending too).
  */
 export async function dbMarkSettingsSynced(rows) {
   if (!isNative || !rows || rows.length === 0) return;
   const db = await getDb();
   for (const r of rows) {
+    const sameValue = 'value' in r;
     await db.run(
       `UPDATE user_settings SET sync_status = 'synced'
-       WHERE user_id = ? AND key = ? AND updated_at = ?`,
-      [LOCAL_USER_ID, r.key, r.updated_at]
+       WHERE user_id = ? AND key = ? AND updated_at = ?${sameValue ? ' AND value IS ?' : ''}`,
+      [LOCAL_USER_ID, r.key, r.updated_at, ...(sameValue ? [r.value] : [])]
     );
   }
+}
+
+/** The phone's copy of these settings as it is now ({key, updated_at}),
+ *  taken before a direct save so dbMarkSettingsSynced marks only that copy
+ *  sent, not one changed again while it went. */
+export async function dbSettingStamps(keys) {
+  if (!isNative || !keys?.length) return [];
+  const db = await getDb();
+  const out = [];
+  for (const key of keys) {
+    const r = (await db.query(`SELECT updated_at, value FROM user_settings WHERE user_id = ? AND key = ?`, [LOCAL_USER_ID, key]))?.values?.[0];
+    if (r?.updated_at) out.push({ key, updated_at: r.updated_at, value: r.value });
+  }
+  return out;
 }
 
 export async function dbGetAllSettings() {
