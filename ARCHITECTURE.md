@@ -157,7 +157,11 @@ that belong together stay together (`server/lib/sync-fields.js`
 `SYNC_GROUPS`), a delete made before a later edit loses, an edit made
 before a delete doesn't bring the row back, and times count in whole
 seconds (a tie between two edits goes to the one arriving, between an
-edit and a delete to the delete).
+edit and a delete to the delete). A pushed row with no readable
+`updated_at` (missing, null, not a time, a number like 1e20), from this
+app or an older one, can't be told from a stale copy: it never brings back
+a row deleted on the server, which is stamped again so the device pulls
+the delete.
 
 - Each synced row keeps `field_stamps` (`{ field: [synced_at, edited_at] }`,
   server only), kept by triggers in `db.js` and set per field by a merged

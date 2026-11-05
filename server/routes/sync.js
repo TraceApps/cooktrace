@@ -358,6 +358,16 @@ router.post('/push', wrap((req, res) => {
           ).get(row.server_id);
           if (!existing) continue;
           if ((u == null && existing.user_id != null) || (u != null && existing.user_id !== u)) continue;
+          // A copy with no readable time of its own (a client re-sending a
+          // row it has had for a while) can't be told from a stale one: it
+          // never brings back a row deleted here. Stamped again, so the
+          // device's next pull brings the delete down.
+          if (spec.softDelete && existing.deleted_at != null && translated.deleted_at == null && !Number.isFinite(utcMs(translated.updated_at))) {
+            db.prepare(`UPDATE ${name} SET synced_at = strftime('%Y-%m-%d %H:%M:%f', 'now') WHERE id = ?`).run(row.server_id);
+            results[name].push({ client_id: row.client_id, server_id: row.server_id, ...(modern ? { kept: 'server' } : {}) });
+            idMaps[name][row.client_id] = row.server_id;
+            continue;
+          }
           // Columns an app from before doesn't send keep what's here.
           for (const c of LATER_COLS[name] || []) {
             if (!(c in row)) values[spec.cols.indexOf(c)] = existing[c] ?? null;
