@@ -409,6 +409,7 @@ test('Clear All Settings on the web resets the phone too, and a change made on t
   assert.deepEqual(r.told, ['household', 'measurementSystem'], 'the open setting stores hear of it at the first sync');
   assert.equal(r.after.servings, 6, 'a change made on the phone after the reset stays');
   assert.deepEqual(r.server, { defaultServings: 6 }, 'and goes up; nothing reset comes back');
+  assert.deepEqual(r.quick, { allergens: ['egg'], row: '["egg"]' }, 'a change of the last moments stays a while, on screen and in the copy alike');
   assert.deepEqual(r.after.allergens, [], 'a change made on the phone before the reset is reset too');
   assert.ok(r.rows.every(x => x.sync_status === 'synced'), 'nothing is left waiting: ' + JSON.stringify(r.rows));
   assert.equal(r.sentBack, 0);

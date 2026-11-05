@@ -1114,7 +1114,7 @@ export async function dbRememberEcho(table, rowId, updatedAt) {
   );
 }
 
-export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => true, touched = null, settings = null } = {}) {
+export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => true, touched = null, settings = null, keepSetting = () => false } = {}) {
   // live(): false once the copy is changing hands (another account signing
   // in, lib/local-account.js): nothing more of this pull is written.
   if (!isNative || !payload?.tables) return true;
@@ -1496,7 +1496,12 @@ export async function dbApplyPull(payload, { clockOffsetMs = 0, live = () => tru
       // to its default too. Only a setting the phone has a copy of: one
       // set here before it ever synced is left as it is.
       if (s.deleted_at) {
-        if (localRow) {
+        if (localRow && keepSetting(s.key)) {
+          // Changed here a moment ago, so kept on screen (stores/settings.js
+          // isRecentlyChanged): sent again, for the server to judge against
+          // the reset, so the two don't stay apart.
+          await db.run(`UPDATE user_settings SET sync_status = 'pending' WHERE user_id = ? AND key = ?`, [LOCAL_USER_ID, s.key]);
+        } else if (localRow) {
           await db.run(`DELETE FROM user_settings WHERE user_id = ? AND key = ?`, [LOCAL_USER_ID, s.key]);
           settings?.push({ key: s.key, reset: true });
         }

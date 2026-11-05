@@ -822,7 +822,8 @@ async function pullChanges({ token = getAuthToken(), signal = null, gen = accoun
   // are added by dbApplyPull when it really changes them.
   for (const k of pullKinds(body.tables)) _touched.add(k);
   const settings = [];
-  const done = await dbApplyPull(body, { clockOffsetMs, live, touched: _touched, settings });
+  const { isRecentlyChanged } = await import('../stores/settings.js');
+  const done = await dbApplyPull(body, { clockOffsetMs, live, touched: _touched, settings, keepSetting: isRecentlyChanged });
   if (done === false || !live()) return { pulled: 0, changed: 0, stopped: true };
   if (settings.length) await _applyPulledSettings(settings, live);
   await dbSetMeta(LAST_PULL_KEY, body.now || new Date().toISOString());

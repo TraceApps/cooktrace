@@ -711,9 +711,12 @@ const scenarios = {
     const at = sent.length;
     await sync();
     out.told = events.filter(e => e.type === 'wl:setting').map(e => e.detail.key).sort();
-    // The next sync, once the change made before the reset is no longer one
-    // just made (isRecentlyChanged: a pull doesn't undo a change of the last
-    // 10 seconds).
+    // A sync while the change made before the reset is still one just made
+    // (isRecentlyChanged: a pull doesn't undo a change of the last 10
+    // seconds): kept on screen and in the phone's copy alike.
+    await sync();
+    out.quick = { allergens: DB.getSetting('allergens', []), row: (await db.query(`SELECT value FROM user_settings WHERE key = 'allergens'`)).values[0]?.value ?? null };
+    // And the next one after that.
     await sleep(5000);
     await sync();
     out.after = {
