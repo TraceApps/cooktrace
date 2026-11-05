@@ -96,6 +96,16 @@ test('an edit made after the delete still brings the row back', { skip }, async 
   assert.equal((await pulled('shopping_list', item)).deleted_at, null);
 });
 
+test('a new row that only shares a deleted one\'s name is made as before, time or not', { skip }, async () => {
+  const made = (await call('POST', '/api/cookbooks', { name: 'Desserts' })).body;
+  const { id, slug } = made.cookbook || made;
+  await call('DELETE', `/api/cookbooks/${id}`);
+  await sleep(1100);
+  const r = await push({ cookbooks: [{ client_id: 3, name: 'Desserts', slug, is_smart: 0, sort_order: 0 }] }, { client_now: undefined });
+  assert.equal(r.status, 200);
+  assert.equal((await pulled('cookbooks', id)).deleted_at, null);
+});
+
 test('no pushed time fails the push: the other rows in it go in', { skip }, async () => {
   const now = new Date().toISOString();
   const r = await push({ shopping_list: [

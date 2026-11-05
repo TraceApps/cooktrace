@@ -337,9 +337,10 @@ router.post('/push', wrap((req, res) => {
         // one, as an edit of it. A second would break the unique name and
         // stop every push of the table.
         const natural = NATURAL_KEYS[name];
+        let byName = false;
         if (!row.server_id && natural && translated[natural] != null) {
           const same = db.prepare(`SELECT id FROM ${name} WHERE ${userClause(u)} AND ${natural} = ?`).get(...userArgs(u), translated[natural]);
-          if (same) row.server_id = same.id;
+          if (same) { row.server_id = same.id; byName = true; }
         }
 
         if (name === 'recipe_revisions') {
@@ -358,11 +359,12 @@ router.post('/push', wrap((req, res) => {
           ).get(row.server_id);
           if (!existing) continue;
           if ((u == null && existing.user_id != null) || (u != null && existing.user_id !== u)) continue;
-          // A copy with no readable time of its own (a client re-sending a
-          // row it has had for a while) can't be told from a stale one: it
-          // never brings back a row deleted here. Stamped again, so the
-          // device's next pull brings the delete down.
-          if (spec.softDelete && existing.deleted_at != null && translated.deleted_at == null && !Number.isFinite(utcMs(translated.updated_at))) {
+          // A copy of this row with no readable time of its own (a client
+          // re-sending a row it has had for a while) can't be told from a
+          // stale one: it never brings back a row deleted here. Stamped
+          // again, so the device's next pull brings the delete down. A new
+          // row that only shares a deleted one's name is made as before.
+          if (!byName && spec.softDelete && existing.deleted_at != null && translated.deleted_at == null && !Number.isFinite(utcMs(translated.updated_at))) {
             db.prepare(`UPDATE ${name} SET synced_at = strftime('%Y-%m-%d %H:%M:%f', 'now') WHERE id = ?`).run(row.server_id);
             results[name].push({ client_id: row.client_id, server_id: row.server_id, ...(modern ? { kept: 'server' } : {}) });
             idMaps[name][row.client_id] = row.server_id;
