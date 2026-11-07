@@ -67,8 +67,8 @@ async function _extFetch(url) {
 
 // FDC nutrient ID → CookTrace nutrition object key (matches NT exactly).
 const _USDA_NUTRIENT_MAP = {
-  1008: 'calories',         // Energy kcal
-  1062: 'kilojoules',       // Energy kJ
+  // Energy (1008 kcal, 2048 and 2047 kcal, 1062 kJ) is read by
+  // USDA_ENERGY_IDS below, not here.
   1003: 'proteins',
   1004: 'fat',
   1258: 'saturated-fat',
@@ -107,6 +107,29 @@ const _USDA_NUTRIENT_MAP = {
   1180: 'choline',          // mg (Choline, total)
 };
 
+// USDA's energy ids, in the order calories are taken from: the first one
+// the food has wins. All are kcal per 100 g; FoodData Central has no kJ
+// for 2047 or 2048 (its nutrient list), and none for any food since
+// October 2020 except the older 1062 rows. Since October 2020 Foundation
+// foods no longer show 1008 and most give only 2047 and 2048, so reading
+// 1008 alone saved them at 0 kcal.
+//  - 1008 "Energy": every SR Legacy, Survey (FNDDS) and Branded food, and
+//    Foundation foods from before October 2020.
+//  - 2048 "Energy (Atwater Specific Factors)": the food's own factors from
+//    USDA Handbook 74, the method behind SR Legacy's 1008 for single foods,
+//    so a Foundation food reads like its SR Legacy counterpart.
+//  - 2047 "Energy (Atwater General Factors)": the general factors, such as
+//    4, 9 and 4 kcal per gram of protein, fat and carbohydrate. Every
+//    Foundation food with 2048 has it too, and some have only this one.
+//  - 1062 "Energy" in kJ, divided by 4.184, as Open Food Facts kJ-only
+//    products are. No Foundation food has it without 1008.
+// Same order as NutriTrace's usda-map.js. Sources:
+// https://fdc.nal.usda.gov/Foundation_Foods_Documentation/ ("Energy") and
+// nutrient.csv in the Foundation Foods download,
+// https://fdc.nal.usda.gov/download-datasets/
+export const USDA_ENERGY_IDS = [1008, 2048, 2047];
+export const USDA_KJ_ID = 1062;
+
 // FoodData Central gives every nutrient per 100 g (or 100 ml), for every data
 // type: the search's `value` and the detail's `amount`, Branded included. For
 // Branded foods USDA works them out from the label's per-serving numbers, and
@@ -116,14 +139,27 @@ const _USDA_NUTRIENT_MAP = {
 // https://fdc.nal.usda.gov/docs/Download_Field_Descriptions_Oct2020.pdf
 export function mapUsdaFood(item) {
   const nutrition = {};
+  const energy = {};
 
   for (const fn of (item.foodNutrients || [])) {
     const nid = fn.nutrientId || (fn.nutrient && fn.nutrient.id);
     const key = _USDA_NUTRIENT_MAP[nid];
     const raw = fn.value != null ? fn.value : fn.amount;
-    if (key && raw != null) {
+    if (raw == null || !Number.isFinite(Number(raw))) continue;
+    if (key) {
       nutrition[key] = Math.round(raw * 10000) / 10000;
+    } else if (Number(nid) === USDA_KJ_ID || USDA_ENERGY_IDS.includes(Number(nid))) {
+      energy[Number(nid)] = Number(raw);
     }
+  }
+  const kcalId = USDA_ENERGY_IDS.find(id => energy[id] != null);
+  if (kcalId != null) {
+    nutrition.calories = Math.round(energy[kcalId] * 10000) / 10000;
+  } else if (energy[USDA_KJ_ID] != null) {
+    nutrition.calories = Math.round(energy[USDA_KJ_ID] / 4.184 * 10) / 10;
+  }
+  if (energy[USDA_KJ_ID] != null) {
+    nutrition.kilojoules = Math.round(energy[USDA_KJ_ID] * 10000) / 10000;
   }
   // Derive kJ from kcal if missing.
   if (nutrition.calories && !nutrition.kilojoules) {
