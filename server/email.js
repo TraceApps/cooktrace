@@ -15,15 +15,20 @@ export function seedSmtpFromEnv() {
   const upsert = db.prepare(
     'INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
   );
-  let locked = false;
-  for (const [envKey, dbKey] of Object.entries(map)) {
-    if (process.env[envKey] != null) {
-      upsert.run(dbKey, process.env[envKey]);
-      locked = true;
+  // The env takes over only when it names a server: the stock compose passes
+  // SMTP_HOST empty, and that must leave Settings > Email to the admin.
+  if (process.env.SMTP_HOST) {
+    for (const [envKey, dbKey] of Object.entries(map)) {
+      if (process.env[envKey] != null) upsert.run(dbKey, process.env[envKey]);
     }
+    // Store lock flag so clients can disable the UI fields
+    upsert.run('smtp_env_locked', 'true');
+  } else if (isSmtpEnvLocked()) {
+    // The env stopped managing SMTP: unlock, and drop the values it wrote so
+    // mail doesn't keep going to a server nobody configures any more.
+    const keys = [...Object.values(map), 'smtp_env_locked'];
+    db.prepare(`DELETE FROM app_config WHERE key IN (${keys.map(() => '?').join(', ')})`).run(...keys);
   }
-  // Store lock flag so clients can disable the UI fields
-  if (locked) upsert.run('smtp_env_locked', 'true');
 }
 
 export function isSmtpEnvLocked() {
