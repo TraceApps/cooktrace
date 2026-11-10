@@ -400,7 +400,8 @@ export const biometricLoginEnabled = createSettingStore('biometricLoginEnabled',
 export const forceMobileLayout = createSettingStore('forceMobileLayout', false);
 
 // ── User prefs (server-synced) ─────────────────────────────────────────────
-export const language    = createSettingStore('language',    'en');
+// Empty until someone picks a language: until then the browser's stands (src/i18n/index.js).
+export const language    = createSettingStore('language',    '');
 export const accentColor = createSettingStore('accentColor', 'mint');
 // Page banners — three styles:
 //   'animated' = tall header with the page's illustrated SVG

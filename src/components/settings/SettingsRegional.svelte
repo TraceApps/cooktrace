@@ -2,7 +2,7 @@
   // Regional & Units section — extracted from Settings.svelte. Owns
   // language, date/time format, measurement system, and energy unit.
   // Stores + AVAILABLE_LOCALES import verbatim from the shell.
-  import { _ } from 'svelte-i18n';
+  import { _, locale } from 'svelte-i18n';
   import { AVAILABLE_LOCALES } from '../../i18n/index.js';
   import {
     language, dateFormat, timeFormat, measurementSystem, energyUnit,
@@ -17,7 +17,7 @@
         <div class="setting-desc">{$_('settings_page.regional.language_desc')}</div>
       </div>
       <div class="select-wrap" style="width:160px">
-        <select class="select sel-sm" value={$language} on:change={e => language.set(e.target.value)}>
+        <select class="select sel-sm" value={$language || $locale} on:change={e => language.set(e.target.value)}>
           {#each AVAILABLE_LOCALES as loc}
             <option value={loc.code}>{loc.label}</option>
           {/each}
