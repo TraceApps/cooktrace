@@ -29,6 +29,8 @@ import { registerCreateRecipe } from './create-recipe.js';
 import { registerAddPantryItem } from './add-pantry-item.js';
 import { registerDeleteCookDiaryEntry } from './delete-cook-diary-entry.js';
 import { registerRemoveShoppingItem } from './remove-shopping-item.js';
+import { registerPlanCook, registerUpdatePlan } from './plan-cook.js';
+import { registerDeleteRecipe } from './delete-recipe.js';
 import { registerUpdateRecipe, registerSetRecipeImage, registerImportRecipeFromUrl } from './recipe-edit.js';
 
 export function registerReadTools(server, ctx) {
@@ -47,6 +49,8 @@ export function registerWriteTools(server, ctx) {
   registerUpdatePantryStock(server, ctx);
   registerUpdateRecipe(server, ctx);
   registerSetRecipeImage(server, ctx);
+  registerPlanCook(server, ctx);
+  registerUpdatePlan(server, ctx);
 }
 
 export function registerDestroyTools(server, ctx) {
@@ -55,4 +59,5 @@ export function registerDestroyTools(server, ctx) {
   registerDeleteCookDiaryEntry(server, ctx);
   registerRemoveShoppingItem(server, ctx);
   registerImportRecipeFromUrl(server, ctx);
+  registerDeleteRecipe(server, ctx);
 }

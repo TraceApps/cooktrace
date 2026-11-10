@@ -71,7 +71,7 @@ A bad request (an invalid date, a recipe id with no match) returns
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/api/v1/cook-diary?date_from=&date_to=&kind=&limit=&offset=` | Cook diary entries (logged and planned cooks), newest first. Optionally bound by a date range or `kind` (`cooked`/`planned`). The reply's `count` is the entries on this page, `total` every match, `next_offset` where the next page starts (null on the last), `complete`, and `more` says it in words. |
+| GET | `/api/v1/cook-diary?date_from=&date_to=&kind=&limit=&offset=` | Cook diary entries (logged and planned cooks), newest first. Optionally bound by a date range or `kind` (`cooked`/`planned`). A planned cook with `any_day: true` is for some day of the week its date falls in. The reply's `count` is the entries on this page, `total` every match, `next_offset` where the next page starts (null on the last), `complete`, and `more` says it in words. |
 | GET | `/api/v1/shopping?include_checked=` | The current shopping list, unchecked items only by default. |
 
 ### Write (require `mcp:write` and `PUBLIC_API_WRITE_ENABLED=1`)
@@ -83,11 +83,12 @@ A bad request (an invalid date, a recipe id with no match) returns
 | PATCH | `/api/v1/pantry/:id/stock` | `{in_stock?, quantity?}` | Updates an existing pantry item's stock state and/or quantity. Does not create new pantry rows. |
 
 Not yet exposed here: creating, importing or editing a recipe, setting
-its photo or nutrition, adding a pantry or shopping item, or deleting a
-diary/shopping entry. Those stay MCP-only for now (`create_recipe`,
+its photo or nutrition, adding a pantry or shopping item, planning a
+cook, or deleting a recipe or a diary/shopping entry. Those stay MCP-only for now (`create_recipe`,
 `import_recipe_from_url`, `update_recipe`, `set_recipe_image`,
 `add_pantry_item`, `add_shopping_item`, `remove_shopping_item`,
-`delete_cook_diary_entry` in the MCP setup guide). The destructive ones
+`delete_cook_diary_entry`, `plan_cook`, `update_plan`, `delete_recipe` in the
+MCP setup guide). The destructive ones
 need `MCP_DESTROY_ENABLED`, the `mcp:destroy` scope and `confirm: true`
 on the MCP side; recipe edits need `mcp:write`, since every one can be
 undone in the app.

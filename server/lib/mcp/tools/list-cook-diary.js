@@ -33,13 +33,13 @@ export function listCookDiaryCore(userId, { date_from, date_to, kind, limit, off
   // Ties go by id, so pages never skip or repeat an entry.
   const rows = db.prepare(
     `SELECT cd.id, cd.recipe_id, r.name AS recipe_name, cd.date, cd.kind,
-            cd.servings, cd.notes, cd.meal_type, cd.rating
+            cd.servings, cd.notes, cd.meal_type, cd.rating, cd.any_day
        FROM cook_diary cd
        LEFT JOIN recipes r ON r.id = cd.recipe_id
       WHERE ${clauses.join(' AND ')}
       ORDER BY cd.date DESC, cd.created_at DESC, cd.id DESC
       LIMIT ? OFFSET ?`
-  ).all(...args, cap, start);
+  ).all(...args, cap, start).map(r => ({ ...r, any_day: !!r.any_day }));
   // count stays what this page holds (the REST API has always said so).
   return { count: rows.length, limit: cap, ...pageFields(total, start, rows.length), items: rows };
 }
