@@ -79,6 +79,7 @@ import {
 import { localToday } from '../lib/calendar-day.js';
 import { frameAncestorsDirective } from '../lib/frame-ancestors.js';
 import { followPlan } from './shopping.js';
+import { readSettingRaw } from '../lib/secret-settings.js';
 
 // Tack the creator's current avatar onto a hydrated recipe so the
 // byline can render their photo. Live lookup (cheap PK fetch) keeps
@@ -1653,10 +1654,8 @@ function _userSetting(u, key) {
   ).get(...(u == null ? [key] : [u, key]));
   if (!row?.value) return null;
   // Values are JSON-encoded by createSettingStore; unwrap if so.
-  try {
-    const parsed = JSON.parse(row.value);
-    return typeof parsed === 'string' ? parsed : (parsed == null ? null : String(parsed));
-  } catch { return String(row.value); }
+  const parsed = readSettingRaw(key, row.value);
+  return typeof parsed === 'string' ? parsed : (parsed == null ? null : String(parsed));
 }
 
 // Build an AI config object for a user from their stored settings, or

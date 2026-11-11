@@ -1,4 +1,5 @@
 <script>
+  import { selectSecret } from '../../lib/secret-set.js';
   import { failed } from '../../lib/messages.js';
   // SettingsNotifications — device + push-service reminders.
   //
@@ -159,7 +160,7 @@
           value={$gotifyUrl} on:change={e => gotifyUrl.set(e.target.value)} />
         <label class="form-label">{$_('settings_notifications.app_token')}</label>
         <input class="input" type="text"
-          value={$gotifyToken} on:change={e => gotifyToken.set(e.target.value)} />
+          value={$gotifyToken} on:focus={selectSecret} on:change={e => gotifyToken.set(e.target.value)} />
       </div>
     {:else if $notifPushService === 'ntfy'}
       <div class="setting-divider"></div>
@@ -172,7 +173,7 @@
           value={$ntfyTopic} on:change={e => ntfyTopic.set(e.target.value)} />
         <label class="form-label">{$_('settings_notifications_ui.bearer_optional')}</label>
         <input class="input" type="text"
-          value={$ntfyToken} on:change={e => ntfyToken.set(e.target.value)} />
+          value={$ntfyToken} on:focus={selectSecret} on:change={e => ntfyToken.set(e.target.value)} />
       </div>
     {/if}
 

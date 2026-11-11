@@ -22,9 +22,10 @@ services:
       # Required if using user management — set a long random secret
       - JWT_SECRET=${JWT_SECRET}
       # Or mount a Swarm/Docker secret and set JWT_SECRET_FILE=/run/secrets/<name>
-      # Optional — at-rest encryption key for OIDC client secrets and
-      # NutriTrace federation tokens. Defaults to a key derived from
-      # JWT_SECRET, which means rotating JWT_SECRET also invalidates every
+      # Optional: at-rest encryption key for OIDC client secrets,
+      # webhook secrets and the tokens, keys and passwords saved in Settings
+      # (NutriTrace link, ntfy, Gotify, AI, USDA, Open Food Facts). Defaults
+      # to a key derived from JWT_SECRET, which means rotating JWT_SECRET also invalidates every
       # encrypted secret. Set this explicitly if you want to rotate session
       # tokens independently.
       # - TOKEN_ENC_KEY=${TOKEN_ENC_KEY:-}

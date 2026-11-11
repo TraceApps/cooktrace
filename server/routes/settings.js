@@ -3,6 +3,7 @@ import db from '../db.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 import { isServerOnlyKey } from '../lib/server-only-keys.js';
+import { clientSetting, readSettingRaw, settingToStore } from '../lib/secret-settings.js';
 import { fetchChecked, serviceBase } from '../lib/ssrf-guard.js';
 
 // Push services usually live on the home network, so that's allowed for
@@ -26,6 +27,11 @@ async function _pushErrorMessage(resp) {
 const router = Router();
 router.use(requireAuth);
 
+// What's stored for a setting now (its JSON text), or null.
+const _stored = (u, key) => db.prepare(
+  'SELECT value FROM user_settings WHERE user_id = ? AND key = ? AND deleted_at IS NULL'
+).get(u, key)?.value ?? null;
+
 // GET /api/settings — return all user settings (empty object in single-user mode)
 // SECURITY: server-only keys (OAuth secrets, admin config) are filtered out.
 router.get('/', wrap((req, res) => {
@@ -34,7 +40,9 @@ router.get('/', wrap((req, res) => {
   const out = {};
   for (const { key, value } of rows) {
     if (isServerOnlyKey(key)) continue; // never expose admin keys to clients
-    try { out[key] = JSON.parse(value); } catch { out[key] = value; }
+    let v; try { v = JSON.parse(value); } catch { v = value; }
+    // A secret only the server uses is said to be set, never sent (#92).
+    out[key] = clientSetting(key, v);
   }
   res.json(out);
 }));
@@ -46,9 +54,12 @@ router.put('/', wrap((req, res) => {
   const { key, value } = req.body;
   if (!key) return res.status(400).json({ error: 'key required' });
   if (isServerOnlyKey(key)) return res.status(403).json({ error: 'forbidden key' });
+  // A secret is stored encrypted; the placeholder sent back for one leaves it be.
+  const stored = settingToStore(key, value, _stored(req.user.id, key));
+  if (stored === undefined) return res.json({ ok: true });
   db.prepare(`INSERT INTO user_settings (user_id, key, value, updated_at) VALUES (?, ?, ?, datetime('now'))
     ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value, updated_at = datetime('now'), deleted_at = NULL`)
-    .run(req.user.id, key, JSON.stringify(value));
+    .run(req.user.id, key, stored);
   res.json({ ok: true });
 }));
 
@@ -70,7 +81,9 @@ router.put('/bulk', wrap((req, res) => {
   db.transaction(() => {
     for (const [key, value] of Object.entries(settings)) {
       if (isServerOnlyKey(key)) { skipped++; continue; }
-      upsert.run(req.user.id, key, JSON.stringify(value));
+      const stored = settingToStore(key, value, _stored(req.user.id, key));
+      if (stored === undefined) { skipped++; continue; }
+      upsert.run(req.user.id, key, stored);
       written++;
     }
   })();
@@ -123,7 +136,7 @@ async function _pushTestHandler(req, res) {
 
   function _s(key) {
     const r = db.prepare('SELECT value FROM user_settings WHERE user_id=? AND key=?').get(u, key);
-    return r?.value ? JSON.parse(r.value) : '';
+    return r?.value ? readSettingRaw(key, r.value) : '';
   }
 
   try {

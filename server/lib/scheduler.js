@@ -22,6 +22,7 @@ import { logger } from '../logger.js';
 import { notifyCookDay, notifyShoppingNudge, notifyExpiryDigest } from './push-notify.js';
 import { sendWeeklySummaryEmail } from '../email.js';
 import { isBackupDue } from './backup-schedule.js';
+import { readSettingRaw } from './secret-settings.js';
 
 const TICK_MS = 15 * 60 * 1000; // 15 minutes
 let _interval = null;
@@ -97,7 +98,7 @@ function _todayUtc() {
 function _userSetting(userId, key) {
   const r = db.prepare(`SELECT value FROM user_settings WHERE user_id = ? AND key = ?`).get(userId, key);
   if (!r) return null;
-  try { return JSON.parse(r.value); } catch { return r.value; }
+  return readSettingRaw(key, r.value);
 }
 
 function _alreadyFired(userId, kind, refId, today) {

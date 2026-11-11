@@ -1,4 +1,5 @@
 <script>
+  import { selectSecret } from '../../lib/secret-set.js';
   import { failed } from '../../lib/messages.js';
   import { _ } from 'svelte-i18n';
   import {
@@ -128,11 +129,11 @@
       {#if showToken}
         <input class="input" type="text" bind:value={tokenDraft}
           placeholder={$_('settings_federation_ct.access_token_ph')}
-          on:input={_invalidate} />
+          on:focus={selectSecret} on:input={_invalidate} />
       {:else}
         <input class="input" type="password" bind:value={tokenDraft}
           placeholder={$_('settings_federation_ct.access_token_ph')}
-          on:input={_invalidate} />
+          on:focus={selectSecret} on:input={_invalidate} />
       {/if}
       <button class="key-toggle" on:click={() => showToken = !showToken} aria-label={showToken ? $_('common.hide') : $_('settings_federation_ui.show')}>
         <span class="material-symbols-rounded">{showToken ? 'visibility_off' : 'visibility'}</span>

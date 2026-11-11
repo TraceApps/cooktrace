@@ -58,6 +58,7 @@ import { cleanSourceIds } from '../lib/shopping-plan.js';
 import { localizeRowPhotos } from '../lib/inline-photos.js';
 import { recordRevision, revisionUsed, cleanLabel, cookedVersion } from '../lib/recipe-history.js';
 import { revisionOf, parseRevision } from '../lib/recipe-content.js';
+import { clientSettingRaw, settingToStoreRaw } from '../lib/secret-settings.js';
 
 // Unique per account (server/db.js), so one made on two devices is one row.
 const NATURAL_KEYS = { recipe_categories: 'slug', pantry_categories: 'slug', cookbooks: 'slug', custom_units: 'abbr' };
@@ -633,6 +634,7 @@ router.post('/push', wrap((req, res) => {
     );
     const reset = db.prepare(`SELECT deleted_at FROM user_settings WHERE user_id IS ? AND key = ? AND deleted_at IS NOT NULL`);
     const restamp = db.prepare(`UPDATE user_settings SET deleted_at = deleted_at WHERE user_id IS ? AND key = ?`);
+    const current = db.prepare(`SELECT value FROM user_settings WHERE user_id IS ? AND key = ? AND deleted_at IS NULL`);
     const txn = db.transaction(() => {
       for (const s of req.body.settings) {
         const was = reset.get(u, s.key);
@@ -640,7 +642,12 @@ router.post('/push', wrap((req, res) => {
           const at = utcMs(editTime(s.updated_at || null, offsetMs));
           if (!s.updated_at || !Number.isFinite(at) || at <= utcMs(was.deleted_at)) { restamp.run(u, s.key); continue; }
         }
-        ins.run(u, s.key, typeof s.value === 'string' ? s.value : JSON.stringify(s.value), s.updated_at || _now());
+        // A secret is stored encrypted; the placeholder the phone was sent
+        // for one leaves it be (#92).
+        const raw = typeof s.value === 'string' ? s.value : JSON.stringify(s.value);
+        const stored = settingToStoreRaw(s.key, raw, current.get(u, s.key)?.value ?? null);
+        if (stored === undefined) continue;
+        ins.run(u, s.key, stored, s.updated_at || _now());
       }
     });
     try { txn(); } catch {}
@@ -758,7 +765,7 @@ router.get('/pull', wrap((req, res) => {
   out.settings = db.prepare(
     `SELECT key, value, updated_at, deleted_at FROM user_settings
       WHERE ${userClause(u)} AND synced_at >= ?`
-  ).all(...userArgs(u), since);
+  ).all(...userArgs(u), since).map(r => ({ ...r, value: clientSettingRaw(r.key, r.value) }));
 
   res.json({ now, tables: out });
 }));
