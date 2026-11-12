@@ -19,6 +19,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **API tokens for every user** (from [nutritrace#245](https://github.com/TraceApps/nutritrace/pull/245)). Anyone signed in can create and revoke their own API tokens in Settings > API Tokens, now under Integrations, so connecting your own MCP client no longer needs an admin account. Webhooks stay admin-only.
 - **Servings on a plan are optional, and never filled in.** Planning a cook (from the Diary, a recipe or a card), Build My Week and Trace set none unless you say how many, so a plan shows no servings and the shopping list buys the recipe as written. Tap **Set Servings** (in Plan a Cook or Edit Plan, or the Servings row in Build My Week) to cook for a different number, and the list scales to it; the close button takes it off again. Plans that already have servings keep them.
 
 ### Fixed

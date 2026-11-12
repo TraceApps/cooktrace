@@ -67,7 +67,7 @@
   async function load() {
     loading = true;
     try {
-      const r = await fetch(apiUrl('/api/admin/api-tokens'), {
+      const r = await fetch(apiUrl('/api/tokens'), {
         credentials: 'include', headers: _csrfHeaders(),
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || '');
@@ -103,7 +103,7 @@
   async function sendCreate({ password, code }) {
     creating = true;
     try {
-      const r = await fetch(apiUrl('/api/admin/api-tokens'), {
+      const r = await fetch(apiUrl('/api/tokens'), {
         method: 'POST', credentials: 'include',
         headers: _csrfHeaders(),
         body: JSON.stringify({
@@ -139,7 +139,7 @@
       dangerous: true,
     })) return;
     try {
-      const r = await fetch(apiUrl(`/api/admin/api-tokens/${t.id}`), {
+      const r = await fetch(apiUrl(`/api/tokens/${t.id}`), {
         method: 'DELETE', credentials: 'include', headers: _csrfHeaders(),
       });
       if (!r.ok) {

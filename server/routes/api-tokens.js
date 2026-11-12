@@ -1,31 +1,33 @@
 /**
- * /api/admin/api-tokens — CRUD for personal access tokens.
+ * /api/tokens (alias /api/admin/api-tokens): CRUD for personal access tokens.
  *
  * Mounted INSIDE the regular /api authentication (cookie/Bearer for
  * the user session), not the token Bearer auth. This is for the
  * Settings UI to manage tokens, not for MCP clients to use tokens.
  *
- * Restricted to admins; non-admins get 403. requireAuth/requireAdmin
- * both pass single-user-mode requests through unconditionally (there's
- * no meaningful non-admin in that mode) — but single-user mode has
+ * Any signed-in user manages only their own tokens. requireAuth passes
+ * single-user-mode requests through unconditionally, but single-user mode has
  * zero rows in `users`, so req.user is null there, not a synthetic
  * "LOCAL_USER". A token needs a real owner (api_tokens.user_id is NOT
  * NULL), so the guard below refuses cleanly instead of crashing on
- * req.user.id when this is hit without a real signed-in admin.
+ * req.user.id when this is hit without a real signed-in account.
  */
 import { Router } from 'express';
 import { wrap } from '../logger.js';
-import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
 import { freshCheck } from './two-step.js';
 import { createToken, listTokens, revokeToken, KNOWN_SCOPES, SCOPE_DESCRIPTIONS } from '../lib/api-tokens.js';
 
 const router = Router();
-router.use(requireAuth, requireAdmin);
+// Any signed-in user manages their own tokens (from nutritrace#245): every
+// query below is scoped to req.user.id, and what a token can reach is still
+// set by the server's MCP_* / PUBLIC_API_* switches.
+router.use(requireAuth);
 
 router.use((req, res, next) => {
   if (!req.user) {
     return res.status(400).json({
-      error: 'API tokens require a signed-in account. Enable user management and sign in as an admin first.',
+      error: 'API tokens require a signed-in account. Enable user management and sign in first.',
     });
   }
   next();

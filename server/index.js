@@ -262,6 +262,9 @@ router.use('/api/units',        unitsRoutes);
 router.use('/api/off',          offContributeRoutes);
 router.use('/api/cookbooks',    cookbooksRoutes);
 router.use('/api/kitchens',     kitchensRoutes);
+// Any signed-in user's own tokens; /api/admin/api-tokens stays for older
+// Android builds.
+router.use('/api/tokens', apiTokensRoutes);
 router.use('/api/admin/api-tokens', apiTokensRoutes);
 router.use('/api/admin/webhooks', webhooksRoutes);
 router.use('/api/mcp',          mcpRoutes);

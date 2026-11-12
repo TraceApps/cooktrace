@@ -511,6 +511,15 @@
     <span>{$_('settings.connected_services.section')}</span>
     <span class="material-symbols-rounded chevron">expand_more</span>
   </button>
+  <!-- API Tokens: any signed-in user's own tokens (from nutritrace#245).
+       Needs real multi-user mode: a token needs a real user_id. -->
+  {#if !isNativeLocal && $userMgmtActive}
+    <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'apitokens')} class:active={currentSection === 'apitokens'} aria-current={currentSection === 'apitokens' ? 'page' : undefined} on:click={() => toggleSection('apitokens')}>
+      <span class="material-symbols-rounded si">key</span>
+      <span>{$_('settings.apitokens.section')}</span>
+      <span class="material-symbols-rounded chevron">expand_more</span>
+    </button>
+  {/if}
 
   <p class="settings-group-label">{$_('settings_ui.group_app')}</p>
   {#if isNative}
@@ -562,11 +571,6 @@
       <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'auth')} class:active={currentSection === 'auth'} aria-current={currentSection === 'auth' ? 'page' : undefined} on:click={() => toggleSection('auth')}>
         <span class="material-symbols-rounded si">vpn_key</span>
         <span>{$_('settings.authentication.section')}</span>
-        <span class="material-symbols-rounded chevron">expand_more</span>
-      </button>
-      <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'apitokens')} class:active={currentSection === 'apitokens'} aria-current={currentSection === 'apitokens' ? 'page' : undefined} on:click={() => toggleSection('apitokens')}>
-        <span class="material-symbols-rounded si">key</span>
-        <span>{$_('settings.apitokens.section')}</span>
         <span class="material-symbols-rounded chevron">expand_more</span>
       </button>
       <button class="section-toggle" class:hidden={!sectionVisible(settingsQuery, 'webhooks')} class:active={currentSection === 'webhooks'} aria-current={currentSection === 'webhooks' ? 'page' : undefined} on:click={() => toggleSection('webhooks')}>
