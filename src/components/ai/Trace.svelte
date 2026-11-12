@@ -1,4 +1,5 @@
 <script>
+  import { pastedImage } from '../../lib/paste-image.js';
   import { failed } from '../../lib/messages.js';
   /**
    * Trace — assistant chat panel + FAB.
@@ -923,6 +924,15 @@ When you write to the user's data, summarise what you did briefly and concretely
   let _voicePrefix = null;
 
   // From the shared attach button: an array of image Files. Trace takes one.
+  // A pasted screenshot attaches like the image button (lib/paste-image.js).
+  function _onPaste(e) {
+    if (busy) return;
+    const file = pastedImage(e.clipboardData);
+    if (!file) return;
+    e.preventDefault();
+    _useImageFiles([file]);
+  }
+
   function _useImageFiles(files) {
     const f = files?.[0];
     if (!f) return;
@@ -1200,6 +1210,7 @@ When you write to the user's data, summarise what you did briefly and concretely
           dir="auto"
           rows="1"
           bind:value={input}
+          on:paste={_onPaste}
           placeholder={recording ? $_('trace.listening') : $_('trace.ask_placeholder', { values: { name: assistantName } })}
           on:keydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
           disabled={busy}
