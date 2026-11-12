@@ -1,4 +1,5 @@
 import { writable, get, derived } from 'svelte/store';
+import { pickInitialLocale } from '../i18n/index.js';
 import { DB } from '../lib/db.js';
 import { settingPrefix } from '../lib/setting-key.js';
 import { FACTS_COLUMN_DEFAULT } from '../lib/facts-column.js';
@@ -400,7 +401,8 @@ export const biometricLoginEnabled = createSettingStore('biometricLoginEnabled',
 export const forceMobileLayout = createSettingStore('forceMobileLayout', false);
 
 // ── User prefs (server-synced) ─────────────────────────────────────────────
-export const language    = createSettingStore('language',    'en');
+// The browser or phone's own language until one is chosen (nutritrace#323).
+export const language    = createSettingStore('language',    pickInitialLocale());
 export const accentColor = createSettingStore('accentColor', 'mint');
 // Page banners — three styles:
 //   'animated' = tall header with the page's illustrated SVG
