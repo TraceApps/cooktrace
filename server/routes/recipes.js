@@ -1678,17 +1678,23 @@ function _aiConfigForUser(u, req) {
 // then source_url. Returns { id } or null. _saveImportedRecipe skips on
 // a match (dedup 'skip'), and the routes report the match's id so the
 // client can open it instead of a recipe that was never written.
-function _findImportDuplicate(u, parsed) {
+// `excludeIds` (a Set of ids written earlier in the same batch) are
+// ignored, so an archive that itself contains several near-copies —
+// e.g. Paprika user-made copies sharing a name or source URL — doesn't
+// swallow its own entries.
+function _findImportDuplicate(u, parsed, excludeIds) {
+  const excl = excludeIds ? [...excludeIds] : [];
+  const notIn = excl.length ? ` AND id NOT IN (${excl.map(() => '?').join(',')})` : '';
   const lower = String(parsed?.name || '').toLowerCase().trim();
   let existing = lower ? db.prepare(
     `SELECT id FROM recipes
-      WHERE ${_whereUser(u)} AND deleted_at IS NULL AND lower(name) = ? LIMIT 1`
-  ).get(...[..._userArgs(u), lower]) : null;
+      WHERE ${_whereUser(u)} AND deleted_at IS NULL AND lower(name) = ?${notIn} LIMIT 1`
+  ).get(...[..._userArgs(u), lower, ...excl]) : null;
   if (!existing && parsed?.source_url) {
     existing = db.prepare(
       `SELECT id FROM recipes
-        WHERE ${_whereUser(u)} AND deleted_at IS NULL AND source_url = ? LIMIT 1`
-    ).get(...[..._userArgs(u), parsed.source_url]);
+        WHERE ${_whereUser(u)} AND deleted_at IS NULL AND source_url = ?${notIn} LIMIT 1`
+    ).get(...[..._userArgs(u), parsed.source_url, ...excl]);
   }
   return existing || null;
 }
@@ -1710,9 +1716,12 @@ function _saveImportedRecipe(u, parsed, opts = {}) {
     // shape; 'force' creates a duplicate (pre-dedup behaviour). Match
     // is by case-insensitive name first, then by source_url.
     dedup = 'skip',
+    // Recipe ids written earlier in the same import batch — near-copies
+    // inside one archive are not duplicates of each other.
+    excludeIds = null,
   } = opts;
   if (dedup !== 'force' && parsed?.name) {
-    const existing = _findImportDuplicate(u, parsed);
+    const existing = _findImportDuplicate(u, parsed, excludeIds);
     if (existing) {
       if (dedup === 'skip') return null;
       // dedup === 'replace' falls through and gets re-inserted; the
@@ -2072,6 +2081,12 @@ router.post('/import-zip/commit', _zipImportUpload.single('file'), wrap(async (r
   const failed = [];
   const skippedDup = [];
   let timelineImported = 0;
+  // Rows written earlier in this same batch. Archives legitimately hold
+  // several near-copies (e.g. Paprika keeps user-made copies with the
+  // same name or source URL as distinct recipes), so dedup must compare
+  // against what the user had *before* the import, not against entries
+  // from this batch.
+  const createdIds = new Set();
 
   for (let i = 0; i < scanned.length; i++) {
     if (wantedIdx && !wantedIdx.has(i)) continue;
@@ -2090,16 +2105,17 @@ router.post('/import-zip/commit', _zipImportUpload.single('file'), wrap(async (r
       } else if (!importImages) {
         recipe.imgUrl = null;
       }
-      const row = _saveImportedRecipe(u, recipe, { addToPantry, applyTags, importCategories, dedup, creatorUsername });
+      const row = _saveImportedRecipe(u, recipe, { addToPantry, applyTags, importCategories, dedup, creatorUsername, excludeIds: createdIds });
       // Resolve a target recipe_id even when the row was dedup-skipped
       // so timeline events still land on the existing recipe.
       let targetRecipeId = row?.id || null;
       if (!row) {
-        const existing = _findImportDuplicate(u, recipe);
+        const existing = _findImportDuplicate(u, recipe, createdIds);
         targetRecipeId = existing?.id || null;
         skippedDup.push({ idx: i, name: recipe?.name || `(item ${i})`, existing_id: targetRecipeId });
       } else {
         created.push(row);
+        createdIds.add(row.id);
       }
 
       // Mealie timeline events ride along with each recipe entry from
@@ -2221,12 +2237,14 @@ router.post('/import', _importUpload.single('file'), wrap(async (req, res) => {
     catch (e) { return res.status(400).json({ error: e.message }); }
     const created = [];
     const skipped = [];
+    // Same-batch exemption — see the createdIds comment in /import-zip/commit.
+    const createdIds = new Set();
     for (const r of recipes) {
       try {
-        const row = _saveImportedRecipe(u, r, { addToPantry, applyTags, importCategories, creatorUsername });
+        const row = _saveImportedRecipe(u, r, { addToPantry, applyTags, importCategories, creatorUsername, excludeIds: createdIds });
         // null = a duplicate that was skipped, not a recipe written.
-        if (row) created.push(row);
-        else skipped.push({ name: r?.name || '', existing_id: _findImportDuplicate(u, r)?.id || null });
+        if (row) { created.push(row); createdIds.add(row.id); }
+        else skipped.push({ name: r?.name || '', existing_id: _findImportDuplicate(u, r, createdIds)?.id || null });
       } catch (e) {
         // Continue on per-recipe failure — most archives have many.
       }

@@ -471,20 +471,22 @@ function _importPaprika(r) {
   return {
     name: r.name || 'Imported recipe',
     description: r.description || null,
-    imgUrl: r.photo_url || (r.photo ? `data:image/jpeg;base64,${r.photo}` : null),
+    imgUrl: _paprikaImgUrl(r),
     servings: _parseServings(r.servings),
     yield_text: r.servings || null,
     prep_minutes:  _parseMinutes(r.prep_time),
     cook_minutes:  _parseMinutes(r.cook_time),
     rest_minutes:  _parseMinutes(r.rest_time),
     total_minutes: _parseMinutes(r.total_time),
+    // Paprika's 0-5 stars; 0 means unrated, which is null here.
+    rating: r.rating > 0 ? r.rating : null,
     ingredients: items.length ? [{ name: '', items }] : [],
     steps,
     tags: paprikaCats.slice(1, 13),
     tools: [],
     nutrition: {},
     source_url: r.source_url || r.source || null,
-    notes: r.notes || null,
+    notes: _paprikaNotes(r),
     category_name: categoryName,
     // Paprika stores recipe creation timestamp in `created`; older
     // exports used `dateAdded`. Pulling this lets the save flow
@@ -681,6 +683,25 @@ function _parseImportedCreatedAt(raw) {
   return d.toISOString().replace('T', ' ').slice(0, 19);
 }
 
+// Paprika's photo fields: `photo` is only the embedded filename, the
+// bytes live in `photo_data` (base64 JPEG) or `photos[0].data`;
+// `photo_url` / `image_url` are remote URLs on the source site. Prefer
+// the embedded bytes — the save flow turns data URLs into real files —
+// and fall back to a remote URL only when nothing was embedded.
+function _paprikaImgUrl(r) {
+  const b64 = r.photo_data || r.photos?.[0]?.data;
+  if (b64) return `data:image/jpeg;base64,${b64}`;
+  return r.photo_url || r.image_url || null;
+}
+// Paprika's `nutritional_info` is a free-text blob with no structured
+// equivalent here; append it to notes so it survives the import
+// instead of being dropped.
+function _paprikaNotes(r) {
+  const nutrition = String(r.nutritional_info || '').trim();
+  if (!nutrition) return r.notes || null;
+  const label = `Nutrition (from Paprika):\n${nutrition}`;
+  return r.notes ? `${r.notes}\n\n${label}` : label;
+}
 function _parseServings(s) {
   if (s == null) return null;
   const m = String(s).match(/(\d+)/);
