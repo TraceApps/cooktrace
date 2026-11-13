@@ -478,6 +478,8 @@ function _importPaprika(r) {
     cook_minutes:  _parseMinutes(r.cook_time),
     rest_minutes:  _parseMinutes(r.rest_time),
     total_minutes: _parseMinutes(r.total_time),
+    // Paprika's 0-5 stars; 0 means unrated, which is null here.
+    rating: r.rating > 0 ? r.rating : null,
     ingredients: items.length ? [{ name: '', items }] : [],
     steps,
     tags: paprikaCats.slice(1, 13),

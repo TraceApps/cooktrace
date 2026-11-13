@@ -79,6 +79,16 @@ test('importPaprikaArchive (the /import path) reads the same fields', async () =
   assert.ok(recipes.every(r => r.imgUrl === `data:image/jpeg;base64,${PHOTO_B64}`));
 });
 
+test('a Paprika rating survives import (0 means unrated)', async () => {
+  const out = await scanLoadedZip(await loadRecipeZip(await paprikaArchive([
+    ['a.paprikarecipe', paprikaRecipe({ rating: 4 })],
+    ['b.paprikarecipe', paprikaRecipe({ name: 'Unrated', rating: 0 })],
+  ])));
+  const byName = Object.fromEntries(out.map(o => [o.recipe.name, o.recipe]));
+  assert.equal(byName['Lentil Soup'].rating, 4);
+  assert.equal(byName['Unrated'].rating, null);
+});
+
 test('the client-side importer copy builds the same data URL', () => {
   const client = read('src/lib/recipe-importers-client.js');
   assert.match(client, /function _paprikaImgUrl\(r\)/);

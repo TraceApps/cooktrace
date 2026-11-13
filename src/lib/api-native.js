@@ -2013,6 +2013,8 @@ function _importedToRecipePayload(r) {
     description: r.description ?? null,
     img_url: r.imgUrl ?? r.img_url ?? null,
     servings: r.servings ?? 2,
+    // Paprika's 0-5 stars (0 = unrated) travels with the payload now.
+    rating: r.rating > 0 ? r.rating : null,
     yield_text: r.yield_text ?? null,
     prep_minutes:  r.prep_minutes  ?? null,
     cook_minutes:  r.cook_minutes  ?? null,
