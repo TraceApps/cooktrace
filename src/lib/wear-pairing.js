@@ -5,7 +5,8 @@
  * an aisle with no phone signal. It needs the server address and a token for
  * the signed-in account, and there is no keyboard on a watch worth typing
  * either into. The phone writes both into the Wearable Data Layer when you
- * sign in, and takes them away when you sign out.
+ * sign in, and takes them away when you sign out. In Local mode there is no
+ * server: the watch asks this phone instead (watch-relay.js).
  *
  * Pressing Cook sends the recipe over the same channel, along with what has
  * been ticked off it. Either device can tick, so each write carries a stamp
@@ -14,9 +15,12 @@
  * Android only, and only when a watch is actually paired with this phone.
  */
 import { registerPlugin } from '@capacitor/core';
-import { isNative, getServerUrl, getAuthToken } from './platform.js';
+import { get } from 'svelte/store';
+import { _ } from 'svelte-i18n';
+import { isNative, getServerUrl, getAuthToken, getNativeMode } from './platform.js';
 import { APP_VERSION } from './version.js';
 import { mirroredConfirmation } from './plain-http.js';
+import { PHONE_ADDRESS, answerWatchRequest } from './watch-relay.js';
 
 // Registered at module level: a plugin proxy returned from an async function
 // confuses Capacitor's promise handling.
@@ -33,6 +37,20 @@ export async function hasWatch() {
   }
 }
 
+/** Local mode: no server, so the watch asks this phone (watch-relay.js). */
+export function isLocalMode() {
+  return isNative && getNativeMode() === 'local' && !getServerUrl();
+}
+
+/**
+ * The id the watch knows a cook's recipe by. With a server, the server's,
+ * since the watch fetches it from there; in Local mode this phone's own,
+ * since the watch asks this phone. Zero: nothing the watch could fetch.
+ */
+export function watchRecipeId(cook) {
+  return Number(isLocalMode() ? cook?.localId : cook?.serverId) || 0;
+}
+
 /**
  * Send the current server and token to the watch. Safe to call often: the
  * write carries a timestamp, so a refreshed token still reaches the watch.
@@ -41,11 +59,11 @@ export async function pairWatch() {
   if (!isNative) return false;
   const serverUrl = getServerUrl();
   const token = getAuthToken();
-  // Local-only mode keeps everything on the phone, so there is no address for
-  // the watch to call and nothing to pair. Say which of these it is: a watch
-  // stuck on "pair from your phone" is otherwise a mystery from both ends,
-  // and this line is the only thing that can tell you why.
-  if (!serverUrl || !token) {
+  const local = isLocalMode();
+  // Signed out of a server: nothing to hand over. Say which of these it is: a
+  // watch stuck on "pair from your phone" is otherwise a mystery from both
+  // ends, and this line is the only thing that can tell you why.
+  if (!local && (!serverUrl || !token)) {
     console.warn('[wear] not pairing:', serverUrl ? 'signed in on this device but no token' : 'no server connected');
     return false;
   }
@@ -58,7 +76,9 @@ export async function pairWatch() {
     // httpOk: the server again when it is plain http:// on your own network
     // and you said Connect Anyway to it; the watch uses plain HTTP only then
     // (LocalAddress.kt, from TraceApps/nutritrace#194).
-    await WearPairing.pair({ serverUrl, token, appVersion: APP_VERSION, httpOk: mirroredConfirmation(serverUrl) });
+    // In Local mode the watch is told to ask this phone instead (watch-relay.js).
+    if (local) await WearPairing.pair({ serverUrl: PHONE_ADDRESS, token: 'local', appVersion: APP_VERSION, httpOk: '' });
+    else await WearPairing.pair({ serverUrl, token, appVersion: APP_VERSION, httpOk: mirroredConfirmation(serverUrl) });
     console.info('[wear] paired with the watch');
     return true;
   } catch (e) {
@@ -83,6 +103,9 @@ export async function publishCooks(cooks, at = 0) {
         steps: Array.from(c.steps || []).map(Number).filter(Number.isFinite),
         ingredients: Array.from(c.ingredients || []).map(String),
       })).filter(c => c.serverRecipeId > 0),
+      // Which ids these are: the phone's own (Local mode) or the server's. A
+      // record from before a switch then never points at the wrong recipe.
+      local: isLocalMode(),
       at: at || Date.now(),
     });
     return true;
@@ -103,6 +126,8 @@ export async function readCooks(mine = 0) {
     const remote = await WearPairing.readCooks();
     if (!remote?.found) return undefined;
     if (Number(remote.at || 0) <= mine) return undefined;
+    // Said in the other mode (before a switch): its ids aren't this mode's.
+    if (!!remote.local !== isLocalMode()) return undefined;
     return (remote.cooks || []).map(c => ({
       serverRecipeId: Number(c.serverRecipeId) || 0,
       name: String(c.name || ''),
@@ -161,6 +186,46 @@ export async function readTimers(mine = 0) {
   } catch {
     return undefined;
   }
+}
+
+let _serving = false;
+
+/**
+ * Answer the watch's requests in Local mode (watch-relay.js). Listening in
+ * any native mode costs nothing: a phone connected to a server answers that
+ * the watch should pair again, which it does with the server's address.
+ */
+export function serveWatch() {
+  if (!isNative || _serving) return;
+  _serving = true;
+  try {
+    WearPairing.addListener('watchRequest', async (req) => {
+      let out;
+      try {
+        const { CtApiNative } = await import('./api-native.js');
+        out = await answerWatchRequest(req, { localMode: isLocalMode(), api: CtApiNative });
+      } catch (e) {
+        out = { status: 500, body: JSON.stringify({ error: e?.message || 'The phone could not answer' }) };
+      }
+      try { await WearPairing.answer({ id: String(req?.id || ''), status: out.status, body: out.body }); } catch { /* the watch gave up */ }
+      // The pages on show read again, as after a sync (sync-refresh.js).
+      if (out.changed) {
+        try { window.dispatchEvent(new CustomEvent('ct:sync-complete', { detail: { ok: true, changed: 1, kinds: out.changed } })); } catch { /* no window */ }
+      }
+    });
+  } catch { /* no watch here */ }
+}
+
+/**
+ * Keep the app awake for the watch while it's off screen (on), or not (off).
+ * Local mode only, and only with a watch connected or used lately.
+ */
+export async function keepAwakeForWatch(on) {
+  if (!isNative) return;
+  try {
+    if (on && isLocalMode()) await WearPairing.keepAwake({ on: true, title: 'CookTrace', text: get(_)('watch.keep_awake_text') });
+    else await WearPairing.keepAwake({ on: false });
+  } catch { /* no watch here */ }
 }
 
 /** Signed out: the watch shouldn't keep a working token. */

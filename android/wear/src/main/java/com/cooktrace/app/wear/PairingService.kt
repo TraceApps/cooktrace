@@ -16,7 +16,8 @@ import com.google.android.gms.wearable.WearableListenerService
 class PairingService : WearableListenerService() {
 
     override fun onDataChanged(events: DataEventBuffer) {
-        for (event in events) {
+        // The pairing first: which ids a cook holds depends on the mode it set.
+        for (event in events.sortedBy { if (it.dataItem.uri.path.orEmpty().startsWith(PATH)) 0 else 1 }) {
             val path = event.dataItem.uri.path ?: continue
             if (path.startsWith(COOK_PATH)) {
                 // The end of a cook arrives as a dated record saying so,

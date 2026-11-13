@@ -1,7 +1,13 @@
 package com.cooktrace.app.wear
 
+import android.content.Context
+import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import okhttp3.ConnectionSpec
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -22,6 +28,12 @@ import java.util.concurrent.TimeUnit
 object CookApi {
 
     class ApiError(message: String, val code: Int) : Exception(message)
+
+    /** Local mode: the phone couldn't answer (out of reach, or its app closed). What was ticked waits. */
+    class PhoneUnavailable(message: String) : IOException(message)
+
+    /** Where Local mode asks the phone (WearPairingPlugin.API_PATH). */
+    private const val PHONE_API = "/cooktrace/api"
 
     private val JSON = "application/json; charset=utf-8".toMediaType()
 
@@ -44,24 +56,24 @@ object CookApi {
         .build()
 
     /** Everything on the list, the server's own order: aisle, then name. */
-    suspend fun list(cfg: Pairing.Config): String = send(cfg, "GET", "/api/shopping", null)
+    suspend fun list(ctx: Context, cfg: Pairing.Config): String = send(ctx, cfg, "GET", "/api/shopping", null)
 
     /** One recipe, for the cook the phone handed over. */
-    suspend fun recipe(cfg: Pairing.Config, id: Long): String = send(cfg, "GET", "/api/recipes/$id", null)
+    suspend fun recipe(ctx: Context, cfg: Pairing.Config, id: Long): String = send(ctx, cfg, "GET", "/api/recipes/$id", null)
 
     /** Into the basket, or back out of it. */
-    suspend fun check(cfg: Pairing.Config, id: Long, checked: Boolean): String =
-        send(cfg, "PATCH", "/api/shopping/$id/check", JSONObject().put("checked", checked))
+    suspend fun check(ctx: Context, cfg: Pairing.Config, id: Long, checked: Boolean): String =
+        send(ctx, cfg, "PATCH", "/api/shopping/$id/check", JSONObject().put("checked", checked))
 
     /** Cooked, on a date, which is what the cook diary is. */
-    suspend fun cooked(cfg: Pairing.Config, recipeId: Long, date: String): String =
+    suspend fun cooked(ctx: Context, cfg: Pairing.Config, recipeId: Long, date: String): String =
         send(
-            cfg, "POST", "/api/cook-diary",
+            ctx, cfg, "POST", "/api/cook-diary",
             JSONObject().put("recipe_id", recipeId).put("date", date).put("kind", "cooked"),
         )
 
-    private suspend fun send(cfg: Pairing.Config, method: String, path: String, body: JSONObject?): String =
-        withContext(Dispatchers.IO) {
+    private suspend fun send(ctx: Context, cfg: Pairing.Config, method: String, path: String, body: JSONObject?): String =
+        if (cfg.viaPhone) askPhone(ctx, method, path, body) else withContext(Dispatchers.IO) {
             // https:// as saved; plain http:// only to a server on your own
             // network that the phone confirmed (LocalAddress.workerBase).
             // Refused, it fails like no connection.
@@ -89,4 +101,50 @@ object CookApi {
                 text
             }
         }
+
+    /**
+     * Local mode: the same request, answered by the phone's app over the Wear
+     * connection instead of by a server. A failure here is like no
+     * connection: what was ticked waits, and the watch says why.
+     */
+    private suspend fun askPhone(ctx: Context, method: String, path: String, body: JSONObject?): String {
+        val nodes = try {
+            Wearable.getNodeClient(ctx).connectedNodes.await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw PhoneUnavailable("Phone not nearby")
+        }
+        val phone = nodes.firstOrNull { it.isNearby } ?: nodes.firstOrNull() ?: throw PhoneUnavailable("Phone not nearby")
+        val request = JSONObject().put("method", method).put("path", path).put("body", body?.toString() ?: JSONObject.NULL)
+        val answer = try {
+            withTimeout(25_000) {
+                Wearable.getMessageClient(ctx).sendRequest(phone.id, PHONE_API, request.toString().toByteArray(Charsets.UTF_8)).await()
+            }
+        } catch (e: TimeoutCancellationException) {
+            throw PhoneUnavailable("Open CookTrace on your phone")
+        } catch (e: CancellationException) {
+            // The screen closed: nothing to say.
+            throw e
+        } catch (e: Exception) {
+            // No one listening on the phone: its app isn't running.
+            throw PhoneUnavailable("Open CookTrace on your phone")
+        }
+        return readPhoneAnswer(answer)
+    }
+
+    /** The phone's reply ({status, body}, WearPairingPlugin.reply): the body, or why not. */
+    fun readPhoneAnswer(answer: ByteArray): String {
+        val reply = runCatching { JSONObject(String(answer, Charsets.UTF_8)) }.getOrNull()
+            ?: throw PhoneUnavailable("Open CookTrace on your phone")
+        val status = reply.optInt("status", 500)
+        val text = reply.optString("body", "")
+        // The app not ready yet, or too slow: what was ticked waits, as offline.
+        if (status == 503 || status == 504) throw PhoneUnavailable("Open CookTrace on your phone")
+        if (status !in 200..299) {
+            val message = runCatching { JSONObject(text).optString("error") }.getOrNull()
+            throw ApiError(message?.ifBlank { "Phone error $status" } ?: "Phone error $status", status)
+        }
+        return text
+    }
 }

@@ -32,7 +32,16 @@ object Pairing {
      * TraceApps/nutritrace#194); empty otherwise. The API sends over plain
      * HTTP only when it matches (LocalAddress.workerBase).
      */
-    data class Config(val serverUrl: String, val token: String, val httpOk: String = "")
+    data class Config(val serverUrl: String, val token: String, val httpOk: String = "") {
+        /** The phone is in Local mode: ask it, not a server. */
+        val viaPhone: Boolean get() = serverUrl == PHONE
+    }
+
+    /** The address a phone in Local mode gives instead of a server's (watch-relay.js). */
+    const val PHONE = "phone:"
+
+    /** Set by a watch that knows Local mode when it saves the phone's address. */
+    private const val KEY_VIA_PHONE = "via_phone"
 
     private const val TAG = "CookTraceWear"
     private const val PREFS = "cooktrace.wear"
@@ -87,13 +96,15 @@ object Pairing {
         return try {
             val items = Wearable.getDataClient(ctx).getDataItems().await()
             var found: Config? = null
+            val cookItems = ArrayList<DataMap>()
             val timerItems = ArrayList<DataMap>()
             for (item in items) {
                 val path = item.uri.path.orEmpty()
                 if (path.startsWith(PairingService.COOK_PATH)) {
                     // putCooks ignores anything older than what is known, so
-                    // the newest wins whatever order these arrive in.
-                    putCooks(ctx, DataMapItem.fromDataItem(item).dataMap)
+                    // the newest wins whatever order these arrive in. After
+                    // the pairing: which ids it holds depends on the mode.
+                    cookItems.add(DataMapItem.fromDataItem(item).dataMap)
                     continue
                 }
                 if (path.startsWith(PairingService.TIMER_PATH)) {
@@ -114,6 +125,7 @@ object Pairing {
                 found = Config(url.trimEnd('/'), token, httpOk)
             }
             items.release()
+            cookItems.forEach { putCooks(ctx, it) }
             timerItems.forEach { adoptTimers(ctx, it) }
             found ?: existing
         } catch (e: Exception) {
@@ -131,12 +143,21 @@ object Pairing {
         val p = prefs(ctx)
         val before = accountOf(p.getString(KEY_TOKEN, null) ?: p.getString(KEY_REFUSED, null))
         val now = accountOf(token)
-        if (before != null && now != null && before != now) {
-            Log.i(TAG, "paired with another account: what the previous one left here is cleared")
+        // A phone switched between a server and Local mode: what was kept and
+        // ticked here belongs to the other one, and its ids mean other things.
+        val wasUrl = p.getString(KEY_URL, null)?.takeIf { it.isNotBlank() }
+        val viaPhone = serverUrl.trim() == PHONE
+        // A watch on an older release took the phone's address without
+        // clearing (it didn't know it): what it kept is cleared once, here.
+        val unmarked = viaPhone && wasUrl == PHONE && !p.getBoolean(KEY_VIA_PHONE, false)
+        val switched = wasUrl != null && ((wasUrl == PHONE) != viaPhone || unmarked)
+        if (switched || (before != null && now != null && before != now)) {
+            Log.i(TAG, "paired with another account or mode: what the previous one left here is cleared")
             clear(ctx)
         }
         val edit = prefs(ctx).edit()
             .putString(KEY_URL, serverUrl.trim().trimEnd('/'))
+            .putBoolean(KEY_VIA_PHONE, viaPhone)
             .putString(KEY_TOKEN, token.trim())
             // Only what the phone said with this address: an older phone app says nothing.
             .putString(KEY_HTTP_OK, httpOk)
@@ -198,7 +219,9 @@ object Pairing {
         /**
          * The id YOUR SERVER uses. The phone has two for every recipe, its
          * own and the server's, and only this one means anything here: the
-         * watch fetches the recipe from the server itself.
+         * watch fetches the recipe from the server itself. In Local mode
+         * there is no server and the watch asks the phone, so it is the
+         * phone's own.
          */
         val serverRecipeId: Long,
         val name: String,
@@ -224,6 +247,10 @@ object Pairing {
 
     /** Something the phone (or this watch) said about the cooks. */
     fun putCooks(ctx: Context, map: DataMap) {
+        // Said in the other mode (before a switch): its ids aren't this one's.
+        // An older phone app says nothing, and has only a server.
+        val cfg = config(ctx)
+        if (cfg != null && map.getBoolean("local", false) != cfg.viaPhone) return
         val at = map.getLong("at", 0L)
         if (at > 0 && at < prefs(ctx).getLong(KEY_COOK_AT, 0L)) return
         val arr = JSONArray()
@@ -260,6 +287,7 @@ object Pairing {
             )
         }
         request.dataMap.putDataMapArrayList("cooks", out)
+        request.dataMap.putBoolean("local", config(ctx)?.viaPhone == true)
         request.dataMap.putLong("at", at)
         putCooks(ctx, request.dataMap)
         runCatching {

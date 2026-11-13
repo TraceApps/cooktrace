@@ -4131,5 +4131,8 @@
       "confirmed": "Email confirmed"
     },
     "reset_password_done": "Your password was changed. Two-step sign-in is on for this account, so sign in with your new password and your code."
+  },
+  "watch": {
+    "keep_awake_text": "Your watch is working through this phone"
   }
 }

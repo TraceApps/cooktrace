@@ -68,9 +68,9 @@ test('a timer already gone from both is not resurrected', () => {
 
 test('nothing crosses unless a cook has been handed to the watch', () => {
   const src = readFileSync(new URL('../src/lib/wear-timers.js', import.meta.url), 'utf8');
-  // The gate is a cook with a server id, the same one the cooks themselves
-  // are published under.
-  assert.match(src, /export function sharingTimers\(\)[\s\S]*?c\.serverId > 0/);
+  // The gate is a cook the watch can know (its server id, or in Local mode
+  // the phone's own), the same one the cooks themselves are published under.
+  assert.match(src, /export function sharingTimers\(\)[\s\S]*?watchRecipeId\(c\) > 0/);
   // Both directions are behind it.
   assert.match(src, /const send = \(\) => \{[\s\S]*?if \(!sharingTimers\(\)\) \{/);
   assert.match(src, /export async function hearWatch\(\)[\s\S]*?if \(!isNative \|\| !sharingTimers\(\)\) return;/);

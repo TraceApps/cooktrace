@@ -33,7 +33,7 @@
   import { scaleQty, displayQty, displayQtyParts, parseQty } from '../lib/qty.js';
   import { convertWithinFamily, convertQty, unitFamily } from '../lib/recipe-nutrition.js';
   import { resolveAssetUrl, isNative, getServerUrl, publicRecipeUrl } from '../lib/platform.js';
-  import { publishCooks as _publishCooks, readCooks as _readCooks } from '../lib/wear-pairing.js';
+  import { publishCooks as _publishCooks, readCooks as _readCooks, watchRecipeId } from '../lib/wear-pairing.js';
   import { portal } from '../lib/portal.js';
   import RecipeComments from '../components/recipe/RecipeComments.svelte';
   import KitchenGear from '../components/recipe/KitchenGear.svelte';
@@ -406,9 +406,9 @@
   /** Every cook underway, as the watch needs to see it. */
   function _cooksForWatch() {
     return cookList(get(activeCooks))
-      .filter(c => c.serverId > 0)
+      .filter(c => watchRecipeId(c) > 0)
       .map(c => ({
-        serverRecipeId: c.serverId,
+        serverRecipeId: watchRecipeId(c),
         name: c.name || '',
         steps: [..._loadChecks(c.localId, 'step')],
         ingredients: [..._loadChecks(c.localId, 'ing')],
@@ -445,7 +445,7 @@
       if (!theirs) return;
       const mine = get(activeCooks);
       const byServer = new Map(
-        Object.entries(mine).map(([localId, v]) => [Number(v.serverId), Number(localId)]),
+        Object.entries(mine).map(([localId, v]) => [watchRecipeId({ ...v, localId: Number(localId) }), Number(localId)]),
       );
       const seen = new Set();
       for (const cook of theirs) {

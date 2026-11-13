@@ -49,7 +49,7 @@ class KitchenTileService : TileService() {
         when {
             !paired -> {
                 headline = "Pair from your phone"
-                detail = "Sign in on the phone app"
+                detail = "Open CookTrace on the phone"
             }
             timers.isNotEmpty() -> {
                 val soonest = timers.minByOrNull { it.endsAt }!!

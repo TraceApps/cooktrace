@@ -252,7 +252,7 @@ private fun ShoppingScreen(store: CookStore, nav: NavHostController) {
             ) {
                 Message(
                     title = "Pair from your phone",
-                    body = "Open CookTrace on your phone and sign in. The watch pairs itself.",
+                    body = "Open CookTrace on your phone. The watch pairs itself.",
                 )
             }
             return@ScreenScaffold
@@ -845,8 +845,8 @@ private fun TimerFace(
 private fun StatusLine(state: CookStore.State) {
     val text = when {
         state.error != null -> state.error
-        state.offline && state.pending > 0 -> "Offline, ${state.pending} waiting"
-        state.offline -> "Offline"
+        state.offline && state.pending > 0 -> "${state.offlineWhy ?: "Offline"}, ${state.pending} waiting"
+        state.offline -> state.offlineWhy ?: "Offline"
         state.pending > 0 -> "${state.pending} waiting"
         else -> ""
     }

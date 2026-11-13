@@ -101,13 +101,20 @@ test('the watch is given server ids only, and only for cooks that have one', () 
   assert.match(pick, /if \(!isNative\) return id;/);
   assert.match(pick, /Number\(recipe\.server_id\) \|\| 0/);
   const build = source.slice(source.indexOf('function _cooksForWatch'), source.indexOf('function _tellWatch'));
-  assert.match(build, /filter\(c => c\.serverId > 0\)/);
-  assert.match(build, /serverRecipeId: c\.serverId/);
+  assert.match(build, /filter\(c => watchRecipeId\(c\) > 0\)/);
+  assert.match(build, /serverRecipeId: watchRecipeId\(c\)/);
+  // With a server, the server's id; in Local mode the phone's own, since the
+  // watch then asks this phone (watch-relay.js), and the cooks say which.
+  const pairing = readFileSync(new URL('../src/lib/wear-pairing.js', import.meta.url), 'utf8');
+  assert.match(pairing, /export function watchRecipeId\(cook\) \{\s*return Number\(isLocalMode\(\) \? cook\?\.localId : cook\?\.serverId\) \|\| 0;/);
+  assert.match(pairing, /local: isLocalMode\(\),/);
+  assert.match(pairing, /if \(!!remote\.local !== isLocalMode\(\)\) return undefined;/);
 });
 
 test('what comes back from the watch is matched by server id', () => {
   const hear = source.slice(source.indexOf('async function _hearWatch'));
   assert.match(hear.slice(0, 1200), /byServer\.get\(Number\(cook\.serverRecipeId\)\)/);
+  assert.match(hear.slice(0, 1200), /\[watchRecipeId\(\{ \.\.\.v, localId: Number\(localId\) \}\), Number\(localId\)\]/);
   // A dish the watch finished is finished here too.
   assert.match(hear.slice(0, 1200), /endCook\(localId\)/);
 });

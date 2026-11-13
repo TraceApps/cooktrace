@@ -27,6 +27,8 @@ class CookStore(private val ctx: Context) {
         val paired: Boolean = false,
         val loading: Boolean = false,
         val offline: Boolean = false,
+        /** Local mode: why the phone couldn't answer, said instead of "Offline". */
+        val offlineWhy: String? = null,
         val error: String? = null,
         val pending: Int = 0,
         /** A word about what just happened, shown for a moment. */
@@ -63,8 +65,13 @@ class CookStore(private val ctx: Context) {
         when (key) {
             Pairing.KEY_COOK -> _state.update { it.copy(cooks = Pairing.cooks(ctx)) }
             Pairing.KEY_TIMERS -> _state.update { it.copy(timers = Pairing.timers(ctx)) }
-            Pairing.KEY_URL, Pairing.KEY_TOKEN ->
+            // Paired again: what's on screen is redrawn from what's kept, which
+            // a switch of account or mode cleared (a recipe id then means
+            // another recipe).
+            Pairing.KEY_URL, Pairing.KEY_TOKEN -> {
+                restore()
                 _state.update { it.copy(paired = Pairing.config(ctx) != null) }
+            }
         }
     }
 
@@ -99,7 +106,7 @@ class CookStore(private val ctx: Context) {
         _state.update { it.copy(paired = true, loading = !quiet, error = null) }
         flush(cfg)
         try {
-            val body = CookApi.list(cfg)
+            val body = CookApi.list(ctx, cfg)
             Pairing.putList(ctx, body)
             val waiting = Pairing.outbox(ctx)
             // Anything still waiting is the watch's own and newer than what
@@ -112,7 +119,7 @@ class CookStore(private val ctx: Context) {
             readRecipes(cfg)
             _state.update {
                 it.copy(
-                    loading = false, offline = false, error = null,
+                    loading = false, offline = false, offlineWhy = null, error = null,
                     items = shown, pending = waiting.size,
                 )
             }
@@ -141,7 +148,7 @@ class CookStore(private val ctx: Context) {
         for (cook in cooks) {
             if (have.containsKey(cook.serverRecipeId)) continue
             runCatching {
-                val body = CookApi.recipe(cfg, cook.serverRecipeId)
+                val body = CookApi.recipe(ctx, cfg, cook.serverRecipeId)
                 Pairing.putRecipe(ctx, cook.serverRecipeId, body)
                 Kitchen.recipe(body)?.let { have[cook.serverRecipeId] = it }
             }
@@ -315,8 +322,8 @@ class CookStore(private val ctx: Context) {
         try {
             for (op in waiting) {
                 when (op.kind) {
-                    Pairing.Op.CHECK -> CookApi.check(cfg, op.itemId, op.checked)
-                    Pairing.Op.COOKED -> CookApi.cooked(cfg, op.recipeId, op.date)
+                    Pairing.Op.CHECK -> CookApi.check(ctx, cfg, op.itemId, op.checked)
+                    Pairing.Op.COOKED -> CookApi.cooked(ctx, cfg, op.recipeId, op.date)
                     else -> {}
                 }
                 sent.add(op)
@@ -329,7 +336,7 @@ class CookStore(private val ctx: Context) {
         // Only what actually went up comes off the queue. Anything ticked
         // while this was in the air is a later entry and stays.
         forget(sent)
-        _state.update { it.copy(pending = Pairing.outbox(ctx).size, offline = false, error = null) }
+        _state.update { it.copy(pending = Pairing.outbox(ctx).size, offline = false, offlineWhy = null, error = null) }
         return true
     }
 
@@ -358,6 +365,7 @@ class CookStore(private val ctx: Context) {
             it.copy(
                 loading = false,
                 offline = offline,
+                offlineWhy = (e as? CookApi.PhoneUnavailable)?.message,
                 error = if (offline || quiet) null else (e.message ?: "Couldn't reach CookTrace"),
             )
         }

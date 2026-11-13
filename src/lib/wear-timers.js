@@ -18,13 +18,13 @@ import { get } from 'svelte/store';
 import { isNative } from './platform.js';
 import { cookTimers, adoptTimers } from '../stores/cookTimers.js';
 import { activeCooks, cookList } from '../stores/cooks.js';
-import { publishTimers, readTimers } from './wear-pairing.js';
+import { publishTimers, readTimers, watchRecipeId } from './wear-pairing.js';
 
 const STAMP = 'ct:timersat';
 
 /** Is there a cook on the watch to share a clock with? */
 export function sharingTimers() {
-  return cookList(get(activeCooks)).some(c => c.serverId > 0);
+  return cookList(get(activeCooks)).some(c => watchRecipeId(c) > 0);
 }
 
 function stamp() {
