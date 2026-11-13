@@ -1922,25 +1922,24 @@ export const NtApiNative = CtApiNative;
  */
 async function _findImportDuplicateLocal(r, excludeIds) {
   // The recipe an import would duplicate: case-insensitive name first,
-  // then source_url. Mirrors the server's _findImportDuplicate —
-  // including its excludeIds: ids written earlier in the same import
-  // batch don't count, so an archive containing several near-copies
-  // (Paprika user-made copies share a name or source URL) doesn't
-  // swallow its own entries.
-  const excl = excludeIds ? [...excludeIds] : [];
-  const notIn = excl.length ? ` AND id NOT IN (${excl.map(() => '?').join(',')})` : '';
+  // then source_url. Mirrors the server's _findImportDuplicate, including
+  // its excludeIds: ids written earlier in the same import batch match by
+  // name only, never by source_url (Paprika's "[copy]" entries and
+  // different recipes from one page share a link).
   const lower = String(r?.name || '').toLowerCase().trim();
   let existing = lower ? (await _query(
     `SELECT id, name, source_url FROM recipes
-      WHERE user_id = ? AND deleted_at IS NULL AND LOWER(name) = ?${notIn} LIMIT 1`,
-    [LOCAL_USER_ID, lower, ...excl]
+      WHERE user_id = ? AND deleted_at IS NULL AND LOWER(name) = ? LIMIT 1`,
+    [LOCAL_USER_ID, lower]
   ))[0] : null;
   if (!existing && r?.source_url) {
+    // Filtered here, not in the query: a big archive's ids would pass the
+    // database's limit on query parameters (999 on some phones).
     existing = (await _query(
       `SELECT id, name, source_url FROM recipes
-        WHERE user_id = ? AND deleted_at IS NULL AND source_url = ?${notIn} LIMIT 1`,
-      [LOCAL_USER_ID, r.source_url, ...excl]
-    ))[0];
+        WHERE user_id = ? AND deleted_at IS NULL AND source_url = ? ORDER BY id`,
+      [LOCAL_USER_ID, r.source_url]
+    )).find(x => !excludeIds?.has(x.id)) || null;
   }
   return existing || null;
 }
@@ -1953,10 +1952,19 @@ async function _localizeImportedImage(api, url) {
   if (typeof url !== 'string' || !url.startsWith('data:image/')) return url;
   try {
     const comma = url.indexOf(',');
-    const mime = url.slice(5, comma).split(';')[0].toLowerCase() || 'image/jpeg';
-    const ext = mime === 'image/jpeg' ? 'jpg' : mime.replace('image/', '');
     const bytes = Uint8Array.from(atob(url.slice(comma + 1)), c => c.charCodeAt(0));
-    return await api.uploadImage(new File([bytes], `imported.${ext}`, { type: mime }));
+    // As the server's localizeDataUrl: at most 12 MB, and a real picture
+    // by its first bytes (JPEG, PNG, GIF, WebP), whatever the label says.
+    if (bytes.length > 12 * 1024 * 1024) return null;
+    const b = i => bytes[i];
+    const type = b(0) === 0xff && b(1) === 0xd8 && b(2) === 0xff ? 'jpeg'
+      : b(0) === 0x89 && b(1) === 0x50 && b(2) === 0x4e && b(3) === 0x47 ? 'png'
+      : b(0) === 0x47 && b(1) === 0x49 && b(2) === 0x46 ? 'gif'
+      : b(0) === 0x52 && b(1) === 0x49 && b(2) === 0x46 && b(3) === 0x46 && b(8) === 0x57 && b(9) === 0x45 && b(10) === 0x42 && b(11) === 0x50 ? 'webp'
+      : null;
+    if (!type) return null;
+    const ext = type === 'jpeg' ? 'jpg' : type;
+    return await api.uploadImage(new File([bytes], `imported.${ext}`, { type: `image/${type}` }));
   } catch {
     return null;
   }
@@ -2050,6 +2058,9 @@ function _importedToRecipePayload(r) {
     source_url: r.source_url ?? null,
     video_url: r.video_url ?? null,
     notes: r.notes ?? null,
+    // A rating the source kept (Paprika's stars, #97), as the server takes
+    // it. Only when there is one: a Replace keeps the stars you gave.
+    ...(r.rating != null ? { rating: r.rating } : {}),
   };
 }
 

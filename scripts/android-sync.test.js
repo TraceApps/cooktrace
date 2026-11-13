@@ -533,6 +533,35 @@ test('a favorite on a flat-stored recipe on the phone keeps the web\'s newer ing
   } finally { srv.stop(); }
 });
 
+test('a Paprika archive imported on a phone with no server keeps photos, ratings and nutrition (#97)', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const JSZip = createRequire(new URL('../package.json', import.meta.url))('jszip');
+  const { gzipSync } = await import('node:zlib');
+  const PHOTO = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAMABADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAABf/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AJACzr//2Q==';
+  const rec = (name, over = {}) => ({ name, ingredients: '1 cup lentils', directions: 'Boil.', photo: 'x.jpg', ...over });
+  const z = new JSZip();
+  [
+    rec('Lentil Soup', { photo_data: PHOTO, rating: 4, nutritional_info: 'Calories: 210', source_url: 'https://example.com/lentil' }),
+    rec('Lentil Soup [copy]', { photo_data: PHOTO, rating: 0, source_url: 'https://example.com/lentil' }),
+    rec('Pea Soup', { source_url: 'https://example.com/soups', photos: [{ data: PHOTO }] }),
+    rec('Bean Soup', { source_url: 'https://example.com/soups', image_url: 'https://example.com/bean.jpg' }),
+    rec('Twice Bread', { rating: 5 }),
+    rec('twice bread', { rating: 2 }),
+    rec('Old Favorite Remix', { source_url: 'https://example.com/old' }),
+    rec('Bad Photo', { photo_data: Buffer.from('not a picture at all').toString('base64') }),
+  ].forEach((r, i) => z.file(`${i}.paprikarecipe`, gzipSync(Buffer.from(JSON.stringify(r)))));
+  const zip = (await z.generateAsync({ type: 'nodebuffer' })).toString('base64');
+  const r = await run('paprikaLocal', { PAPRIKA_ZIP_B64: zip });
+  assert.deepEqual(r.skipped, ['Old Favorite Remix', 'twice bread']);
+  assert.deepEqual(Object.keys(r.recipes).sort(), ['Bad Photo', 'Bean Soup', 'Lentil Soup', 'Lentil Soup [copy]', 'Old Favorite', 'Pea Soup', 'Twice Bread']);
+  assert.equal(r.recipes['Bad Photo'].img, null, 'what isn\'t a picture is left out, the recipe still imports');
+  for (const n of ['Lentil Soup', 'Lentil Soup [copy]', 'Pea Soup']) assert.equal(r.recipes[n].img, PHOTO, `${n}: the photo stored as a file`);
+  assert.equal(r.recipes['Bean Soup'].img, 'https://example.com/bean.jpg');
+  assert.equal(r.recipes['Lentil Soup'].rating, 4);
+  assert.equal(r.recipes['Lentil Soup [copy]'].rating, null);
+  assert.equal(r.recipes['Twice Bread'].rating, 5);
+  assert.match(r.recipes['Lentil Soup'].notes, /Nutrition \(from Paprika\):\s*Calories: 210/);
+});
+
 test('Upload sends every link as the server\'s id, and the phone keeps its links after the first pull', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const r = await run('uploadLinks');
   assert.deepEqual(r.errors, []);

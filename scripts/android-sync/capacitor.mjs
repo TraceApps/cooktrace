@@ -1,5 +1,7 @@
 // The Capacitor plugins the sync code touches.
-export const Filesystem = { readdir: async () => ({ files: [] }), stat: async () => { throw new Error('none'); }, readFile: async () => { throw new Error('none'); }, writeFile: async () => ({}), mkdir: async () => ({}), deleteFile: async () => ({}) };
+// Files written are kept in memory (phoneFiles), so a scenario can read them back.
+export const phoneFiles = new Map();
+export const Filesystem = { readdir: async () => ({ files: [] }), stat: async () => { throw new Error('none'); }, readFile: async () => { throw new Error('none'); }, writeFile: async ({ path, data }) => { phoneFiles.set(path, data); return {}; }, getUri: async ({ path }) => ({ uri: `file:///data/${path}` }), mkdir: async () => ({}), deleteFile: async () => ({}) };
 export const Directory = { Data: 'DATA', Cache: 'CACHE', Documents: 'DOCUMENTS' };
 export const Capacitor = { isNativePlatform: () => true, convertFileSrc: x => x, getPlatform: () => 'android', isPluginAvailable: () => false };
 export const Network = { getStatus: async () => ({ connected: true, connectionType: 'wifi' }), addListener: async () => ({ remove() {} }) };

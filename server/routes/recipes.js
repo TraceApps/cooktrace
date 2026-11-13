@@ -1678,23 +1678,23 @@ function _aiConfigForUser(u, req) {
 // then source_url. Returns { id } or null. _saveImportedRecipe skips on
 // a match (dedup 'skip'), and the routes report the match's id so the
 // client can open it instead of a recipe that was never written.
-// `excludeIds` (a Set of ids written earlier in the same batch) are
-// ignored, so an archive that itself contains several near-copies —
-// e.g. Paprika user-made copies sharing a name or source URL — doesn't
-// swallow its own entries.
+// `excludeIds` (a Set of ids written earlier in the same batch) match by
+// name only, never by source_url: an archive holds Paprika's "[copy]"
+// entries and different recipes from one page under the same link, but a
+// recipe that's in it twice under the same name still imports once.
 function _findImportDuplicate(u, parsed, excludeIds) {
-  const excl = excludeIds ? [...excludeIds] : [];
-  const notIn = excl.length ? ` AND id NOT IN (${excl.map(() => '?').join(',')})` : '';
   const lower = String(parsed?.name || '').toLowerCase().trim();
   let existing = lower ? db.prepare(
     `SELECT id FROM recipes
-      WHERE ${_whereUser(u)} AND deleted_at IS NULL AND lower(name) = ?${notIn} LIMIT 1`
-  ).get(...[..._userArgs(u), lower, ...excl]) : null;
+      WHERE ${_whereUser(u)} AND deleted_at IS NULL AND lower(name) = ? LIMIT 1`
+  ).get(...[..._userArgs(u), lower]) : null;
   if (!existing && parsed?.source_url) {
+    // Filtered here, not in the query: a big archive's ids would pass the
+    // database's limit on query parameters.
     existing = db.prepare(
       `SELECT id FROM recipes
-        WHERE ${_whereUser(u)} AND deleted_at IS NULL AND source_url = ?${notIn} LIMIT 1`
-    ).get(...[..._userArgs(u), parsed.source_url, ...excl]);
+        WHERE ${_whereUser(u)} AND deleted_at IS NULL AND source_url = ? ORDER BY id`
+    ).all(...[..._userArgs(u), parsed.source_url]).find(r => !excludeIds?.has(r.id)) || null;
   }
   return existing || null;
 }
@@ -2008,6 +2008,12 @@ router.post('/import-zip/scan', _zipImportUpload.single('file'), wrap(async (req
     } catch { return null; }
   }));
 
+  // A photo embedded in the recipe itself (Paprika, #97) is a data: URL of
+  // the whole picture: sent as the thumbnail only within the same cap, so a
+  // big archive's scan doesn't carry every photo. The commit reads them
+  // from the archive again.
+  const embedded = s => typeof s.recipe.imgUrl === 'string' && s.recipe.imgUrl.startsWith('data:');
+  const embeddedThumb = s => (embedded(s) && s.recipe.imgUrl.length <= Math.ceil(THUMB_BYTE_CAP * 4 / 3) + 64 ? s.recipe.imgUrl : null);
   res.json({
     count: scanned.length,
     uploadId: uploadId || null,
@@ -2016,9 +2022,9 @@ router.post('/import-zip/scan', _zipImportUpload.single('file'), wrap(async (req
       name: s.recipe.name,
       source: s.source,
       source_url: s.recipe.source_url || null,
-      img_url: s.recipe.imgUrl || null,
-      has_image_asset: !!s.imageEntryName,
-      thumb_data_url: thumbs[idx] || null,
+      img_url: embedded(s) ? null : (s.recipe.imgUrl || null),
+      has_image_asset: !!s.imageEntryName || embedded(s),
+      thumb_data_url: thumbs[idx] || embeddedThumb(s),
       ingredient_count: (s.recipe.ingredients || []).reduce((n, g) => n + (g.items?.length || 0), 0),
       step_count: (s.recipe.steps || []).length,
       timelineEventCount: Array.isArray(s.timelineEvents) ? s.timelineEvents.length : 0,

@@ -6,11 +6,11 @@
  * out of the *filename*, so the magic-byte check downstream rejected
  * every picture and Paprika imports arrived imageless.
  *
- * The same archive can also hold several user-made copies of a recipe
- * (same name or same source URL, distinct entries in the app). Dedup
- * must compare against the library the user had *before* the import,
- * not against rows written earlier in the same batch — otherwise three
- * copies import as one and the rest are reported as its "duplicates".
+ * The same archive can also hold user-made copies of a recipe ("[copy]",
+ * the same source URL) and different recipes from one page. Rows written
+ * earlier in the same batch count as duplicates by name only, never by
+ * source URL, so those all import, and a recipe that's in the archive
+ * twice under one name still imports once.
  *
  * Fixtures are trimmed from a real Paprika 3 export (2026-10).
  */
@@ -108,7 +108,8 @@ test('the client-side importer copy builds the same data URL', () => {
 test('server: batch imports dedup against the library, not against the batch', () => {
   const routes = read('server/routes/recipes.js');
   assert.match(routes, /function _findImportDuplicate\(u, parsed, excludeIds\)/);
-  assert.match(routes, /id NOT IN \(\$\{excl\.map/);
+  // Same batch: a duplicate by name only, never by source link (#97).
+  assert.match(routes, /\.find\(r => !excludeIds\?\.has\(r\.id\)\)/);
   assert.match(routes, /_saveImportedRecipe\(u, recipe, \{ addToPantry, applyTags, importCategories, dedup, creatorUsername, excludeIds: createdIds \}\)/);
   assert.match(routes, /_saveImportedRecipe\(u, r, \{ addToPantry, applyTags, importCategories, creatorUsername, excludeIds: createdIds \}\)/);
   assert.equal((routes.match(/createdIds\.add\(row\.id\)/g) || []).length, 2, 'both server batch paths record what they wrote');
@@ -117,7 +118,7 @@ test('server: batch imports dedup against the library, not against the batch', (
 test('local mode: batch imports dedup against the library, not against the batch', () => {
   const native = read('src/lib/api-native.js');
   assert.match(native, /function _findImportDuplicateLocal\(r, excludeIds\)/);
-  assert.match(native, /id NOT IN \(\$\{excl\.map/);
+  assert.match(native, /\.find\(x => !excludeIds\?\.has\(x\.id\)\)/);
   assert.match(native, /_saveImportedRecipeLocal\(this, r, \{ addToPantry, applyTags, excludeIds: createdIds \}\)/);
   assert.match(native, /_saveImportedRecipeLocal\(this, entry\.recipe, \{ addToPantry, applyTags, dedup, excludeIds: createdIds \}\)/);
   assert.equal((native.match(/createdIds\.add\(saved\.id\)/g) || []).length, 2, 'both local batch paths record what they wrote');

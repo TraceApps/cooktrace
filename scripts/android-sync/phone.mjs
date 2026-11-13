@@ -1503,6 +1503,33 @@ const scenarios = {
     out.phone = (await localRecipe(sid)).ingredients.flatMap(g => g.items.map(i => i.name));
   },
 
+  // A Paprika archive imported on a phone with no server (#97): photos
+  // stored as files, ratings and nutrition kept, duplicates inside the
+  // archive by name only.
+  async paprikaLocal() {
+    const la = await import('../../src/lib/local-account.js');
+    process.env.CT_SERVER = ''; signIn(null);
+    await la.setLocalOwner();
+    await api.createRecipe({ name: 'Old Favorite', source_url: 'https://example.com/old', ingredients: [], steps: [] });
+    // The WebView has FileReader; Node doesn't.
+    globalThis.FileReader ??= class {
+      _done(p) { p.then(v => { this.result = v; this.onload?.({ target: this }); this.onloadend?.({ target: this }); }, e => { this.error = e; this.onerror?.(e); }); }
+      readAsDataURL(b) { this._done(b.arrayBuffer().then(a => `data:${b.type || 'application/octet-stream'};base64,${Buffer.from(a).toString('base64')}`)); }
+      readAsArrayBuffer(b) { this._done(b.arrayBuffer()); }
+    };
+    const bytes = Buffer.from(process.env.PAPRIKA_ZIP_B64, 'base64');
+    const file = new File([bytes], 'export.paprikarecipes');
+    const res = await api.importRecipe({ file, addToPantry: false });
+    out.skipped = (res.skipped || []).map(s => s.name).sort();
+    const { phoneFiles } = await import('./capacitor.mjs');
+    out.recipes = {};
+    for (const r of (await db.query(`SELECT name, img_url, rating, notes FROM recipes ORDER BY name`)).values) {
+      const path = r.img_url ? String(r.img_url).replace('file:///data/', '') : null;
+      const img = !r.img_url ? null : r.img_url.startsWith('data:') ? 'data-url' : /^https?:/.test(r.img_url) ? r.img_url : phoneFiles.get(path) ?? 'missing file';
+      out.recipes[r.name] = { img, rating: r.rating, notes: r.notes };
+    }
+  },
+
   // A pull from a server that knows more than this app: what it doesn't
   // know is left out, not stopping the pull.
   async newerServer() {
