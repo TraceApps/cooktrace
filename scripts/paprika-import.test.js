@@ -89,6 +89,16 @@ test('a Paprika rating survives import (0 means unrated)', async () => {
   assert.equal(byName['Unrated'].rating, null);
 });
 
+test("Paprika's nutritional_info rides along in notes instead of being dropped", async () => {
+  const out = await scanLoadedZip(await loadRecipeZip(await paprikaArchive([
+    ['a.paprikarecipe', paprikaRecipe({ notes: 'Family favourite.', nutritional_info: '340 kcal per serving' })],
+    ['b.paprikarecipe', paprikaRecipe({ name: 'Bare', notes: null, nutritional_info: null })],
+  ])));
+  const byName = Object.fromEntries(out.map(o => [o.recipe.name, o.recipe]));
+  assert.equal(byName['Lentil Soup'].notes, 'Family favourite.\n\nNutrition (from Paprika):\n340 kcal per serving');
+  assert.equal(byName['Bare'].notes, null);
+});
+
 test('the client-side importer copy builds the same data URL', () => {
   const client = read('src/lib/recipe-importers-client.js');
   assert.match(client, /function _paprikaImgUrl\(r\)/);

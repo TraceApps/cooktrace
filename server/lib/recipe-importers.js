@@ -829,7 +829,7 @@ function _importPaprika(r) {
     tools: [],
     nutrition: {},
     source_url: r.source_url || r.source || null,
-    notes: r.notes || null,
+    notes: _paprikaNotes(r),
     category_name: categoryName,
     // Paprika stores the recipe creation timestamp in `created` (or
     // older `dateAdded` for legacy exports). Pull this so the imported
@@ -870,6 +870,15 @@ function _paprikaImgUrl(r) {
   const b64 = r.photo_data || r.photos?.[0]?.data;
   if (b64) return `data:image/jpeg;base64,${b64}`;
   return r.photo_url || r.image_url || null;
+}
+// Paprika's `nutritional_info` is a free-text blob with no structured
+// equivalent here; append it to notes so it survives the import
+// instead of being dropped.
+function _paprikaNotes(r) {
+  const nutrition = String(r.nutritional_info || '').trim();
+  if (!nutrition) return r.notes || null;
+  const label = `Nutrition (from Paprika):\n${nutrition}`;
+  return r.notes ? `${r.notes}\n\n${label}` : label;
 }
 function _parseServings(s) {
   if (s == null) return null;
