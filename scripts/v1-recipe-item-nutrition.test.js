@@ -82,6 +82,7 @@ test('v1 recipe items carry nutrition for the recipe amount', { skip: !ready && 
     const byName = new Map(pantry.map((p) => [p.name, p]));
     const items = LINES.map((l) => ({ ...l, pantry_item_id: byName.get(l.name).id }));
     const recipe = await call('POST', '/api/recipes', { name: 'Pancakes', servings: 1, ingredients: [{ group: '', items }] });
+    const blank = await call('POST', '/api/recipes', { name: 'Blank Pancakes', ingredients: [{ group: '', items }] });
     const raw = (await call('POST', '/api/admin/api-tokens', { name: 'nt', scopes: ['read:recipes'], password: PW })).raw;
     token = raw;
     const got = await call('GET', `/api/v1/recipes/${recipe.id}`);
@@ -103,6 +104,13 @@ test('v1 recipe items carry nutrition for the recipe amount', { skip: !ready && 
     assert.deepEqual(it.Salt.basis, { amount: 100, unit: 'g' });
     assert.equal(it.Salt.amount_text, '1 pinch');
     assert.equal(it.Flour.amount_text, undefined);
+
+    // A recipe with no servings goes out as 1, never 0 (#95): NutriTrace
+    // divides and multiplies by it.
+    assert.equal((await call('GET', `/api/v1/recipes/${blank.id}`)).servings, 1);
+    const listed = (await call('GET', '/api/v1/recipes?limit=100')).items;
+    assert.equal(listed.find((x) => x.id === blank.id).servings, 1);
+    assert.equal(listed.find((x) => x.id === recipe.id).servings, 1);
 
     // The scaled items add up to CookTrace's own recipe totals.
     const ct = computeRecipeNutrition([{ items }], new Map(pantry.map((p) => [p.id, p])));

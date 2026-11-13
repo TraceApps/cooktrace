@@ -1451,6 +1451,27 @@ const scenarios = {
     out.server = ((await web('GET', '/api/units')).disabled || []).slice().sort();
     out.phone = (await db.query(`SELECT abbr FROM disabled_units`)).values.map(r => r.abbr);
   },
+  // A recipe with no servings stays blank on the phone and the server, as
+  // when made in the browser (#95): made without servings, saved with the
+  // field blank, or imported from a page that doesn't say.
+  async blankServings() {
+    await api.createRecipe({ name: 'Blank Made', ingredients: [], steps: [] });
+    await api.createRecipe({ name: 'Blank Saved', servings: null, ingredients: [], steps: [] });
+    await api.createRecipe({ name: 'Four Saved', servings: 4, ingredients: [], steps: [] });
+    // A page's recipe pasted as JSON (the HTML path needs a browser's DOMParser).
+    await api.importRecipe({ text: JSON.stringify({
+      '@context': 'https://schema.org', '@type': 'Recipe', name: 'Blank Imported',
+      recipeIngredient: ['1 l water'], recipeInstructions: ['Boil.'],
+    }), addToPantry: false });
+    const names = ['Blank Made', 'Blank Saved', 'Four Saved', 'Blank Imported'];
+    const rows = async () => Object.fromEntries((await db.query(
+      `SELECT name, servings, server_id FROM recipes WHERE name IN (${names.map(() => '?').join(',')})`, names)).values.map(r => [r.name, r]));
+    out.phone = Object.fromEntries(Object.entries(await rows()).map(([n, r]) => [n, r.servings]));
+    await sync();
+    out.server = {};
+    for (const [n, r] of Object.entries(await rows())) out.server[n] = r.server_id ? (await web('GET', `/api/recipes/${r.server_id}`)).servings : 'not synced';
+  },
+
   // A pull from a server that knows more than this app: what it doesn't
   // know is left out, not stopping the pull.
   async newerServer() {

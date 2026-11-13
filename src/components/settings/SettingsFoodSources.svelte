@@ -20,15 +20,15 @@
 
   const OFF_LANGUAGE_OPTS = [
     ['en','English'],['fr','French'],['de','German'],['es','Spanish'],['it','Italian'],
-    ['pt','Portuguese'],['nl','Dutch'],['pl','Polish'],['ru','Russian'],['ja','Japanese'],
+    ['pt','Portuguese'],['nl','Dutch'],['pl','Polish'],['ru','Russian'],['uk','Ukrainian'],['ja','Japanese'],
     ['zh','Chinese'],['ar','Arabic'],['ko','Korean'],
   ];
   const OFF_COUNTRY_OPTS = ['World',
     'Argentina','Australia','Austria','Belgium','Brazil','Canada','Chile','China',
     'Denmark','Finland','France','Germany','India','Ireland','Italy','Japan',
     'Mexico','Netherlands','New Zealand','Norway','Poland','Portugal','Singapore',
-    'South Africa','South Korea','Spain','Sweden','Switzerland','United Kingdom',
-    'United States'];
+    'South Africa','South Korea','Spain','Sweden','Switzerland','Ukraine',
+    'United Kingdom','United States'];
   // Labels for the stored English country values above.
   const countryKey = (c) => `settings_food_sources_ui.country_${c.toLowerCase().replace(/ /g, '_')}`;
   let offShowPass = false;
