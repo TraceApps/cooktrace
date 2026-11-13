@@ -39,9 +39,9 @@ function _getOffSearchCountry() {
   } catch { return null; }
 }
 
-// Read the user's saved OFF language preference. Passed to OFF as
-// `lc=<code>` so product names / ingredients / categories come back
-// translated when OFF has translations. Defaults to 'en'.
+// Read the user's saved OFF language preference. Barcode lookups send
+// it as `lc=<code>`; name search sends it as `langs=` (offSearchLangs
+// below). Defaults to 'en'.
 function _getOffSearchLanguage() {
   try {
     if (typeof localStorage === 'undefined') return 'en';
@@ -52,6 +52,16 @@ function _getOffSearchLanguage() {
     if (!lang || typeof lang !== 'string') return 'en';
     return lang.slice(0, 2).toLowerCase();
   } catch { return 'en'; }
+}
+
+// The `langs=` value for a name search (nutritrace#320). search-a-licious
+// ignores `lc=`, which is what this sent before, so the Search Language
+// setting did nothing. English rides along with any other language: a
+// product named only in English is still found, and langs=uk alone
+// returned nothing on OFF's production index in 2026-11.
+export function offSearchLangs(lang) {
+  const l = typeof lang === 'string' && lang ? lang.slice(0, 2).toLowerCase() : 'en';
+  return l === 'en' ? 'en' : `${l},en`;
 }
 
 // Re-rank OFF search results within the fetched page so higher-quality
@@ -157,8 +167,7 @@ export async function searchByName(query, page = 1) {
     const qWithFilter = country
       ? `${q} +countries_tags:"${country}"`
       : q;
-    const lc = `&lc=${encodeURIComponent(_getOffSearchLanguage())}`;
-    const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(qWithFilter)}&json=1&page_size=20&page=${page}${lc}`;
+    const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(qWithFilter)}&json=1&page_size=20&page=${page}&langs=${encodeURIComponent(offSearchLangs(_getOffSearchLanguage()))}`;
     const res = await _extFetch(url);
     if (!res.ok) return [];
     const data = await res.json();
