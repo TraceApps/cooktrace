@@ -471,7 +471,7 @@ function _importPaprika(r) {
   return {
     name: r.name || 'Imported recipe',
     description: r.description || null,
-    imgUrl: r.photo_url || (r.photo ? `data:image/jpeg;base64,${r.photo}` : null),
+    imgUrl: _paprikaImgUrl(r),
     servings: _parseServings(r.servings),
     yield_text: r.servings || null,
     prep_minutes:  _parseMinutes(r.prep_time),
@@ -681,6 +681,16 @@ function _parseImportedCreatedAt(raw) {
   return d.toISOString().replace('T', ' ').slice(0, 19);
 }
 
+// Paprika's photo fields: `photo` is only the embedded filename, the
+// bytes live in `photo_data` (base64 JPEG) or `photos[0].data`;
+// `photo_url` / `image_url` are remote URLs on the source site. Prefer
+// the embedded bytes — the save flow turns data URLs into real files —
+// and fall back to a remote URL only when nothing was embedded.
+function _paprikaImgUrl(r) {
+  const b64 = r.photo_data || r.photos?.[0]?.data;
+  if (b64) return `data:image/jpeg;base64,${b64}`;
+  return r.photo_url || r.image_url || null;
+}
 function _parseServings(s) {
   if (s == null) return null;
   const m = String(s).match(/(\d+)/);

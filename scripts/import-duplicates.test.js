@@ -24,7 +24,7 @@ test('server: every duplicate answer names the recipe it matched', () => {
 
 test('server: a Paprika archive never counts a skipped duplicate as imported', () => {
   assert.doesNotMatch(routes, /const row = _saveImportedRecipe\(u, r,[^\n]*\n\s*created\.push\(row\);/);
-  assert.match(routes, /if \(row\) created\.push\(row\);\s*else skipped\.push/);
+  assert.match(routes, /if \(row\) \{ created\.push\(row\); createdIds\.add\(row\.id\); \}\s*else skipped\.push/);
 });
 
 test('local mode answers duplicates the same way as the server', () => {

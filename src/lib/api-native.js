@@ -660,10 +660,14 @@ export const CtApiNative = {
           const recipes = await importPaprikaArchive(blob);
           const created = [];
           const skipped = [];
+          // Ids written earlier in this same batch — an archive that
+          // itself holds several near-copies (Paprika user-made copies
+          // share a name or source URL) must not dedup against itself.
+          const createdIds = new Set();
           for (const r of recipes) {
-            const saved = await _saveImportedRecipeLocal(this, r, { addToPantry, applyTags });
-            if (saved) created.push(saved);
-            else if (r?.name) skipped.push({ name: r.name, existing_id: (await _findImportDuplicateLocal(r))?.id || null });
+            const saved = await _saveImportedRecipeLocal(this, r, { addToPantry, applyTags, excludeIds: createdIds });
+            if (saved) { created.push(saved); createdIds.add(saved.id); }
+            else if (r?.name) skipped.push({ name: r.name, existing_id: (await _findImportDuplicateLocal(r, createdIds))?.id || null });
           }
           return { recipes: created, count: created.length, skipped };
         } catch (e) {
@@ -732,6 +736,10 @@ export const CtApiNative = {
     const failed = [];
     const skipped = [];
     let timelineImported = 0;
+    // Rows written earlier in this same batch — near-copies inside one
+    // archive (Paprika keeps user-made copies with the same name or
+    // source URL as distinct recipes) are not duplicates of each other.
+    const createdIds = new Set();
 
     for (const entry of picked) {
       try {
@@ -743,21 +751,26 @@ export const CtApiNative = {
             const uploaded = await this.uploadImage(new File([blob], `${fileName}.${img.ext}`, { type: blob.type }));
             entry.recipe.imgUrl = uploaded;
           }
+        } else if (!importImages) {
+          // Same contract as the server's commit: "no images" drops the
+          // picture the scan found, embedded or remote alike.
+          entry.recipe.imgUrl = null;
         }
         // Save the recipe (or skip + look up the existing one). Either
         // way we end up with a target recipe_id to attach timeline
         // events to — re-imports should land cook history on the
         // existing recipe instead of being dropped alongside.
-        const saved = await _saveImportedRecipeLocal(this, entry.recipe, { addToPantry, applyTags, dedup });
+        const saved = await _saveImportedRecipeLocal(this, entry.recipe, { addToPantry, applyTags, dedup, excludeIds: createdIds });
         let targetRecipeId = saved?.id;
         if (!saved) {
           // Re-resolve the existing recipe so timeline events still
           // land on it, and so the summary can link to it.
-          const existing = await _findImportDuplicateLocal(entry.recipe);
+          const existing = await _findImportDuplicateLocal(entry.recipe, createdIds);
           targetRecipeId = existing?.id || null;
           skipped.push({ name: entry.recipe?.name || '?', existing_id: targetRecipeId });
         } else {
           imported.push(saved);
+          createdIds.add(saved.id);
         }
 
         if (importTimeline && targetRecipeId && Array.isArray(entry.timelineEvents) && entry.timelineEvents.length) {
@@ -1883,27 +1896,56 @@ export const NtApiNative = CtApiNative;
  *   dedup        'skip' (default) | 'force' | 'replace'
  * @returns {object|null}   the saved recipe row, or null when skipped
  */
-async function _findImportDuplicateLocal(r) {
+async function _findImportDuplicateLocal(r, excludeIds) {
   // The recipe an import would duplicate: case-insensitive name first,
-  // then source_url. Mirrors the server's _findImportDuplicate.
+  // then source_url. Mirrors the server's _findImportDuplicate —
+  // including its excludeIds: ids written earlier in the same import
+  // batch don't count, so an archive containing several near-copies
+  // (Paprika user-made copies share a name or source URL) doesn't
+  // swallow its own entries.
+  const excl = excludeIds ? [...excludeIds] : [];
+  const notIn = excl.length ? ` AND id NOT IN (${excl.map(() => '?').join(',')})` : '';
   const lower = String(r?.name || '').toLowerCase().trim();
   let existing = lower ? (await _query(
     `SELECT id, name, source_url FROM recipes
-      WHERE user_id = ? AND deleted_at IS NULL AND LOWER(name) = ? LIMIT 1`,
-    [LOCAL_USER_ID, lower]
+      WHERE user_id = ? AND deleted_at IS NULL AND LOWER(name) = ?${notIn} LIMIT 1`,
+    [LOCAL_USER_ID, lower, ...excl]
   ))[0] : null;
   if (!existing && r?.source_url) {
     existing = (await _query(
       `SELECT id, name, source_url FROM recipes
-        WHERE user_id = ? AND deleted_at IS NULL AND source_url = ? LIMIT 1`,
-      [LOCAL_USER_ID, r.source_url]
+        WHERE user_id = ? AND deleted_at IS NULL AND source_url = ?${notIn} LIMIT 1`,
+      [LOCAL_USER_ID, r.source_url, ...excl]
     ))[0];
   }
   return existing || null;
 }
 
+// A data: image the importer embedded (Paprika ships photos inside the
+// recipe JSON) becomes a real file — the same path every other
+// local-mode picture takes — instead of a multi-megabyte base64 string
+// in the recipes table.
+async function _localizeImportedImage(api, url) {
+  if (typeof url !== 'string' || !url.startsWith('data:image/')) return url;
+  try {
+    const comma = url.indexOf(',');
+    const mime = url.slice(5, comma).split(';')[0].toLowerCase() || 'image/jpeg';
+    const ext = mime === 'image/jpeg' ? 'jpg' : mime.replace('image/', '');
+    const bytes = Uint8Array.from(atob(url.slice(comma + 1)), c => c.charCodeAt(0));
+    return await api.uploadImage(new File([bytes], `imported.${ext}`, { type: mime }));
+  } catch {
+    return null;
+  }
+}
+
+// The importer's normalised shape as a create/update payload, with any
+// embedded photo turned into a stored file first.
+async function _importedPayloadWithImage(api, r) {
+  return _importedToRecipePayload({ ...r, imgUrl: await _localizeImportedImage(api, r.imgUrl) });
+}
+
 async function _saveImportedRecipeLocal(api, r, opts = {}) {
-  const { addToPantry = true, dedup = 'skip' } = opts;
+  const { addToPantry = true, dedup = 'skip', excludeIds = null } = opts;
   if (!r?.name) return null;
 
   // Dedup pass — match by case-insensitive name first, then by
@@ -1911,16 +1953,16 @@ async function _saveImportedRecipeLocal(api, r, opts = {}) {
   // existing recipe alone. 'replace' updates the existing row.
   // 'force' creates a duplicate (the pre-dedup behaviour).
   if (dedup !== 'force') {
-    const existing = await _findImportDuplicateLocal(r);
+    const existing = await _findImportDuplicateLocal(r, excludeIds);
     if (existing) {
       if (dedup === 'skip') return null;
       if (dedup === 'replace') {
-        return api.updateRecipe(existing.id, _importedToRecipePayload(r));
+        return api.updateRecipe(existing.id, await _importedPayloadWithImage(api, r));
       }
     }
   }
 
-  const saved = await api.createRecipe(_importedToRecipePayload(r));
+  const saved = await api.createRecipe(await _importedPayloadWithImage(api, r));
   // Backdate to the source app's original creation timestamp if the
   // importer captured one. backdateRecipe only pulls the date back,
   // never forward, so this is safe to call unconditionally.
