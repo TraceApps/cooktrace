@@ -219,7 +219,10 @@ const _CtApiHttp = {
     form.append('file', file);
     return this._postFormWithProgress('/api/recipes/import-zip/scan', form, { onProgress });
   },
-  async commitRecipeZip(file, { selected = null, importImages = true, addToPantry = true, applyTags = false, importCategories = true, uploadId = null, onProgress } = {}) {
+  async commitRecipeZip(file, { selected = null, importImages = true, addToPantry = true, applyTags = false, importCategories = true, importTimeline = true, dedup = 'skip', uploadId = null, onProgress } = {}) {
+    // If a Recipe Already Exists and the cook history toggle go to the
+    // server too: they were left out, so Replace and Allow Duplicates did
+    // what Skip does (#97 follow-up).
     // Cached-upload path: scan stashed the zip server-side and gave us
     // an id back. Commit becomes a tiny JSON POST instead of re-uploading
     // the whole archive (which on a 100 MB Mealie backup is a real win).
@@ -234,6 +237,8 @@ const _CtApiHttp = {
           addToPantry,
           applyTags,
           importCategories,
+          import_timeline: importTimeline,
+          dedup,
         });
         return {
           ...res,
@@ -252,6 +257,8 @@ const _CtApiHttp = {
     form.append('addToPantry', addToPantry ? 'true' : 'false');
     form.append('applyTags',   applyTags   ? 'true' : 'false');
     form.append('importCategories', importCategories ? 'true' : 'false');
+    form.append('import_timeline', importTimeline ? 'true' : 'false');
+    form.append('dedup', dedup);
     const res = await this._postFormWithProgress('/api/recipes/import-zip/commit', form, { onProgress });
     return {
       ...res,

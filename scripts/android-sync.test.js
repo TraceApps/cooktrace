@@ -562,6 +562,49 @@ test('a Paprika archive imported on a phone with no server keeps photos, ratings
   assert.match(r.recipes['Lentil Soup'].notes, /Nutrition \(from Paprika\):\s*Calories: 210/);
 });
 
+test('Settings > Import works on a phone with no server: Paprika, Tandoor and Mealie archives', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const JSZip = createRequire(new URL('../package.json', import.meta.url))('jszip');
+  const { gzipSync } = await import('node:zlib');
+  const JPEG = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAMABADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAABf/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AJACzr//2Q==', 'base64');
+  const pap = new JSZip();
+  [
+    { name: 'Lentil Soup', ingredients: '1 cup lentils', directions: 'Boil.', photo_data: JPEG.toString('base64'), rating: 4, source_url: 'https://example.com/lentil' },
+    { name: 'Lentil Soup [copy]', ingredients: '1 cup lentils', directions: 'Boil.', source_url: 'https://example.com/lentil' },
+    { name: 'lentil soup', ingredients: '1 cup lentils', directions: 'Boil.' },
+  ].forEach((r, i) => pap.file(`${i}.paprikarecipe`, gzipSync(Buffer.from(JSON.stringify(r)))));
+  const tan = new JSZip();
+  for (const [id, name, food, withImage] of [[1, 'Tandoor Stew', 'beef', true], [2, 'Tandoor Salad', 'lettuce', false]]) {
+    const inner = new JSZip();
+    inner.file('recipe.json', JSON.stringify({ name, description: '', keywords: [], working_time: 10, waiting_time: 0, internal: true, servings: 2,
+      steps: [{ name: '', instruction: 'Cook it.', ingredients: [{ food: { name: food }, unit: { name: 'g' }, amount: 100, note: '', order: 0, is_header: false, no_amount: false }] }] }));
+    if (withImage) inner.file('image.jpg', JPEG);
+    tan.file(`${id}.zip`, await inner.generateAsync({ type: 'nodebuffer' }));
+  }
+  // A Mealie full backup: database.json, and each picture under its recipe.
+  const mid = '0123456789abcdef0123456789abcdef';
+  const mea = new JSZip();
+  mea.file('database.json', JSON.stringify({
+    recipes: [{ id: mid, name: 'Mealie Chili', recipe_servings: 4, org_url: 'https://example.com/chili' }],
+    ingredient_foods: [{ id: 'f1', name: 'beans' }], ingredient_units: [{ id: 'u1', name: 'cup', abbreviation: 'cup' }],
+    recipes_ingredients: [{ recipe_id: mid, food_id: 'f1', unit_id: 'u1', quantity: 2, position: 0 }],
+    recipe_instructions: [{ recipe_id: mid, text: 'Simmer.', position: 0 }],
+  }));
+  mea.file('data/recipes/01234567-89ab-cdef-0123-456789abcdef/images/original.webp', Buffer.from('UklGRjQAAABXRUJQVlA4ICgAAABwAQCdASoQAAwAAoBCJaACdAFAAAD+15Xqqnr8bv/hWv5Wv5WrfAAA', 'base64'));
+  const r = await run('bulkLocal', {
+    PAPRIKA_ZIP_B64: (await pap.generateAsync({ type: 'nodebuffer' })).toString('base64'),
+    TANDOOR_ZIP_B64: (await tan.generateAsync({ type: 'nodebuffer' })).toString('base64'),
+    MEALIE_ZIP_B64: (await mea.generateAsync({ type: 'nodebuffer' })).toString('base64'),
+  });
+  assert.deepEqual(r.runs.mealie, { scanned: 1, imported: 1, skipped: [], failed: [] });
+  assert.deepEqual(r.recipes['Mealie Chili'], { img: 'file', rating: null, ingredients: ['beans'] });
+  assert.deepEqual(r.runs.paprika, { scanned: 3, imported: 2, skipped: ['lentil soup'], failed: [] });
+  assert.deepEqual(r.runs.tandoor, { scanned: 2, imported: 2, skipped: [], failed: [] });
+  assert.deepEqual(r.recipes['Lentil Soup'], { img: 'file', rating: 4, ingredients: ['lentils'] });
+  assert.equal(r.recipes['Lentil Soup [copy]'].img, null);
+  assert.deepEqual(r.recipes['Tandoor Stew'], { img: 'file', rating: null, ingredients: ['beef'] });
+  assert.deepEqual(r.recipes['Tandoor Salad'], { img: null, rating: null, ingredients: ['lettuce'] });
+});
+
 test('Upload sends every link as the server\'s id, and the phone keeps its links after the first pull', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const r = await run('uploadLinks');
   assert.deepEqual(r.errors, []);

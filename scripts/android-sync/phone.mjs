@@ -1530,6 +1530,33 @@ const scenarios = {
     }
   },
 
+  // Settings > Import on a phone with no server: an archive scanned, then
+  // committed, as the import screen does (it said a server was needed).
+  async bulkLocal() {
+    const la = await import('../../src/lib/local-account.js');
+    process.env.CT_SERVER = ''; signIn(null);
+    await la.setLocalOwner();
+    globalThis.FileReader ??= class {
+      _done(p) { p.then(v => { this.result = v; this.onload?.({ target: this }); this.onloadend?.({ target: this }); }, e => { this.error = e; this.onerror?.(e); }); }
+      readAsDataURL(b) { this._done(b.arrayBuffer().then(a => `data:${b.type || 'application/octet-stream'};base64,${Buffer.from(a).toString('base64')}`)); }
+      readAsArrayBuffer(b) { this._done(b.arrayBuffer()); }
+    };
+    const { phoneFiles } = await import('./capacitor.mjs');
+    out.runs = {};
+    for (const [label, env] of [['paprika', 'PAPRIKA_ZIP_B64'], ['tandoor', 'TANDOOR_ZIP_B64'], ['mealie', 'MEALIE_ZIP_B64']]) {
+      const file = new File([Buffer.from(process.env[env], 'base64')], `${label}.zip`);
+      const scan = await api.scanRecipeZip(file);
+      const done = await api.commitRecipeZip(file, { addToPantry: false });
+      out.runs[label] = { scanned: scan.count, imported: (done.recipes || []).length, skipped: (done.skipped || []).map(x => x.name), failed: done.failed || [] };
+    }
+    out.recipes = {};
+    for (const r of (await db.query(`SELECT name, img_url, rating, ingredients FROM recipes ORDER BY name`)).values) {
+      const path = r.img_url ? String(r.img_url).replace('file:///data/', '') : null;
+      const img = !r.img_url ? null : /^https?:|^data:/.test(r.img_url) ? r.img_url.slice(0, 30) : phoneFiles.has(path) ? 'file' : 'missing file';
+      out.recipes[r.name] = { img, rating: r.rating, ingredients: JSON.parse(r.ingredients || '[]').flatMap(g => (g.items || []).map(i => i.name)) };
+    }
+  },
+
   // A pull from a server that knows more than this app: what it doesn't
   // know is left out, not stopping the pull.
   async newerServer() {

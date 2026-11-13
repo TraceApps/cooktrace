@@ -132,3 +132,37 @@ test('single-file import of the archive works the same way', { skip, timeout: 12
     await check(s, (done.skipped || []).map(x => x.name));
   });
 });
+
+test('Replace updates the recipe you have, keeping its cooks, favorite and stars', { skip, timeout: 120000 }, async () => {
+  await withServer(async (s) => {
+    // Yours, with stars, a favorite and a cook. Twice Bread is in the
+    // archive twice (5 stars, then 2): both replace it in turn. Pea Soup is
+    // unrated there, so your stars stay.
+    const mine = await s.call('POST', '/api/recipes', { name: 'Twice Bread', notes: 'My old notes.', rating: 3, favorite: true, img_url: 'https://example.com/my-bread.jpg', ingredients: [], steps: [] });
+    const pea = await s.call('POST', '/api/recipes', { name: 'Pea Soup', rating: 3, ingredients: [], steps: [] });
+    await s.call('POST', `/api/recipes/${mine.id}/cooked`, {});
+    const fd = new FormData();
+    fd.append('file', new Blob([await archive()]), 'export.paprikarecipes');
+    const scan = await s.call('POST', '/api/recipes/import-zip/scan', fd);
+    const commit = new FormData();
+    commit.append('uploadId', scan.uploadId);
+    commit.append('import_images', 'true');
+    commit.append('dedup', 'replace');
+    await s.call('POST', '/api/recipes/import-zip/commit', commit);
+    const all = await s.call('GET', '/api/recipes');
+    const list = Array.isArray(all) ? all : all.recipes || all.items;
+    assert.equal(list.filter(r => r.name.toLowerCase() === 'twice bread').length, 1, 'no second copy');
+    const got = await s.call('GET', `/api/recipes/${mine.id}`);
+    assert.deepEqual(got.ingredients.flatMap(g => g.items.map(i => i.name)), ['lentils'], 'the imported content');
+    assert.equal(got.notes, null);
+    assert.equal(got.rating, 2, "the archive's stars, from its last copy");
+    assert.equal((await s.call('GET', `/api/recipes/${pea.id}`)).rating, 3, 'unrated in the archive: your stars stay');
+    assert.equal(!!got.favorite, true, 'your favorite stays');
+    assert.equal(got.img_url, 'https://example.com/my-bread.jpg', 'no picture in the archive: yours stays');
+    const diary = await s.call('GET', '/api/cook-diary');
+    const cooks = (Array.isArray(diary) ? diary : diary.entries || diary.items || []).filter(c => c.recipe_id === mine.id);
+    assert.equal(cooks.length, 1, 'your cook stays with it');
+    const revs = await s.call('GET', `/api/recipes/${mine.id}/revisions`);
+    assert.ok(revs.revisions.length >= 2, 'the replace is a new version; the old one is kept');
+  });
+});

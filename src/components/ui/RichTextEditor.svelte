@@ -255,6 +255,7 @@
 </style>
 
 <script context="module">
+  import { plainTextAsHtml } from '../../lib/plain-text-html.js';
   // Allowed tags + their permitted child positions. Anything else gets
   // unwrapped (kids preserved) or dropped wholesale. Intentionally
   // narrow — nothing here can execute script, load resources, or carry
@@ -281,7 +282,7 @@
     if (!html) return '';
     if (typeof document === 'undefined') return html; // SSR no-op
     const wrapper = document.createElement('div');
-    wrapper.innerHTML = html;
+    wrapper.innerHTML = plainTextAsHtml(html);
     _walk(wrapper);
     // Treat a tree of only <br> / whitespace as empty.
     const txt = (wrapper.textContent || '').trim();

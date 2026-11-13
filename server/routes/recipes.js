@@ -1720,14 +1720,15 @@ function _saveImportedRecipe(u, parsed, opts = {}) {
     // inside one archive are not duplicates of each other.
     excludeIds = null,
   } = opts;
+  let replaceId = null;
   if (dedup !== 'force' && parsed?.name) {
     const existing = _findImportDuplicate(u, parsed, excludeIds);
     if (existing) {
       if (dedup === 'skip') return null;
-      // dedup === 'replace' falls through and gets re-inserted; the
-      // existing row stays for now (could be deleted-and-recreated
-      // here but that'd lose cook_diary FK references). Caller can
-      // explicitly delete the duplicate after the fact if needed.
+      // 'replace': the recipe you have takes the imported content, as an
+      // edit (its cooks, plans and history stay with it). It used to be
+      // imported again next to it.
+      replaceId = existing.id;
     }
   }
   const body = { ...parsed };
@@ -1763,6 +1764,23 @@ function _saveImportedRecipe(u, parsed, opts = {}) {
       ).run(u, name, slug, null, maxOrder + 1);
       body.category_id = ins.lastInsertRowid;
     }
+  }
+  if (replaceId) {
+    const cur = db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(replaceId);
+    // Yours stays yours: the favorite and who sees it, and the stars and
+    // category when the import has none.
+    const r = updateRecipe(replaceId, {
+      ...body,
+      favorite: !!cur.favorite,
+      visibility: cur.visibility,
+      // No picture in the import (or pictures left out): yours stays.
+      img_url: body.img_url || body.imgUrl || cur.img_url,
+      imgUrl: undefined,
+      rating: body.rating ?? cur.rating,
+      category_id: body.category_id ?? cur.category_id,
+    }, { u });
+    if (r.status !== 200) throw Object.assign(new Error(r.body?.error || 'Replace failed'), { status: r.status });
+    return _hydrate(db.prepare(`SELECT * FROM recipes WHERE id = ?`).get(replaceId));
   }
   const data = _toStorage(body);
   data.ingredients = ownIngredientLinks(data.ingredients, u);

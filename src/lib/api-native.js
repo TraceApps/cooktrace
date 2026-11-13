@@ -727,6 +727,12 @@ export const CtApiNative = {
         stepCount: e.recipe.steps?.length || 0,
         hasImage: !!e.imageEntryName,
         hasThumb: !!e.thumbEntryName,
+        // The names the import screen reads, as the server sends them.
+        source_url: e.recipe.source_url || null,
+        ingredient_count: (e.recipe.ingredients || []).reduce((n, g) => n + (g.items?.length || 0), 0),
+        step_count: e.recipe.steps?.length || 0,
+        has_image_asset: !!e.imageEntryName || (typeof e.recipe.imgUrl === 'string' && e.recipe.imgUrl.startsWith('data:')),
+        img_url: typeof e.recipe.imgUrl === 'string' && /^https?:/.test(e.recipe.imgUrl) ? e.recipe.imgUrl : null,
         timelineEventCount: (e.timelineEvents || []).length,
         // Keep the full payload so commit can re-use it without
         // re-parsing the ZIP. Caller doesn't need to ship this back
@@ -1858,12 +1864,6 @@ export const CtApiNative = {
   async getCookbookShares()        { return []; },
   async shareCookbookWithUsers()   { return { added: 0 }; },
   async unshareCookbookWithUser()  { return { ok: true }; },
-
-  // Recipe importers — Mealie / Tandoor / Paprika ZIPs need the
-  // server-side parser pipeline. UI guard suppresses the dialog in
-  // local mode but throw a clear error if anything still calls in.
-  async scanRecipeZip()            { throw new Error('Recipe ZIP import requires a server connection.'); },
-  async commitRecipeZip()          { throw new Error('Recipe ZIP import requires a server connection.'); },
 
   // Low-level helpers used by Settings sub-components for endpoints
   // that don't have a dedicated wrapper (e.g. /api/health). In local
