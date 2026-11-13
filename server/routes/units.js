@@ -11,6 +11,7 @@
 import { Router } from 'express';
 import db from '../db.js';
 import { saveRow } from '../lib/rest-merge.js';
+import { normaliseIngredientGroups } from '../lib/recipe-hydrate.js';
 import { wrap } from '../logger.js';
 import { requireAuth, userMgmtActive } from '../middleware/auth.js';
 
@@ -45,7 +46,7 @@ router.get('/', wrap((req, res) => {
   ).all(...userArgs(u));
   for (const row of recipeRows) {
     let groups = [];
-    try { groups = JSON.parse(row.ingredients || '[]'); } catch {}
+    try { groups = normaliseIngredientGroups(JSON.parse(row.ingredients || '[]')); } catch {}
     for (const g of groups) {
       for (const it of (g.items || [])) {
         if (!it || !it.unit) continue;

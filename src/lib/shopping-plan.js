@@ -47,8 +47,13 @@ function _flatItems(ingredients) {
   if (typeof groups === 'string') {
     try { groups = JSON.parse(groups); } catch { groups = []; }
   }
+  if (!Array.isArray(groups)) return [];
+  // A flat list (an old recipe, or one an AI agent made before #94) holds
+  // the ingredients themselves: one group, as normaliseIngredientGroups
+  // (server/lib/recipe-hydrate.js) reads it.
+  if (groups.length && groups.every(g => g && typeof g === 'object' && !Array.isArray(g.items))) groups = [{ items: groups }];
   const out = [];
-  for (const g of Array.isArray(groups) ? groups : []) {
+  for (const g of groups) {
     for (const it of (g?.items || [])) if (it && it.name && String(it.name).trim()) out.push(it);
   }
   return out;

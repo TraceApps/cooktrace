@@ -41,6 +41,23 @@ function _parseJson(v, fallback) {
   try { return JSON.parse(v); } catch { return fallback; }
 }
 
+// A recipe's ingredients as groups, as the server reads them
+// (normaliseIngredientGroups in server/lib/recipe-hydrate.js): a flat list
+// (an old recipe, or one an AI agent made before #94) is one unnamed group.
+function _ingredientGroups(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  if (raw.every(r => r && typeof r === 'object' && !Array.isArray(r.items))) return [{ name: '', items: raw }];
+  return raw.map(g => ({ name: (g && g.name) || '', items: Array.isArray(g && g.items) ? g.items : [] }));
+}
+function _stableText(v) {
+  if (Array.isArray(v)) return `[${v.map(_stableText).join(',')}]`;
+  if (v && typeof v === 'object') return `{${Object.keys(v).sort().map(k => `${JSON.stringify(k)}:${_stableText(v[k])}`).join(',')}}`;
+  return JSON.stringify(v ?? null);
+}
+function _sameIngredients(a, b) {
+  return _stableText(_ingredientGroups(_parseJson(a, []))) === _stableText(_ingredientGroups(_parseJson(b, [])));
+}
+
 function _stringify(v) {
   if (v == null) return null;
   if (typeof v === 'string') return v;
@@ -116,6 +133,7 @@ function _recipeFromRow(row) {
   for (const f of JSON_FIELDS_RECIPE) {
     out[f] = _parseJson(out[f], f === 'nutrition' ? {} : []);
   }
+  out.ingredients = _ingredientGroups(out.ingredients);
   out.imgUrl = resolveAssetUrl(out.img_url) || '';
   out.favorite = !!out.favorite;
   return out;
@@ -449,6 +467,12 @@ export const CtApiNative = {
     const existing = (await _query(`SELECT * FROM recipes WHERE id = ?`, [id]))[0];
     if (!existing) throw new Error('Recipe not found');
     const d = { ...existing, ...data };
+    // Ingredients stored as a flat list come back as one group (#94). Given
+    // back unchanged (a rating or a favorite saves the whole recipe), the
+    // stored text stays, so sync doesn't count it as an edit and send this
+    // copy over a newer one.
+    const ingredientsText = _sameIngredients(d.ingredients, existing.ingredients)
+      ? existing.ingredients : _stringify(d.ingredients ?? []);
     // No picture is null, as the server keeps it: '' would read as a change.
     const img = (d.img_url ?? d.imgUrl ?? existing.img_url) || null;
     await _run(
@@ -471,7 +495,7 @@ export const CtApiNative = {
         d.cook_minutes  ?? null,
         d.total_minutes ?? null,
         d.rest_minutes  ?? null,
-        _stringify(d.ingredients ?? []),
+        ingredientsText,
         _stringify(d.steps ?? []),
         _stringify(d.tags ?? []),
         _stringify(d.tools ?? []),
@@ -1458,7 +1482,7 @@ export const CtApiNative = {
     const recipeRows = await _query(`SELECT ingredients FROM recipes WHERE user_id = ? AND deleted_at IS NULL`, [LOCAL_USER_ID]);
     const usage = {};
     for (const r of recipeRows) {
-      const groups = _parseJson(r.ingredients, []);
+      const groups = _ingredientGroups(_parseJson(r.ingredients, []));
       for (const g of groups) for (const it of (g.items || [])) {
         if (!it?.unit) continue;
         const k = String(it.unit).toLowerCase().trim();

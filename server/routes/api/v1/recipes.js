@@ -42,6 +42,7 @@ import { wrap } from '../../../logger.js';
 import { requireScope } from '../../../middleware/bearer-auth.js';
 import { foldText } from '../../../lib/search-text.js';
 import { parseQty, servingRatio } from '../../../lib/quantity.js';
+import { normaliseIngredientGroups } from '../../../lib/recipe-hydrate.js';
 
 const router = Router();
 
@@ -149,7 +150,9 @@ router.get('/:id', wrap((req, res) => {
     return res.status(404).json({ error: 'not_found', code: 'not_found' });
   }
 
-  const ingredients = _safeJson(row.ingredients, []);
+  // A flat list (an old row, or create_recipe before #94) as one group, as
+  // the app reads it; it used to send no items at all.
+  const ingredients = normaliseIngredientGroups(_safeJson(row.ingredients, []));
   const nutrition = _safeJson(row.nutrition, {});
 
   // Batch-load referenced pantry items so per-ingredient nutrition

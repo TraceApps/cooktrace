@@ -1472,6 +1472,37 @@ const scenarios = {
     for (const [n, r] of Object.entries(await rows())) out.server[n] = r.server_id ? (await web('GET', `/api/recipes/${r.server_id}`)).servings : 'not synced';
   },
 
+  // A recipe whose ingredients are stored as a flat list (an AI agent's
+  // create_recipe before #94, or an old row) comes down with them in one
+  // group, as the app shows and edits them; a grouped one stays as it was.
+  async flatIngredients() {
+    await sync();
+    const names = ['Flat Soup', 'Grouped Stew'];
+    out.recipes = {};
+    for (const n of names) {
+      const row = (await db.query(`SELECT id FROM recipes WHERE name = ?`, [n])).values[0];
+      out.recipes[n] = row ? (await api.getRecipe(row.id)).ingredients : 'not synced';
+    }
+  },
+
+  // A favorite on a flat-stored recipe (#94) saves the whole recipe, its
+  // ingredients now read as one group. That is no change of the ingredients,
+  // so it mustn't carry the phone's copy over a newer one from the web.
+  async flatFavorite() {
+    await sync();
+    const sid = (await db.query(`SELECT server_id FROM recipes WHERE name = 'Flat Soup'`)).values[0].server_id;
+    await new Promise(r => setTimeout(r, 1100));
+    await webSave(sid, { ingredients: [{ name: '', items: [{ id: 'w1', name: 'carrot', qty: '3', unit: '', note: '' }] }] });
+    await new Promise(r => setTimeout(r, 1100));
+    const x = await localRecipe(sid);
+    await api.updateRecipe(x.id, { ...x, favorite: true });
+    out.changed = dbn.rowChanges('recipes', await local(sid));
+    await sync();
+    const after = await web('GET', `/api/recipes/${sid}`);
+    out.server = { favorite: !!after.favorite, ingredients: after.ingredients.flatMap(g => g.items.map(i => i.name)) };
+    out.phone = (await localRecipe(sid)).ingredients.flatMap(g => g.items.map(i => i.name));
+  },
+
   // A pull from a server that knows more than this app: what it doesn't
   // know is left out, not stopping the pull.
   async newerServer() {

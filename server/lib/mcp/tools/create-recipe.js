@@ -6,11 +6,10 @@
  * an agent that fabricates recipes can pollute the library in a way a
  * user has to hand-clean.
  *
- * Ingredients accept the simple flat shape ([{name, qty, unit, note}]);
- * normaliseIngredientGroups (recipe-hydrate.js) already wraps a flat
- * array into a single unnamed group on read, matching how the app
- * treats legacy-shape data, so callers don't need to know about
- * ingredient groups at all.
+ * Ingredients accept the simple flat shape ([{name, qty, unit, note}]),
+ * so callers don't need to know about ingredient groups at all; they're
+ * stored as one unnamed group, as the editor stores them (#94: stored
+ * flat, the public API and the Android app showed none).
  *
  * Runs the same Kitchen auto-share hook POST /api/recipes does
  * (autoShareNewRecipe) so an MCP-created recipe fans out to Kitchen
@@ -97,7 +96,7 @@ export function registerCreateRecipe(server, { userId }) {
         cook_minutes ?? null,
         rest_minutes ?? null,
         total_minutes ?? null,
-        JSON.stringify(storedIngredients),
+        JSON.stringify([{ name: '', items: storedIngredients }]),
         JSON.stringify(storedSteps),
         JSON.stringify(tags || []),
         source_url || null,

@@ -500,6 +500,39 @@ test('a recipe with no servings stays blank on the phone and the server (#95)', 
   assert.deepEqual(r.server, want);
 });
 
+test('a recipe stored with a flat ingredient list shows its ingredients on the phone (#94)', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const srv = await startServer();
+  try {
+    // Stored as create_recipe stored it before #94 (and old rows are).
+    const db = new Database(srv.dbPath);
+    const uid = db.prepare(`SELECT id FROM users WHERE username = 'cook'`).get().id;
+    const flat = [{ id: 'f1', name: 'leek', qty: '2', unit: '', note: '' }, { id: 'f2', name: 'stock', qty: '1', unit: 'l', note: '' }];
+    const grouped = [{ name: 'Base', items: [{ id: 'g1', name: 'onion', qty: '1', unit: '', note: '' }] }, { name: 'Top', items: [{ id: 'g2', name: 'cheese', qty: '50', unit: 'g', note: '' }] }];
+    const ins = db.prepare(`INSERT INTO recipes (user_id, name, ingredients, steps, visibility) VALUES (?, ?, ?, '[]', 'private')`);
+    ins.run(uid, 'Flat Soup', JSON.stringify(flat));
+    ins.run(uid, 'Grouped Stew', JSON.stringify(grouped));
+    db.close();
+    const r = await phone(srv, 'flatIngredients');
+    assert.deepEqual(r.recipes['Flat Soup'], [{ name: '', items: flat }]);
+    assert.deepEqual(r.recipes['Grouped Stew'], grouped);
+  } finally { srv.stop(); }
+});
+
+test('a favorite on a flat-stored recipe on the phone keeps the web\'s newer ingredients (#94)', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const srv = await startServer();
+  try {
+    const db = new Database(srv.dbPath);
+    const uid = db.prepare(`SELECT id FROM users WHERE username = 'cook'`).get().id;
+    db.prepare(`INSERT INTO recipes (user_id, name, ingredients, steps, visibility) VALUES (?, 'Flat Soup', ?, '[]', 'private')`)
+      .run(uid, JSON.stringify([{ id: 'f1', name: 'leek', qty: '2', unit: '', note: '' }]));
+    db.close();
+    const r = await phone(srv, 'flatFavorite');
+    assert.deepEqual(r.server, { favorite: true, ingredients: ['carrot'] });
+    assert.deepEqual(r.changed, ['favorite'], 'only the favorite changed on the phone');
+    assert.deepEqual(r.phone, ['carrot']);
+  } finally { srv.stop(); }
+});
+
 test('Upload sends every link as the server\'s id, and the phone keeps its links after the first pull', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const r = await run('uploadLinks');
   assert.deepEqual(r.errors, []);
