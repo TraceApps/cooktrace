@@ -406,7 +406,8 @@
     if (take('imgUrl')) imgUrl = r.imgUrl || '';
     if (take('rating')) rating = r.rating ?? null;
     if (take('yield_text')) yieldText = r.yield_text || '';
-    if (take('servings')) servings = r.servings || 2;
+    // Blank stays blank: a 2 here would be saved with the next change (#95).
+    if (take('servings')) servings = r.servings ?? '';
     if (take('prep_minutes')) prepMinutes = r.prep_minutes  ?? '';
     if (take('cook_minutes')) cookMinutes = r.cook_minutes  ?? '';
     if (take('rest_minutes')) restMinutes = r.rest_minutes  ?? '';

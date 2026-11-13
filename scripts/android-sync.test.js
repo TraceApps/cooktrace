@@ -493,6 +493,13 @@ test('a phone restored from another phone\'s backup gets its own install id: row
   } finally { srv.stop(); rmSync(dir, { recursive: true, force: true }); }
 });
 
+test('a recipe with no servings stays blank on the phone and the server (#95)', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const r = await run('blankServings');
+  const want = { 'Blank Made': null, 'Blank Saved': null, 'Four Saved': 4, 'Blank Imported': null };
+  assert.deepEqual(r.phone, want);
+  assert.deepEqual(r.server, want);
+});
+
 test('Upload sends every link as the server\'s id, and the phone keeps its links after the first pull', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const r = await run('uploadLinks');
   assert.deepEqual(r.errors, []);

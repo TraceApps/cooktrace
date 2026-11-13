@@ -424,7 +424,7 @@ export const CtApiNative = {
         d.name || 'Untitled',
         d.description || null,
         img,
-        d.servings ?? 2,
+        d.servings ?? null,
         d.prep_minutes  ?? null,
         d.cook_minutes  ?? null,
         d.total_minutes ?? null,
@@ -1970,7 +1970,7 @@ function _importedToRecipePayload(r) {
     name: r.name,
     description: r.description ?? null,
     img_url: r.imgUrl ?? r.img_url ?? null,
-    servings: r.servings ?? 2,
+    servings: r.servings ?? null,
     yield_text: r.yield_text ?? null,
     prep_minutes:  r.prep_minutes  ?? null,
     cook_minutes:  r.cook_minutes  ?? null,
@@ -2114,7 +2114,7 @@ function _normalizeJsonLdRecipe(r, sourceUrl) {
   const name = r.name || 'Imported recipe';
   const description = r.description || null;
   const img = Array.isArray(r.image) ? (r.image[0]?.url || r.image[0]) : (r.image?.url || r.image || null);
-  const servings = parseInt(String(r.recipeYield || r.yield || '').match(/\d+/)?.[0] || '0', 10) || 2;
+  const servings = parseInt(String(r.recipeYield || r.yield || '').match(/\d+/)?.[0] || '0', 10) || null;
   const ingredients = (r.recipeIngredient || []).map(s => ({ name: String(s).trim() }));
   const steps = (Array.isArray(r.recipeInstructions) ? r.recipeInstructions : (r.recipeInstructions ? [r.recipeInstructions] : [])).map(s => {
     if (typeof s === 'string') return { text: s };
