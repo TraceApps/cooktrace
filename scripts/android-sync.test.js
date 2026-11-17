@@ -562,6 +562,16 @@ test('a Paprika archive imported on a phone with no server keeps photos, ratings
   assert.match(r.recipes['Lentil Soup'].notes, /Nutrition \(from Paprika\):\s*Calories: 210/);
 });
 
+test('a single .paprikarecipe imports on a phone with no server (#98)', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
+  const { gzipSync } = await import('node:zlib');
+  const PHOTO = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAMABADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAABf/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AJACzr//2Q==';
+  const one = gzipSync(Buffer.from(JSON.stringify({ name: 'Lentil Soup', ingredients: '1 cup lentils', directions: 'Boil.', photo_data: PHOTO, rating: 4 }))).toString('base64');
+  const r = await run('paprikaLocal', { PAPRIKA_ZIP_B64: one, PAPRIKA_FILE_NAME: 'Lentil Soup.paprikarecipe' });
+  assert.deepEqual(Object.keys(r.recipes).sort(), ['Lentil Soup', 'Old Favorite']);
+  assert.equal(r.recipes['Lentil Soup'].img, PHOTO);
+  assert.equal(r.recipes['Lentil Soup'].rating, 4);
+});
+
 test('Settings > Import works on a phone with no server: Paprika, Tandoor and Mealie archives', { skip, timeout: TEST_TIMEOUT_MS }, async () => {
   const JSZip = createRequire(new URL('../package.json', import.meta.url))('jszip');
   const { gzipSync } = await import('node:zlib');

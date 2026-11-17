@@ -25,6 +25,7 @@
   import { buildRecipeCardPages, buildRecipeShareText } from '../lib/recipe-card.js';
   import { svgToPngBlob, shareBlobs } from '../lib/shopping-card.js';
   import { isNative, getServerUrl, publicRecipeUrl, resolveAssetUrl } from '../lib/platform.js';
+  import { pickerAccept, fileMatchesAccept } from '../lib/file-accept.js';
 
   import { foldText } from '../lib/search-text.js';
   import AllergenChips from '../components/allergens/AllergenChips.svelte';
@@ -103,8 +104,14 @@
   let pasteAddToPantry = false;
   let pasteApplyTags = false;
   let pasteImportCategories = true;
+  const PASTE_FILE_ACCEPT = '.json,.html,.htm,.paprikarecipes,.paprikarecipe,application/json,text/html';
   function onPasteFileChange(e) {
     const f = e.target.files?.[0];
+    if (f && isNative && !fileMatchesAccept(f, PASTE_FILE_ACCEPT)) {
+      showError($_('recipes_page.toast.paste_file_unsupported'));
+      e.target.value = '';
+      return;
+    }
     if (f) { pasteFile = f; pasteText = ''; }
   }
   function clearPasteFile() {
@@ -1245,7 +1252,7 @@
               {$_('recipes_ui.choose_file')}
             </button>
             <input bind:this={pasteFileInput} type="file"
-              accept=".json,.html,.htm,.paprikarecipes,.paprikarecipe,application/json,text/html"
+              accept={pickerAccept(PASTE_FILE_ACCEPT, isNative)}
               on:change={onPasteFileChange} style="display:none" />
           {/if}
           <label class="opt-row">

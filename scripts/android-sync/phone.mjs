@@ -1518,7 +1518,7 @@ const scenarios = {
       readAsArrayBuffer(b) { this._done(b.arrayBuffer()); }
     };
     const bytes = Buffer.from(process.env.PAPRIKA_ZIP_B64, 'base64');
-    const file = new File([bytes], 'export.paprikarecipes');
+    const file = new File([bytes], process.env.PAPRIKA_FILE_NAME || 'export.paprikarecipes');
     const res = await api.importRecipe({ file, addToPantry: false });
     out.skipped = (res.skipped || []).map(s => s.name).sort();
     const { phoneFiles } = await import('./capacitor.mjs');

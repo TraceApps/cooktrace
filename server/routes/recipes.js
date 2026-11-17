@@ -2253,9 +2253,10 @@ router.post('/import', _importUpload.single('file'), wrap(async (req, res) => {
   const importCategories = req.body?.importCategories !== false && req.body?.importCategories !== 'false';
   const creatorUsername = req.user?.username || null;
 
-  // Paprika archive — multiple recipes in one .paprikarecipes zip.
+  // Paprika archive: multiple recipes in one .paprikarecipes zip, or one
+  // recipe in a .paprikarecipe (gzipped JSON, cooktrace#98).
   const f = req.file;
-  if (f && /\.paprikarecipes$/i.test(f.originalname)) {
+  if (f && /\.paprikarecipes?$/i.test(f.originalname)) {
     let recipes;
     try { recipes = await importPaprikaArchive(f.buffer); }
     catch (e) { return res.status(400).json({ error: e.message }); }

@@ -333,25 +333,37 @@ function _importCookTrace(r) {
 // .paprikarecipes is a zip containing one or more .paprikarecipe files,
 // each of which is a gzipped JSON. Returns an array of normalised
 // recipes — caller writes each as a row.
+// A single .paprikarecipe (Paprika's one-recipe export) is accepted too:
+// gzipped JSON, or plain JSON, rather than a zip (cooktrace#98).
 export async function importPaprikaArchive(buffer) {
-  const zip = await JSZip.loadAsync(buffer);
+  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+  if (!_isZip(buf)) return [_importPaprika(await _decodePaprikaEntry(buf, 'the file'))];
+  const zip = await JSZip.loadAsync(buf);
   const recipes = [];
   const entries = Object.values(zip.files).filter(e => !e.dir && e.name.endsWith('.paprikarecipe'));
   if (entries.length === 0) throw new Error('No .paprikarecipe files found in archive');
   for (const entry of entries) {
-    const compressed = await entry.async('nodebuffer');
-    let json;
-    try {
-      const decompressed = await gunzip(compressed);
-      json = JSON.parse(decompressed.toString('utf-8'));
-    } catch (e) {
-      // Some Paprika exports embed plain JSON instead of gzipped — try that.
-      try { json = JSON.parse(compressed.toString('utf-8')); }
-      catch { throw new Error(`Could not decode ${entry.name}`); }
-    }
-    recipes.push(_importPaprika(json));
+    recipes.push(_importPaprika(await _decodePaprikaEntry(await entry.async('nodebuffer'), entry.name)));
   }
   return recipes;
+}
+
+function _isZip(buf) {
+  return buf.length >= 2 && buf[0] === 0x50 && buf[1] === 0x4b; // "PK"
+}
+
+async function _decodePaprikaEntry(compressed, name) {
+  const parse = (b) => JSON.parse(b.toString('utf-8').replace(/^\uFEFF/, ''));
+  let json;
+  try {
+    json = parse(await gunzip(compressed));
+  } catch {
+    // Some Paprika exports embed plain JSON instead of gzipped: try that.
+    try { json = parse(compressed); }
+    catch { throw new Error(`Could not decode ${name}`); }
+  }
+  if (!json || typeof json !== 'object' || Array.isArray(json)) throw new Error(`Could not decode ${name}`);
+  return json;
 }
 
 // ── Generic zip walker ─────────────────────────────────────────────────────

@@ -17,7 +17,10 @@
   import { slide } from 'svelte/transition';
   import { onMount } from 'svelte';
   import { NtApi } from '../../lib/api.js';
-  import { resolveAssetUrl } from '../../lib/platform.js';
+  import { resolveAssetUrl, isNative } from '../../lib/platform.js';
+  import { pickerAccept, fileMatchesAccept } from '../../lib/file-accept.js';
+
+  const ARCHIVE_ACCEPT = '.zip,.paprikarecipes,application/zip,application/x-zip-compressed';
   import { showSuccess, showError } from '../../stores/toast.js';
 
   // Clean up localStorage from the now-removed live Mealie API tool so
@@ -107,6 +110,11 @@
   async function onFile(e) {
     const file = e.target?.files?.[0];
     if (!file) return;
+    if (isNative && !fileMatchesAccept(file, ARCHIVE_ACCEPT)) {
+      showError($_('settings_import_ui.not_archive'));
+      e.target.value = '';
+      return;
+    }
     pickedFile = file;
     manifest = null;
     summary = null;
@@ -258,7 +266,7 @@
     <input
       bind:this={fileInput}
       type="file"
-      accept=".zip,.paprikarecipes"
+      accept={pickerAccept(ARCHIVE_ACCEPT, isNative)}
       style="display:none"
       on:change={onFile}
     />

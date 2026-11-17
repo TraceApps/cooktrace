@@ -1402,6 +1402,7 @@
   "recipes_page": {
     "toast": {
       "paste_or_pick":           "Paste a recipe or pick a file first.",
+      "paste_file_unsupported":  "Pick a Paprika export, or a JSON or HTML file.",
       "recipe_imported":         "Recipe imported",
       "already_exists":          "This recipe already exists. Opening it.",
       "already_exists_short":    "This recipe already exists.",
@@ -3432,6 +3433,7 @@
     "testing": "Testing…"
   },
   "settings_import_ui": {
+    "not_archive": "Pick a Mealie, Tandoor or Paprika export (.zip or .paprikarecipes).",
     "uploading": "Uploading",
     "uploading_pct": "Uploading {pct}%",
     "source_recipe": "Recipe",

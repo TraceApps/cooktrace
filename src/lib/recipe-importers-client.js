@@ -65,24 +65,33 @@ export function importRecipeFromText(text, hint = null) {
   };
 }
 
+// A single .paprikarecipe (Paprika's one-recipe export) is accepted too:
+// gzipped JSON, or plain JSON, rather than a zip (cooktrace#98).
 export async function importPaprikaArchive(blob) {
-  const zip = await JSZip.loadAsync(blob);
+  const bytes = blob instanceof Uint8Array ? blob : new Uint8Array(await blob.arrayBuffer());
+  if (!(bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b)) { // not "PK": one recipe
+    return [_importPaprika(await _decodePaprikaEntry(bytes, 'the file'))];
+  }
+  const zip = await JSZip.loadAsync(bytes);
   const recipes = [];
   const entries = Object.values(zip.files).filter(e => !e.dir && e.name.endsWith('.paprikarecipe'));
   if (entries.length === 0) throw new Error('No .paprikarecipe files found in archive');
   for (const entry of entries) {
-    const compressed = await entry.async('uint8array');
-    let json;
-    try {
-      const decompressed = await _gunzip(compressed);
-      json = JSON.parse(_utf8.decode(decompressed));
-    } catch {
-      try { json = JSON.parse(_utf8.decode(compressed)); }
-      catch { throw new Error(`Could not decode ${entry.name}`); }
-    }
-    recipes.push(_importPaprika(json));
+    recipes.push(_importPaprika(await _decodePaprikaEntry(await entry.async('uint8array'), entry.name)));
   }
   return recipes;
+}
+
+async function _decodePaprikaEntry(compressed, name) {
+  let json;
+  try {
+    json = JSON.parse(_utf8.decode(await _gunzip(compressed)));
+  } catch {
+    try { json = JSON.parse(_utf8.decode(compressed)); }
+    catch { throw new Error(`Could not decode ${name}`); }
+  }
+  if (!json || typeof json !== 'object' || Array.isArray(json)) throw new Error(`Could not decode ${name}`);
+  return json;
 }
 
 export async function loadRecipeZip(blob) {

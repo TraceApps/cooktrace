@@ -7,6 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Paprika exports can be picked in the Android app** ([#98](https://github.com/TraceApps/cooktrace/issues/98), thanks @sreich). The file picker in Settings > Import from Another App and in Import from JSON/HTML greyed out `.paprikarecipes` and `.paprikarecipe` files. It now shows every file, and one CookTrace can't import gets a message saying what to pick.
+- **A single-recipe Paprika export (`.paprikarecipe`) imports.** On the web it made an empty recipe called "Pasted recipe", and in the Android app it failed. It now imports, with its photo, rating and notes, and a file that isn't one gets a message instead.
+
 ### Security
 
 - **hono** 4.13.18 on the server closes [GHSA-4m76-xfj5-7975](https://github.com/advisories/GHSA-4m76-xfj5-7975), [GHSA-h7mg-cq63-vhpq](https://github.com/advisories/GHSA-h7mg-cq63-vhpq), [GHSA-3gg2-335m-rxc6](https://github.com/advisories/GHSA-3gg2-335m-rxc6), [GHSA-46wx-v44x-9hh2](https://github.com/advisories/GHSA-46wx-v44x-9hh2) and [GHSA-4h7h-rv7c-7m2v](https://github.com/advisories/GHSA-4h7h-rv7c-7m2v). Only the MCP server uses it.

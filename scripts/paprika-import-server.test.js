@@ -68,10 +68,11 @@ async function withServer(fn) {
     const PW = 'Str0ng-Pass-77!x';
     const reg = await fetch(base + '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'cook', password: PW }) });
     const token = reg.headers.getSetCookie().map(c => c.split(';')[0].split('=')[1]).find(v => v?.startsWith('eyJ'));
-    const call = async (method, p, body) => {
+    const call = async (method, p, body, { expectOk = true } = {}) => {
       const isForm = body instanceof FormData;
       const r = await fetch(base + p, { method, headers: { Authorization: 'Bearer ' + token, ...(isForm || !body ? {} : { 'Content-Type': 'application/json' }) }, body: isForm ? body : body ? JSON.stringify(body) : undefined });
       const t = await r.text();
+      if (!expectOk) return { status: r.status, body: t ? JSON.parse(t) : null };
       assert.ok(r.ok, `${method} ${p} -> ${r.status} ${t.slice(0, 300)}`);
       return t ? JSON.parse(t) : null;
     };
@@ -130,6 +131,52 @@ test('single-file import of the archive works the same way', { skip, timeout: 12
     fd.append('file', new Blob([await archive()]), 'export.paprikarecipes');
     const done = await s.call('POST', '/api/recipes/import', fd);
     await check(s, (done.skipped || []).map(x => x.name));
+  });
+});
+
+test('a single .paprikarecipe imports as one recipe, and a broken one makes none (#98)', { skip, timeout: 120000 }, async () => {
+  await withServer(async ({ call, uploads }) => {
+    const fd = new FormData();
+    fd.append('file', new Blob([gzipSync(Buffer.from(JSON.stringify(ENTRIES[0])))]), 'Lentil Soup.paprikarecipe');
+    const done = await call('POST', '/api/recipes/import', fd);
+    assert.equal(done.count, 1);
+    const list = await call('GET', '/api/recipes');
+    const rows = Array.isArray(list) ? list : list.recipes || list.items;
+    const lentil = rows.find(r => r.name === 'Lentil Soup');
+    assert.ok(lentil, 'imported by its name, not as "Pasted recipe"');
+    assert.equal(lentil.rating, 4);
+    assert.match(lentil.img_url || '', /^\/uploads\//);
+    assert.ok(existsSync(join(uploads, lentil.img_url.replace(/^\/uploads\//, ''))));
+    const full = await call('GET', `/api/recipes/${lentil.id}`);
+    assert.match(full.notes, /Family favorite\./);
+
+    // Plain JSON (some exports skip the gzip) works too.
+    const plain = new FormData();
+    plain.append('file', new Blob([JSON.stringify(recipe('Plain Pea Soup'))]), 'Plain Pea Soup.paprikarecipe');
+    assert.equal((await call('POST', '/api/recipes/import', plain)).count, 1);
+
+    // Not a recipe: refused, and nothing is made from it.
+    const bad = new FormData();
+    bad.append('file', new Blob([Buffer.from('not a recipe at all')]), 'Broken.paprikarecipe');
+    const r = await call('POST', '/api/recipes/import', bad, { expectOk: false });
+    assert.equal(r.status, 400);
+    // JSON that isn't one recipe, gzipped or not, is refused too.
+    for (const body of ['null', '42', '[{"name":"A"}]']) {
+      for (const bytes of [Buffer.from(body), gzipSync(Buffer.from(body))]) {
+        const fd2 = new FormData();
+        fd2.append('file', new Blob([bytes]), 'Odd.paprikarecipe');
+        const r2 = await call('POST', '/api/recipes/import', fd2, { expectOk: false });
+        assert.equal(r2.status, 400, body);
+        assert.match(r2.body.error, /Could not decode/);
+      }
+    }
+    // A byte-order mark before plain JSON is fine.
+    const bom = new FormData();
+    bom.append('file', new Blob([Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(JSON.stringify(recipe('Bom Bread')))])]), 'Bom Bread.paprikarecipe');
+    assert.equal((await call('POST', '/api/recipes/import', bom)).count, 1);
+    const after = await call('GET', '/api/recipes');
+    const names = (Array.isArray(after) ? after : after.recipes || after.items).map(x => x.name).sort();
+    assert.deepEqual(names, ['Bom Bread', 'Lentil Soup', 'Old Favorite', 'Plain Pea Soup']);
   });
 });
 
