@@ -1,5 +1,6 @@
 <script>
-  import { location, push } from 'svelte-spa-router';
+  import { location } from 'svelte-spa-router';
+  import { goTab } from '../../lib/tab-nav.js';
   import { _ } from 'svelte-i18n';
   import { updateAvailable } from '../../lib/updates.js';
   import { pwaUpdateReady } from '../../lib/pwa-update.js';
@@ -30,7 +31,7 @@
     return 0;
   })();
 
-  function go(path) { push(path); }
+  function go(path) { goTab(path); }
 </script>
 
 <nav class="bottom-nav" role="navigation" aria-label={$_('bottom_nav_ui.main_navigation')}>

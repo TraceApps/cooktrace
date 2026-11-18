@@ -1,7 +1,8 @@
 <script>
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { location, push } from 'svelte-spa-router';
+  import { location } from 'svelte-spa-router';
+  import { goTab } from '../../lib/tab-nav.js';
   import { _ } from 'svelte-i18n';
   import { createEventDispatcher } from 'svelte';
   import { resolveAssetUrl, iconUrl, isNative, getNativeMode } from '../../lib/platform.js';
@@ -41,7 +42,7 @@
   ];
 
   function go(path) {
-    push(path);
+    goTab(path);
     if (!persistent) {
       open = false;
       dispatch('close');

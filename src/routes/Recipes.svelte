@@ -711,7 +711,7 @@
     const qs = params.toString();
     const next = qs ? `${base}?${qs}` : base;
     if (window.location.hash !== next && window.location.hash !== next.slice(1)) {
-      window.history.replaceState(null, '', next);
+      window.history.replaceState(window.history.state, '', next);
     }
   }
   function setCategoryFilter(slug) {

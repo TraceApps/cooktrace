@@ -60,7 +60,7 @@
     if (typeof window !== 'undefined') {
       const next = `#/manage/${id}`;
       if (window.location.hash !== next) {
-        window.history.replaceState(null, '', next);
+        window.history.replaceState(window.history.state, '', next);
       }
     }
   }

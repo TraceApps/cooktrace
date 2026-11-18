@@ -9,6 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Back leaves the Android app instead of walking through every tab** ([#99](https://github.com/TraceApps/cooktrace/issues/99), thanks @sreich). Each tab you opened was added to the back history, so back went through all of them before the app offered to exit. Now back goes one step inside a tab (from a recipe to the list), from any other tab to Recipes, and from Recipes it offers to exit; pages left open in a tab you switched away from no longer come back. The installed web app works the same way, except that it closes from Recipes without asking; a browser tab keeps the browser's usual history.
 - **Paprika exports can be picked in the Android app** ([#98](https://github.com/TraceApps/cooktrace/issues/98), thanks @sreich). The file picker in Settings > Import from Another App and in Import from JSON/HTML greyed out `.paprikarecipes` and `.paprikarecipe` files. It now shows every file, and one CookTrace can't import gets a message saying what to pick.
 - **A single-recipe Paprika export (`.paprikarecipe`) imports.** On the web it made an empty recipe called "Pasted recipe", and in the Android app it failed. It now imports, with its photo, rating and notes, and a file that isn't one gets a message instead.
 
