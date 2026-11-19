@@ -71,7 +71,7 @@ The English source text may also change occasionally without renaming the key. T
 - **Volume vs weight.** Some languages / cuisines strongly prefer one over the other. If your locale users cook by weight, don't force volume translations.
 - **Match the tone.** CookTrace's English copy is informal and direct ("Log a cook", "Plan tacos for Friday"). Try to keep that register rather than translating to a more formal style.
 - **Length awareness.** Some buttons are tight on small screens. If your translation is significantly longer than the English, test on a phone-sized viewport.
-- **Do not translate proper nouns or product names.** `CookTrace`, `Trace` (the AI assistant), `Open Food Facts`, `OFF`, `USDA`, `Mealie`, `Paprika`, `Tandoor`, `Kitchen`, `Cookbook` stay as-is.
+- **Do not translate proper nouns or product names.** `CookTrace`, `Trace` (the AI assistant), `Open Food Facts`, `OFF`, `USDA`, `Mealie`, `Paprika`, `Tandoor`, `Kitchen`, `Cookbook` stay as-is. The one exception: when Android or the service itself shows its name translated in your language, use that name, so it matches what people see on their phone (Android shows Health Connect as "Santé Connect" in French).
 
 ### For code contributors: instrumenting new strings
 
