@@ -1,8 +1,10 @@
 import { writable, get, derived } from 'svelte/store';
 import { pickInitialLocale } from '../i18n/index.js';
 import { DB } from '../lib/db.js';
-import { settingPrefix } from '../lib/setting-key.js';
+import { settingPrefix, settingScope } from '../lib/setting-key.js';
 import { FACTS_COLUMN_DEFAULT } from '../lib/facts-column.js';
+import { regionalDefault, rememberInstanceDefaults } from '../lib/regional-defaults.js';
+import { REGIONAL_OPTIONS } from '../../server/lib/regional-options.js';
 // Whose settings: the account (and server) they're kept for.
 const _userKey = () => settingPrefix();
 
@@ -348,17 +350,22 @@ export function reloadSettingStores({ force = false } = {}) {
   _storesUser = now;
   for (const k of Object.keys(_saveQueue)) { clearTimeout(_saveQueue[k]); delete _saveQueue[k]; }
   _recentlyChanged.clear();
-  for (const { key, defaultValue, store } of _settingStores) store.set(DB.getSetting(key, defaultValue));
+  for (const { key, defaultValue, store } of _settingStores) store.set(DB.getSetting(key, _resolve(defaultValue)));
   return true;
 }
 
+// A store's default may be a function, worked out each time it's needed:
+// the regional ones follow the server's defaults and this device's locale
+// (regionalStore, below).
+const _resolve = d => (typeof d === 'function' ? d() : d);
+
 function createSettingStore(key, defaultValue) {
-  const store = writable(DB.getSetting(key, defaultValue));
+  const store = writable(DB.getSetting(key, _resolve(defaultValue)));
   _settingStores.push({ key, defaultValue, store });
 
   window.addEventListener('wl:setting', (e) => {
     if (e.detail && e.detail.key === key) {
-      const next = DB.getSetting(key, defaultValue);
+      const next = DB.getSetting(key, _resolve(defaultValue));
       const prev = get(store);
       if (JSON.stringify(prev) !== JSON.stringify(next)) store.set(next);
     }
@@ -367,7 +374,7 @@ function createSettingStore(key, defaultValue) {
   return {
     subscribe: store.subscribe,
     set(value) {
-      const current = DB.getSetting(key, defaultValue);
+      const current = DB.getSetting(key, _resolve(defaultValue));
       if (JSON.stringify(current) === JSON.stringify(value)) {
         store.set(value);
         return;
@@ -380,11 +387,60 @@ function createSettingStore(key, defaultValue) {
       scheduleSave(key, value);
     },
     update(fn) {
-      const current = DB.getSetting(key, defaultValue);
+      const current = DB.getSetting(key, _resolve(defaultValue));
       this.set(fn(current));
     },
     get() { return get(store); }
   };
+}
+
+// ── Regional defaults (cooktrace#93) ─────────────────────────────────────
+// Language, units, date and time, and food search start, for someone who
+// never chose, from the server's defaults (Settings > Users), else this
+// device's locale, else `fallback`. Their own choice always wins, and the
+// default is never saved as theirs.
+
+/** Whose defaults: the server's, as settings are kept per server (the
+ *  Android app can switch servers; lib/setting-key.js). */
+export function instanceDefaultsScope() {
+  return settingScope();
+}
+
+function regionalStore(key, fallback) {
+  const allowed = REGIONAL_OPTIONS[key]?.values || null;
+  return createSettingStore(key, () => regionalDefault(key, fallback, { scope: instanceDefaultsScope(), allowed }));
+}
+
+/** What a regional setting shows for someone who hasn't chosen: for a
+ *  module that reads settings without the stores (lib/off.js). */
+export function regionalFallback(key, fallback) {
+  return regionalDefault(key, fallback, { scope: instanceDefaultsScope(), allowed: REGIONAL_OPTIONS[key]?.values || null });
+}
+
+/**
+ * The server's defaults, kept for offline, and every store showing a
+ * default (nobody chose) moved to them at once. Nothing is written into
+ * the account or sent.
+ */
+export function applyInstanceDefaults(values) {
+  if (!rememberInstanceDefaults(values, instanceDefaultsScope())) return false;
+  for (const { key, defaultValue, store } of _settingStores) {
+    if (typeof defaultValue === 'function') store.set(DB.getSetting(key, defaultValue()));
+  }
+  return true;
+}
+
+/** Ask the server for its defaults (signed in or not). Offline, the last
+ *  ones stay. In the Android app's Local mode there's no server: the
+ *  phone's locale alone. */
+export async function loadInstanceDefaults() {
+  if (isNative && !getServerUrl()) return;
+  try {
+    const res = await fetch(apiUrl('/api/app-config/defaults'), { credentials: 'include', signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return;
+    const body = await res.json();
+    applyInstanceDefaults(body?.values || {});
+  } catch { /* offline: the last ones stay */ }
 }
 
 // ── Device prefs (local-only) ──────────────────────────────────────────────
@@ -402,7 +458,7 @@ export const forceMobileLayout = createSettingStore('forceMobileLayout', false);
 
 // ── User prefs (server-synced) ─────────────────────────────────────────────
 // The browser or phone's own language until one is chosen (nutritrace#323).
-export const language    = createSettingStore('language',    pickInitialLocale());
+export const language    = regionalStore('language',    pickInitialLocale);
 export const accentColor = createSettingStore('accentColor', 'mint');
 // Page banners — three styles:
 //   'animated' = tall header with the page's illustrated SVG
@@ -441,12 +497,12 @@ export const pageBanners = derived(bannerStyle, $s => $s !== 'off');
 // 'animated'. Four styles: 'shimmer' (default), 'drift', 'pulse', 'aurora'.
 export const bannerAnimation = createSettingStore('bannerAnimation', 'shimmer');
 export const startPage   = createSettingStore('startPage',   '/');
-export const dateFormat  = createSettingStore('dateFormat',  'US');
-export const timeFormat  = createSettingStore('timeFormat',  '12h');
+export const dateFormat  = regionalStore('dateFormat',  'US');
+export const timeFormat  = regionalStore('timeFormat',  '12h');
 export const timezone    = createSettingStore('timezone',    '');
 
 // Cooking prefs
-export const measurementSystem = createSettingStore('measurementSystem', 'imperial');
+export const measurementSystem = regionalStore('measurementSystem', 'imperial');
 export const defaultServings   = createSettingStore('defaultServings',   2);
 
 // Recipes list sort. Mirrors NutriTrace's per-list sort settings (food /
@@ -477,7 +533,7 @@ export const autoCreatePantryFromRecipes = createSettingStore('autoCreatePantryF
 // (UK / EU / Canada) still use kcal — AU + NZ are the kJ outliers. So both
 // systems default to kcal and the user flips the kJ toggle if they want it.
 // Stored nutrition values always stay in kcal; the unit is presentation-only.
-export const energyUnit = createSettingStore('energyUnit', 'kcal');
+export const energyUnit = regionalStore('energyUnit', 'kcal');
 export const dietaryPrefs      = createSettingStore('dietaryPrefs',      []);
 export const allergens         = createSettingStore('allergens',         []);
 export const household         = createSettingStore('household',         []);
@@ -570,8 +626,8 @@ export const ntfyToken   = createSettingStore('ntfyToken',   '');
 // `offEnabled` gates the Refresh-from-OFF / Share-to-OFF buttons in
 // the pantry editor + barcode-scanner search-bar in the pantry list.
 export const offEnabled        = createSettingStore('offEnabled',        true);
-export const offSearchLanguage = createSettingStore('offSearchLanguage', 'en');
-export const offSearchCountry  = createSettingStore('offSearchCountry',  'World');
+export const offSearchLanguage = regionalStore('offSearchLanguage', 'en');
+export const offSearchCountry  = regionalStore('offSearchCountry',  'World');
 export const offUploadCountry  = createSettingStore('offUploadCountry',  'Auto');
 export const offUsername       = createSettingStore('offUsername',       '');
 export const offPassword       = createSettingStore('offPassword',       '');

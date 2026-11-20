@@ -248,7 +248,7 @@
     backup:        ['backup','export','import','restore','json','full backup','reset','danger zone'],
     import:        ['import','mealie','tandoor','paprika','recipe import','migration','migrate','transfer','bulk','zip','from another app'],
     kitchens:      ['kitchens','kitchen','share','sharing','family','roommates','crew','group','members','auto-share','auto share','auto sharing','share recipes','share cookbook','cookbook sharing','via kitchen'],
-    users:         ['users','user management','accounts','login','admin','register','invite','two-step sign-in','require two-step','require for everyone','reset two-step','2fa','mfa','two-factor','authenticator'],
+    users:         ['users','user management','accounts','login','admin','register','invite','defaults','defaults for everyone','default language','default units','new accounts','regional defaults','everyone','two-step sign-in','require two-step','require for everyone','reset two-step','2fa','mfa','two-factor','authenticator'],
     auth:          ['authentication','auth','sso','single sign-on','single sign on','oidc','openid','authentik','keycloak','authelia','password login'],
     apitokens:     ['api tokens','api token','personal access token','pat','mcp','model context protocol','claude desktop','cursor','codex','agent','ai agent','bearer token','scopes','revoke token','token expiry','expires','expiry'],
     webhooks:      ['webhooks','webhook','automation','n8n','home assistant','ifttt','push','event','integration','integrations','http post','callback url','signature','hmac','secret'],

@@ -226,6 +226,8 @@ router.get('/api/health', (req, res) => res.json(setupRequired() ? { ok: true, s
 router.use('/api', (req, res, next) => {
   if (req.path.startsWith('/auth')) return next();
   if (req.path.startsWith('/r/'))   return next();
+  // Everyone's defaults, for the setup wizard (cooktrace#93).
+  if (req.method === 'GET' && req.path === '/app-config/defaults') return next();
   if (!setupRequired()) return next();              // set up, or single-user mode by choice
   res.status(503).json({ error: 'Setup required', setup_required: true });
 });

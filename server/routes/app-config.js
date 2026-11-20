@@ -5,6 +5,7 @@ import { wrap } from '../logger.js';
 import { requireAuth, requireAdmin, userMgmtActive } from '../middleware/auth.js';
 import { testSmtp, isSmtpEnvLocked } from '../email.js';
 import { isAiEnvLocked, getAiConfig } from '../ai.js';
+import { getInstanceDefaults, setInstanceDefaults } from '../lib/instance-defaults.js';
 
 const router = Router();
 
@@ -53,6 +54,24 @@ router.get('/env-locks', requireAuth, wrap(async (req, res) => {
     oidc_password_login_locked: isPasswordLoginEnvLocked(),
     backup_locked,
   });
+}));
+
+// ── /api/app-config/defaults: language, units and formats for everyone ──
+// who hasn't chosen their own (cooktrace#93). Anyone may read them, signed
+// in or not and before setup (index.js lets this through): the sign-in page
+// and the setup wizard start from them, and they say nothing private.
+router.get('/defaults', wrap((req, res) => {
+  res.json(getInstanceDefaults());
+}));
+
+// body: { values: { key: value | null } }; null takes a default away.
+router.put('/defaults', requireAuth, requireAdmin, wrap((req, res) => {
+  try {
+    res.json(setInstanceDefaults(req.body?.values));
+  } catch (e) {
+    if (!e.status) throw e;
+    res.status(e.status).json({ error: e.message });
+  }
 }));
 
 // ── GET /api/app-config/sharing — sharing status + recipe count (any auth user) ───

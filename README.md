@@ -155,6 +155,7 @@ The most-asked knobs. Full list at [docs/self-hosting/env-vars](https://traceapp
 | `BACKUP_SCHEDULE` | - | `off` \| `daily` \| `weekly` \| `monthly`. Locks the UI field when set. |
 | `BACKUP_TIME` | - | Auto-backup time (HH:MM, container TZ). Locks the UI field. |
 | `BACKUP_RETENTION` | - | How many auto-backups to keep. |
+| `DEFAULT_LANGUAGE` / `DEFAULT_MEASUREMENT_SYSTEM` / `DEFAULT_ENERGY_UNIT` / `DEFAULT_DATE_FORMAT` / `DEFAULT_TIME_FORMAT` / `DEFAULT_OFF_SEARCH_LANGUAGE` / `DEFAULT_OFF_SEARCH_COUNTRY` | each device's language and region | What everyone who hasn't chosen their own starts with. Each one set locks it in Settings > Users > Defaults for Everyone. Values as `.env.example` lists them. |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` / `SMTP_SECURE` | - | Password reset + invite email. Without SMTP, invites fall back to a copyable link. |
 | `AI_PROVIDER` / `AI_API_KEY` / `AI_MODEL` / `AI_BASE_URL` / `AI_ENABLED` | - | Lock Trace to a server-side provider. Required combo for local endpoints is `AI_PROVIDER=oai-compat` + `AI_BASE_URL` + `AI_MODEL`. |
 | `OIDC_ISSUER` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` (or numbered `OIDC_PROVIDER_N_*`) | - | OIDC SSO provider(s). Env-defined providers are read-only in the UI. Full setup at [docs/auth/oidc](https://traceapps.github.io/docs/auth/oidc/). |

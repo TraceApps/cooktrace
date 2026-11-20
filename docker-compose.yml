@@ -79,6 +79,15 @@ services:
       # - BACKUP_SCHEDULE=${BACKUP_SCHEDULE:-}    # off | daily | weekly | monthly
       # - BACKUP_TIME=${BACKUP_TIME:-}            # HH:MM in container timezone
       # - BACKUP_RETENTION=${BACKUP_RETENTION:-}  # backups to keep (older purged)
+      # Optional: defaults for everyone who hasn't chosen their own (each
+      # one set here is locked in Settings > Users > Defaults for Everyone)
+      # - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-}                       # en | es | fr | sv
+      # - DEFAULT_MEASUREMENT_SYSTEM=${DEFAULT_MEASUREMENT_SYSTEM:-}   # metric | imperial
+      # - DEFAULT_ENERGY_UNIT=${DEFAULT_ENERGY_UNIT:-}                 # kcal | kJ
+      # - DEFAULT_DATE_FORMAT=${DEFAULT_DATE_FORMAT:-}                 # ISO | US | EU | natural
+      # - DEFAULT_TIME_FORMAT=${DEFAULT_TIME_FORMAT:-}                 # 12h | 24h
+      # - DEFAULT_OFF_SEARCH_LANGUAGE=${DEFAULT_OFF_SEARCH_LANGUAGE:-} # en, fr, de, ...
+      # - DEFAULT_OFF_SEARCH_COUNTRY=${DEFAULT_OFF_SEARCH_COUNTRY:-}   # World, Germany, ...
       # Optional — Cap session length in hours (default 8760 = 1 year)
       # - MAX_SESSION_HOURS=${MAX_SESSION_HOURS:-}
       # Optional — Model Context Protocol server at /api/mcp, for external AI

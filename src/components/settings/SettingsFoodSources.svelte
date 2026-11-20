@@ -18,6 +18,8 @@
   import SettingsFederation from './SettingsFederation.svelte';
   import SettingsImportFromNT from './SettingsImportFromNT.svelte';
 
+  // The same lists as the server's defaults (server/lib/regional-options.js;
+  // scripts/regional-defaults.test.js keeps them equal).
   const OFF_LANGUAGE_OPTS = [
     ['en','English'],['fr','French'],['de','German'],['es','Spanish'],['it','Italian'],
     ['pt','Portuguese'],['nl','Dutch'],['pl','Polish'],['ru','Russian'],['uk','Ukrainian'],['ja','Japanese'],

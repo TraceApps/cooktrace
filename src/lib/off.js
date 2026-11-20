@@ -18,8 +18,16 @@
 import { apiUrl, isNative, getServerUrl, getAuthToken, resolveAssetUrl } from './platform.js';
 import { shareWithOff, OffShareError } from './off-contribute.js';
 import { deriveSodiumSalt } from './nutriments.js';
-import { settingPrefix } from './setting-key.js';
+import { settingPrefix, settingScope } from './setting-key.js';
 import { cleanCodes } from './allergens.js';
+import { regionalDefault } from './regional-defaults.js';
+import { REGIONAL_OPTIONS } from '../../server/lib/regional-options.js';
+
+// A food search setting nobody chose: the server's default, else this
+// device's locale (cooktrace#93). Same rule as the settings stores.
+function _regional(key, fallback) {
+  return regionalDefault(key, fallback, { scope: settingScope(), allowed: REGIONAL_OPTIONS[key].values });
+}
 
 const OFF_BASE = 'https://world.openfoodfacts.org';
 
@@ -31,8 +39,7 @@ function _getOffSearchCountry() {
     if (typeof localStorage === 'undefined') return null;
     const setKey = settingPrefix() + 'offSearchCountry';
     const raw = localStorage.getItem(setKey);
-    if (!raw) return null;
-    const country = JSON.parse(raw);
+    const country = raw ? JSON.parse(raw) : _regional('offSearchCountry', 'World');
     if (!country || country === 'World') return null;
     const slug = country.toLowerCase().replace(/\s+/g, '-');
     return slug.startsWith('en:') ? slug : `en:${slug}`;
@@ -47,8 +54,7 @@ function _getOffSearchLanguage() {
     if (typeof localStorage === 'undefined') return 'en';
     const setKey = settingPrefix() + 'offSearchLanguage';
     const raw = localStorage.getItem(setKey);
-    if (!raw) return 'en';
-    const lang = JSON.parse(raw);
+    const lang = raw ? JSON.parse(raw) : _regional('offSearchLanguage', 'en');
     if (!lang || typeof lang !== 'string') return 'en';
     return lang.slice(0, 2).toLowerCase();
   } catch { return 'en'; }
