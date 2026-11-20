@@ -77,7 +77,7 @@ test('no answer from the server carries field_stamps (real server)', { timeout: 
     for (const p of ['/api/v1/recipes', `/api/v1/recipes/${recipe.id}`, '/api/v1/pantry', '/api/v1/shopping', '/api/v1/cook-diary']) await call('GET', p, undefined, bearer);
     const mcp = body => call('POST', '/api/mcp', { jsonrpc: '2.0', ...body }, bearer, { Accept: 'application/json, text/event-stream' });
     await mcp({ id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'check', version: '1' } } });
-    for (const [name, args] of [['get_recipe', { recipe_id: recipe.id }], ['list_pantry', {}], ['list_shopping_list', {}], ['list_cook_diary', {}], ['recent_recipes', {}], ['search_recipes', { query: 'soup' }]]) {
+    for (const [name, args] of [['get_recipe', { recipe_id: recipe.id }], ['list_pantry', {}], ['list_shopping_list', {}], ['list_cook_diary', {}], ['recent_recipes', {}], ['search_recipes', { query: 'soup' }], ['list_cookbooks', {}], ['list_recipe_categories', {}]]) {
       await mcp({ id: 2, method: 'tools/call', params: { name, arguments: args } });
     }
     assert.ok(calls > 30, `${calls} answers checked`);

@@ -97,7 +97,7 @@ function _evalSmartFilter(userId, filter, { full = true } = {}) {
 // cookbook's filter matches, or the manual links to recipes that still
 // exist. A deleted recipe keeps its link (deletes are soft), so links
 // alone overcount. `cache` keeps one owner's recipes across a list.
-function _recipeCount(cb, cache = new Map()) {
+export function cookbookRecipeCount(cb, cache = new Map()) {
   if (cb.is_smart) {
     const owner = cb.user_id ?? null;
     if (!cache.has(owner)) cache.set(owner, _evalSmartFilter(owner, {}, { full: false }));
@@ -126,7 +126,7 @@ router.get('/', wrap((req, res) => {
       ORDER BY c.sort_order ASC, c.name ASC`
   ).all(...userArgs(u));
   const cache = new Map();
-  res.json(rows.map(r => _hydrate(r, _recipeCount(r, cache))));
+  res.json(rows.map(r => _hydrate(r, cookbookRecipeCount(r, cache))));
 }));
 
 // ── PUT /order — rewrite the global cookbook display order ─────────────
@@ -176,7 +176,7 @@ router.get('/shared-with-me', wrap((req, res) => {
   // shows (recipes this account can't open come up locked).
   const cache = new Map();
   res.json(rows.map(r => ({
-    ..._hydrate(r, _recipeCount(r, cache)),
+    ..._hydrate(r, cookbookRecipeCount(r, cache)),
     shared_with_me: true,
     shared_by: r.shared_by_username || null,
     via_kitchen_id: r.via_kitchen_id ?? null,
@@ -353,7 +353,7 @@ router.post('/', wrap((req, res) => {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(u, name, slug, description, cover_image_url, is_smart, smart_filter_json, maxOrder + 1);
   const row = db.prepare(`SELECT * FROM cookbooks WHERE id = ?`).get(result.lastInsertRowid);
-  res.status(201).json(_hydrate(row, _recipeCount(row)));
+  res.status(201).json(_hydrate(row, cookbookRecipeCount(row)));
 }));
 
 // ── PUT /:id — update ───────────────────────────────────────────────────
@@ -392,7 +392,7 @@ router.put('/:id', wrap((req, res) => {
 
   saveRow('cookbooks', id, existing, { name, description, cover_image_url, sort_order, is_smart: nextIsSmart, smart_filter_json: nextFilterJson }, req.body?._sync);
   const row = db.prepare(`SELECT * FROM cookbooks WHERE id = ?`).get(id);
-  res.json(_hydrate(row, _recipeCount(row)));
+  res.json(_hydrate(row, cookbookRecipeCount(row)));
 }));
 
 // ── DELETE /:id — soft delete ───────────────────────────────────────────
@@ -419,16 +419,30 @@ router.delete('/:id', wrap((req, res) => {
 // ── POST /:id/recipes — add recipes ─────────────────────────────────────
 // body: { recipe_ids: [1,2,3] }
 router.post('/:id/recipes', wrap((req, res) => {
-  const u = uid(req);
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
-  const cb = db.prepare(`SELECT * FROM cookbooks WHERE id = ? AND deleted_at IS NULL`).get(id);
-  if (!cb) return res.status(404).json({ error: 'Not found' });
-  const isOwner = (u == null && cb.user_id == null) || cb.user_id === u;
-  if (!isOwner && !_canEditViaKitchen(id, u)) return res.status(403).json({ error: 'Forbidden' });
+  const r = addRecipesToCookbook(parseInt(req.params.id, 10), uid(req), req.body?.recipe_ids);
+  res.status(r.status).json(r.body);
+}));
 
-  const ids = Array.isArray(req.body?.recipe_ids) ? req.body.recipe_ids.map(n => parseInt(n, 10)).filter(Number.isFinite) : [];
-  if (ids.length === 0) return res.status(400).json({ error: 'recipe_ids required' });
+// Whether this account may change what's in a cookbook (its own, or one a
+// kitchen shared with it as Sous Chef). Shared with MCP (lib/mcp/tools/cookbooks.js).
+export function canEditCookbook(cb, u) {
+  const isOwner = (u == null && cb.user_id == null) || cb.user_id === u;
+  return isOwner || _canEditViaKitchen(cb.id, u);
+}
+
+/**
+ * Put recipes in a cookbook, after any already there. Recipes the account
+ * can't open are skipped, so one stray id doesn't fail the rest. Shared
+ * with MCP's add_recipe_to_cookbook. Returns { status, body }.
+ */
+export function addRecipesToCookbook(id, u, recipeIds) {
+  if (!Number.isFinite(id)) return { status: 400, body: { error: 'Invalid id' } };
+  const cb = db.prepare(`SELECT * FROM cookbooks WHERE id = ? AND deleted_at IS NULL`).get(id);
+  if (!cb) return { status: 404, body: { error: 'Not found' } };
+  if (!canEditCookbook(cb, u)) return { status: 403, body: { error: 'Forbidden' } };
+
+  const ids = Array.isArray(recipeIds) ? recipeIds.map(n => parseInt(n, 10)).filter(Number.isFinite) : [];
+  if (ids.length === 0) return { status: 400, body: { error: 'recipe_ids required' } };
 
   // Filter to recipes the user can actually see: their own OR recipes
   // that have been shared with them via recipe_shares (per-user grant
@@ -467,8 +481,8 @@ router.post('/:id/recipes', wrap((req, res) => {
     }
   });
   tx();
-  res.json({ ok: true, added });
-}));
+  return { status: 200, body: { ok: true, added } };
+}
 
 // ── PUT /:id/recipes/order — rewrite the recipe order inside a cookbook
 // body: { recipe_ids: [123, 99, 42, ...] } in the desired display order.
@@ -493,18 +507,20 @@ router.put('/:id/recipes/order', wrap((req, res) => {
 
 // ── DELETE /:id/recipes/:recipeId — remove a recipe link ────────────────
 router.delete('/:id/recipes/:recipeId', wrap((req, res) => {
-  const u = uid(req);
-  const id = parseInt(req.params.id, 10);
-  const recipeId = parseInt(req.params.recipeId, 10);
-  if (!Number.isFinite(id) || !Number.isFinite(recipeId)) return res.status(400).json({ error: 'Invalid id' });
-  const cb = db.prepare(`SELECT * FROM cookbooks WHERE id = ? AND deleted_at IS NULL`).get(id);
-  if (!cb) return res.status(404).json({ error: 'Not found' });
-  const isOwner = (u == null && cb.user_id == null) || cb.user_id === u;
-  if (!isOwner && !_canEditViaKitchen(id, u)) return res.status(403).json({ error: 'Forbidden' });
-
-  db.prepare(`DELETE FROM recipe_cookbook_links WHERE cookbook_id = ? AND recipe_id = ?`).run(id, recipeId);
-  res.json({ ok: true });
+  const r = removeRecipeFromCookbook(parseInt(req.params.id, 10), uid(req), parseInt(req.params.recipeId, 10));
+  res.status(r.status).json(r.body);
 }));
+
+/** Take a recipe out of a cookbook. Shared with MCP's remove_recipe_from_cookbook. */
+export function removeRecipeFromCookbook(id, u, recipeId) {
+  if (!Number.isFinite(id) || !Number.isFinite(recipeId)) return { status: 400, body: { error: 'Invalid id' } };
+  const cb = db.prepare(`SELECT * FROM cookbooks WHERE id = ? AND deleted_at IS NULL`).get(id);
+  if (!cb) return { status: 404, body: { error: 'Not found' } };
+  if (!canEditCookbook(cb, u)) return { status: 403, body: { error: 'Forbidden' } };
+
+  const r = db.prepare(`DELETE FROM recipe_cookbook_links WHERE cookbook_id = ? AND recipe_id = ?`).run(id, recipeId);
+  return { status: 200, body: { ok: true, removed: r.changes } };
+}
 
 // ── GET /by-recipe/:recipeId — which cookbooks contain this recipe ──────
 // Used by the recipe-edit / recipe-view "in cookbooks" pill row.

@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **More for MCP agents: categories, favorites, ratings and cookbooks** ([#101](https://github.com/TraceApps/cooktrace/issues/101), thanks @sreich). `update_recipe` sets a recipe's category (by id or name), favorite and rating. New tools: `list_recipe_categories` and `list_cookbooks` to read, and `add_recipe_to_cookbook` and `remove_recipe_from_cookbook` (write tier) to change which recipes a cookbook holds, several at once. They follow the app's rules: a cookbook shared with you changes only if you're a Sous Chef in its kitchen, and a smart cookbook is refused, since its filter decides what's in it. `get_recipe` also lists the cookbooks a recipe is in.
+
 ### Fixed
 
 - **Back leaves the Android app instead of walking through every tab** ([#99](https://github.com/TraceApps/cooktrace/issues/99), thanks @sreich). Each tab you opened was added to the back history, so back went through all of them before the app offered to exit. Now back goes one step inside a tab (from a recipe to the list), from any other tab to Recipes, and from Recipes it offers to exit; pages left open in a tab you switched away from no longer come back. The installed web app works the same way, except that it closes from Recipes without asking; a browser tab keeps the browser's usual history.

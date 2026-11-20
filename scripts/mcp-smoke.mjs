@@ -102,8 +102,10 @@ const READ_TOOLS = [
   'list_pantry',
   'list_shopping_list',
   'list_cook_diary',
+  'list_recipe_categories',
+  'list_cookbooks',
 ];
-const WRITE_TOOLS = ['log_cook', 'add_shopping_item', 'check_shopping_item', 'update_pantry_stock', 'update_recipe', 'set_recipe_image', 'plan_cook', 'update_plan'];
+const WRITE_TOOLS = ['log_cook', 'add_shopping_item', 'check_shopping_item', 'update_pantry_stock', 'update_recipe', 'set_recipe_image', 'plan_cook', 'update_plan', 'add_recipe_to_cookbook', 'remove_recipe_from_cookbook'];
 const DESTROY_TOOLS = ['create_recipe', 'add_pantry_item', 'delete_cook_diary_entry', 'remove_shopping_item', 'import_recipe_from_url', 'delete_recipe'];
 const expected = new Set([
   ...READ_TOOLS,
@@ -172,6 +174,8 @@ await checkTool('recent_recipes',    { limit: 3 }, 'items');
   await checkTool('list_shopping_list', {}, 'items');
 }
 await checkTool('list_cook_diary', { limit: 3 }, 'items');
+await checkTool('list_recipe_categories', {}, 'categories');
+await checkTool('list_cookbooks', {}, 'cookbooks');
 
 // --- Write tools (opt-in with --writes) ---
 if (WRITE_MODE) {

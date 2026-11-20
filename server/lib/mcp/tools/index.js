@@ -32,6 +32,7 @@ import { registerRemoveShoppingItem } from './remove-shopping-item.js';
 import { registerPlanCook, registerUpdatePlan } from './plan-cook.js';
 import { registerDeleteRecipe } from './delete-recipe.js';
 import { registerUpdateRecipe, registerSetRecipeImage, registerImportRecipeFromUrl } from './recipe-edit.js';
+import { registerListRecipeCategories, registerListCookbooks, registerAddRecipeToCookbook, registerRemoveRecipeFromCookbook } from './cookbooks.js';
 
 export function registerReadTools(server, ctx) {
   registerSearchRecipes(server, ctx);
@@ -40,6 +41,8 @@ export function registerReadTools(server, ctx) {
   registerListPantry(server, ctx);
   registerListShoppingList(server, ctx);
   registerListCookDiary(server, ctx);
+  registerListRecipeCategories(server, ctx);
+  registerListCookbooks(server, ctx);
 }
 
 export function registerWriteTools(server, ctx) {
@@ -51,6 +54,8 @@ export function registerWriteTools(server, ctx) {
   registerSetRecipeImage(server, ctx);
   registerPlanCook(server, ctx);
   registerUpdatePlan(server, ctx);
+  registerAddRecipeToCookbook(server, ctx);
+  registerRemoveRecipeFromCookbook(server, ctx);
 }
 
 export function registerDestroyTools(server, ctx) {

@@ -114,6 +114,21 @@ function _ingredients(list, existing) {
 
 const _steps = list => list.map(s => ({ title: '', text: s.trim(), refIds: [], imgUrl: '' }));
 
+// A category of this account's, by id or by name (any case), or why not.
+function _category(value, userId) {
+  if (value === null) return { id: null };
+  if (typeof value === 'number') {
+    const row = db.prepare(`SELECT id FROM recipe_categories WHERE id = ? AND user_id = ?`).get(value, userId);
+    return row ? { id: row.id } : { error: `category ${value} not found in your categories (list_recipe_categories has them).` };
+  }
+  const key = n => String(n ?? '').normalize('NFC').trim().toLowerCase();
+  const rows = db.prepare(`SELECT id, name FROM recipe_categories WHERE user_id = ?`).all(userId)
+    .filter(c => key(c.name) === key(value));
+  if (rows.length === 1) return { id: rows[0].id };
+  if (rows.length > 1) return { error: `More than one category is called "${value}": send its id (list_recipe_categories).` };
+  return { error: `No category called "${value}" (list_recipe_categories has yours; make new ones in the app).` };
+}
+
 function _own(recipeId, userId) {
   return db.prepare(`SELECT * FROM recipes WHERE id = ? AND user_id = ? AND deleted_at IS NULL`).get(recipeId, userId);
 }
@@ -146,8 +161,9 @@ export function registerUpdateRecipe(server, ctx) {
       description:
         'Change one of your recipes. Only the fields you send change. Sending ingredients or steps ' +
         'replaces that whole list (ingredients keep their pantry links by name). nutrition is merged: ' +
-        'send only the values to set, null to remove one. The replaced copy is kept as an earlier ' +
-        'version in the app, so an edit can be undone there.',
+        'send only the values to set, null to remove one. category is one of list_recipe_categories, ' +
+        'by id or name (null takes it off). The replaced copy is kept as an earlier version in the ' +
+        'app, so an edit can be undone there.',
       inputSchema: {
         recipe_id:    z.number().int().positive(),
         name:         z.string().min(1).max(200).optional(),
@@ -164,6 +180,12 @@ export function registerUpdateRecipe(server, ctx) {
         source_url:   z.string().url().max(500).nullable().optional(),
         notes:        z.string().max(2000).nullable().optional(),
         nutrition:    nutritionSchema.optional(),
+        category:     z.union([z.number().int().positive(), z.string().trim().min(1).max(100)]).nullable().optional()
+          .describe('A category id or name from list_recipe_categories; null takes the recipe out of its category.'),
+        favorite:     z.boolean().optional(),
+        // 1 to 5, as the app's stars; the app keeps "no rating" as null.
+        rating:       z.number().int().min(1).max(5).nullable().optional()
+          .describe('1 to 5 stars; null for no rating.'),
       },
     },
     async (args) => {
@@ -174,6 +196,13 @@ export function registerUpdateRecipe(server, ctx) {
       for (const f of ['name', 'description', 'servings', 'prep_minutes', 'cook_minutes', 'rest_minutes', 'total_minutes', 'tags', 'source_url', 'notes']) {
         if (args[f] !== undefined) body[f] = typeof args[f] === 'string' && f !== 'description' && f !== 'notes' ? args[f].trim() : args[f];
       }
+      if (args.category !== undefined) {
+        const cat = _category(args.category, ctx.userId);
+        if (cat.error) return toolError(cat.error);
+        body.category_id = cat.id;
+      }
+      if (args.favorite !== undefined) body.favorite = args.favorite;
+      if (args.rating !== undefined) body.rating = args.rating;
       if (args.ingredients) body.ingredients = _ingredients(args.ingredients, body.ingredients);
       if (args.steps) body.steps = _steps(args.steps);
       if (args.nutrition) {
@@ -189,7 +218,8 @@ export function registerUpdateRecipe(server, ctx) {
       // Which of them differ from what's there; none, and nothing is saved
       // (thanks to @Stasky745's #79 for the shape).
       const before = JSON.parse(was);
-      const changed = sent.filter(f => JSON.stringify(body[f]) !== JSON.stringify(before[f]));
+      const field = f => (f === 'category' ? 'category_id' : f);
+      const changed = sent.filter(f => JSON.stringify(body[field(f)]) !== JSON.stringify(before[field(f)]));
       if (!changed.length) return toolResult({ ok: true, recipe_id: row.id, changed: [] });
       return _save(row.id, body, ctx, { changed });
     }

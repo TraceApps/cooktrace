@@ -121,9 +121,19 @@ test('a Sous Chef can edit a cookbook shared into the kitchen, but not delete or
   assert.match(cookbooksJs, /function _canEditViaKitchen/);
   const fn = cookbooksJs.slice(cookbooksJs.indexOf('function _canEditViaKitchen'));
   assert.match(fn.slice(0, fn.indexOf('\n}')), /FROM cookbook_shares s[\s\S]*m\.role = 'sous'/);
-  for (const route of ["router.put('/:id',", "router.post('/:id/recipes',", "router.put('/:id/recipes/order',", "router.delete('/:id/recipes/:recipeId',"]) {
+  for (const route of ["router.put('/:id',", "router.put('/:id/recipes/order',"]) {
     const block = cookbooksJs.slice(cookbooksJs.indexOf(route));
     assert.match(block.slice(0, 700), /!isOwner && !_canEditViaKitchen\(id, u\)/, `${route} admits a Sous Chef`);
+  }
+  // Adding and taking out recipes live in functions MCP shares (#101),
+  // which ask canEditCookbook: the owner, or a Sous Chef.
+  const can = cookbooksJs.slice(cookbooksJs.indexOf('export function canEditCookbook'));
+  assert.match(can.slice(0, can.indexOf('\n}')), /return isOwner \|\| _canEditViaKitchen\(cb\.id, u\)/);
+  for (const [route, fn] of [["router.post('/:id/recipes',", 'export function addRecipesToCookbook'], ["router.delete('/:id/recipes/:recipeId',", 'export function removeRecipeFromCookbook']]) {
+    const block = cookbooksJs.slice(cookbooksJs.indexOf(route));
+    assert.match(block.slice(0, 300), new RegExp(fn.replace('export function ', '') + '\\('), `${route} goes through ${fn}`);
+    const body = cookbooksJs.slice(cookbooksJs.indexOf(fn));
+    assert.match(body.slice(0, body.indexOf('\n}')), /if \(!canEditCookbook\(cb, u\)\) return \{ status: 403/, `${fn} admits a Sous Chef, no one else`);
   }
   for (const route of ["router.delete('/:id',", "router.post('/:id/shares',"]) {
     const block = cookbooksJs.slice(cookbooksJs.indexOf(route));

@@ -66,14 +66,14 @@ test('a saved filter is read from the row', () => {
 test('the server counts what opening the cookbook shows', () => {
   assert.doesNotMatch(serverJs, /COUNT\(\*\) FROM recipe_cookbook_links l\s+WHERE l\.cookbook_id = c\.id/,
     'counting links alone gives a smart cookbook 0 and counts deleted recipes');
-  const count = serverJs.slice(serverJs.indexOf('function _recipeCount'));
+  const count = serverJs.slice(serverJs.indexOf('export function cookbookRecipeCount'));
   const body = count.slice(0, count.indexOf('\n}'));
   assert.match(body, /if \(cb\.is_smart\)/);
   assert.match(body, /matchesSmartFilter/);
   assert.match(body, /JOIN recipes r ON r\.id = l\.recipe_id[\s\S]*r\.deleted_at IS NULL/);
   for (const route of ["router.get('/',", "router.get('/shared-with-me',", "router.post('/',", "router.put('/:id',"]) {
     const r = serverJs.slice(serverJs.indexOf(route));
-    assert.match(r.slice(0, r.indexOf('\n}));')), /_recipeCount\(/, `${route} counts with _recipeCount`);
+    assert.match(r.slice(0, r.indexOf('\n}));')), /cookbookRecipeCount\(/, `${route} counts with cookbookRecipeCount`);
   }
   const open = serverJs.slice(serverJs.indexOf("router.get('/:id',"));
   assert.match(open.slice(0, open.indexOf('\n}));')), /_evalSmartFilter\(cb\.user_id, parseSmartFilter\(cb\.smart_filter_json\) \|\| \{\}\)/);

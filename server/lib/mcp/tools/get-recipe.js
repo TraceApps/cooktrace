@@ -19,7 +19,7 @@ export function registerGetRecipe(server, { userId }) {
       title: 'Get Recipe',
       description:
         'Full detail of one of the user\'s own recipes: ingredients (grouped), steps, ' +
-        'servings, timings, tags, tools, and nutrition. Use search_recipes or ' +
+        'servings, timings, tags, tools, nutrition, and the cookbooks it\'s in. Use search_recipes or ' +
         'recent_recipes first to find a recipe_id.',
       inputSchema: {
         recipe_id: z.number().int().positive(),
@@ -32,6 +32,14 @@ export function registerGetRecipe(server, { userId }) {
       if (!row) return toolError(`recipe_id ${recipe_id} not found in your recipes.`);
       const catMap = buildCategoryMap(userId);
       const hydrated = hydrateRecipe(row, catMap);
+      // The cookbooks it's in that this account can see (#101).
+      const cookbooks = db.prepare(
+        `SELECT c.id, c.name FROM recipe_cookbook_links l
+           JOIN cookbooks c ON c.id = l.cookbook_id
+          WHERE l.recipe_id = ? AND c.deleted_at IS NULL
+            AND (c.user_id = ? OR EXISTS (SELECT 1 FROM cookbook_shares s WHERE s.cookbook_id = c.id AND s.grantee_id = ?))
+          ORDER BY c.name ASC`
+      ).all(row.id, userId, userId);
       return toolResult({
         id: hydrated.id,
         name: hydrated.name,
@@ -45,6 +53,7 @@ export function registerGetRecipe(server, { userId }) {
         rating: hydrated.rating,
         favorite: hydrated.favorite,
         category: hydrated.category,
+        cookbooks,
         tags: hydrated.tags,
         tools: hydrated.tools,
         ingredients: hydrated.ingredients,

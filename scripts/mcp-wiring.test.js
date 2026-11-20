@@ -114,6 +114,8 @@ test('All read tools are registered', () => {
     'registerListPantry',
     'registerListShoppingList',
     'registerListCookDiary',
+    'registerListRecipeCategories',
+    'registerListCookbooks',
   ];
   for (const fn of expected) {
     assert.match(mcpTools, new RegExp(`\\b${fn}\\s*\\(`), `expected ${fn}() call in tools/index.js`);
@@ -128,6 +130,8 @@ test('All write tools are registered in registerWriteTools', () => {
     'registerUpdatePantryStock',
     'registerPlanCook',
     'registerUpdatePlan',
+    'registerAddRecipeToCookbook',
+    'registerRemoveRecipeFromCookbook',
   ];
   for (const fn of expected) {
     assert.match(mcpTools, new RegExp(`\\b${fn}\\s*\\(`), `expected ${fn}() call in tools/index.js`);
@@ -205,6 +209,7 @@ test('MCP tool DB queries scope on user_id — no cross-user access', () => {
     'recipe-edit.js',
     'plan-cook.js',
     'delete-recipe.js',
+    'cookbooks.js',
   ];
   for (const f of toolFiles) {
     const src = readFileSync(new URL(`../server/lib/mcp/tools/${f}`, import.meta.url), 'utf8');
