@@ -358,15 +358,13 @@ export function followPlan(u, diaryId) {
 // cooks the list already holds from other weeks are worked out with the
 // range's, so a cook moved to another week isn't counted twice; their lines
 // are kept to the ones still on the list.
-router.post('/from-plan', wrap((req, res) => {
-  const u = uid(req);
+export function addPlanToList(u, { from: fromArg, to: toArg, onlyMissing = true } = {}) {
   // Calendar days from the server's local today (the UTC date was a day off
   // for part of every night).
   const todayIso = localToday();
-  const from = /^\d{4}-\d{2}-\d{2}$/.test(req.query.from) ? req.query.from : todayIso;
-  let to = /^\d{4}-\d{2}-\d{2}$/.test(req.query.to) ? req.query.to : null;
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(fromArg) ? fromArg : todayIso;
+  let to = /^\d{4}-\d{2}-\d{2}$/.test(toArg) ? toArg : null;
   if (!to) to = shiftDay(todayIso, 7);
-  const onlyMissing = req.query.only_missing !== '0';
 
   const inRange = db.prepare(
     `SELECT id FROM cook_diary
@@ -379,29 +377,40 @@ router.post('/from-plan', wrap((req, res) => {
   const contributions = onlyListed(_planContributions(u, cooks, onlyMissing), rows, others);
   // Run even with nothing planned: cooks taken off the plan leave the list.
   const result = _applyToList(u, contributions, { window: { from, to }, cooks });
-  res.json({ ...result, planned_cooks: inRange.length, from, to });
+  return { ...result, planned_cooks: inRange.length, from, to };
+}
+
+router.post('/from-plan', wrap((req, res) => {
+  res.json(addPlanToList(uid(req), {
+    from: req.query.from, to: req.query.to, onlyMissing: req.query.only_missing !== '0',
+  }));
 }));
 
 // ── POST /from-recipe/:id: a recipe's ingredients onto the list ─────────
 // Scaled to ?servings= when given. `only_missing` (default on) leaves out
 // ingredients whose pantry item is in stock.
-router.post('/from-recipe/:id', wrap((req, res) => {
-  const u = uid(req);
-  const recipeId = parseInt(req.params.id, 10);
-  if (!Number.isFinite(recipeId)) return res.status(400).json({ error: 'Invalid id' });
-  if (linkableRecipeId(recipeId, u) == null) return res.status(404).json({ error: 'Recipe not found' });
+// Null when the recipe isn't one this account can use.
+export function addRecipeToList(u, recipeId, { servings, onlyMissing = true } = {}) {
+  if (linkableRecipeId(recipeId, u) == null) return null;
   const recipe = db.prepare(`SELECT * FROM recipes WHERE id = ? AND deleted_at IS NULL`).get(recipeId);
-  if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
-
-  const onlyMissing = req.query.only_missing !== '0';
+  if (!recipe) return null;
   const stock = _inStockSet(u);
-  const servings = Number(req.query.servings);
   const contributions = recipeContributions(recipe, {
     servings: Number.isFinite(servings) && servings > 0 ? servings : null,
     skip: it => onlyMissing && it.pantry_item_id && stock.has(it.pantry_item_id),
   });
   const result = _applyToList(u, contributions, {});
-  res.json({ ...result, added: result.added + result.updated });
+  return { ...result, added: result.added + result.updated };
+}
+
+router.post('/from-recipe/:id', wrap((req, res) => {
+  const recipeId = parseInt(req.params.id, 10);
+  if (!Number.isFinite(recipeId)) return res.status(400).json({ error: 'Invalid id' });
+  const result = addRecipeToList(uid(req), recipeId, {
+    servings: Number(req.query.servings), onlyMissing: req.query.only_missing !== '0',
+  });
+  if (!result) return res.status(404).json({ error: 'Recipe not found' });
+  res.json(result);
 }));
 
 export default router;

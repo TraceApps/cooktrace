@@ -55,7 +55,8 @@ export const KNOWN_SCOPES = new Set([
   'mcp:read',
   // mcp:write unlocks MCP write tools (log_cook, add_shopping_item,
   // check_shopping_item, update_pantry_stock, update_recipe,
-  // set_recipe_image). Independent of mcp:read
+  // set_recipe_image, add_recipe_to_shopping_list,
+  // add_plan_to_shopping_list). Independent of mcp:read
   // but tokens typically hold both. Requires MCP_WRITE_ENABLED=1 on
   // the server for any effect.
   'mcp:write',

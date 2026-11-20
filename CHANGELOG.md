@@ -10,6 +10,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - **More for MCP agents: categories, favorites, ratings and cookbooks** ([#101](https://github.com/TraceApps/cooktrace/issues/101), thanks @sreich). `update_recipe` sets a recipe's category (by id or name), favorite and rating. New tools: `list_recipe_categories` and `list_cookbooks` to read, and `add_recipe_to_cookbook` and `remove_recipe_from_cookbook` (write tier) to change which recipes a cookbook holds, several at once. They follow the app's rules: a cookbook shared with you changes only if you're a Sous Chef in its kitchen, and a smart cookbook is refused, since its filter decides what's in it. `get_recipe` also lists the cookbooks a recipe is in.
+- **MCP builds the shopping list from a recipe or the plan.** New write tools `add_recipe_to_shopping_list` (scaled to `servings` when given) and `add_plan_to_shopping_list` (the planned cooks of a date range, default the next 7 days) do what the Shopping screen's add recipe and build from plan do: amounts of one ingredient add up, in-stock pantry items are skipped unless `only_missing` is false, and building the same week again replaces its share instead of doubling it.
 
 ### Fixed
 

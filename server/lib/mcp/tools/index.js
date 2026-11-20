@@ -23,6 +23,7 @@ import { registerListShoppingList } from './list-shopping-list.js';
 import { registerListCookDiary } from './list-cook-diary.js';
 import { registerLogCook } from './log-cook.js';
 import { registerAddShoppingItem } from './add-shopping-item.js';
+import { registerAddRecipeToShoppingList, registerAddPlanToShoppingList } from './shopping-from.js';
 import { registerCheckShoppingItem } from './check-shopping-item.js';
 import { registerUpdatePantryStock } from './update-pantry-stock.js';
 import { registerCreateRecipe } from './create-recipe.js';
@@ -48,6 +49,8 @@ export function registerReadTools(server, ctx) {
 export function registerWriteTools(server, ctx) {
   registerLogCook(server, ctx);
   registerAddShoppingItem(server, ctx);
+  registerAddRecipeToShoppingList(server, ctx);
+  registerAddPlanToShoppingList(server, ctx);
   registerCheckShoppingItem(server, ctx);
   registerUpdatePantryStock(server, ctx);
   registerUpdateRecipe(server, ctx);
