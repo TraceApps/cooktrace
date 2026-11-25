@@ -15,6 +15,7 @@
   import { _ } from 'svelte-i18n';
   import { onMount } from 'svelte';
   import { UNIT_GROUPS } from '../../lib/units.js';
+  import { foldText } from '../../lib/search-text.js';
   import { NtApi } from '../../lib/api.js';
   import { onSyncChanges, newestRead } from '../../lib/sync-refresh.js';
   import { refreshUnitsOverlay } from '../../stores/unitsOverlay.js';
@@ -70,11 +71,11 @@
   // tidy under a narrow filter.
   let filter = '';
   function _matches(u, needle) {
-    const abbr = (u.abbr || '').toLowerCase();
-    const full = (u.full || u.full_name || '').toLowerCase();
+    const abbr = foldText(u.abbr);
+    const full = foldText(u.full || u.full_name);
     return abbr.includes(needle) || full.includes(needle);
   }
-  $: needle = filter.trim().toLowerCase();
+  $: needle = foldText(filter).trim();
   $: filteredGroups = needle
     ? UNIT_GROUPS
         .map(g => ({ ...g, units: g.units.filter(u => _matches(u, needle)) }))
