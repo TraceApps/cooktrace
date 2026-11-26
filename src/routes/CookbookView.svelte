@@ -464,15 +464,25 @@
                    own access to this recipe. Show the name so they
                    know what's here + a hint about how to unlock it,
                    but don't navigate anywhere. -->
+              <!-- In your own cookbook a recipe locks when you can't open it
+                   (a share that ended, or one a Sous Chef added that's only
+                   theirs; an access audit, after cooktrace#110): say so,
+                   and let it be taken out. -->
               <div class="card recipe-card locked-card"
-                title={$_('cookbook_view_ui.locked_tooltip')}>
+                title={cookbook.shared_with_me ? $_('cookbook_view_ui.locked_tooltip') : $_('cookbook_view_ui.locked_hint_owner')}>
                 <div class="card-image">
                   <span class="material-symbols-rounded card-image-fallback">lock</span>
                 </div>
                 <div class="card-body">
                   <h3 class="card-name" dir="auto">{r.name}</h3>
-                  <p class="card-desc locked-hint">{$_('cookbook_view_ui.locked_hint')}</p>
+                  <p class="card-desc locked-hint">{cookbook.shared_with_me ? $_('cookbook_view_ui.locked_hint') : $_('cookbook_view_ui.locked_hint_owner')}</p>
                 </div>
+                {#if cbEditable}
+                  <button class="remove-btn" on:click={() => removeRecipe(r)}
+                    aria-label={$_('cookbook_view_ui.remove_aria', { values: { name: r.name } })} title={$_('cookbook_view_ui.remove_tooltip')}>
+                    <span class="material-symbols-rounded">close</span>
+                  </button>
+                {/if}
               </div>
             {:else}
             <div class="card recipe-card"

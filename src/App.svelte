@@ -328,6 +328,9 @@
   onMount(async () => {
     trackTabDepth();
     initFold();
+    // Everyone's defaults (language, units, formats) from the server, signed
+    // in or not: a setting nobody chose follows them (cooktrace#93).
+    import('./stores/settings.js').then(({ loadInstanceDefaults }) => loadInstanceDefaults()).catch(() => {});
     // Update checks: a device that was already using the app keeps checking,
     // a fresh one stays quiet until setup asks. Runs first so nothing above
     // can skip it (see lib/updates.js).
@@ -660,7 +663,7 @@
 
     // PWA settings refresh
     if (!isNative && $userMgmtActive && $currentUser) {
-      const _refreshSettings = () => import('./stores/settings.js').then(({ loadServerSettings }) => loadServerSettings());
+      const _refreshSettings = () => import('./stores/settings.js').then(({ loadServerSettings, loadInstanceDefaults }) => { loadInstanceDefaults(); return loadServerSettings(); });
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') _refreshSettings();
       });
@@ -745,7 +748,7 @@
   $: {
     if (_wasNeedsLogin && !needsLogin && $currentUser) {
       _wasNeedsLogin = false;
-      import('./stores/settings.js').then(({ loadServerSettings }) => loadServerSettings()).catch(() => {});
+      import('./stores/settings.js').then(({ loadServerSettings, loadInstanceDefaults }) => { loadInstanceDefaults(); return loadServerSettings(); }).catch(() => {});
       loadEnvLocks();
     } else if (needsLogin) {
       _wasNeedsLogin = true;

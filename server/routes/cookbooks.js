@@ -255,10 +255,14 @@ router.get('/:id', wrap((req, res) => {
     ).all(id);
   }
 
-  // Access filter for non-owner reads: owned by them OR shared to
-  // them via recipe_shares. Owners see everything they added.
+  // Access filter for every reader, the cookbook's owner included: the
+  // same rule as opening the recipe (GET /api/recipes/:id), so yours,
+  // shared with you, or visible to the group. Owning the cookbook isn't
+  // enough: a recipe added while it was shared stays linked after the
+  // share ends, and a Sous Chef can add one only they can open; either
+  // shows as a locked placeholder (an access audit, after cooktrace#110).
   let accessible = null;
-  if (!isOwner && u != null) {
+  if (u != null) {
     const ids = recipes.map(r => r.id);
     if (ids.length > 0) {
       const ph = ids.map(() => '?').join(',');
@@ -267,6 +271,7 @@ router.get('/:id', wrap((req, res) => {
           `SELECT r.id FROM recipes r
             WHERE r.id IN (${ph}) AND r.deleted_at IS NULL
               AND (r.user_id = ?
+                   OR r.visibility = 'group'
                    OR EXISTS (SELECT 1 FROM recipe_shares s
                                WHERE s.recipe_id = r.id AND s.grantee_id = ?))`
         ).all(...ids, u, u).map(r => r.id)

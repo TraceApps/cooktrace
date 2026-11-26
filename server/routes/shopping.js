@@ -304,17 +304,24 @@ function _inStockSet(u) {
 
 // The planned cooks with these ids that are still planned, each recipe
 // scaled to the cook's servings; `onlyMissing` leaves out what's in stock.
+// Only recipes this account can still open (its own, shared with it, or
+// visible to the group, as GET /api/recipes/:id): a plan made while a
+// recipe was shared doesn't keep copying it after the share ends (an
+// access audit, after cooktrace#110).
 function _planContributions(u, ids, onlyMissing) {
   const list = [...ids].filter(Number.isFinite);
   if (!list.length) return [];
+  const canOpen = u == null ? '' : `AND (r.user_id = ? OR r.visibility = 'group'
+                   OR EXISTS (SELECT 1 FROM recipe_shares s WHERE s.recipe_id = r.id AND s.grantee_id = ?))`;
   const planned = db.prepare(
     `SELECT cd.id AS diary_id, cd.date, cd.servings AS planned_servings,
             r.id, r.servings, r.ingredients
        FROM cook_diary cd
        JOIN recipes r ON r.id = cd.recipe_id AND r.deleted_at IS NULL
       WHERE ${userClause(u).replace(/user_id/g, 'cd.user_id')} AND cd.deleted_at IS NULL
-        AND cd.kind = 'planned' AND cd.id IN (${list.map(() => '?').join(',')})`
-  ).all(...userArgs(u), ...list);
+        AND cd.kind = 'planned' AND cd.id IN (${list.map(() => '?').join(',')})
+        ${canOpen}`
+  ).all(...userArgs(u), ...list, ...(u == null ? [] : [u, u]));
   const stock = _inStockSet(u);
   const skip = it => onlyMissing && it.pantry_item_id && stock.has(it.pantry_item_id);
   return planned.flatMap(p => recipeContributions(p, {

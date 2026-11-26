@@ -1111,7 +1111,11 @@ router.put('/:id/cooks/:cookId', wrap((req, res) => {
   const isOwner = (u == null && recipe.user_id == null) || recipe.user_id === u;
   if (!isOwner) return res.status(403).json({ error: 'Forbidden' });
 
-  const existing = db.prepare(`SELECT * FROM cook_diary WHERE id = ? AND recipe_id = ? AND deleted_at IS NULL`).get(cookId, id);
+  // Your own cook only: owning the recipe doesn't make someone else's
+  // diary entry yours, the same rule as PUT /api/cook-diary/:id (an access
+  // audit, after cooktrace#110).
+  const existing = db.prepare(`SELECT * FROM cook_diary WHERE id = ? AND recipe_id = ? AND deleted_at IS NULL AND ${u == null ? 'user_id IS NULL' : 'user_id = ?'}`)
+    .get(cookId, id, ...(u == null ? [] : [u]));
   if (!existing) return res.status(404).json({ error: 'Cook entry not found' });
 
   const date = (typeof req.body?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date))
@@ -1317,11 +1321,16 @@ router.delete('/:id/cooks/:cookId', wrap((req, res) => {
   const isOwner = (u == null && recipe.user_id == null) || recipe.user_id === u;
   if (!isOwner) return res.status(403).json({ error: 'Forbidden' });
 
-  const was = db.prepare(`SELECT kind FROM cook_diary WHERE id = ? AND recipe_id = ? AND deleted_at IS NULL`).get(cookId, id);
+  // Your own cook only (see PUT above).
+  const mine = u == null ? 'user_id IS NULL' : 'user_id = ?';
+  const mineArgs = u == null ? [] : [u];
+  const was = db.prepare(`SELECT kind FROM cook_diary WHERE id = ? AND recipe_id = ? AND deleted_at IS NULL AND ${mine}`).get(cookId, id, ...mineArgs);
+  // Already gone, or someone else's: nothing to do, as before.
+  if (!was) return res.json({ ok: true });
   db.prepare(
     `UPDATE cook_diary SET deleted_at = datetime('now'), updated_at = datetime('now')
-     WHERE id = ? AND recipe_id = ?`
-  ).run(cookId, id);
+     WHERE id = ? AND recipe_id = ? AND ${mine}`
+  ).run(cookId, id, ...mineArgs);
 
   _recomputeCookAggregates(id);
   // A planned cook taken off takes its share of the list with it (#81).

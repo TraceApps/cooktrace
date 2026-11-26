@@ -19,6 +19,7 @@
   import { onMount, onDestroy, tick } from 'svelte';
   import { get } from 'svelte/store';
   import { fold } from '../../lib/fold.js';
+  import { foldText } from '../../lib/search-text.js';
   import { placeAnchoredMenu } from '../../lib/fold-core.js';
   import { fade } from 'svelte/transition';
   import { portal } from '../../lib/portal.js';
@@ -42,7 +43,9 @@
   // full pantry catalog unprompted on focus is its own kind of mess.
   $: q = _norm(value);
   $: filtered = q
-    ? suggestions.filter(n => _norm(n).includes(q) && _norm(n) !== q)
+    // Accents folded for the match, so "jalapeno" offers "Jalapeño"; the
+    // exact check stays plain, so the accented name is still offered.
+    ? suggestions.filter(n => foldText(n).includes(foldText(q)) && _norm(n) !== q)
     : [];
   $: if (highlight >= filtered.length) highlight = filtered.length - 1;
   $: showPopover = open && filtered.length > 0;

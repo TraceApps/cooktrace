@@ -2340,6 +2340,7 @@
     "ai_test": "Couldn't reach the AI provider",
     "revoke_invite": "Couldn't revoke the invite",
     "password_policy": "Couldn't save the password rules",
+    "save_defaults": "Couldn't save the default",
     "update_user": "Couldn't update the user",
     "create_invite": "Couldn't create the invite",
     "update_entry": "Couldn't update the diary entry",
@@ -2916,6 +2917,7 @@
     "no_match_title": "No Recipes Match \"{q}\"",
     "locked_tooltip": "This recipe isn't shared with you individually. Ask the cookbook owner to share the recipe or add it to a Kitchen you're both in.",
     "locked_hint": "Not shared with you. Ask the cookbook owner to share it.",
+    "locked_hint_owner": "You can't open this recipe. Remove it, or ask its owner to share it with you.",
     "favorite": "Favorite",
     "rated": "Rated {rating} of 5",
     "remove_aria": "Remove {name}",
@@ -3655,6 +3657,14 @@
     "log_file_desc": "Today's persisted log on disk (rotates daily, last 7 days kept). Better for long sessions or after a crash; the in-memory buffer above resets every reload.",
     "crash_desc": "The app captured an uncaught error. Share the report to help track it down, then dismiss it.",
     "share_crash": "Share Crash Report"
+  },
+  "settings_defaults": {
+    "title": "Defaults for Everyone",
+    "desc": "What anyone who hasn't chosen their own starts with, in Regional & Units and Food Sources. Their own choice always wins, and a change here reaches everyone who hasn't chosen.",
+    "device_choice": "Each Device",
+    "locked": "Set on the server by {env}.",
+    "load_failed": "Couldn't load the defaults. Check the connection, then open this page again.",
+    "saved": "Default saved"
   },
   "settings_food_sources_ui": {
     "lang_en": "English",

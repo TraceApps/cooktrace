@@ -5,7 +5,7 @@
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { DB } from '../lib/db.js';
-  import { bulkSet } from '../stores/settings.js';
+  import { bulkSet, measurementSystem as measurementSystemSetting } from '../stores/settings.js';
   import { currentUser, userMgmtActive, setupRequired, loadAuthState, signInProblem } from '../stores/auth.js';
   import { get } from 'svelte/store';
   import { cookieBlockedByHttp, droppedCookieReason } from '../lib/cookie-check.js';
@@ -57,22 +57,15 @@
   $: progress = ((step + 1) / STEPS.length) * 100;
 
   // ── Cooking prefs state ──────────────────────────────────────────────────
-  // Locale-aware defaults: en-AU / en-NZ → kJ, everyone else → kcal.
-  // metric vs imperial: en-US is the only major imperial locale; everyone
-  // else metric. Both are still freely toggleable in Settings.
-  function _localeDefaults() {
-    let metric = false, kj = false;
-    try {
-      const lang = (typeof navigator !== 'undefined' && (navigator.language || '')).toLowerCase();
-      metric = !!lang && !lang.startsWith('en-us');
-      kj = lang === 'en-au' || lang === 'en-nz';
-    } catch {}
-    return { metric, kj };
-  }
-  const _ld = _localeDefaults();
+  // Starts as the setting's own default: the server's (Settings > Users),
+  // else this device's locale (lib/regional-defaults.js), and follows it
+  // until a choice is tapped (cooktrace#93). Saved only when chosen, so an
+  // admin's later default still reaches this account. Energy isn't asked
+  // here: it follows the same defaults until changed in Settings.
   let displayName = '';
-  let measurementSystem = _ld.metric ? 'metric' : 'imperial';
-  let energyUnitVal = _ld.kj ? 'kJ' : 'kcal';
+  let measurementSystem = get(measurementSystemSetting);
+  let measurementChosen = false;
+  $: if (!measurementChosen) measurementSystem = $measurementSystemSetting;
   let defaultServings = 2;
   // Who you cook for starts as you, by the name given a step earlier.
   $: youName = displayName.trim() || umNickname.trim() || umFullName.trim() || umUsername.trim() || $_('household.you');
@@ -164,8 +157,7 @@
   async function finish() {
     await _saveUpdateChoice();
     const settingsToSave = {
-      measurementSystem,
-      energyUnit: energyUnitVal,
+      ...(measurementChosen ? { measurementSystem } : {}),
       defaultServings,
       // New users finishing onboarding get gradient banners as their
       // default first impression. Existing users (who never re-run the
@@ -337,7 +329,7 @@
             {#each ['imperial','metric'] as opt}
               <button
                 class="seg" class:active={measurementSystem === opt}
-                on:click={() => measurementSystem = opt}
+                on:click={() => { measurementSystem = opt; measurementChosen = true; }}
               >{opt === 'metric' ? $_('settings_page.regional.metric') : $_('settings_page.regional.imperial')}</button>
             {/each}
           </div>
