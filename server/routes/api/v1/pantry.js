@@ -32,6 +32,7 @@ import { Router } from 'express';
 import db from '../../../db.js';
 import { wrap } from '../../../logger.js';
 import { requireScope } from '../../../middleware/bearer-auth.js';
+import { foldText } from '../../../lib/search-text.js';
 
 const router = Router();
 
@@ -125,7 +126,9 @@ function _makeResolver(pantryById) {
 // the whole set, so `total` always reflects importable rows only.
 router.get('/', wrap((req, res) => {
   const userId = req.apiUser.id;
-  const q = String(req.query.q || '').trim().toLowerCase();
+  // Accents and case ignored on both sides, as every other search here
+  // ("vacio" finds "Vacío"; #109).
+  const q = foldText(String(req.query.q || '')).trim();
   const rawLimit = Number(req.query.limit);
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 200) : null;
   const rawOffset = Number(req.query.offset);
@@ -171,7 +174,7 @@ router.get('/', wrap((req, res) => {
     let displayName = row.name;
     if (row.generic_parent_id != null) {
       const parent = pantryById.get(row.generic_parent_id);
-      if (parent?.name && !row.name.toLowerCase().includes(parent.name.toLowerCase())) {
+      if (parent?.name && !foldText(row.name).includes(foldText(parent.name))) {
         displayName = `${parent.name}, ${row.name}`;
       }
     }
@@ -202,8 +205,8 @@ router.get('/', wrap((req, res) => {
       // under a "Flour" generic is still found by typing "flour". Without
       // that, hiding the generic parent would make its variants
       // unreachable by the word people actually search for.
-      _haystack: [displayName, row.name, row.brand, row.category]
-        .filter(Boolean).join(' ').toLowerCase(),
+      _haystack: foldText([displayName, row.name, row.brand, row.category]
+        .filter(Boolean).join(' ')),
     });
   }
 
