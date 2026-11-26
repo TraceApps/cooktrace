@@ -2917,6 +2917,7 @@
     "no_match_title": "No Recipes Match \"{q}\"",
     "locked_tooltip": "This recipe isn't shared with you individually. Ask the cookbook owner to share the recipe or add it to a Kitchen you're both in.",
     "locked_hint": "Not shared with you. Ask the cookbook owner to share it.",
+    "locked_hint_owner": "You can't open this recipe. Remove it, or ask its owner to share it with you.",
     "favorite": "Favorite",
     "rated": "Rated {rating} of 5",
     "remove_aria": "Remove {name}",

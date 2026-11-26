@@ -1889,6 +1889,9 @@
                       {/if}
                     {/if}
                   </div>
+                  <!-- Your own cooks only: someone else's diary entry isn't
+                       yours to change, the server's rule too. -->
+                  {#if _mine(c)}
                   <div class="cook-actions">
                     <button class="btn-icon small" on:click={() => openCookLog(c)} aria-label={$_('common.edit')} title={$_('common.edit')}>
                       <span class="material-symbols-rounded">edit</span>
@@ -1897,6 +1900,7 @@
                       <span class="material-symbols-rounded">delete</span>
                     </button>
                   </div>
+                  {/if}
                 </li>
               {/each}
             </ul>

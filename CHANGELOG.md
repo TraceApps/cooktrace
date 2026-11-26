@@ -21,6 +21,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Security
 
+- **Adding a recipe to the shopping list checks you can open it** ([#110](https://github.com/TraceApps/cooktrace/issues/110), thanks @carfeii). On a server with accounts, any signed-in user could copy the ingredients of another account's private recipe into their own list by its number. Fixed since 1.5.0-dev01; advisory GHSA-xfcj-w586-mg45.
+- **What a recipe's sharing allows holds everywhere** (an access audit after #110). A cookbook shows a recipe in full only to someone who can open it, its owner included: one whose share ended, or one a Sous Chef added that only they can open, shows locked, with a button to take it out. A planned cook no longer copies a recipe into the shopping list once it isn't shared with you. And owning a recipe no longer lets you change or remove someone else's cook of it; the recipe's cook history offers Edit and Delete on your own cooks only.
 - **hono** 4.13.18 on the server closes [GHSA-4m76-xfj5-7975](https://github.com/advisories/GHSA-4m76-xfj5-7975), [GHSA-h7mg-cq63-vhpq](https://github.com/advisories/GHSA-h7mg-cq63-vhpq), [GHSA-3gg2-335m-rxc6](https://github.com/advisories/GHSA-3gg2-335m-rxc6), [GHSA-46wx-v44x-9hh2](https://github.com/advisories/GHSA-46wx-v44x-9hh2) and [GHSA-4h7h-rv7c-7m2v](https://github.com/advisories/GHSA-4h7h-rv7c-7m2v). Only the MCP server uses it.
 - **Server dependencies updated** (body-parser, multer, undici, zod and others): `npm audit` reports 0 vulnerabilities for the server.
 
