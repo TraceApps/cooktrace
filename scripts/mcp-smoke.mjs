@@ -105,7 +105,7 @@ const READ_TOOLS = [
   'list_recipe_categories',
   'list_cookbooks',
 ];
-const WRITE_TOOLS = ['log_cook', 'add_shopping_item', 'check_shopping_item', 'update_pantry_stock', 'update_recipe', 'set_recipe_image', 'plan_cook', 'update_plan', 'add_recipe_to_cookbook', 'remove_recipe_from_cookbook'];
+const WRITE_TOOLS = ['log_cook', 'add_shopping_item', 'check_shopping_item', 'update_pantry_stock', 'update_recipe', 'set_recipe_image', 'plan_cook', 'update_plan', 'add_recipe_to_cookbook', 'remove_recipe_from_cookbook', 'add_recipe_to_shopping_list', 'add_plan_to_shopping_list'];
 const DESTROY_TOOLS = ['create_recipe', 'add_pantry_item', 'delete_cook_diary_entry', 'remove_shopping_item', 'import_recipe_from_url', 'delete_recipe'];
 const expected = new Set([
   ...READ_TOOLS,

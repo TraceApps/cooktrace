@@ -132,6 +132,8 @@ test('All write tools are registered in registerWriteTools', () => {
     'registerUpdatePlan',
     'registerAddRecipeToCookbook',
     'registerRemoveRecipeFromCookbook',
+    'registerAddRecipeToShoppingList',
+    'registerAddPlanToShoppingList',
   ];
   for (const fn of expected) {
     assert.match(mcpTools, new RegExp(`\\b${fn}\\s*\\(`), `expected ${fn}() call in tools/index.js`);
